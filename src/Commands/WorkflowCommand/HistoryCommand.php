@@ -21,6 +21,7 @@ class HistoryCommand extends BaseCommand
             ->addArgument('workflow-id', InputArgument::REQUIRED, 'Workflow ID')
             ->addArgument('run-id', InputArgument::REQUIRED, 'Run ID')
             ->addOption('follow', 'f', InputOption::VALUE_NONE, 'Follow new events (long-poll)')
+            ->addOption('page-size', null, InputOption::VALUE_REQUIRED, 'Number of events per page')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output as JSON');
     }
 
@@ -29,18 +30,39 @@ class HistoryCommand extends BaseCommand
         $workflowId = $input->getArgument('workflow-id');
         $runId = $input->getArgument('run-id');
         $follow = $input->getOption('follow');
+        $pageSize = $input->getOption('page-size');
 
-        $result = $this->client($input)->get("/workflows/{$workflowId}/runs/{$runId}/history", [
+        $query = [
             'wait_new_event' => $follow,
-        ]);
+        ];
+
+        if ($pageSize !== null) {
+            $query['page_size'] = (int) $pageSize;
+        }
+
+        $allEvents = [];
+        $nextPageToken = null;
+
+        do {
+            if ($nextPageToken !== null) {
+                $query['next_page_token'] = $nextPageToken;
+            }
+
+            $result = $this->client($input)->get("/workflows/{$workflowId}/runs/{$runId}/history", $query);
+
+            $events = $result['events'] ?? [];
+            $allEvents = array_merge($allEvents, $events);
+            $nextPageToken = $result['next_page_token'] ?? null;
+        } while ($nextPageToken !== null);
 
         if ($input->getOption('json')) {
+            $result['events'] = $allEvents;
+            unset($result['next_page_token']);
+
             return $this->renderJson($output, $result);
         }
 
-        $events = $result['events'] ?? [];
-
-        if (empty($events)) {
+        if (empty($allEvents)) {
             $output->writeln('<comment>No history events.</comment>');
 
             return Command::SUCCESS;
@@ -51,7 +73,7 @@ class HistoryCommand extends BaseCommand
             $e['event_type'] ?? '-',
             $e['timestamp'] ?? '-',
             json_encode($e['details'] ?? null, JSON_UNESCAPED_SLASHES),
-        ], $events);
+        ], $allEvents);
 
         $this->renderTable($output, ['#', 'Event Type', 'Time', 'Details'], $rows);
 

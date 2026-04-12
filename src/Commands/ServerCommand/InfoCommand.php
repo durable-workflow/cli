@@ -113,6 +113,14 @@ class InfoCommand extends BaseCommand
                     $enabled = $serverCapabilities['workflow_task_poll_request_idempotency'] === true ? 'yes' : 'no';
                     $output->writeln('  Workflow Task Poll Idempotency: '.$enabled);
                 }
+
+                if (array_key_exists('history_page_size_default', $serverCapabilities)) {
+                    $output->writeln('  History Page Size (default): '.($serverCapabilities['history_page_size_default'] ?? 'unknown'));
+                }
+
+                if (array_key_exists('history_page_size_max', $serverCapabilities)) {
+                    $output->writeln('  History Page Size (max): '.($serverCapabilities['history_page_size_max'] ?? 'unknown'));
+                }
             }
         }
 

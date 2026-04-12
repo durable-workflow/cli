@@ -1,0 +1,51 @@
+<?php
+
+declare(strict_types=1);
+
+namespace DurableWorkflow\Cli\Commands\WorkflowCommand;
+
+use DurableWorkflow\Cli\Commands\BaseCommand;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\InputArgument;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
+use Symfony\Component\Console\Output\OutputInterface;
+
+class SignalCommand extends BaseCommand
+{
+    protected function configure(): void
+    {
+        parent::configure();
+        $this->setName('workflow:signal')
+            ->setDescription('Send a signal to a running workflow')
+            ->addArgument('workflow-id', InputArgument::REQUIRED, 'Workflow ID')
+            ->addArgument('signal-name', InputArgument::REQUIRED, 'Signal name')
+            ->addOption('input', 'i', InputOption::VALUE_OPTIONAL, 'Signal input JSON');
+    }
+
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
+        $workflowId = $input->getArgument('workflow-id');
+        $signalName = $input->getArgument('signal-name');
+
+        $body = [];
+        if ($input->getOption('input')) {
+            $body['input'] = json_decode($input->getOption('input'), true);
+        }
+
+        $result = $this->client($input)->post("/workflows/{$workflowId}/signal/{$signalName}", $body);
+
+        $output->writeln('<info>Signal sent</info>');
+        $output->writeln('  Workflow ID: '.$result['workflow_id']);
+        $output->writeln('  Signal: '.$result['signal_name']);
+        $output->writeln('  Outcome: '.$result['outcome']);
+        if (isset($result['command_status'])) {
+            $output->writeln('  Command Status: '.$result['command_status']);
+        }
+        if (isset($result['command_id'])) {
+            $output->writeln('  Command ID: '.$result['command_id']);
+        }
+
+        return Command::SUCCESS;
+    }
+}

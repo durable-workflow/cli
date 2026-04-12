@@ -29,8 +29,12 @@ class InfoCommand extends BaseCommand
         $output->writeln('');
         $output->writeln('Capabilities:');
 
-        foreach ($result['capabilities'] ?? [] as $cap => $enabled) {
-            $status = $enabled ? '<info>yes</info>' : '<comment>no</comment>';
+        foreach ($result['capabilities'] ?? [] as $cap => $value) {
+            if (is_array($value)) {
+                $status = $value !== [] ? '<info>'.implode(', ', $value).'</info>' : '<comment>none</comment>';
+            } else {
+                $status = $value ? '<info>yes</info>' : '<comment>no</comment>';
+            }
             $output->writeln("  {$cap}: {$status}");
         }
 
@@ -120,6 +124,11 @@ class InfoCommand extends BaseCommand
 
                 if (array_key_exists('history_page_size_max', $serverCapabilities)) {
                     $output->writeln('  History Page Size (max): '.($serverCapabilities['history_page_size_max'] ?? 'unknown'));
+                }
+
+                $compression = $serverCapabilities['response_compression'] ?? null;
+                if (is_array($compression)) {
+                    $output->writeln('  Response Compression: '.($compression !== [] ? implode(', ', $compression) : 'disabled'));
                 }
             }
         }

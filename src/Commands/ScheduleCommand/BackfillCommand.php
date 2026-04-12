@@ -1,0 +1,41 @@
+<?php
+
+declare(strict_types=1);
+
+namespace DurableWorkflow\Cli\Commands\ScheduleCommand;
+
+use DurableWorkflow\Cli\Commands\BaseCommand;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\InputArgument;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
+use Symfony\Component\Console\Output\OutputInterface;
+
+class BackfillCommand extends BaseCommand
+{
+    protected function configure(): void
+    {
+        parent::configure();
+        $this->setName('schedule:backfill')
+            ->setDescription('Backfill missed schedule executions')
+            ->addArgument('schedule-id', InputArgument::REQUIRED, 'Schedule ID')
+            ->addOption('start-time', null, InputOption::VALUE_REQUIRED, 'Start time (ISO 8601)')
+            ->addOption('end-time', null, InputOption::VALUE_REQUIRED, 'End time (ISO 8601)')
+            ->addOption('overlap-policy', null, InputOption::VALUE_OPTIONAL, 'Override overlap policy');
+    }
+
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
+        $scheduleId = $input->getArgument('schedule-id');
+
+        $this->client($input)->post("/schedules/{$scheduleId}/backfill", array_filter([
+            'start_time' => $input->getOption('start-time'),
+            'end_time' => $input->getOption('end-time'),
+            'overlap_policy' => $input->getOption('overlap-policy'),
+        ], fn ($v) => $v !== null));
+
+        $output->writeln('<info>Backfill started for: '.$scheduleId.'</info>');
+
+        return Command::SUCCESS;
+    }
+}

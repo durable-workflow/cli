@@ -130,6 +130,16 @@ class InfoCommand extends BaseCommand
                 if (is_array($compression)) {
                     $output->writeln('  Response Compression: '.($compression !== [] ? implode(', ', $compression) : 'disabled'));
                 }
+
+                $historyCompression = $serverCapabilities['history_compression'] ?? null;
+                if (is_array($historyCompression)) {
+                    $encodings = $historyCompression['supported_encodings'] ?? [];
+                    $threshold = $historyCompression['compression_threshold'] ?? null;
+                    $output->writeln('  History Compression: '.(is_array($encodings) && $encodings !== [] ? implode(', ', $encodings) : 'disabled'));
+                    if ($threshold !== null) {
+                        $output->writeln('  History Compression Threshold: '.$threshold.' events');
+                    }
+                }
             }
         }
 

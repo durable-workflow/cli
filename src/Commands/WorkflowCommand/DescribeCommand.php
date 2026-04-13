@@ -106,6 +106,10 @@ class DescribeCommand extends BaseCommand
         $output->writeln('  Current Run: '.(($result['is_current_run'] ?? false) ? 'yes' : 'no'));
         $output->writeln('  Task Queue: '.($result['task_queue'] ?? '-'));
         $output->writeln('  Compatibility: '.($result['compatibility'] ?? '-'));
+        $output->writeln('  Execution Timeout: '.$this->formatTimeout($result['execution_timeout_seconds'] ?? null));
+        $output->writeln('  Run Timeout: '.$this->formatTimeout($result['run_timeout_seconds'] ?? null));
+        $output->writeln('  Execution Deadline: '.($result['execution_deadline_at'] ?? '-'));
+        $output->writeln('  Run Deadline: '.($result['run_deadline_at'] ?? '-'));
         $output->writeln('  Started: '.($result['started_at'] ?? '-'));
         $output->writeln('  Closed: '.($result['closed_at'] ?? '-'));
         $output->writeln('  Last Progress: '.($result['last_progress_at'] ?? '-'));
@@ -134,5 +138,14 @@ class DescribeCommand extends BaseCommand
         }
 
         return Command::SUCCESS;
+    }
+
+    private function formatTimeout(int|null $seconds): string
+    {
+        if ($seconds === null) {
+            return '-';
+        }
+
+        return "{$seconds}s";
     }
 }

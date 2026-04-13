@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DurableWorkflow\Cli\Commands\WorkflowCommand;
 
 use DurableWorkflow\Cli\Commands\BaseCommand;
+use DurableWorkflow\Cli\Support\DetectsTerminalStatus;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -12,15 +13,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 class StartCommand extends BaseCommand
 {
-    private const TERMINAL_BUCKETS = ['completed', 'failed'];
-
-    private const TERMINAL_STATUSES = [
-        'completed',
-        'failed',
-        'cancelled',
-        'terminated',
-        'timed_out',
-    ];
+    use DetectsTerminalStatus;
 
     private const WAIT_POLL_INTERVAL_SECONDS = 2;
 
@@ -105,20 +98,19 @@ class StartCommand extends BaseCommand
             sleep(self::WAIT_POLL_INTERVAL_SECONDS);
 
             $describe = $client->get("/workflows/{$workflowId}");
-            $status = $describe['status'] ?? null;
-            $statusBucket = $describe['status_bucket'] ?? null;
 
-            if (in_array($statusBucket, self::TERMINAL_BUCKETS, true)
-                || in_array($status, self::TERMINAL_STATUSES, true)) {
+            if ($this->isTerminal($describe)) {
                 $output->writeln('');
                 $output->writeln('<info>Workflow reached terminal state</info>');
-                $output->writeln('  Status: '.($status ?? '-'));
+                $output->writeln('  Status: '.($describe['status'] ?? '-'));
                 $output->writeln('  Closed Reason: '.($describe['closed_reason'] ?? '-'));
                 $output->writeln('  Closed At: '.($describe['closed_at'] ?? '-'));
 
                 if (isset($describe['output'])) {
                     $output->writeln('  Output: '.json_encode($describe['output'], JSON_UNESCAPED_SLASHES));
                 }
+
+                $statusBucket = $describe['status_bucket'] ?? null;
 
                 return $statusBucket === 'completed' ? Command::SUCCESS : Command::FAILURE;
             }

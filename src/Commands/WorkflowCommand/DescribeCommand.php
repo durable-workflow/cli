@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DurableWorkflow\Cli\Commands\WorkflowCommand;
 
 use DurableWorkflow\Cli\Commands\BaseCommand;
+use DurableWorkflow\Cli\Support\DetectsTerminalStatus;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -13,15 +14,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 class DescribeCommand extends BaseCommand
 {
-    private const TERMINAL_BUCKETS = ['completed', 'failed'];
-
-    private const TERMINAL_STATUSES = [
-        'completed',
-        'failed',
-        'cancelled',
-        'terminated',
-        'timed_out',
-    ];
+    use DetectsTerminalStatus;
 
     private const FOLLOW_POLL_INTERVAL_SECONDS = 2;
 
@@ -89,18 +82,6 @@ class DescribeCommand extends BaseCommand
         return $runId
             ? $this->client($input)->get("/workflows/{$workflowId}/runs/{$runId}")
             : $this->client($input)->get("/workflows/{$workflowId}");
-    }
-
-    /**
-     * @param  array<string, mixed>  $result
-     */
-    private function isTerminal(array $result): bool
-    {
-        $statusBucket = $result['status_bucket'] ?? null;
-        $status = $result['status'] ?? null;
-
-        return in_array($statusBucket, self::TERMINAL_BUCKETS, true)
-            || in_array($status, self::TERMINAL_STATUSES, true);
     }
 
     /**

@@ -13,6 +13,18 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 class DescribeCommand extends BaseCommand
 {
+    private const TERMINAL_BUCKETS = ['completed', 'failed'];
+
+    private const TERMINAL_STATUSES = [
+        'completed',
+        'failed',
+        'cancelled',
+        'terminated',
+        'timed_out',
+    ];
+
+    private const FOLLOW_POLL_INTERVAL_SECONDS = 2;
+
     protected function configure(): void
     {
         parent::configure();
@@ -20,6 +32,7 @@ class DescribeCommand extends BaseCommand
             ->setDescription('Show detailed information about a workflow execution')
             ->addArgument('workflow-id', InputArgument::REQUIRED, 'Workflow ID')
             ->addOption('run-id', 'r', InputOption::VALUE_OPTIONAL, 'Specific run ID')
+            ->addOption('follow', 'f', InputOption::VALUE_NONE, 'Poll until the workflow reaches a terminal state')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output as JSON');
     }
 
@@ -27,11 +40,74 @@ class DescribeCommand extends BaseCommand
     {
         $workflowId = $input->getArgument('workflow-id');
         $runId = $input->getOption('run-id');
+        $follow = $input->getOption('follow');
 
-        $result = $runId
+        $result = $this->fetchWorkflow($input, $workflowId, $runId);
+
+        if ($follow && ! $this->isTerminal($result)) {
+            return $this->followUntilTerminal($input, $output, $workflowId, $runId, $result);
+        }
+
+        return $this->renderResult($input, $output, $result);
+    }
+
+    /**
+     * @param  array<string, mixed>  $result
+     */
+    private function followUntilTerminal(
+        InputInterface $input,
+        OutputInterface $output,
+        string $workflowId,
+        ?string $runId,
+        array $result,
+    ): int {
+        $lastStatus = $result['status'] ?? null;
+        $output->writeln('<comment>Following workflow (status: '.($lastStatus ?? 'unknown').')...</comment>');
+
+        while (! $this->isTerminal($result)) {
+            sleep(self::FOLLOW_POLL_INTERVAL_SECONDS);
+
+            $result = $this->fetchWorkflow($input, $workflowId, $runId);
+            $currentStatus = $result['status'] ?? null;
+
+            if ($currentStatus !== $lastStatus) {
+                $output->writeln('  Status changed: '.($lastStatus ?? '-').' -> '.($currentStatus ?? '-'));
+                $lastStatus = $currentStatus;
+            }
+        }
+
+        $output->writeln('');
+
+        return $this->renderResult($input, $output, $result);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function fetchWorkflow(InputInterface $input, string $workflowId, ?string $runId): array
+    {
+        return $runId
             ? $this->client($input)->get("/workflows/{$workflowId}/runs/{$runId}")
             : $this->client($input)->get("/workflows/{$workflowId}");
+    }
 
+    /**
+     * @param  array<string, mixed>  $result
+     */
+    private function isTerminal(array $result): bool
+    {
+        $statusBucket = $result['status_bucket'] ?? null;
+        $status = $result['status'] ?? null;
+
+        return in_array($statusBucket, self::TERMINAL_BUCKETS, true)
+            || in_array($status, self::TERMINAL_STATUSES, true);
+    }
+
+    /**
+     * @param  array<string, mixed>  $result
+     */
+    private function renderResult(InputInterface $input, OutputInterface $output, array $result): int
+    {
         if ($input->getOption('json')) {
             return $this->renderJson($output, $result);
         }

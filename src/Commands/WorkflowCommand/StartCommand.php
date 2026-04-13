@@ -12,6 +12,18 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 class StartCommand extends BaseCommand
 {
+    private const TERMINAL_BUCKETS = ['completed', 'failed'];
+
+    private const TERMINAL_STATUSES = [
+        'completed',
+        'failed',
+        'cancelled',
+        'terminated',
+        'timed_out',
+    ];
+
+    private const WAIT_POLL_INTERVAL_SECONDS = 2;
+
     protected function configure(): void
     {
         parent::configure();
@@ -24,7 +36,8 @@ class StartCommand extends BaseCommand
             ->addOption('duplicate-policy', null, InputOption::VALUE_OPTIONAL, 'Duplicate policy (discover canonical values with server:info)')
             ->addOption('input', 'i', InputOption::VALUE_OPTIONAL, 'Input JSON')
             ->addOption('memo', null, InputOption::VALUE_OPTIONAL, 'Memo JSON')
-            ->addOption('search-attr', null, InputOption::VALUE_OPTIONAL | InputOption::VALUE_IS_ARRAY, 'Search attributes (key=value)');
+            ->addOption('search-attr', null, InputOption::VALUE_OPTIONAL | InputOption::VALUE_IS_ARRAY, 'Search attributes (key=value)')
+            ->addOption('wait', null, InputOption::VALUE_NONE, 'Wait for the workflow to reach a terminal state');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -73,7 +86,45 @@ class StartCommand extends BaseCommand
         }
         $output->writeln('  Outcome: '.$result['outcome']);
 
+        if ($input->getOption('wait')) {
+            return $this->waitForCompletion($client, $output, $result['workflow_id']);
+        }
+
         return Command::SUCCESS;
+    }
+
+    private function waitForCompletion(
+        \DurableWorkflow\Cli\Support\ServerClient $client,
+        OutputInterface $output,
+        string $workflowId,
+    ): int {
+        $output->writeln('');
+        $output->writeln('<comment>Waiting for workflow to complete...</comment>');
+
+        while (true) {
+            sleep(self::WAIT_POLL_INTERVAL_SECONDS);
+
+            $describe = $client->get("/workflows/{$workflowId}");
+            $status = $describe['status'] ?? null;
+            $statusBucket = $describe['status_bucket'] ?? null;
+
+            if (in_array($statusBucket, self::TERMINAL_BUCKETS, true)
+                || in_array($status, self::TERMINAL_STATUSES, true)) {
+                $output->writeln('');
+                $output->writeln('<info>Workflow reached terminal state</info>');
+                $output->writeln('  Status: '.($status ?? '-'));
+                $output->writeln('  Closed Reason: '.($describe['closed_reason'] ?? '-'));
+                $output->writeln('  Closed At: '.($describe['closed_at'] ?? '-'));
+
+                if (isset($describe['output'])) {
+                    $output->writeln('  Output: '.json_encode($describe['output'], JSON_UNESCAPED_SLASHES));
+                }
+
+                return $statusBucket === 'completed' ? Command::SUCCESS : Command::FAILURE;
+            }
+
+            $output->write('.');
+        }
     }
 
     private function optionalString(mixed $value): ?string

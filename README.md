@@ -69,6 +69,7 @@ durable-workflow server:start-dev --port=9090 --db=sqlite
 # Start a workflow
 durable-workflow workflow:start --type=order.process --input='{"order_id":123}'
 durable-workflow workflow:start --type=order.process --workflow-id=order-123
+durable-workflow workflow:start --type=order.process --execution-timeout=3600 --run-timeout=600
 
 # List workflows
 durable-workflow workflow:list

@@ -156,13 +156,57 @@ class WorkflowReadCommandTest extends TestCase
         );
     }
 
-    public function test_start_command_definition_only_exposes_supported_v2_start_options(): void
+    public function test_start_command_definition_exposes_all_supported_v2_start_options(): void
     {
         $command = new StartCommand();
 
-        self::assertFalse($command->getDefinition()->hasOption('execution-timeout'));
-        self::assertFalse($command->getDefinition()->hasOption('run-timeout'));
+        self::assertTrue($command->getDefinition()->hasOption('execution-timeout'));
+        self::assertTrue($command->getDefinition()->hasOption('run-timeout'));
         self::assertTrue($command->getDefinition()->hasOption('duplicate-policy'));
+    }
+
+    public function test_start_command_sends_execution_and_run_timeout_seconds_when_provided(): void
+    {
+        $client = new WorkflowReadFakeServerClient([
+            'workflow_id' => 'wf-timeout-1',
+            'run_id' => 'run-timeout-1',
+            'outcome' => 'started_new',
+        ]);
+
+        $command = new StartCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            '--type' => 'orders.process',
+            '--execution-timeout' => '300',
+            '--run-timeout' => '120',
+        ]));
+
+        self::assertSame(300, $client->lastPostBody['execution_timeout_seconds'] ?? null);
+        self::assertSame(120, $client->lastPostBody['run_timeout_seconds'] ?? null);
+    }
+
+    public function test_start_command_omits_timeout_fields_when_not_provided(): void
+    {
+        $client = new WorkflowReadFakeServerClient([
+            'workflow_id' => 'wf-no-timeout',
+            'run_id' => 'run-no-timeout',
+            'outcome' => 'started_new',
+        ]);
+
+        $command = new StartCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            '--type' => 'orders.process',
+        ]));
+
+        self::assertArrayNotHasKey('execution_timeout_seconds', $client->lastPostBody);
+        self::assertArrayNotHasKey('run_timeout_seconds', $client->lastPostBody);
     }
 
     public function test_list_command_renders_business_keys_in_the_table(): void

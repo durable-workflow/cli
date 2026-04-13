@@ -30,6 +30,8 @@ class StartCommand extends BaseCommand
             ->addOption('input', 'i', InputOption::VALUE_OPTIONAL, 'Input JSON')
             ->addOption('memo', null, InputOption::VALUE_OPTIONAL, 'Memo JSON')
             ->addOption('search-attr', null, InputOption::VALUE_OPTIONAL | InputOption::VALUE_IS_ARRAY, 'Search attributes (key=value)')
+            ->addOption('execution-timeout', null, InputOption::VALUE_REQUIRED, 'Execution timeout in seconds (across all runs)')
+            ->addOption('run-timeout', null, InputOption::VALUE_REQUIRED, 'Run timeout in seconds (single run)')
             ->addOption('wait', null, InputOption::VALUE_NONE, 'Wait for the workflow to reach a terminal state');
     }
 
@@ -49,6 +51,9 @@ class StartCommand extends BaseCommand
             return Command::INVALID;
         }
 
+        $executionTimeout = $input->getOption('execution-timeout');
+        $runTimeout = $input->getOption('run-timeout');
+
         $body = array_filter([
             'workflow_type' => $input->getOption('type'),
             'workflow_id' => $input->getOption('workflow-id'),
@@ -57,6 +62,8 @@ class StartCommand extends BaseCommand
             'duplicate_policy' => $duplicatePolicy,
             'input' => $input->getOption('input') ? json_decode($input->getOption('input'), true) : null,
             'memo' => $input->getOption('memo') ? json_decode($input->getOption('memo'), true) : null,
+            'execution_timeout_seconds' => $executionTimeout !== null ? (int) $executionTimeout : null,
+            'run_timeout_seconds' => $runTimeout !== null ? (int) $runTimeout : null,
         ], fn ($v) => $v !== null);
 
         $searchAttrs = $input->getOption('search-attr');

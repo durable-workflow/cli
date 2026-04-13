@@ -35,6 +35,8 @@ class Application extends ConsoleApplication
             new WorkflowCommand\UpdateCommand(),
             new WorkflowCommand\CancelCommand(),
             new WorkflowCommand\TerminateCommand(),
+            new WorkflowCommand\RepairCommand(),
+            new WorkflowCommand\ArchiveCommand(),
             new WorkflowCommand\HistoryCommand(),
             new WorkflowCommand\HistoryExportCommand(),
 

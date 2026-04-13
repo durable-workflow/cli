@@ -26,12 +26,43 @@ class TriggerCommand extends BaseCommand
     {
         $scheduleId = $input->getArgument('schedule-id');
 
-        $this->client($input)->post("/schedules/{$scheduleId}/trigger", array_filter([
+        $result = $this->client($input)->post("/schedules/{$scheduleId}/trigger", array_filter([
             'overlap_policy' => $input->getOption('overlap-policy'),
         ], fn ($v) => $v !== null));
 
-        $output->writeln('<info>Schedule triggered: '.$scheduleId.'</info>');
+        $outcome = $result['outcome'] ?? 'unknown';
 
-        return Command::SUCCESS;
+        match ($outcome) {
+            'triggered' => $output->writeln(sprintf(
+                '<info>Schedule triggered:</info> %s → %s',
+                $scheduleId,
+                $result['workflow_id'] ?? '(unknown)',
+            )),
+            'buffered' => $output->writeln(sprintf(
+                '<comment>Schedule buffered:</comment> %s (buffer depth: %d)',
+                $scheduleId,
+                $result['buffer_depth'] ?? 0,
+            )),
+            'buffer_full' => $output->writeln(sprintf(
+                '<comment>Buffer full:</comment> %s — %s',
+                $scheduleId,
+                $result['reason'] ?? 'previous workflow still running',
+            )),
+            'trigger_failed' => $output->writeln(sprintf(
+                '<error>Trigger failed:</error> %s — %s',
+                $scheduleId,
+                $result['reason'] ?? 'unknown error',
+            )),
+            default => $output->writeln(sprintf(
+                '<info>Schedule trigger outcome:</info> %s (%s)',
+                $scheduleId,
+                $outcome,
+            )),
+        };
+
+        return match ($outcome) {
+            'triggered', 'buffered', 'buffer_full' => Command::SUCCESS,
+            default => Command::FAILURE,
+        };
     }
 }

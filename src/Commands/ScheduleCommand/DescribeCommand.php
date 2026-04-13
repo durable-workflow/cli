@@ -35,6 +35,14 @@ class DescribeCommand extends BaseCommand
         $output->writeln('  Spec: '.json_encode($result['spec'] ?? null, JSON_UNESCAPED_SLASHES));
         $output->writeln('  Action: '.json_encode($result['action'] ?? null, JSON_UNESCAPED_SLASHES));
         $output->writeln('  State: '.json_encode($result['state'] ?? null, JSON_UNESCAPED_SLASHES));
+        $output->writeln('  Overlap Policy: '.($result['overlap_policy'] ?? 'skip'));
+
+        $info = $result['info'] ?? [];
+        $bufferedActions = $info['buffered_actions'] ?? [];
+
+        if (!empty($bufferedActions)) {
+            $output->writeln(sprintf('  Buffered Actions: %d pending', count($bufferedActions)));
+        }
 
         return Command::SUCCESS;
     }

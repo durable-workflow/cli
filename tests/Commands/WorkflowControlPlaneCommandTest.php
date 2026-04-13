@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Commands;
 
+use DurableWorkflow\Cli\Commands\WorkflowCommand\ArchiveCommand;
 use DurableWorkflow\Cli\Commands\WorkflowCommand\CancelCommand;
+use DurableWorkflow\Cli\Commands\WorkflowCommand\RepairCommand;
 use DurableWorkflow\Cli\Commands\WorkflowCommand\SignalCommand;
 use DurableWorkflow\Cli\Commands\WorkflowCommand\TerminateCommand;
 use DurableWorkflow\Cli\Commands\WorkflowCommand\UpdateCommand;
@@ -186,6 +188,84 @@ class WorkflowControlPlaneCommandTest extends TestCase
         ]));
 
         self::assertSame('/workflows/wf-123/runs/run-456/terminate', $client->lastPostPath);
+    }
+
+    public function test_repair_command_sends_post_and_renders_outcome(): void
+    {
+        $client = new FakeServerClient([
+            'workflow_id' => 'wf-repair-1',
+            'outcome' => 'repair_requested',
+            'command_status' => 'accepted',
+            'command_id' => 'cmd-repair-1',
+        ]);
+
+        $command = new RepairCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            'workflow-id' => 'wf-repair-1',
+        ]));
+
+        self::assertSame('/workflows/wf-repair-1/repair', $client->lastPostPath);
+
+        $display = $tester->getDisplay();
+
+        self::assertStringContainsString('Repair requested', $display);
+        self::assertStringContainsString('Workflow ID: wf-repair-1', $display);
+        self::assertStringContainsString('Outcome: repair_requested', $display);
+        self::assertStringContainsString('Command Status: accepted', $display);
+        self::assertStringContainsString('Command ID: cmd-repair-1', $display);
+    }
+
+    public function test_archive_command_sends_reason_and_renders_outcome(): void
+    {
+        $client = new FakeServerClient([
+            'workflow_id' => 'wf-archive-1',
+            'outcome' => 'archived',
+            'command_status' => 'accepted',
+            'command_id' => 'cmd-archive-1',
+        ]);
+
+        $command = new ArchiveCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            'workflow-id' => 'wf-archive-1',
+            '--reason' => 'retention policy cleanup',
+        ]));
+
+        self::assertSame('/workflows/wf-archive-1/archive', $client->lastPostPath);
+        self::assertSame(['reason' => 'retention policy cleanup'], $client->lastPostBody);
+
+        $display = $tester->getDisplay();
+
+        self::assertStringContainsString('Archive requested', $display);
+        self::assertStringContainsString('Workflow ID: wf-archive-1', $display);
+        self::assertStringContainsString('Outcome: archived', $display);
+    }
+
+    public function test_archive_command_omits_reason_when_not_provided(): void
+    {
+        $client = new FakeServerClient([
+            'workflow_id' => 'wf-archive-2',
+            'outcome' => 'archived',
+            'command_status' => 'accepted',
+        ]);
+
+        $command = new ArchiveCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            'workflow-id' => 'wf-archive-2',
+        ]));
+
+        self::assertSame([], $client->lastPostBody);
     }
 
     private static function requestContract(): ControlPlaneRequestContract

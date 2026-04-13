@@ -10,7 +10,7 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
 
 class ServerClient
 {
-    public const WORKER_PROTOCOL_VERSION = '1';
+    public const WORKER_PROTOCOL_VERSION = '1.0';
 
     public const CONTROL_PLANE_VERSION = '2';
 

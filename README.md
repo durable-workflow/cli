@@ -162,6 +162,25 @@ durable-workflow activity:complete TASK_ID --result='{"status":"done"}'
 durable-workflow activity:fail TASK_ID --message="External service unavailable" --non-retryable
 ```
 
+### System Operations
+
+```bash
+# Show task repair diagnostics
+durable-workflow system:repair-status
+
+# Run a task repair sweep
+durable-workflow system:repair-pass
+
+# Show expired activity timeout diagnostics
+durable-workflow system:activity-timeout-status
+
+# Run activity timeout enforcement sweep
+durable-workflow system:activity-timeout-pass
+
+# Target specific execution IDs
+durable-workflow system:activity-timeout-pass --execution-id=EXEC_ID_1 --execution-id=EXEC_ID_2
+```
+
 ## Global Options
 
 | Option | Description |

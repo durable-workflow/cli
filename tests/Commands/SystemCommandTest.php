@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Commands;
 
+use DurableWorkflow\Cli\Commands\SystemCommand\ActivityTimeoutPassCommand;
+use DurableWorkflow\Cli\Commands\SystemCommand\ActivityTimeoutStatusCommand;
 use DurableWorkflow\Cli\Commands\SystemCommand\RepairPassCommand;
 use DurableWorkflow\Cli\Commands\SystemCommand\RepairStatusCommand;
 use DurableWorkflow\Cli\Support\ServerClient;
@@ -184,6 +186,149 @@ class SystemCommandTest extends TestCase
         self::assertSame(Command::FAILURE, $tester->execute([]));
 
         self::assertStringContainsString('Dispatch failed', $tester->getDisplay());
+    }
+    // ── Activity Timeout Status ──────────────────────────────────────
+
+    public function test_activity_timeout_status_renders_diagnostics(): void
+    {
+        $command = new ActivityTimeoutStatusCommand();
+        $command->setServerClient(new SystemFakeClient([
+            'expired_count' => 3,
+            'expired_execution_ids' => ['exec-1', 'exec-2', 'exec-3'],
+            'scan_limit' => 100,
+            'scan_pressure' => false,
+        ]));
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+
+        $display = $tester->getDisplay();
+
+        self::assertStringContainsString('3', $display);
+        self::assertStringContainsString('exec-1', $display);
+        self::assertStringContainsString('exec-2', $display);
+        self::assertStringContainsString('100', $display);
+    }
+
+    public function test_activity_timeout_status_renders_json_output(): void
+    {
+        $payload = [
+            'expired_count' => 0,
+            'expired_execution_ids' => [],
+            'scan_limit' => 100,
+            'scan_pressure' => false,
+        ];
+
+        $command = new ActivityTimeoutStatusCommand();
+        $command->setServerClient(new SystemFakeClient($payload));
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute(['--json' => true]));
+
+        $decoded = json_decode($tester->getDisplay(), true);
+
+        self::assertIsArray($decoded);
+        self::assertSame(0, $decoded['expired_count']);
+    }
+
+    // ── Activity Timeout Pass ──────────────────────────────────────
+
+    public function test_activity_timeout_pass_renders_results(): void
+    {
+        $command = new ActivityTimeoutPassCommand();
+        $command->setServerClient(new SystemFakeClient([
+            'processed' => 2,
+            'enforced' => 1,
+            'skipped' => 1,
+            'failed' => 0,
+            'results' => [
+                ['execution_id' => 'exec-1', 'outcome' => 'enforced', 'has_retry' => true],
+                ['execution_id' => 'exec-2', 'outcome' => 'skipped', 'reason' => 'no_deadline_expired'],
+            ],
+        ]));
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+
+        $display = $tester->getDisplay();
+
+        self::assertStringContainsString('Processed:  2', $display);
+        self::assertStringContainsString('Enforced:   1', $display);
+        self::assertStringContainsString('Skipped:    1', $display);
+    }
+
+    public function test_activity_timeout_pass_sends_execution_ids(): void
+    {
+        $client = new SystemFakeClient([
+            'processed' => 1,
+            'enforced' => 0,
+            'skipped' => 1,
+            'failed' => 0,
+            'results' => [],
+        ]);
+
+        $command = new ActivityTimeoutPassCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            '--execution-id' => ['exec-1', 'exec-2'],
+            '--limit' => '50',
+        ]));
+
+        self::assertSame('/system/activity-timeouts/pass', $client->lastPostPath);
+        self::assertContains('exec-1', $client->lastPostBody['execution_ids'] ?? []);
+        self::assertContains('exec-2', $client->lastPostBody['execution_ids'] ?? []);
+        self::assertSame(50, $client->lastPostBody['limit'] ?? null);
+    }
+
+    public function test_activity_timeout_pass_returns_failure_on_errors(): void
+    {
+        $command = new ActivityTimeoutPassCommand();
+        $command->setServerClient(new SystemFakeClient([
+            'processed' => 1,
+            'enforced' => 0,
+            'skipped' => 0,
+            'failed' => 1,
+            'results' => [
+                ['execution_id' => 'exec-1', 'outcome' => 'error', 'reason' => 'Something went wrong'],
+            ],
+        ]));
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::FAILURE, $tester->execute([]));
+
+        self::assertStringContainsString('Something went wrong', $tester->getDisplay());
+    }
+
+    public function test_activity_timeout_pass_renders_json_output(): void
+    {
+        $payload = [
+            'processed' => 1,
+            'enforced' => 1,
+            'skipped' => 0,
+            'failed' => 0,
+            'results' => [
+                ['execution_id' => 'exec-1', 'outcome' => 'enforced', 'has_retry' => false],
+            ],
+        ];
+
+        $command = new ActivityTimeoutPassCommand();
+        $command->setServerClient(new SystemFakeClient($payload));
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute(['--json' => true]));
+
+        $decoded = json_decode($tester->getDisplay(), true);
+
+        self::assertIsArray($decoded);
+        self::assertSame(1, $decoded['enforced']);
     }
 }
 

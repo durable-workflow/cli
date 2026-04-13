@@ -36,6 +36,7 @@ class Application extends ConsoleApplication
             new WorkflowCommand\CancelCommand(),
             new WorkflowCommand\TerminateCommand(),
             new WorkflowCommand\HistoryCommand(),
+            new WorkflowCommand\HistoryExportCommand(),
 
             // Namespace management
             new NamespaceCommand\ListCommand(),
@@ -55,6 +56,7 @@ class Application extends ConsoleApplication
             new ScheduleCommand\PauseCommand(),
             new ScheduleCommand\ResumeCommand(),
             new ScheduleCommand\TriggerCommand(),
+            new ScheduleCommand\UpdateCommand(),
             new ScheduleCommand\BackfillCommand(),
 
             // Task queue inspection

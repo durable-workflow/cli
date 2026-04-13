@@ -12,6 +12,7 @@ use DurableWorkflow\Cli\Commands\ScheduleCommand\ListCommand;
 use DurableWorkflow\Cli\Commands\ScheduleCommand\PauseCommand;
 use DurableWorkflow\Cli\Commands\ScheduleCommand\ResumeCommand;
 use DurableWorkflow\Cli\Commands\ScheduleCommand\TriggerCommand;
+use DurableWorkflow\Cli\Commands\ScheduleCommand\UpdateCommand;
 use DurableWorkflow\Cli\Support\ServerClient;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
@@ -317,6 +318,90 @@ class ScheduleCommandTest extends TestCase
         self::assertSame('2026-04-10T00:00:00Z', $client->lastPostBody['end_time']);
         self::assertStringContainsString('daily-report', $tester->getDisplay());
     }
+
+    public function test_update_command_sends_cron_spec(): void
+    {
+        $client = new ScheduleFakeClient([
+            'schedule_id' => 'daily-report',
+            'outcome' => 'updated',
+        ]);
+
+        $command = new UpdateCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            'schedule-id' => 'daily-report',
+            '--cron' => '0 6 * * *',
+        ]));
+
+        self::assertSame('/schedules/daily-report', $client->lastPutPath);
+        self::assertSame(['cron_expressions' => ['0 6 * * *']], $client->lastPutBody['spec']);
+        self::assertStringContainsString('daily-report', $tester->getDisplay());
+    }
+
+    public function test_update_command_sends_overlap_policy_and_note(): void
+    {
+        $client = new ScheduleFakeClient([
+            'schedule_id' => 'daily-report',
+            'outcome' => 'updated',
+        ]);
+
+        $command = new UpdateCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            'schedule-id' => 'daily-report',
+            '--overlap-policy' => 'allow_all',
+            '--note' => 'Relaxing overlap',
+        ]));
+
+        self::assertSame('allow_all', $client->lastPutBody['overlap_policy']);
+        self::assertSame('Relaxing overlap', $client->lastPutBody['note']);
+        self::assertArrayNotHasKey('spec', $client->lastPutBody);
+        self::assertArrayNotHasKey('action', $client->lastPutBody);
+    }
+
+    public function test_update_command_sends_action_fields(): void
+    {
+        $client = new ScheduleFakeClient([
+            'schedule_id' => 'daily-report',
+            'outcome' => 'updated',
+        ]);
+
+        $command = new UpdateCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            'schedule-id' => 'daily-report',
+            '--workflow-type' => 'reports.weekly',
+            '--task-queue' => 'reports-v2',
+        ]));
+
+        self::assertSame('reports.weekly', $client->lastPutBody['action']['workflow_type']);
+        self::assertSame('reports-v2', $client->lastPutBody['action']['task_queue']);
+    }
+
+    public function test_update_command_fails_without_any_fields(): void
+    {
+        $client = new ScheduleFakeClient([]);
+
+        $command = new UpdateCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::FAILURE, $tester->execute([
+            'schedule-id' => 'daily-report',
+        ]));
+
+        self::assertNull($client->lastPutPath);
+    }
 }
 
 class ScheduleFakeClient extends ServerClient
@@ -327,6 +412,11 @@ class ScheduleFakeClient extends ServerClient
     public string $lastPostPath = '';
 
     public string $lastDeletePath = '';
+
+    /** @var array<string, mixed> */
+    public array $lastPutBody = [];
+
+    public ?string $lastPutPath = null;
 
     public int $postCalls = 0;
 
@@ -345,6 +435,14 @@ class ScheduleFakeClient extends ServerClient
         $this->postCalls++;
         $this->lastPostPath = $path;
         $this->lastPostBody = $body;
+
+        return $this->payload;
+    }
+
+    public function put(string $path, array $body = []): array
+    {
+        $this->lastPutPath = $path;
+        $this->lastPutBody = $body;
 
         return $this->payload;
     }

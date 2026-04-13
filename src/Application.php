@@ -7,6 +7,7 @@ namespace DurableWorkflow\Cli;
 use DurableWorkflow\Cli\Commands\ActivityCommand;
 use DurableWorkflow\Cli\Commands\NamespaceCommand;
 use DurableWorkflow\Cli\Commands\ScheduleCommand;
+use DurableWorkflow\Cli\Commands\SearchAttributeCommand;
 use DurableWorkflow\Cli\Commands\ServerCommand;
 use DurableWorkflow\Cli\Commands\TaskQueueCommand;
 use DurableWorkflow\Cli\Commands\WorkflowCommand;
@@ -58,6 +59,11 @@ class Application extends ConsoleApplication
             // Task queue inspection
             new TaskQueueCommand\ListCommand(),
             new TaskQueueCommand\DescribeCommand(),
+
+            // Search attribute management
+            new SearchAttributeCommand\ListCommand(),
+            new SearchAttributeCommand\CreateCommand(),
+            new SearchAttributeCommand\DeleteCommand(),
         ]);
     }
 }

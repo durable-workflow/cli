@@ -1,0 +1,45 @@
+<?php
+
+declare(strict_types=1);
+
+namespace DurableWorkflow\Cli\Commands\SearchAttributeCommand;
+
+use DurableWorkflow\Cli\Commands\BaseCommand;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\OutputInterface;
+
+class ListCommand extends BaseCommand
+{
+    protected function configure(): void
+    {
+        parent::configure();
+        $this->setName('search-attribute:list')
+            ->setDescription('List search attribute definitions');
+    }
+
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
+        $result = $this->client($input)->get('/search-attributes');
+
+        $rows = [];
+
+        foreach ($result['system_attributes'] ?? [] as $name => $type) {
+            $rows[] = [$name, $type, 'system'];
+        }
+
+        foreach ($result['custom_attributes'] ?? [] as $name => $type) {
+            $rows[] = [$name, $type, 'custom'];
+        }
+
+        if (empty($rows)) {
+            $output->writeln('<comment>No search attributes found.</comment>');
+
+            return Command::SUCCESS;
+        }
+
+        $this->renderTable($output, ['Name', 'Type', 'Source'], $rows);
+
+        return Command::SUCCESS;
+    }
+}

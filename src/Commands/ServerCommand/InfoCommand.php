@@ -58,6 +58,23 @@ class InfoCommand extends BaseCommand
             }
         }
 
+        $limits = $result['limits'] ?? null;
+
+        if (is_array($limits) && $limits !== []) {
+            $output->writeln('');
+            $output->writeln('Limits:');
+
+            foreach ($limits as $limitName => $limitValue) {
+                $label = str_replace('_', ' ', ucfirst((string) $limitName));
+
+                if (is_int($limitValue) && $limitValue >= 1024 && str_contains((string) $limitName, 'bytes')) {
+                    $output->writeln(sprintf('  %s: %s (%s)', $label, number_format($limitValue), $this->formatBytes($limitValue)));
+                } else {
+                    $output->writeln(sprintf('  %s: %s', $label, number_format((int) $limitValue)));
+                }
+            }
+        }
+
         $controlPlane = $result['control_plane'] ?? null;
 
         if (is_array($controlPlane) && $controlPlane !== []) {
@@ -144,6 +161,19 @@ class InfoCommand extends BaseCommand
         }
 
         return self::SUCCESS;
+    }
+
+    private function formatBytes(int $bytes): string
+    {
+        if ($bytes >= 1024 * 1024) {
+            return sprintf('%.0f MB', $bytes / (1024 * 1024));
+        }
+
+        if ($bytes >= 1024) {
+            return sprintf('%.0f KB', $bytes / 1024);
+        }
+
+        return sprintf('%d B', $bytes);
     }
 
     private function renderRequestContract(

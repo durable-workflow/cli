@@ -9,6 +9,7 @@ use DurableWorkflow\Cli\Commands\NamespaceCommand;
 use DurableWorkflow\Cli\Commands\ScheduleCommand;
 use DurableWorkflow\Cli\Commands\SearchAttributeCommand;
 use DurableWorkflow\Cli\Commands\ServerCommand;
+use DurableWorkflow\Cli\Commands\SystemCommand;
 use DurableWorkflow\Cli\Commands\TaskQueueCommand;
 use DurableWorkflow\Cli\Commands\WorkflowCommand;
 use Symfony\Component\Console\Application as ConsoleApplication;
@@ -64,6 +65,10 @@ class Application extends ConsoleApplication
             new SearchAttributeCommand\ListCommand(),
             new SearchAttributeCommand\CreateCommand(),
             new SearchAttributeCommand\DeleteCommand(),
+
+            // System operations
+            new SystemCommand\RepairStatusCommand(),
+            new SystemCommand\RepairPassCommand(),
         ]);
     }
 }

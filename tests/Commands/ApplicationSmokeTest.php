@@ -20,6 +20,8 @@ class ApplicationSmokeTest extends TestCase
         foreach ([
             'workflow:start',
             'workflow:list',
+            'workflow:list-runs',
+            'workflow:show-run',
             'schedule:create',
         ] as $command) {
             self::assertSame(0, $tester->run([

@@ -19,7 +19,8 @@ class CreateCommand extends BaseCommand
             ->setDescription('Create a new schedule')
             ->addOption('schedule-id', null, InputOption::VALUE_OPTIONAL, 'Schedule ID')
             ->addOption('workflow-type', 't', InputOption::VALUE_REQUIRED, 'Workflow type to execute')
-            ->addOption('cron', 'c', InputOption::VALUE_REQUIRED, 'Cron expression')
+            ->addOption('cron', 'c', InputOption::VALUE_OPTIONAL, 'Cron expression')
+            ->addOption('interval', null, InputOption::VALUE_OPTIONAL, 'Interval as ISO 8601 duration (e.g. PT30M, PT1H)')
             ->addOption('task-queue', null, InputOption::VALUE_OPTIONAL, 'Task queue')
             ->addOption('input', 'i', InputOption::VALUE_OPTIONAL, 'Workflow input JSON')
             ->addOption('timezone', null, InputOption::VALUE_OPTIONAL, 'Timezone', 'UTC')
@@ -30,12 +31,24 @@ class CreateCommand extends BaseCommand
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        $cron = $input->getOption('cron');
+        $interval = $input->getOption('interval');
+
+        if ($cron === null && $interval === null) {
+            $output->writeln('<error>Either --cron or --interval is required.</error>');
+
+            return Command::FAILURE;
+        }
+
+        $spec = array_filter([
+            'cron_expressions' => $cron !== null ? [$cron] : null,
+            'intervals' => $interval !== null ? [['every' => $interval]] : null,
+            'timezone' => $input->getOption('timezone'),
+        ], fn ($v) => $v !== null);
+
         $body = [
             'schedule_id' => $input->getOption('schedule-id'),
-            'spec' => [
-                'cron_expressions' => [$input->getOption('cron')],
-                'timezone' => $input->getOption('timezone'),
-            ],
+            'spec' => $spec,
             'action' => array_filter([
                 'workflow_type' => $input->getOption('workflow-type'),
                 'task_queue' => $input->getOption('task-queue'),

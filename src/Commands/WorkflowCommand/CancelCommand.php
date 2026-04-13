@@ -19,18 +19,24 @@ class CancelCommand extends BaseCommand
         $this->setName('workflow:cancel')
             ->setDescription('Request cancellation of a workflow')
             ->addArgument('workflow-id', InputArgument::REQUIRED, 'Workflow ID')
-            ->addOption('reason', null, InputOption::VALUE_OPTIONAL, 'Cancellation reason');
+            ->addOption('reason', null, InputOption::VALUE_OPTIONAL, 'Cancellation reason')
+            ->addOption('run-id', null, InputOption::VALUE_OPTIONAL, 'Target a specific run ID');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $workflowId = $input->getArgument('workflow-id');
+        $runId = $input->getOption('run-id');
 
         $body = array_filter([
             'reason' => $input->getOption('reason'),
         ], fn ($v) => $v !== null);
 
-        $result = $this->client($input)->post("/workflows/{$workflowId}/cancel", $body);
+        $path = $runId !== null
+            ? "/workflows/{$workflowId}/runs/{$runId}/cancel"
+            : "/workflows/{$workflowId}/cancel";
+
+        $result = $this->client($input)->post($path, $body);
 
         $output->writeln('<info>Cancellation requested</info>');
         $output->writeln('  Workflow ID: '.$result['workflow_id']);

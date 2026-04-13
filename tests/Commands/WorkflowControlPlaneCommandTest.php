@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Commands;
 
+use DurableWorkflow\Cli\Commands\WorkflowCommand\CancelCommand;
 use DurableWorkflow\Cli\Commands\WorkflowCommand\SignalCommand;
+use DurableWorkflow\Cli\Commands\WorkflowCommand\TerminateCommand;
 use DurableWorkflow\Cli\Commands\WorkflowCommand\UpdateCommand;
 use DurableWorkflow\Cli\Support\ControlPlaneRequestContract;
 use DurableWorkflow\Cli\Support\ServerClient;
@@ -99,6 +101,93 @@ class WorkflowControlPlaneCommandTest extends TestCase
         );
     }
 
+    public function test_signal_command_uses_run_targeted_path_when_run_id_is_provided(): void
+    {
+        $client = new FakeServerClient([
+            'workflow_id' => 'wf-123',
+            'signal_name' => 'advance',
+            'outcome' => 'signal_received',
+            'command_status' => 'accepted',
+        ]);
+
+        $command = new SignalCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            'workflow-id' => 'wf-123',
+            'signal-name' => 'advance',
+            '--run-id' => 'run-456',
+        ]));
+
+        self::assertSame('/workflows/wf-123/runs/run-456/signal/advance', $client->lastPostPath);
+    }
+
+    public function test_signal_command_uses_instance_path_without_run_id(): void
+    {
+        $client = new FakeServerClient([
+            'workflow_id' => 'wf-123',
+            'signal_name' => 'advance',
+            'outcome' => 'signal_received',
+            'command_status' => 'accepted',
+        ]);
+
+        $command = new SignalCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            'workflow-id' => 'wf-123',
+            'signal-name' => 'advance',
+        ]));
+
+        self::assertSame('/workflows/wf-123/signal/advance', $client->lastPostPath);
+    }
+
+    public function test_cancel_command_uses_run_targeted_path_when_run_id_is_provided(): void
+    {
+        $client = new FakeServerClient([
+            'workflow_id' => 'wf-123',
+            'outcome' => 'cancelled',
+            'command_status' => 'accepted',
+        ]);
+
+        $command = new CancelCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            'workflow-id' => 'wf-123',
+            '--run-id' => 'run-456',
+        ]));
+
+        self::assertSame('/workflows/wf-123/runs/run-456/cancel', $client->lastPostPath);
+    }
+
+    public function test_terminate_command_uses_run_targeted_path_when_run_id_is_provided(): void
+    {
+        $client = new FakeServerClient([
+            'workflow_id' => 'wf-123',
+            'outcome' => 'terminated',
+            'command_status' => 'accepted',
+        ]);
+
+        $command = new TerminateCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            'workflow-id' => 'wf-123',
+            '--run-id' => 'run-456',
+        ]));
+
+        self::assertSame('/workflows/wf-123/runs/run-456/terminate', $client->lastPostPath);
+    }
+
     private static function requestContract(): ControlPlaneRequestContract
     {
         return new ControlPlaneRequestContract([
@@ -120,6 +209,8 @@ class FakeServerClient extends ServerClient
      */
     public array $lastPostBody = [];
 
+    public string $lastPostPath = '';
+
     public int $postCalls = 0;
 
     /**
@@ -134,6 +225,7 @@ class FakeServerClient extends ServerClient
     public function post(string $path, array $body = []): array
     {
         $this->postCalls++;
+        $this->lastPostPath = $path;
         $this->lastPostBody = $body;
 
         return $this->payload;

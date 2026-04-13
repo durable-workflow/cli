@@ -20,20 +20,26 @@ class QueryCommand extends BaseCommand
             ->setDescription('Query a workflow\'s state')
             ->addArgument('workflow-id', InputArgument::REQUIRED, 'Workflow ID')
             ->addArgument('query-name', InputArgument::REQUIRED, 'Query name')
-            ->addOption('input', 'i', InputOption::VALUE_OPTIONAL, 'Query input JSON');
+            ->addOption('input', 'i', InputOption::VALUE_OPTIONAL, 'Query input JSON')
+            ->addOption('run-id', null, InputOption::VALUE_OPTIONAL, 'Target a specific run ID');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $workflowId = $input->getArgument('workflow-id');
         $queryName = $input->getArgument('query-name');
+        $runId = $input->getOption('run-id');
 
         $body = [];
         if ($input->getOption('input')) {
             $body['input'] = json_decode($input->getOption('input'), true);
         }
 
-        $result = $this->client($input)->post("/workflows/{$workflowId}/query/{$queryName}", $body);
+        $path = $runId !== null
+            ? "/workflows/{$workflowId}/runs/{$runId}/query/{$queryName}"
+            : "/workflows/{$workflowId}/query/{$queryName}";
+
+        $result = $this->client($input)->post($path, $body);
 
         $output->writeln('<info>Query result</info>');
         if (isset($result['query_name'])) {

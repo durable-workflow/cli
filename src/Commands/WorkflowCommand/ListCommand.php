@@ -18,7 +18,7 @@ class ListCommand extends BaseCommand
         $this->setName('workflow:list')
             ->setDescription('List workflow executions')
             ->addOption('type', 't', InputOption::VALUE_OPTIONAL, 'Filter by workflow type')
-            ->addOption('status', null, InputOption::VALUE_OPTIONAL, 'Filter by status (running, completed, failed, cancelled, terminated)')
+            ->addOption('status', null, InputOption::VALUE_OPTIONAL, 'Filter by status bucket (running, completed, failed)')
             ->addOption('query', null, InputOption::VALUE_OPTIONAL, 'Visibility query')
             ->addOption('limit', 'l', InputOption::VALUE_OPTIONAL, 'Page size', '20')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output as JSON');
@@ -26,6 +26,18 @@ class ListCommand extends BaseCommand
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        $status = $input->getOption('status');
+        if ($status !== null && ! $this->validateControlPlaneOption(
+            client: $this->client($input),
+            output: $output,
+            operation: 'list',
+            field: 'status',
+            value: $status,
+            optionName: '--status',
+        )) {
+            return Command::INVALID;
+        }
+
         $result = $this->client($input)->get('/workflows', array_filter([
             'workflow_type' => $input->getOption('type'),
             'status' => $input->getOption('status'),

@@ -20,20 +20,26 @@ class SignalCommand extends BaseCommand
             ->setDescription('Send a signal to a running workflow')
             ->addArgument('workflow-id', InputArgument::REQUIRED, 'Workflow ID')
             ->addArgument('signal-name', InputArgument::REQUIRED, 'Signal name')
-            ->addOption('input', 'i', InputOption::VALUE_OPTIONAL, 'Signal input JSON');
+            ->addOption('input', 'i', InputOption::VALUE_OPTIONAL, 'Signal input JSON')
+            ->addOption('run-id', null, InputOption::VALUE_OPTIONAL, 'Target a specific run ID');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $workflowId = $input->getArgument('workflow-id');
         $signalName = $input->getArgument('signal-name');
+        $runId = $input->getOption('run-id');
 
         $body = [];
         if ($input->getOption('input')) {
             $body['input'] = json_decode($input->getOption('input'), true);
         }
 
-        $result = $this->client($input)->post("/workflows/{$workflowId}/signal/{$signalName}", $body);
+        $path = $runId !== null
+            ? "/workflows/{$workflowId}/runs/{$runId}/signal/{$signalName}"
+            : "/workflows/{$workflowId}/signal/{$signalName}";
+
+        $result = $this->client($input)->post($path, $body);
 
         $output->writeln('<info>Signal sent</info>');
         $output->writeln('  Workflow ID: '.$result['workflow_id']);

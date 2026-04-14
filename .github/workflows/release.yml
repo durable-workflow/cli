@@ -18,12 +18,13 @@ permissions:
 
 env:
   SPC_EXTENSIONS: curl,mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets
-  SPC_EXTENSIONS_WINDOWS: curl,mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets
+  # Windows: no ext-openssl. PHP's Windows openssl extension fails to
+  # compile against OpenSSL 3 on both 8.3 and 8.4 (php_openssl.h uses
+  # the removed ERR_NUM_ERRORS). We patch spc's config/ext.json to
+  # stop it from being pulled in as a transitive dep of ext-curl;
+  # curl still links libopenssl at the transport layer for TLS.
+  SPC_EXTENSIONS_WINDOWS: curl,mbstring,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets
   PHP_VERSION: '8.4'
-  # Windows phpmicro uses PHP 8.3. PHP 8.4's Windows openssl extension
-  # fails to compile against OpenSSL 3.x (php_openssl.h references the
-  # removed ERR_NUM_ERRORS constant). 8.3 compiles cleanly and is still
-  # ABI-compatible enough to run the PHAR built against 8.4 deps.
   PHP_VERSION_WINDOWS: '8.3'
   BOX_VERSION: '4.6.6'
   # Passed to every spc step so it can use authenticated GitHub API calls
@@ -158,58 +159,77 @@ jobs:
           name: durable-workflow-phar
           path: build/
 
-      - name: Download spc.exe
+      - name: Setup PHP for spc
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION_WINDOWS }}
+          tools: composer:v2
+          coverage: none
+
+      - name: Clone spc and patch ext.json
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path build\.tools | Out-Null
-          $url = "https://dl.static-php.dev/static-php-cli/spc-bin/nightly/spc-windows-x64.exe"
-          for ($i = 1; $i -le 5; $i++) {
-            try {
-              Invoke-WebRequest -Uri $url -OutFile "build\.tools\spc.exe" -TimeoutSec 120
-              break
-            } catch {
-              Write-Host "spc.exe download attempt $i failed: $_"
-              if ($i -eq 5) { throw }
-              Start-Sleep -Seconds 10
-            }
-          }
+          git clone --depth=1 https://github.com/crazywhalecc/static-php-cli.git build\spc-src
+          # Strip 'openssl' from curl's Windows ext-depends. Upstream spc
+          # forces PHP's ext-openssl in whenever ext-curl is built on
+          # Windows, but PHP's Windows ext-openssl fails to compile
+          # against OpenSSL 3 (php_openssl.h references the removed
+          # ERR_NUM_ERRORS). libcurl itself still links libopenssl for
+          # transport-layer TLS, so HTTPS continues to work.
+          python - <<'PY'
+          import json, pathlib
+          p = pathlib.Path("build/spc-src/config/ext.json")
+          d = json.loads(p.read_text())
+          d["curl"]["ext-depends-windows"] = [
+              x for x in d["curl"]["ext-depends-windows"] if x != "openssl"
+          ]
+          p.write_text(json.dumps(d, indent=4))
+          PY
+
+      - name: Install spc Composer dependencies
+        shell: pwsh
+        working-directory: build\spc-src
+        run: composer install --no-dev --prefer-dist --no-interaction
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
       - name: Cache spc downloads
         uses: actions/cache@v4
         with:
           path: |
-            build/.tools/downloads
-            build/.tools/source
-          key: spc-windows-x86_64-php${{ env.PHP_VERSION_WINDOWS }}-${{ hashFiles('.github/workflows/release.yml') }}
+            build/spc-src/downloads
+            build/spc-src/source
+            build/spc-src/buildroot
+          key: spc-src-windows-x86_64-php${{ env.PHP_VERSION_WINDOWS }}-${{ hashFiles('.github/workflows/release.yml') }}
           restore-keys: |
-            spc-windows-x86_64-php${{ env.PHP_VERSION_WINDOWS }}-
+            spc-src-windows-x86_64-php${{ env.PHP_VERSION_WINDOWS }}-
 
       - name: Fetch PHP sources & extension deps
         shell: pwsh
-        working-directory: build/.tools
+        working-directory: build\spc-src
         run: |
-          .\spc.exe doctor --auto-fix
-          .\spc.exe download --with-php=${{ env.PHP_VERSION_WINDOWS }} `
+          php bin\spc doctor --auto-fix
+          php bin\spc download --with-php=${{ env.PHP_VERSION_WINDOWS }} `
             --for-extensions="$env:SPC_EXTENSIONS_WINDOWS" --prefer-pre-built
 
       - name: Build phpmicro SAPI with extensions
         shell: pwsh
-        working-directory: build/.tools
-        run: .\spc.exe build "$env:SPC_EXTENSIONS_WINDOWS" --build-micro --debug
+        working-directory: build\spc-src
+        run: php bin\spc build "$env:SPC_EXTENSIONS_WINDOWS" --build-micro --debug
 
       - name: Upload spc build logs (always)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: windows-spc-logs
-          path: build/.tools/log/
+          path: build/spc-src/log/
           if-no-files-found: warn
 
       - name: Combine PHAR into standalone binary
         shell: pwsh
-        working-directory: build/.tools
+        working-directory: build\spc-src
         run: |
-          .\spc.exe micro:combine ..\..\build\durable-workflow.phar `
+          php bin\spc micro:combine ..\..\build\durable-workflow.phar `
             --output=..\..\build\durable-workflow-windows-x86_64.exe
 
       - name: Smoke test binary

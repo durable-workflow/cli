@@ -83,6 +83,8 @@ class Application extends ConsoleApplication
             new SystemCommand\RepairPassCommand(),
             new SystemCommand\ActivityTimeoutStatusCommand(),
             new SystemCommand\ActivityTimeoutPassCommand(),
+            new SystemCommand\RetentionStatusCommand(),
+            new SystemCommand\RetentionPassCommand(),
         ]);
     }
 }

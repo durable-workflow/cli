@@ -8,6 +8,8 @@ use DurableWorkflow\Cli\Commands\SystemCommand\ActivityTimeoutPassCommand;
 use DurableWorkflow\Cli\Commands\SystemCommand\ActivityTimeoutStatusCommand;
 use DurableWorkflow\Cli\Commands\SystemCommand\RepairPassCommand;
 use DurableWorkflow\Cli\Commands\SystemCommand\RepairStatusCommand;
+use DurableWorkflow\Cli\Commands\SystemCommand\RetentionPassCommand;
+use DurableWorkflow\Cli\Commands\SystemCommand\RetentionStatusCommand;
 use DurableWorkflow\Cli\Support\ServerClient;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
@@ -329,6 +331,158 @@ class SystemCommandTest extends TestCase
 
         self::assertIsArray($decoded);
         self::assertSame(1, $decoded['enforced']);
+    }
+
+    // ── Retention Status ────────────────────────────────────────────
+
+    public function test_retention_status_renders_diagnostics(): void
+    {
+        $command = new RetentionStatusCommand();
+        $command->setServerClient(new SystemFakeClient([
+            'namespace' => 'default',
+            'retention_days' => 30,
+            'cutoff' => '2026-03-15T00:00:00+00:00',
+            'expired_run_count' => 5,
+            'expired_run_ids' => ['run-1', 'run-2', 'run-3', 'run-4', 'run-5'],
+            'scan_limit' => 100,
+            'scan_pressure' => false,
+        ]));
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+
+        $display = $tester->getDisplay();
+
+        self::assertStringContainsString('default', $display);
+        self::assertStringContainsString('30', $display);
+        self::assertStringContainsString('5', $display);
+        self::assertStringContainsString('run-1', $display);
+    }
+
+    public function test_retention_status_renders_json_output(): void
+    {
+        $payload = [
+            'namespace' => 'default',
+            'retention_days' => 30,
+            'cutoff' => '2026-03-15T00:00:00+00:00',
+            'expired_run_count' => 0,
+            'expired_run_ids' => [],
+            'scan_limit' => 100,
+            'scan_pressure' => false,
+        ];
+
+        $command = new RetentionStatusCommand();
+        $command->setServerClient(new SystemFakeClient($payload));
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute(['--json' => true]));
+
+        $decoded = json_decode($tester->getDisplay(), true);
+
+        self::assertIsArray($decoded);
+        self::assertSame(30, $decoded['retention_days']);
+        self::assertSame(0, $decoded['expired_run_count']);
+    }
+
+    // ── Retention Pass ──────────────────────────────────────────────
+
+    public function test_retention_pass_renders_results(): void
+    {
+        $command = new RetentionPassCommand();
+        $command->setServerClient(new SystemFakeClient([
+            'processed' => 3,
+            'pruned' => 2,
+            'skipped' => 1,
+            'failed' => 0,
+            'results' => [
+                ['run_id' => 'run-1', 'outcome' => 'pruned', 'history_events_deleted' => 50, 'tasks_deleted' => 3],
+                ['run_id' => 'run-2', 'outcome' => 'pruned', 'history_events_deleted' => 20, 'tasks_deleted' => 1],
+                ['run_id' => 'run-3', 'outcome' => 'skipped', 'reason' => 'run_not_terminal'],
+            ],
+        ]));
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+
+        $display = $tester->getDisplay();
+
+        self::assertStringContainsString('Processed:  3', $display);
+        self::assertStringContainsString('Pruned:     2', $display);
+        self::assertStringContainsString('Skipped:    1', $display);
+    }
+
+    public function test_retention_pass_sends_run_ids_and_limit(): void
+    {
+        $client = new SystemFakeClient([
+            'processed' => 2,
+            'pruned' => 0,
+            'skipped' => 2,
+            'failed' => 0,
+            'results' => [],
+        ]);
+
+        $command = new RetentionPassCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            '--run-id' => ['run-1', 'run-2'],
+            '--limit' => '50',
+        ]));
+
+        self::assertSame('/system/retention/pass', $client->lastPostPath);
+        self::assertContains('run-1', $client->lastPostBody['run_ids'] ?? []);
+        self::assertContains('run-2', $client->lastPostBody['run_ids'] ?? []);
+        self::assertSame(50, $client->lastPostBody['limit'] ?? null);
+    }
+
+    public function test_retention_pass_returns_failure_on_errors(): void
+    {
+        $command = new RetentionPassCommand();
+        $command->setServerClient(new SystemFakeClient([
+            'processed' => 1,
+            'pruned' => 0,
+            'skipped' => 0,
+            'failed' => 1,
+            'results' => [
+                ['run_id' => 'run-1', 'outcome' => 'error', 'reason' => 'Database connection lost'],
+            ],
+        ]));
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::FAILURE, $tester->execute([]));
+
+        self::assertStringContainsString('Database connection lost', $tester->getDisplay());
+    }
+
+    public function test_retention_pass_renders_json_output(): void
+    {
+        $payload = [
+            'processed' => 1,
+            'pruned' => 1,
+            'skipped' => 0,
+            'failed' => 0,
+            'results' => [
+                ['run_id' => 'run-1', 'outcome' => 'pruned', 'history_events_deleted' => 100, 'tasks_deleted' => 5],
+            ],
+        ];
+
+        $command = new RetentionPassCommand();
+        $command->setServerClient(new SystemFakeClient($payload));
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute(['--json' => true]));
+
+        $decoded = json_decode($tester->getDisplay(), true);
+
+        self::assertIsArray($decoded);
+        self::assertSame(1, $decoded['pruned']);
     }
 }
 

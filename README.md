@@ -17,7 +17,8 @@ chmod +x durable-workflow
 ```
 
 Available assets: `durable-workflow-linux-x86_64`, `durable-workflow-linux-aarch64`,
-`durable-workflow-macos-x86_64`, `durable-workflow-macos-aarch64`.
+`durable-workflow-macos-x86_64`, `durable-workflow-macos-aarch64`,
+`durable-workflow-windows-x86_64.exe`.
 
 **2. PHAR (requires PHP >= 8.2).** Download `durable-workflow.phar` from the
 [releases page](https://github.com/durable-workflow/cli/releases) and run it

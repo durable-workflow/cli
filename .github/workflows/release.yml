@@ -15,7 +15,9 @@ permissions:
   contents: write
 
 env:
+  # Unix builds get pcntl+posix; Windows drops them (not available on NT).
   SPC_EXTENSIONS: curl,mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets,pcntl,posix
+  SPC_EXTENSIONS_WINDOWS: curl,mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets
   PHP_VERSION: '8.3'
   BOX_VERSION: '4.6.6'
 
@@ -129,9 +131,72 @@ jobs:
           path: build/durable-workflow-${{ matrix.name }}
           if-no-files-found: error
 
+  build-binary-windows:
+    name: Build windows-x86_64
+    needs: build-phar
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download PHAR artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: durable-workflow-phar
+          path: build/
+
+      - name: Download spc.exe
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path build\.tools | Out-Null
+          Invoke-WebRequest `
+            -Uri "https://dl.static-php.dev/static-php-cli/spc-bin/nightly/spc-windows-x64.exe" `
+            -OutFile "build\.tools\spc.exe"
+
+      - name: Cache spc downloads
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/.tools/downloads
+            build/.tools/source
+          key: spc-windows-x86_64-php${{ env.PHP_VERSION }}-${{ hashFiles('.github/workflows/release.yml') }}
+          restore-keys: |
+            spc-windows-x86_64-php${{ env.PHP_VERSION }}-
+
+      - name: Fetch PHP sources & extension deps
+        shell: pwsh
+        working-directory: build/.tools
+        run: |
+          .\spc.exe doctor --auto-fix
+          .\spc.exe download --with-php=${{ env.PHP_VERSION }} `
+            --for-extensions="$env:SPC_EXTENSIONS_WINDOWS" --prefer-pre-built
+
+      - name: Build phpmicro SAPI with extensions
+        shell: pwsh
+        working-directory: build/.tools
+        run: .\spc.exe build "$env:SPC_EXTENSIONS_WINDOWS" --build-micro
+
+      - name: Combine PHAR into standalone binary
+        shell: pwsh
+        working-directory: build/.tools
+        run: |
+          .\spc.exe micro:combine ..\..\build\durable-workflow.phar `
+            --output=..\..\build\durable-workflow-windows-x86_64.exe
+
+      - name: Smoke test binary
+        shell: pwsh
+        run: |
+          .\build\durable-workflow-windows-x86_64.exe --version
+          .\build\durable-workflow-windows-x86_64.exe list
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: durable-workflow-windows-x86_64
+          path: build/durable-workflow-windows-x86_64.exe
+          if-no-files-found: error
+
   release:
     name: Publish Release
-    needs: [build-phar, build-binary]
+    needs: [build-phar, build-binary, build-binary-windows]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:

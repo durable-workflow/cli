@@ -20,10 +20,9 @@ permissions:
   contents: write
 
 env:
-  # Unix builds get pcntl+posix; Windows drops them (not available on NT).
-  SPC_EXTENSIONS: curl,mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets,pcntl,posix
+  SPC_EXTENSIONS: curl,mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets
   SPC_EXTENSIONS_WINDOWS: curl,mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets
-  PHP_VERSION: '8.3'
+  PHP_VERSION: '8.4'
   BOX_VERSION: '4.6.6'
 
 jobs:

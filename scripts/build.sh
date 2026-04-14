@@ -19,7 +19,7 @@ PHAR_OUT="$BUILD_DIR/durable-workflow.phar"
 
 # Extensions required by the CLI at runtime. Keep this list in sync with the
 # CI matrix in .github/workflows/release.yml.
-SPC_EXTENSIONS="curl,mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets,pcntl,posix"
+SPC_EXTENSIONS="curl,mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets"
 
 BOX_VERSION="${BOX_VERSION:-4.6.6}"
 BOX_URL="https://github.com/box-project/box/releases/download/${BOX_VERSION}/box.phar"
@@ -76,7 +76,7 @@ build_phar() {
 build_binary() {
     build_phar
     ensure_spc
-    local php_version="${PHP_VERSION:-8.3}"
+    local php_version="${PHP_VERSION:-8.4}"
     local platform
     platform="$(detect_platform)"
     local out_name="durable-workflow-${platform}"

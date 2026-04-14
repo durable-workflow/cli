@@ -17,8 +17,13 @@ chmod +x durable-workflow
 ```
 
 Available assets: `durable-workflow-linux-x86_64`, `durable-workflow-linux-aarch64`,
-`durable-workflow-macos-x86_64`, `durable-workflow-macos-aarch64`,
-`durable-workflow-windows-x86_64.exe`.
+`durable-workflow-macos-aarch64`.
+
+Windows and macOS x86_64 standalone binaries are not currently produced.
+Windows is blocked on an upstream PHP 8.4 + OpenSSL 3 compile bug in
+static-php-cli; macOS x86_64 is dropped because the `macos-13` runner
+label is not available to this org. On Windows, install a system PHP
+(>= 8.4) and use the PHAR.
 
 **2. PHAR (requires PHP >= 8.2).** Download `durable-workflow.phar` from the
 [releases page](https://github.com/durable-workflow/cli/releases) and run it

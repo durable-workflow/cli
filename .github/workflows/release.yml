@@ -4,10 +4,6 @@ on:
   push:
     tags:
       - 'v*'
-    branches:
-      # Temporary: iterate on Windows/macOS build failures pre-merge.
-      # Remove before merging to main.
-      - 'standalone-binary-build'
   workflow_dispatch:
     inputs:
       tag:
@@ -150,6 +146,14 @@ jobs:
     name: Build windows-x86_64
     needs: build-phar
     runs-on: windows-latest
+    # Windows builds currently fail at the ext-openssl compile step:
+    # PHP 8.4's Windows openssl extension references ERR_NUM_ERRORS,
+    # which was removed in OpenSSL 3.x. spc adds ext-openssl as a
+    # transitive dep of curl even though curl-on-Windows uses Schannel.
+    # Until there is an upstream fix (or an spc option to suppress the
+    # transitive dep), this job is allowed to fail without blocking the
+    # release of the PHAR and Linux/macOS binaries.
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
@@ -227,7 +231,11 @@ jobs:
 
   release:
     name: Publish Release
-    needs: [build-phar, build-binary, build-binary-windows]
+    # Windows is intentionally not a hard dependency: it runs with
+    # continue-on-error so a Windows-build failure doesn't block the
+    # Linux/macOS release. If the Windows job succeeds, its artifact
+    # is picked up by download-artifact below.
+    needs: [build-phar, build-binary]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:

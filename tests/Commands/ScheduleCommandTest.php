@@ -387,6 +387,70 @@ class ScheduleCommandTest extends TestCase
         self::assertSame('reports-v2', $client->lastPutBody['action']['task_queue']);
     }
 
+    public function test_create_command_sends_timeout_options(): void
+    {
+        $client = new ScheduleFakeClient([
+            'schedule_id' => 'timeout-schedule',
+        ]);
+
+        $command = new CreateCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            '--workflow-type' => 'reports.daily',
+            '--cron' => '0 0 * * *',
+            '--execution-timeout' => '300',
+            '--run-timeout' => '120',
+        ]));
+
+        self::assertSame(300, $client->lastPostBody['action']['execution_timeout_seconds']);
+        self::assertSame(120, $client->lastPostBody['action']['run_timeout_seconds']);
+    }
+
+    public function test_create_command_omits_timeouts_when_not_provided(): void
+    {
+        $client = new ScheduleFakeClient([
+            'schedule_id' => 'no-timeout-schedule',
+        ]);
+
+        $command = new CreateCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            '--workflow-type' => 'reports.daily',
+            '--cron' => '0 0 * * *',
+        ]));
+
+        self::assertArrayNotHasKey('execution_timeout_seconds', $client->lastPostBody['action']);
+        self::assertArrayNotHasKey('run_timeout_seconds', $client->lastPostBody['action']);
+    }
+
+    public function test_update_command_sends_timeout_options(): void
+    {
+        $client = new ScheduleFakeClient([
+            'schedule_id' => 'daily-report',
+            'outcome' => 'updated',
+        ]);
+
+        $command = new UpdateCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            'schedule-id' => 'daily-report',
+            '--execution-timeout' => '600',
+            '--run-timeout' => '180',
+        ]));
+
+        self::assertSame(600, $client->lastPutBody['action']['execution_timeout_seconds']);
+        self::assertSame(180, $client->lastPutBody['action']['run_timeout_seconds']);
+    }
+
     public function test_update_command_fails_without_any_fields(): void
     {
         $client = new ScheduleFakeClient([]);

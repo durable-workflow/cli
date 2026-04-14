@@ -23,6 +23,8 @@ class UpdateCommand extends BaseCommand
             ->addOption('interval', null, InputOption::VALUE_OPTIONAL, 'Interval as ISO 8601 duration (e.g. PT30M, PT1H)')
             ->addOption('workflow-type', 't', InputOption::VALUE_OPTIONAL, 'Workflow type')
             ->addOption('task-queue', null, InputOption::VALUE_OPTIONAL, 'Task queue')
+            ->addOption('execution-timeout', null, InputOption::VALUE_REQUIRED, 'Workflow execution timeout in seconds')
+            ->addOption('run-timeout', null, InputOption::VALUE_REQUIRED, 'Workflow run timeout in seconds')
             ->addOption('overlap-policy', null, InputOption::VALUE_OPTIONAL, 'Overlap policy')
             ->addOption('note', null, InputOption::VALUE_OPTIONAL, 'Note');
     }
@@ -45,11 +47,15 @@ class UpdateCommand extends BaseCommand
 
         $workflowType = $input->getOption('workflow-type');
         $taskQueue = $input->getOption('task-queue');
+        $executionTimeout = $input->getOption('execution-timeout');
+        $runTimeout = $input->getOption('run-timeout');
 
-        if ($workflowType !== null || $taskQueue !== null) {
+        if ($workflowType !== null || $taskQueue !== null || $executionTimeout !== null || $runTimeout !== null) {
             $body['action'] = array_filter([
                 'workflow_type' => $workflowType,
                 'task_queue' => $taskQueue,
+                'execution_timeout_seconds' => $executionTimeout !== null ? (int) $executionTimeout : null,
+                'run_timeout_seconds' => $runTimeout !== null ? (int) $runTimeout : null,
             ], fn ($v) => $v !== null);
         }
 
@@ -62,7 +68,7 @@ class UpdateCommand extends BaseCommand
         }
 
         if ($body === []) {
-            $output->writeln('<error>No update fields provided. Use --cron, --interval, --workflow-type, --task-queue, --overlap-policy, or --note.</error>');
+            $output->writeln('<error>No update fields provided. Use --cron, --interval, --workflow-type, --task-queue, --execution-timeout, --run-timeout, --overlap-policy, or --note.</error>');
 
             return Command::FAILURE;
         }

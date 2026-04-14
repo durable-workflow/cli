@@ -24,6 +24,8 @@ class CreateCommand extends BaseCommand
             ->addOption('task-queue', null, InputOption::VALUE_OPTIONAL, 'Task queue')
             ->addOption('input', 'i', InputOption::VALUE_OPTIONAL, 'Workflow input JSON')
             ->addOption('timezone', null, InputOption::VALUE_OPTIONAL, 'Timezone', 'UTC')
+            ->addOption('execution-timeout', null, InputOption::VALUE_REQUIRED, 'Workflow execution timeout in seconds')
+            ->addOption('run-timeout', null, InputOption::VALUE_REQUIRED, 'Workflow run timeout in seconds')
             ->addOption('overlap-policy', null, InputOption::VALUE_OPTIONAL, 'Overlap policy', 'skip')
             ->addOption('paused', null, InputOption::VALUE_NONE, 'Create in paused state')
             ->addOption('note', null, InputOption::VALUE_OPTIONAL, 'Note');
@@ -53,6 +55,8 @@ class CreateCommand extends BaseCommand
                 'workflow_type' => $input->getOption('workflow-type'),
                 'task_queue' => $input->getOption('task-queue'),
                 'input' => $input->getOption('input') ? json_decode($input->getOption('input'), true) : null,
+                'execution_timeout_seconds' => $input->getOption('execution-timeout') !== null ? (int) $input->getOption('execution-timeout') : null,
+                'run_timeout_seconds' => $input->getOption('run-timeout') !== null ? (int) $input->getOption('run-timeout') : null,
             ], fn ($v) => $v !== null),
             'overlap_policy' => $input->getOption('overlap-policy'),
             'paused' => $input->getOption('paused'),

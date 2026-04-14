@@ -37,11 +37,27 @@ class DescribeCommand extends BaseCommand
         $output->writeln('  State: '.json_encode($result['state'] ?? null, JSON_UNESCAPED_SLASHES));
         $output->writeln('  Overlap Policy: '.($result['overlap_policy'] ?? 'skip'));
 
+        $jitter = $result['jitter_seconds'] ?? 0;
+        if ($jitter > 0) {
+            $output->writeln('  Jitter: '.$jitter.'s');
+        }
+
+        $maxRuns = $result['max_runs'] ?? null;
+        $remaining = $result['remaining_actions'] ?? null;
+        if ($maxRuns !== null) {
+            $output->writeln(sprintf('  Max Runs: %d (%s remaining)', $maxRuns, $remaining ?? '?'));
+        }
+
         $info = $result['info'] ?? [];
         $bufferedActions = $info['buffered_actions'] ?? [];
 
         if (!empty($bufferedActions)) {
             $output->writeln(sprintf('  Buffered Actions: %d pending', count($bufferedActions)));
+        }
+
+        $skipCount = $info['skipped_trigger_count'] ?? 0;
+        if ($skipCount > 0) {
+            $output->writeln(sprintf('  Skipped: %d (last: %s)', $skipCount, $info['last_skip_reason'] ?? '-'));
         }
 
         return Command::SUCCESS;

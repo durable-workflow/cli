@@ -48,6 +48,11 @@ class TriggerCommand extends BaseCommand
                 $scheduleId,
                 $result['reason'] ?? 'previous workflow still running',
             )),
+            'skipped' => $output->writeln(sprintf(
+                '<comment>Skipped:</comment> %s — %s',
+                $scheduleId,
+                $result['reason'] ?? 'schedule exhausted',
+            )),
             'trigger_failed' => $output->writeln(sprintf(
                 '<error>Trigger failed:</error> %s — %s',
                 $scheduleId,
@@ -61,7 +66,7 @@ class TriggerCommand extends BaseCommand
         };
 
         return match ($outcome) {
-            'triggered', 'buffered', 'buffer_full' => Command::SUCCESS,
+            'triggered', 'buffered', 'buffer_full', 'skipped' => Command::SUCCESS,
             default => Command::FAILURE,
         };
     }

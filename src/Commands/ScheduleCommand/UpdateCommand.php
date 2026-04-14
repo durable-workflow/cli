@@ -26,6 +26,8 @@ class UpdateCommand extends BaseCommand
             ->addOption('execution-timeout', null, InputOption::VALUE_REQUIRED, 'Workflow execution timeout in seconds')
             ->addOption('run-timeout', null, InputOption::VALUE_REQUIRED, 'Workflow run timeout in seconds')
             ->addOption('overlap-policy', null, InputOption::VALUE_OPTIONAL, 'Overlap policy')
+            ->addOption('jitter', null, InputOption::VALUE_REQUIRED, 'Jitter in seconds (0-3600)')
+            ->addOption('max-runs', null, InputOption::VALUE_REQUIRED, 'Maximum number of runs')
             ->addOption('note', null, InputOption::VALUE_OPTIONAL, 'Note');
     }
 
@@ -63,12 +65,20 @@ class UpdateCommand extends BaseCommand
             $body['overlap_policy'] = $input->getOption('overlap-policy');
         }
 
+        if ($input->getOption('jitter') !== null) {
+            $body['jitter_seconds'] = (int) $input->getOption('jitter');
+        }
+
+        if ($input->getOption('max-runs') !== null) {
+            $body['max_runs'] = (int) $input->getOption('max-runs');
+        }
+
         if ($input->getOption('note') !== null) {
             $body['note'] = $input->getOption('note');
         }
 
         if ($body === []) {
-            $output->writeln('<error>No update fields provided. Use --cron, --interval, --workflow-type, --task-queue, --execution-timeout, --run-timeout, --overlap-policy, or --note.</error>');
+            $output->writeln('<error>No update fields provided. Use --cron, --interval, --workflow-type, --task-queue, --execution-timeout, --run-timeout, --overlap-policy, --jitter, --max-runs, or --note.</error>');
 
             return Command::FAILURE;
         }

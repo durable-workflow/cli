@@ -27,6 +27,8 @@ class CreateCommand extends BaseCommand
             ->addOption('execution-timeout', null, InputOption::VALUE_REQUIRED, 'Workflow execution timeout in seconds')
             ->addOption('run-timeout', null, InputOption::VALUE_REQUIRED, 'Workflow run timeout in seconds')
             ->addOption('overlap-policy', null, InputOption::VALUE_OPTIONAL, 'Overlap policy', 'skip')
+            ->addOption('jitter', null, InputOption::VALUE_REQUIRED, 'Jitter in seconds (0-3600)')
+            ->addOption('max-runs', null, InputOption::VALUE_REQUIRED, 'Maximum number of runs before auto-delete')
             ->addOption('paused', null, InputOption::VALUE_NONE, 'Create in paused state')
             ->addOption('note', null, InputOption::VALUE_OPTIONAL, 'Note');
     }
@@ -59,6 +61,8 @@ class CreateCommand extends BaseCommand
                 'run_timeout_seconds' => $input->getOption('run-timeout') !== null ? (int) $input->getOption('run-timeout') : null,
             ], fn ($v) => $v !== null),
             'overlap_policy' => $input->getOption('overlap-policy'),
+            'jitter_seconds' => $input->getOption('jitter') !== null ? (int) $input->getOption('jitter') : null,
+            'max_runs' => $input->getOption('max-runs') !== null ? (int) $input->getOption('max-runs') : null,
             'paused' => $input->getOption('paused'),
             'note' => $input->getOption('note'),
         ];

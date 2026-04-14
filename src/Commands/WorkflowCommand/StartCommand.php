@@ -84,6 +84,9 @@ class StartCommand extends BaseCommand
         if (isset($result['business_key'])) {
             $output->writeln('  Business Key: '.$result['business_key']);
         }
+        if (isset($result['payload_codec'])) {
+            $output->writeln('  Payload Codec: '.$result['payload_codec']);
+        }
         $output->writeln('  Outcome: '.$result['outcome']);
 
         if ($input->getOption('wait')) {

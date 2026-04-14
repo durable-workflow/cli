@@ -21,6 +21,7 @@ class WorkflowReadCommandTest extends TestCase
             'workflow_id' => 'wf-123',
             'run_id' => 'run-123',
             'business_key' => 'order-123',
+            'payload_codec' => 'json',
             'outcome' => 'started_new',
         ]);
 
@@ -36,6 +37,7 @@ class WorkflowReadCommandTest extends TestCase
 
         self::assertSame('order-123', $client->lastPostBody['business_key'] ?? null);
         self::assertStringContainsString('Business Key: order-123', $tester->getDisplay());
+        self::assertStringContainsString('Payload Codec: json', $tester->getDisplay());
     }
 
     public function test_start_command_sends_the_canonical_duplicate_policy_without_server_specific_translation(): void
@@ -251,6 +253,7 @@ class WorkflowReadCommandTest extends TestCase
             'is_current_run' => true,
             'task_queue' => 'orders',
             'compatibility' => 'build-a',
+            'payload_codec' => 'json',
             'execution_timeout_seconds' => 86400,
             'run_timeout_seconds' => 3600,
             'execution_deadline_at' => '2026-04-13T00:00:00Z',
@@ -285,6 +288,7 @@ class WorkflowReadCommandTest extends TestCase
         self::assertStringContainsString('Business Key: order-123', $display);
         self::assertStringContainsString('Status Bucket: running', $display);
         self::assertStringContainsString('Run Count: 2', $display);
+        self::assertStringContainsString('Payload Codec: json', $display);
         self::assertStringContainsString('Execution Timeout: 86400s', $display);
         self::assertStringContainsString('Run Timeout: 3600s', $display);
         self::assertStringContainsString('Execution Deadline: 2026-04-13T00:00:00Z', $display);

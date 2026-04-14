@@ -127,6 +127,7 @@ class WorkflowRunCommandTest extends TestCase
             'is_current_run' => false,
             'task_queue' => 'orders',
             'compatibility' => 'build-a',
+            'payload_codec' => 'json',
             'execution_timeout_seconds' => 86400,
             'run_timeout_seconds' => 3600,
             'execution_deadline_at' => '2026-04-13T00:00:00Z',
@@ -169,6 +170,7 @@ class WorkflowRunCommandTest extends TestCase
         self::assertStringContainsString('Status Bucket: completed', $display);
         self::assertStringContainsString('Run Number: 1', $display);
         self::assertStringContainsString('Current Run: no', $display);
+        self::assertStringContainsString('Payload Codec: json', $display);
         self::assertStringContainsString('Execution Timeout: 86400s', $display);
         self::assertStringContainsString('Run Timeout: 3600s', $display);
         self::assertStringContainsString('Input: {"order_id":456}', $display);

@@ -96,6 +96,7 @@ class ShowRunCommand extends BaseCommand
         $output->writeln('  Current Run: '.(($result['is_current_run'] ?? false) ? 'yes' : 'no'));
         $output->writeln('  Task Queue: '.($result['task_queue'] ?? '-'));
         $output->writeln('  Compatibility: '.($result['compatibility'] ?? '-'));
+        $output->writeln('  Payload Codec: '.($result['payload_codec'] ?? '-'));
         $output->writeln('  Execution Timeout: '.$this->formatTimeout($result['execution_timeout_seconds'] ?? null));
         $output->writeln('  Run Timeout: '.$this->formatTimeout($result['run_timeout_seconds'] ?? null));
         $output->writeln('  Execution Deadline: '.($result['execution_deadline_at'] ?? '-'));

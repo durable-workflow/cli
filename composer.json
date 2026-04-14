@@ -3,7 +3,7 @@
     "description": "Command-line interface for operating the Durable Workflow server and interacting with workflows, activities, namespaces, and schedules.",
     "type": "project",
     "license": "MIT",
-    "bin": ["bin/durable-workflow"],
+    "bin": ["bin/dw"],
     "require": {
         "php": "^8.2",
         "symfony/console": "^7.0",

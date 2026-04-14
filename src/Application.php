@@ -19,7 +19,7 @@ class Application extends ConsoleApplication
 {
     public function __construct()
     {
-        parent::__construct('Durable Workflow CLI', '0.1.0');
+        parent::__construct('dw', '0.1.0');
 
         $this->addCommands([
             // Server management

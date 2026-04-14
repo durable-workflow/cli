@@ -23,7 +23,7 @@ export DURABLE_WORKFLOW_NAMESPACE=default
 Or pass them as options to any command:
 
 ```bash
-durable-workflow --server=http://localhost:8080 --token=your-token --namespace=production workflow:list
+dw --server=http://localhost:8080 --token=your-token --namespace=production workflow:list
 ```
 
 The CLI targets control-plane contract version `2` automatically via
@@ -44,7 +44,7 @@ sending the command. Supported servers publish schema
 `durable-workflow.v2.control-plane-request.contract`, version `1`, with an
 `operations` map. The CLI treats missing or unknown request-contract
 schema/version metadata as a compatibility error instead of silently guessing.
-Use `durable-workflow server:info` to inspect the current canonical values,
+Use `dw server:info` to inspect the current canonical values,
 rejected aliases, and removed fields advertised by the target server.
 
 ## Commands
@@ -53,133 +53,133 @@ rejected aliases, and removed fields advertised by the target server.
 
 ```bash
 # Check server health
-durable-workflow server:health
+dw server:health
 
 # Show server version and capabilities
-durable-workflow server:info
+dw server:info
 
 # Start a local development server
-durable-workflow server:start-dev
-durable-workflow server:start-dev --port=9090 --db=sqlite
+dw server:start-dev
+dw server:start-dev --port=9090 --db=sqlite
 ```
 
 ### Workflows
 
 ```bash
 # Start a workflow
-durable-workflow workflow:start --type=order.process --input='{"order_id":123}'
-durable-workflow workflow:start --type=order.process --workflow-id=order-123
-durable-workflow workflow:start --type=order.process --execution-timeout=3600 --run-timeout=600
+dw workflow:start --type=order.process --input='{"order_id":123}'
+dw workflow:start --type=order.process --workflow-id=order-123
+dw workflow:start --type=order.process --execution-timeout=3600 --run-timeout=600
 
 # List workflows
-durable-workflow workflow:list
-durable-workflow workflow:list --status=running
-durable-workflow workflow:list --type=order.process
+dw workflow:list
+dw workflow:list --status=running
+dw workflow:list --type=order.process
 
 # Describe a workflow
-durable-workflow workflow:describe order-123
-durable-workflow workflow:describe order-123 --run-id=01HXYZ --json
+dw workflow:describe order-123
+dw workflow:describe order-123 --run-id=01HXYZ --json
 
 # Send a signal
-durable-workflow workflow:signal order-123 payment-received --input='{"amount":99.99}'
+dw workflow:signal order-123 payment-received --input='{"amount":99.99}'
 
 # Query workflow state
-durable-workflow workflow:query order-123 current-status
+dw workflow:query order-123 current-status
 
 # Send an update
-durable-workflow workflow:update order-123 approve --input='{"approver":"admin"}'
+dw workflow:update order-123 approve --input='{"approver":"admin"}'
 
 # Cancel a workflow (workflow code can observe and clean up)
-durable-workflow workflow:cancel order-123 --reason="Customer request"
+dw workflow:cancel order-123 --reason="Customer request"
 
 # Terminate a workflow (immediate, no cleanup)
-durable-workflow workflow:terminate order-123 --reason="Stuck workflow"
+dw workflow:terminate order-123 --reason="Stuck workflow"
 
 # View event history
-durable-workflow workflow:history order-123 01HXYZ
-durable-workflow workflow:history order-123 01HXYZ --follow
+dw workflow:history order-123 01HXYZ
+dw workflow:history order-123 01HXYZ --follow
 ```
 
 ### Namespaces
 
 ```bash
 # List namespaces
-durable-workflow namespace:list
+dw namespace:list
 
 # Create a namespace
-durable-workflow namespace:create staging --description="Staging environment" --retention=7
+dw namespace:create staging --description="Staging environment" --retention=7
 
 # Describe a namespace
-durable-workflow namespace:describe staging
+dw namespace:describe staging
 
 # Update a namespace
-durable-workflow namespace:update staging --retention=14
+dw namespace:update staging --retention=14
 ```
 
 ### Schedules
 
 ```bash
 # Create a schedule
-durable-workflow schedule:create --workflow-type=reports.daily --cron="0 9 * * *"
-durable-workflow schedule:create --schedule-id=daily-report --workflow-type=reports.daily --cron="0 9 * * *" --timezone=America/New_York
+dw schedule:create --workflow-type=reports.daily --cron="0 9 * * *"
+dw schedule:create --schedule-id=daily-report --workflow-type=reports.daily --cron="0 9 * * *" --timezone=America/New_York
 
 # List schedules
-durable-workflow schedule:list
+dw schedule:list
 
 # Describe a schedule
-durable-workflow schedule:describe daily-report
+dw schedule:describe daily-report
 
 # Pause/resume
-durable-workflow schedule:pause daily-report --note="Holiday freeze"
-durable-workflow schedule:resume daily-report
+dw schedule:pause daily-report --note="Holiday freeze"
+dw schedule:resume daily-report
 
 # Trigger immediately
-durable-workflow schedule:trigger daily-report
+dw schedule:trigger daily-report
 
 # Backfill missed runs
-durable-workflow schedule:backfill daily-report --start-time=2024-01-01T00:00:00Z --end-time=2024-01-07T00:00:00Z
+dw schedule:backfill daily-report --start-time=2024-01-01T00:00:00Z --end-time=2024-01-07T00:00:00Z
 
 # Delete a schedule
-durable-workflow schedule:delete daily-report
+dw schedule:delete daily-report
 ```
 
 ### Task Queues
 
 ```bash
 # List task queues
-durable-workflow task-queue:list
+dw task-queue:list
 
 # Describe a task queue (pollers, backlog)
-durable-workflow task-queue:describe default
+dw task-queue:describe default
 ```
 
 ### Activities
 
 ```bash
 # Complete an activity externally
-durable-workflow activity:complete TASK_ID --result='{"status":"done"}'
+dw activity:complete TASK_ID --result='{"status":"done"}'
 
 # Fail an activity externally
-durable-workflow activity:fail TASK_ID --message="External service unavailable" --non-retryable
+dw activity:fail TASK_ID --message="External service unavailable" --non-retryable
 ```
 
 ### System Operations
 
 ```bash
 # Show task repair diagnostics
-durable-workflow system:repair-status
+dw system:repair-status
 
 # Run a task repair sweep
-durable-workflow system:repair-pass
+dw system:repair-pass
 
 # Show expired activity timeout diagnostics
-durable-workflow system:activity-timeout-status
+dw system:activity-timeout-status
 
 # Run activity timeout enforcement sweep
-durable-workflow system:activity-timeout-pass
+dw system:activity-timeout-pass
 
 # Target specific execution IDs
-durable-workflow system:activity-timeout-pass --execution-id=EXEC_ID_1 --execution-id=EXEC_ID_2
+dw system:activity-timeout-pass --execution-id=EXEC_ID_1 --execution-id=EXEC_ID_2
 ```
 
 ## Global Options

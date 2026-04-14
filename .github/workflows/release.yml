@@ -169,14 +169,14 @@ jobs:
       - name: Clone spc and patch ext.json
         shell: pwsh
         run: |
-          git clone --depth=1 https://github.com/crazywhalecc/static-php-cli.git build\spc-src
           # Strip 'openssl' from curl's Windows ext-depends. Upstream spc
           # forces PHP's ext-openssl in whenever ext-curl is built on
           # Windows, but PHP's Windows ext-openssl fails to compile
           # against OpenSSL 3 (php_openssl.h references the removed
           # ERR_NUM_ERRORS). libcurl itself still links libopenssl for
           # transport-layer TLS, so HTTPS continues to work.
-          python - <<'PY'
+          git clone --depth=1 https://github.com/crazywhalecc/static-php-cli.git build\spc-src
+          @'
           import json, pathlib
           p = pathlib.Path("build/spc-src/config/ext.json")
           d = json.loads(p.read_text())
@@ -184,7 +184,9 @@ jobs:
               x for x in d["curl"]["ext-depends-windows"] if x != "openssl"
           ]
           p.write_text(json.dumps(d, indent=4))
-          PY
+          '@ | Set-Content -Path patch-ext.py -Encoding utf8
+          python patch-ext.py
+          Get-Content build\spc-src\config\ext.json | Select-String -Pattern '"curl"' -Context 0,8
 
       - name: Install spc Composer dependencies
         shell: pwsh

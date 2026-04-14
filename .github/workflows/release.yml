@@ -4,6 +4,10 @@ on:
   push:
     tags:
       - 'v*'
+    branches:
+      # Temporary: iterate on Windows/macOS build failures pre-merge.
+      # Remove before merging to main.
+      - 'standalone-binary-build'
   workflow_dispatch:
     inputs:
       tag:
@@ -67,9 +71,6 @@ jobs:
           - name: linux-aarch64
             runner: ubuntu-24.04-arm
             spc_asset: spc-linux-aarch64
-          - name: macos-x86_64
-            runner: macos-13
-            spc_asset: spc-macos-x86_64
           - name: macos-aarch64
             runner: macos-14
             spc_asset: spc-macos-aarch64
@@ -86,8 +87,16 @@ jobs:
       - name: Download spc
         run: |
           mkdir -p build/.tools
-          curl -fsSL -o build/.tools/spc \
-            "https://dl.static-php.dev/static-php-cli/spc-bin/nightly/${{ matrix.spc_asset }}"
+          for attempt in 1 2 3 4 5; do
+            if curl -fsSL --retry 3 --retry-all-errors --connect-timeout 10 \
+                -o build/.tools/spc \
+                "https://dl.static-php.dev/static-php-cli/spc-bin/nightly/${{ matrix.spc_asset }}"; then
+              break
+            fi
+            echo "spc download attempt $attempt failed, retrying in 10s..."
+            sleep 10
+          done
+          test -s build/.tools/spc
           chmod +x build/.tools/spc
 
       - name: Cache spc downloads
@@ -147,9 +156,17 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path build\.tools | Out-Null
-          Invoke-WebRequest `
-            -Uri "https://dl.static-php.dev/static-php-cli/spc-bin/nightly/spc-windows-x64.exe" `
-            -OutFile "build\.tools\spc.exe"
+          $url = "https://dl.static-php.dev/static-php-cli/spc-bin/nightly/spc-windows-x64.exe"
+          for ($i = 1; $i -le 5; $i++) {
+            try {
+              Invoke-WebRequest -Uri $url -OutFile "build\.tools\spc.exe" -TimeoutSec 120
+              break
+            } catch {
+              Write-Host "spc.exe download attempt $i failed: $_"
+              if ($i -eq 5) { throw }
+              Start-Sleep -Seconds 10
+            }
+          }
 
       - name: Cache spc downloads
         uses: actions/cache@v4
@@ -172,7 +189,15 @@ jobs:
       - name: Build phpmicro SAPI with extensions
         shell: pwsh
         working-directory: build/.tools
-        run: .\spc.exe build "$env:SPC_EXTENSIONS_WINDOWS" --build-micro
+        run: .\spc.exe build "$env:SPC_EXTENSIONS_WINDOWS" --build-micro --debug
+
+      - name: Upload spc build logs (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-spc-logs
+          path: build/.tools/log/
+          if-no-files-found: warn
 
       - name: Combine PHAR into standalone binary
         shell: pwsh

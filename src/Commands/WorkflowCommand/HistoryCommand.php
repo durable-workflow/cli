@@ -72,7 +72,7 @@ class HistoryCommand extends BaseCommand
             $e['sequence'] ?? '-',
             $e['event_type'] ?? '-',
             $e['timestamp'] ?? '-',
-            json_encode($e['details'] ?? null, JSON_UNESCAPED_SLASHES),
+            json_encode($e['payload'] ?? null, JSON_UNESCAPED_SLASHES),
         ], $allEvents);
 
         $this->renderTable($output, ['#', 'Event Type', 'Time', 'Details'], $rows);

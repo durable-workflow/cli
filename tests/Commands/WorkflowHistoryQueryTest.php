@@ -24,13 +24,13 @@ class WorkflowHistoryQueryTest extends TestCase
                     'sequence' => 1,
                     'event_type' => 'workflow_started',
                     'timestamp' => '2026-04-13T00:00:00Z',
-                    'details' => ['type' => 'orders.process'],
+                    'payload' => ['type' => 'orders.process'],
                 ],
                 [
                     'sequence' => 2,
                     'event_type' => 'activity_scheduled',
                     'timestamp' => '2026-04-13T00:00:01Z',
-                    'details' => ['activity_type' => 'send_email'],
+                    'payload' => ['activity_type' => 'send_email'],
                 ],
             ],
             'next_page_token' => null,
@@ -61,7 +61,7 @@ class WorkflowHistoryQueryTest extends TestCase
                     'sequence' => 1,
                     'event_type' => 'workflow_started',
                     'timestamp' => '2026-04-13T00:00:00Z',
-                    'details' => [],
+                    'payload' => [],
                 ],
             ],
             'next_page_token' => null,
@@ -88,13 +88,13 @@ class WorkflowHistoryQueryTest extends TestCase
         $client = new HistoryQueryPaginatingClient([
             [
                 'events' => [
-                    ['sequence' => 1, 'event_type' => 'workflow_started', 'timestamp' => '2026-04-13T00:00:00Z', 'details' => []],
+                    ['sequence' => 1, 'event_type' => 'workflow_started', 'timestamp' => '2026-04-13T00:00:00Z', 'payload' => []],
                 ],
                 'next_page_token' => 'page-2',
             ],
             [
                 'events' => [
-                    ['sequence' => 2, 'event_type' => 'activity_scheduled', 'timestamp' => '2026-04-13T00:00:01Z', 'details' => []],
+                    ['sequence' => 2, 'event_type' => 'activity_scheduled', 'timestamp' => '2026-04-13T00:00:01Z', 'payload' => []],
                 ],
                 'next_page_token' => null,
             ],

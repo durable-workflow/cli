@@ -20,9 +20,16 @@ permissions:
 
 env:
   SPC_EXTENSIONS: curl,mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets
-  SPC_EXTENSIONS_WINDOWS: curl,mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets
+  # Windows: drop ext-openssl. PHP 8.4's Windows openssl extension fails
+  # to build against OpenSSL 3.x (references removed ERR_NUM_ERRORS).
+  # curl on Windows uses Schannel for TLS, so HTTPS still works without
+  # ext-openssl.
+  SPC_EXTENSIONS_WINDOWS: curl,mbstring,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets
   PHP_VERSION: '8.4'
   BOX_VERSION: '4.6.6'
+  # Passed to every spc step so it can use authenticated GitHub API calls
+  # when fetching source tarballs / pre-built libs (avoids 403 rate limits).
+  GITHUB_TOKEN: ${{ github.token }}
 
 jobs:
   build-phar:

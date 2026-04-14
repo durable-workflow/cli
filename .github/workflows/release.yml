@@ -4,6 +4,11 @@ on:
   push:
     tags:
       - 'v*'
+    branches:
+      # Lets the release workflow build artifacts on the feature branch
+      # before it is merged to main. The publish-release job stays gated
+      # on tag pushes, so nothing gets published from a branch build.
+      - 'standalone-binary-build'
   workflow_dispatch:
     inputs:
       tag:

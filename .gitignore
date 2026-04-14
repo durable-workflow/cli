@@ -3,3 +3,5 @@
 .phpunit.result.cache
 /.idea
 /.vscode
+/build
+*.phar

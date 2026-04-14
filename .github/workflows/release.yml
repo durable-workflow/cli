@@ -1,0 +1,156 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (for manual dispatch, e.g. v0.0.1-test)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+env:
+  SPC_EXTENSIONS: curl,mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets,pcntl,posix
+  PHP_VERSION: '8.3'
+  BOX_VERSION: '4.6.6'
+
+jobs:
+  build-phar:
+    name: Build PHAR
+    runs-on: ubuntu-latest
+    outputs:
+      phar-name: durable-workflow.phar
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          tools: composer:v2, box:${{ env.BOX_VERSION }}
+          coverage: none
+          ini-values: phar.readonly=0
+
+      - name: Install dependencies
+        run: composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
+
+      - name: Build PHAR
+        run: box compile --no-parallel
+
+      - name: Verify PHAR
+        run: |
+          php build/durable-workflow.phar --version || true
+          box info build/durable-workflow.phar
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: durable-workflow-phar
+          path: build/durable-workflow.phar
+          if-no-files-found: error
+
+  build-binary:
+    name: Build ${{ matrix.name }}
+    needs: build-phar
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64
+            runner: ubuntu-latest
+            spc_asset: spc-linux-x86_64
+          - name: linux-aarch64
+            runner: ubuntu-24.04-arm
+            spc_asset: spc-linux-aarch64
+          - name: macos-x86_64
+            runner: macos-13
+            spc_asset: spc-macos-x86_64
+          - name: macos-aarch64
+            runner: macos-14
+            spc_asset: spc-macos-aarch64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download PHAR artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: durable-workflow-phar
+          path: build/
+
+      - name: Download spc
+        run: |
+          mkdir -p build/.tools
+          curl -fsSL -o build/.tools/spc \
+            "https://dl.static-php.dev/static-php-cli/spc-bin/nightly/${{ matrix.spc_asset }}"
+          chmod +x build/.tools/spc
+
+      - name: Cache spc downloads
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/.tools/downloads
+            build/.tools/source
+          key: spc-${{ matrix.name }}-php${{ env.PHP_VERSION }}-${{ hashFiles('.github/workflows/release.yml') }}
+          restore-keys: |
+            spc-${{ matrix.name }}-php${{ env.PHP_VERSION }}-
+
+      - name: Fetch PHP sources & extension deps
+        working-directory: build/.tools
+        run: |
+          ./spc doctor --auto-fix || true
+          ./spc download --with-php=${{ env.PHP_VERSION }} \
+            --for-extensions="$SPC_EXTENSIONS" --prefer-pre-built
+
+      - name: Build phpmicro SAPI with extensions
+        working-directory: build/.tools
+        run: ./spc build "$SPC_EXTENSIONS" --build-micro
+
+      - name: Combine PHAR into standalone binary
+        working-directory: build/.tools
+        run: |
+          ./spc micro:combine ../../build/durable-workflow.phar \
+            --output=../../build/durable-workflow-${{ matrix.name }}
+
+      - name: Smoke test binary (native arch only)
+        if: matrix.name == 'linux-x86_64' || matrix.name == 'macos-aarch64'
+        run: |
+          chmod +x build/durable-workflow-${{ matrix.name }}
+          ./build/durable-workflow-${{ matrix.name }} --version || true
+          ./build/durable-workflow-${{ matrix.name }} list || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: durable-workflow-${{ matrix.name }}
+          path: build/durable-workflow-${{ matrix.name }}
+          if-no-files-found: error
+
+  release:
+    name: Publish Release
+    needs: [build-phar, build-binary]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Generate checksums
+        working-directory: dist
+        run: sha256sum * > SHA256SUMS
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true

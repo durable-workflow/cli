@@ -90,15 +90,13 @@ rejected aliases, and removed fields advertised by the target server.
 
 ## Compatibility
 
-CLI version 0.1.x is compatible with:
-- **Server 0.x** (prerelease versions 0.1.0 through 0.1.9+)
-- **Server 2.x** (stable release versions 2.0.0+)
+CLI version 0.1.x requires **Server 2.x** (versions 2.0.0+).
 
 The CLI automatically validates server version on first invocation and raises a clear error if incompatible:
 
 ```bash
 $ dw workflow:list
-Server version 3.0.0 is incompatible with dw CLI 0.1.x (requires server 0.x or 2.x).
+Server version 3.0.0 is incompatible with dw CLI 0.1.x (requires server 2.x).
 Upgrade the server or use a compatible CLI version.
 ```
 

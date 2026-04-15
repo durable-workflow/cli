@@ -6,24 +6,27 @@ Command-line interface for running and interacting with the [Durable Workflow Se
 
 Three options depending on what you have installed:
 
-**1. Standalone binary (no PHP required).** Download a native binary for your
-platform from the [releases page](https://github.com/durable-workflow/cli/releases):
+**1. Standalone binary (no PHP required).** The easiest path — a one-liner
+installer that detects your OS and arch:
 
 ```bash
-curl -fsSL -o durable-workflow \
-  https://github.com/durable-workflow/cli/releases/latest/download/durable-workflow-linux-x86_64
-chmod +x durable-workflow
-./durable-workflow --version
+# Linux and macOS
+curl -fsSL https://durable-workflow.com/install.sh | sh
 ```
 
-Available assets: `durable-workflow-linux-x86_64`, `durable-workflow-linux-aarch64`,
-`durable-workflow-macos-aarch64`.
+```powershell
+# Windows
+irm https://durable-workflow.com/install.ps1 | iex
+```
 
-Windows and macOS x86_64 standalone binaries are not currently produced.
-Windows is blocked on an upstream PHP 8.4 + OpenSSL 3 compile bug in
-static-php-cli; macOS x86_64 is dropped because the `macos-13` runner
-label is not available to this org. On Windows, install a system PHP
-(>= 8.4) and use the PHAR.
+Or download a native binary directly from the [releases
+page](https://github.com/durable-workflow/cli/releases). Available assets:
+`durable-workflow-linux-x86_64`, `durable-workflow-linux-aarch64`,
+`durable-workflow-macos-aarch64`, `durable-workflow-windows-x86_64.exe`.
+
+macOS x86_64 standalone binaries are not currently produced because the
+`macos-13` runner label is not available to this org; Intel Mac users can
+run the PHAR with a system PHP.
 
 **2. PHAR (requires PHP >= 8.2).** Download `durable-workflow.phar` from the
 [releases page](https://github.com/durable-workflow/cli/releases) and run it

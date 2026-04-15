@@ -1,0 +1,36 @@
+{
+    "$schema": "https://raw.githubusercontent.com/box-project/box/main/res/schema.json",
+    "main": "bin/dw",
+    "output": "build/dw.phar",
+    "chmod": "0755",
+    "directories": ["src"],
+    "finder": [
+        {
+            "name": "*.php",
+            "exclude": ["tests", "Tests", "test", "docs", "doc", "examples"],
+            "in": "vendor"
+        },
+        {
+            "name": ["LICENSE", "LICENSE.md"],
+            "in": "vendor"
+        },
+        {
+            "name": "*",
+            "in": "vendor/symfony/console/Resources"
+        }
+    ],
+    "compactors": [
+        "KevinGH\\Box\\Compactor\\Php",
+        "KevinGH\\Box\\Compactor\\Json"
+    ],
+    "compression": "GZ",
+    "banner": [
+        "Durable Workflow CLI",
+        "",
+        "(c) Durable Workflow <support@durable-workflow.com>",
+        "",
+        "Distributed under the MIT license."
+    ],
+    "exclude-composer-files": true,
+    "check-requirements": true
+}

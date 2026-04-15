@@ -1,0 +1,275 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (for manual dispatch, e.g. v0.0.1-test)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+env:
+  SPC_EXTENSIONS: curl,mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets
+  # Windows: no ext-openssl. PHP's Windows openssl extension fails to
+  # compile against OpenSSL 3 on both 8.3 and 8.4 (php_openssl.h uses
+  # the removed ERR_NUM_ERRORS). We patch spc's config/ext.json to
+  # stop it from being pulled in as a transitive dep of ext-curl;
+  # curl still links libopenssl at the transport layer for TLS.
+  SPC_EXTENSIONS_WINDOWS: curl,mbstring,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets
+  PHP_VERSION: '8.4'
+  PHP_VERSION_WINDOWS: '8.4'
+  BOX_VERSION: '4.6.6'
+  # Passed to every spc step so it can use authenticated GitHub API calls
+  # when fetching source tarballs / pre-built libs (avoids 403 rate limits).
+  GITHUB_TOKEN: ${{ github.token }}
+
+jobs:
+  build-phar:
+    name: Build PHAR
+    runs-on: ubuntu-latest
+    outputs:
+      phar-name: dw.phar
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          tools: composer:v2, box:${{ env.BOX_VERSION }}
+          coverage: none
+          ini-values: phar.readonly=0
+
+      - name: Install dependencies
+        run: composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
+
+      - name: Build PHAR
+        run: box compile --no-parallel
+
+      - name: Verify PHAR
+        run: |
+          php build/dw.phar --version || true
+          box info build/dw.phar
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dw-phar
+          path: build/dw.phar
+          if-no-files-found: error
+
+  build-binary:
+    name: Build ${{ matrix.name }}
+    needs: build-phar
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64
+            runner: ubuntu-latest
+            spc_asset: spc-linux-x86_64
+          - name: linux-aarch64
+            runner: ubuntu-24.04-arm
+            spc_asset: spc-linux-aarch64
+          - name: macos-aarch64
+            runner: macos-14
+            spc_asset: spc-macos-aarch64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download PHAR artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dw-phar
+          path: build/
+
+      - name: Download spc
+        run: |
+          mkdir -p build/.tools
+          for attempt in 1 2 3 4 5; do
+            if curl -fsSL --retry 3 --retry-all-errors --connect-timeout 10 \
+                -o build/.tools/spc \
+                "https://dl.static-php.dev/static-php-cli/spc-bin/nightly/${{ matrix.spc_asset }}"; then
+              break
+            fi
+            echo "spc download attempt $attempt failed, retrying in 10s..."
+            sleep 10
+          done
+          test -s build/.tools/spc
+          chmod +x build/.tools/spc
+
+      - name: Cache spc downloads
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/.tools/downloads
+            build/.tools/source
+          key: spc-${{ matrix.name }}-php${{ env.PHP_VERSION }}-${{ hashFiles('.github/workflows/release.yml') }}
+          restore-keys: |
+            spc-${{ matrix.name }}-php${{ env.PHP_VERSION }}-
+
+      - name: Fetch PHP sources & extension deps
+        working-directory: build/.tools
+        run: |
+          ./spc doctor --auto-fix || true
+          ./spc download --with-php=${{ env.PHP_VERSION }} \
+            --for-extensions="$SPC_EXTENSIONS" --prefer-pre-built
+
+      - name: Build phpmicro SAPI with extensions
+        working-directory: build/.tools
+        run: ./spc build "$SPC_EXTENSIONS" --build-micro
+
+      - name: Combine PHAR into standalone binary
+        working-directory: build/.tools
+        run: |
+          ./spc micro:combine ../../build/dw.phar \
+            --output=../../build/dw-${{ matrix.name }}
+
+      - name: Smoke test binary (native arch only)
+        if: matrix.name == 'linux-x86_64' || matrix.name == 'macos-aarch64'
+        run: |
+          chmod +x build/dw-${{ matrix.name }}
+          ./build/dw-${{ matrix.name }} --version
+          ./build/dw-${{ matrix.name }} list
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dw-${{ matrix.name }}
+          path: build/dw-${{ matrix.name }}
+          if-no-files-found: error
+
+  build-binary-windows:
+    name: Build windows-x86_64
+    needs: build-phar
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download PHAR artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dw-phar
+          path: build/
+
+      - name: Setup PHP for spc
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION_WINDOWS }}
+          tools: composer:v2
+          coverage: none
+
+      - name: Clone spc and patch ext.json
+        shell: pwsh
+        run: |
+          # Strip 'openssl' from curl's Windows ext-depends. Upstream spc
+          # forces PHP's ext-openssl in whenever ext-curl is built on
+          # Windows, but PHP's Windows ext-openssl fails to compile
+          # against OpenSSL 3 (php_openssl.h references the removed
+          # ERR_NUM_ERRORS). libcurl itself still links libopenssl for
+          # transport-layer TLS, so HTTPS continues to work.
+          git clone --depth=1 https://github.com/crazywhalecc/static-php-cli.git build\spc-src
+          @'
+          import json, pathlib
+          p = pathlib.Path("build/spc-src/config/ext.json")
+          d = json.loads(p.read_text())
+          d["curl"]["ext-depends-windows"] = [
+              x for x in d["curl"]["ext-depends-windows"] if x != "openssl"
+          ]
+          p.write_text(json.dumps(d, indent=4))
+          '@ | Set-Content -Path patch-ext.py -Encoding utf8
+          python patch-ext.py
+          Get-Content build\spc-src\config\ext.json | Select-String -Pattern '"curl"' -Context 0,8
+
+      - name: Install spc Composer dependencies
+        shell: pwsh
+        working-directory: build\spc-src
+        run: composer install --no-dev --prefer-dist --no-interaction
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Cache spc downloads
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/spc-src/downloads
+            build/spc-src/source
+            build/spc-src/buildroot
+          key: spc-src-windows-x86_64-php${{ env.PHP_VERSION_WINDOWS }}-${{ hashFiles('.github/workflows/release.yml') }}
+          restore-keys: |
+            spc-src-windows-x86_64-php${{ env.PHP_VERSION_WINDOWS }}-
+
+      - name: Fetch PHP sources & extension deps
+        shell: pwsh
+        working-directory: build\spc-src
+        run: |
+          php bin\spc doctor --auto-fix
+          php bin\spc download --with-php=${{ env.PHP_VERSION_WINDOWS }} `
+            --for-extensions="$env:SPC_EXTENSIONS_WINDOWS" --prefer-pre-built
+
+      - name: Build phpmicro SAPI with extensions
+        shell: pwsh
+        working-directory: build\spc-src
+        run: php bin\spc build "$env:SPC_EXTENSIONS_WINDOWS" --build-micro --debug
+
+      - name: Upload spc build logs (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-spc-logs
+          path: build/spc-src/log/
+          if-no-files-found: warn
+
+      - name: Combine PHAR into standalone binary
+        shell: pwsh
+        working-directory: build\spc-src
+        run: |
+          php bin\spc micro:combine ..\..\build\dw.phar `
+            --output=..\..\build\dw-windows-x86_64.exe
+
+      - name: Smoke test binary
+        shell: pwsh
+        run: |
+          .\build\dw-windows-x86_64.exe --version
+          .\build\dw-windows-x86_64.exe list
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dw-windows-x86_64
+          path: build/dw-windows-x86_64.exe
+          if-no-files-found: error
+
+  release:
+    name: Publish Release
+    # Windows is intentionally not a hard dependency: it runs with
+    # continue-on-error so a Windows-build failure doesn't block the
+    # Linux/macOS release. If the Windows job succeeds, its artifact
+    # is picked up by download-artifact below.
+    needs: [build-phar, build-binary]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Generate checksums
+        working-directory: dist
+        run: sha256sum * > SHA256SUMS
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true

@@ -4,11 +4,52 @@ Command-line interface for running and interacting with the [Durable Workflow Se
 
 ## Installation
 
+Three options depending on what you have installed:
+
+**1. Standalone binary (no PHP required).** The easiest path — a one-liner
+installer that detects your OS and arch:
+
+```bash
+# Linux and macOS
+curl -fsSL https://durable-workflow.com/install.sh | sh
+```
+
+```powershell
+# Windows
+irm https://durable-workflow.com/install.ps1 | iex
+```
+
+Or download a native binary directly from the [releases
+page](https://github.com/durable-workflow/cli/releases). Available assets:
+`dw-linux-x86_64`, `dw-linux-aarch64`,
+`dw-macos-aarch64`, `dw-windows-x86_64.exe`.
+
+macOS x86_64 standalone binaries are not currently produced because the
+`macos-13` runner label is not available to this org; Intel Mac users can
+run the PHAR with a system PHP.
+
+**2. PHAR (requires PHP >= 8.2).** Download `dw.phar` from the
+[releases page](https://github.com/durable-workflow/cli/releases) and run it
+with `php dw.phar` (or `chmod +x` and call directly — the PHAR
+has a `#!/usr/bin/env php` shebang).
+
+**3. Composer.**
+
 ```bash
 composer global require durable-workflow/cli
 ```
 
-Or download a binary from the [releases page](https://github.com/durable-workflow/cli/releases).
+### Building from source
+
+```bash
+make phar      # Build the PHAR (requires PHP >= 8.2 and Composer)
+make binary    # Build the PHAR plus a standalone native binary for the
+               # current platform (downloads Box and static-php-cli on demand)
+make clean     # Remove build artifacts
+```
+
+Build artifacts land in `./build/`. See [scripts/build.sh](scripts/build.sh)
+for the underlying steps; tools are cached under `build/.tools/`.
 
 ## Configuration
 

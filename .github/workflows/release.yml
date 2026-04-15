@@ -137,8 +137,8 @@ jobs:
         if: matrix.name == 'linux-x86_64' || matrix.name == 'macos-aarch64'
         run: |
           chmod +x build/durable-workflow-${{ matrix.name }}
-          ./build/durable-workflow-${{ matrix.name }} --version || true
-          ./build/durable-workflow-${{ matrix.name }} list || true
+          ./build/durable-workflow-${{ matrix.name }} --version
+          ./build/durable-workflow-${{ matrix.name }} list
 
       - uses: actions/upload-artifact@v4
         with:

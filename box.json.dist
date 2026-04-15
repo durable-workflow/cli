@@ -13,6 +13,10 @@
         {
             "name": ["LICENSE", "LICENSE.md"],
             "in": "vendor"
+        },
+        {
+            "name": "*",
+            "in": "vendor/symfony/console/Resources"
         }
     ],
     "compactors": [

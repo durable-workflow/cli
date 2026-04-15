@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - '[0-9]+.[0-9]+.[0-9]+*'
     branches:
       - 'standalone-binary-build'  # temporary, for Windows iteration
   workflow_dispatch:
@@ -254,7 +254,7 @@ jobs:
     # is picked up by download-artifact below.
     needs: [build-phar, build-binary]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/')
     steps:
       - uses: actions/checkout@v4
 

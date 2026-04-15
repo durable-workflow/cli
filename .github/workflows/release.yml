@@ -25,7 +25,7 @@ env:
   # curl still links libopenssl at the transport layer for TLS.
   SPC_EXTENSIONS_WINDOWS: curl,mbstring,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets
   PHP_VERSION: '8.4'
-  PHP_VERSION_WINDOWS: '8.3'
+  PHP_VERSION_WINDOWS: '8.4'
   BOX_VERSION: '4.6.6'
   # Passed to every spc step so it can use authenticated GitHub API calls
   # when fetching source tarballs / pre-built libs (avoids 403 rate limits).

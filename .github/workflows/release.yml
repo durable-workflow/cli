@@ -34,7 +34,7 @@ jobs:
     name: Build PHAR
     runs-on: ubuntu-latest
     outputs:
-      phar-name: durable-workflow.phar
+      phar-name: dw.phar
     steps:
       - uses: actions/checkout@v4
 
@@ -54,13 +54,13 @@ jobs:
 
       - name: Verify PHAR
         run: |
-          php build/durable-workflow.phar --version || true
-          box info build/durable-workflow.phar
+          php build/dw.phar --version || true
+          box info build/dw.phar
 
       - uses: actions/upload-artifact@v4
         with:
-          name: durable-workflow-phar
-          path: build/durable-workflow.phar
+          name: dw-phar
+          path: build/dw.phar
           if-no-files-found: error
 
   build-binary:
@@ -86,7 +86,7 @@ jobs:
       - name: Download PHAR artifact
         uses: actions/download-artifact@v4
         with:
-          name: durable-workflow-phar
+          name: dw-phar
           path: build/
 
       - name: Download spc
@@ -128,20 +128,20 @@ jobs:
       - name: Combine PHAR into standalone binary
         working-directory: build/.tools
         run: |
-          ./spc micro:combine ../../build/durable-workflow.phar \
-            --output=../../build/durable-workflow-${{ matrix.name }}
+          ./spc micro:combine ../../build/dw.phar \
+            --output=../../build/dw-${{ matrix.name }}
 
       - name: Smoke test binary (native arch only)
         if: matrix.name == 'linux-x86_64' || matrix.name == 'macos-aarch64'
         run: |
-          chmod +x build/durable-workflow-${{ matrix.name }}
-          ./build/durable-workflow-${{ matrix.name }} --version
-          ./build/durable-workflow-${{ matrix.name }} list
+          chmod +x build/dw-${{ matrix.name }}
+          ./build/dw-${{ matrix.name }} --version
+          ./build/dw-${{ matrix.name }} list
 
       - uses: actions/upload-artifact@v4
         with:
-          name: durable-workflow-${{ matrix.name }}
-          path: build/durable-workflow-${{ matrix.name }}
+          name: dw-${{ matrix.name }}
+          path: build/dw-${{ matrix.name }}
           if-no-files-found: error
 
   build-binary-windows:
@@ -154,7 +154,7 @@ jobs:
       - name: Download PHAR artifact
         uses: actions/download-artifact@v4
         with:
-          name: durable-workflow-phar
+          name: dw-phar
           path: build/
 
       - name: Setup PHP for spc
@@ -229,19 +229,19 @@ jobs:
         shell: pwsh
         working-directory: build\spc-src
         run: |
-          php bin\spc micro:combine ..\..\build\durable-workflow.phar `
-            --output=..\..\build\durable-workflow-windows-x86_64.exe
+          php bin\spc micro:combine ..\..\build\dw.phar `
+            --output=..\..\build\dw-windows-x86_64.exe
 
       - name: Smoke test binary
         shell: pwsh
         run: |
-          .\build\durable-workflow-windows-x86_64.exe --version
-          .\build\durable-workflow-windows-x86_64.exe list
+          .\build\dw-windows-x86_64.exe --version
+          .\build\dw-windows-x86_64.exe list
 
       - uses: actions/upload-artifact@v4
         with:
-          name: durable-workflow-windows-x86_64
-          path: build/durable-workflow-windows-x86_64.exe
+          name: dw-windows-x86_64
+          path: build/dw-windows-x86_64.exe
           if-no-files-found: error
 
   release:

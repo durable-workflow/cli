@@ -15,7 +15,7 @@ cd "$ROOT"
 
 BUILD_DIR="$ROOT/build"
 TOOLS_DIR="$ROOT/build/.tools"
-PHAR_OUT="$BUILD_DIR/durable-workflow.phar"
+PHAR_OUT="$BUILD_DIR/dw.phar"
 
 # Extensions required by the CLI at runtime. Keep this list in sync with the
 # CI matrix in .github/workflows/release.yml.
@@ -79,7 +79,7 @@ build_binary() {
     local php_version="${PHP_VERSION:-8.4}"
     local platform
     platform="$(detect_platform)"
-    local out_name="durable-workflow-${platform}"
+    local out_name="dw-${platform}"
 
     pushd "$TOOLS_DIR" >/dev/null
     echo ">> Downloading PHP ${php_version} source + extension deps"

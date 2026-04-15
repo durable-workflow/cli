@@ -38,5 +38,5 @@ jobs:
           ini-values: phar.readonly=0
       - run: composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
       - run: box compile --no-parallel
-      - run: box info build/durable-workflow.phar
-      - run: php build/durable-workflow.phar list
+      - run: box info build/dw.phar
+      - run: php build/dw.phar list

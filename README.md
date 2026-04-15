@@ -21,16 +21,16 @@ irm https://durable-workflow.com/install.ps1 | iex
 
 Or download a native binary directly from the [releases
 page](https://github.com/durable-workflow/cli/releases). Available assets:
-`durable-workflow-linux-x86_64`, `durable-workflow-linux-aarch64`,
-`durable-workflow-macos-aarch64`, `durable-workflow-windows-x86_64.exe`.
+`dw-linux-x86_64`, `dw-linux-aarch64`,
+`dw-macos-aarch64`, `dw-windows-x86_64.exe`.
 
 macOS x86_64 standalone binaries are not currently produced because the
 `macos-13` runner label is not available to this org; Intel Mac users can
 run the PHAR with a system PHP.
 
-**2. PHAR (requires PHP >= 8.2).** Download `durable-workflow.phar` from the
+**2. PHAR (requires PHP >= 8.2).** Download `dw.phar` from the
 [releases page](https://github.com/durable-workflow/cli/releases) and run it
-with `php durable-workflow.phar` (or `chmod +x` and call directly — the PHAR
+with `php dw.phar` (or `chmod +x` and call directly — the PHAR
 has a `#!/usr/bin/env php` shebang).
 
 **3. Composer.**

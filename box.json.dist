@@ -1,7 +1,7 @@
 {
     "$schema": "https://raw.githubusercontent.com/box-project/box/main/res/schema.json",
-    "main": "bin/durable-workflow",
-    "output": "build/durable-workflow.phar",
+    "main": "bin/dw",
+    "output": "build/dw.phar",
     "chmod": "0755",
     "directories": ["src"],
     "finder": [

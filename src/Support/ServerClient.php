@@ -35,6 +35,8 @@ class ServerClient
 
     private bool $controlPlaneRequestContractResolved = false;
 
+    private bool $serverVersionChecked = false;
+
     public function __construct(
         ?string $baseUrl = null,
         ?string $token = null,
@@ -100,8 +102,38 @@ class ServerClient
         }
 
         $this->clusterInfoCache = $this->get('/cluster/info');
+        $this->checkServerVersion();
 
         return $this->clusterInfoCache;
+    }
+
+    private function checkServerVersion(): void
+    {
+        if ($this->serverVersionChecked || ! is_array($this->clusterInfoCache)) {
+            return;
+        }
+
+        $this->serverVersionChecked = true;
+
+        $serverVersion = $this->clusterInfoCache['version'] ?? 'unknown';
+
+        // Parse major version (e.g., "0.1.9" -> 0, "2.0.0" -> 2)
+        if (preg_match('/^(\d+)/', (string) $serverVersion, $matches)) {
+            $major = (int) $matches[1];
+        } else {
+            // Unable to parse version, skip validation
+            return;
+        }
+
+        // CLI 0.1.x is compatible with server 0.x (prerelease) and 2.x (stable)
+        // Not compatible with server 1.x (skipped version) or 3+ (future breaking)
+        if ($major !== 0 && $major !== 2) {
+            throw new \RuntimeException(sprintf(
+                'Server version %s is incompatible with dw CLI 0.1.x (requires server 0.x or 2.x). '.
+                'Upgrade the server or use a compatible CLI version.',
+                $serverVersion,
+            ));
+        }
     }
 
     public function controlPlaneRequestContract(): ?ControlPlaneRequestContract

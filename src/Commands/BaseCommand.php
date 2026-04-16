@@ -94,6 +94,21 @@ abstract class BaseCommand extends Command
         return Command::SUCCESS;
     }
 
+    /**
+     * Declare --json on a mutating command. Pair with {@see wantsJson()} in
+     * execute() to return the raw server response instead of the human-readable
+     * summary.
+     */
+    protected function addJsonOption(): void
+    {
+        $this->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
+    }
+
+    protected function wantsJson(InputInterface $input): bool
+    {
+        return $input->hasOption('json') && $input->getOption('json') === true;
+    }
+
     protected function renderTable(OutputInterface $output, array $headers, array $rows): void
     {
         $table = new \Symfony\Component\Console\Helper\Table($output);

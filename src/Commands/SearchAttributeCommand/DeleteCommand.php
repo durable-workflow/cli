@@ -8,6 +8,7 @@ use DurableWorkflow\Cli\Commands\BaseCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 class DeleteCommand extends BaseCommand
@@ -26,14 +27,19 @@ filter on it.
 
   <info>dw search-attribute:delete OrderStatus</info>
 HELP)
-            ->addArgument('name', InputArgument::REQUIRED, 'Attribute name to remove');
+            ->addArgument('name', InputArgument::REQUIRED, 'Attribute name to remove')
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $name = $input->getArgument('name');
 
-        $this->client($input)->delete('/search-attributes/'.$name);
+        $result = $this->client($input)->delete('/search-attributes/'.$name);
+
+        if ($this->wantsJson($input)) {
+            return $this->renderJson($output, $result);
+        }
 
         $output->writeln(sprintf('<info>Search attribute deleted: %s</info>', $name));
 

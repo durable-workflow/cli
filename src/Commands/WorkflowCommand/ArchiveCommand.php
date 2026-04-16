@@ -28,7 +28,8 @@ active cannot be archived; cancel or terminate them first.
   <info>dw workflow:archive chk-42 --reason="GDPR erasure request"</info>
 HELP)
             ->addArgument('workflow-id', InputArgument::REQUIRED, 'Workflow ID')
-            ->addOption('reason', null, InputOption::VALUE_OPTIONAL, 'Archive reason');
+            ->addOption('reason', null, InputOption::VALUE_OPTIONAL, 'Archive reason')
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -40,6 +41,10 @@ HELP)
         ], fn ($v) => $v !== null);
 
         $result = $this->client($input)->post("/workflows/{$workflowId}/archive", $body);
+
+        if ($this->wantsJson($input)) {
+            return $this->renderJson($output, $result);
+        }
 
         $output->writeln('<info>Archive requested</info>');
         $output->writeln('  Workflow ID: '.$result['workflow_id']);

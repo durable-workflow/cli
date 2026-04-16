@@ -8,6 +8,7 @@ use DurableWorkflow\Cli\Commands\BaseCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 class DeleteCommand extends BaseCommand
@@ -25,13 +26,18 @@ Delete a schedule. In-flight runs it has already spawned keep running
 
   <info>dw schedule:delete daily-report</info>
 HELP)
-            ->addArgument('schedule-id', InputArgument::REQUIRED, 'Schedule ID');
+            ->addArgument('schedule-id', InputArgument::REQUIRED, 'Schedule ID')
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $scheduleId = $input->getArgument('schedule-id');
-        $this->client($input)->delete("/schedules/{$scheduleId}");
+        $result = $this->client($input)->delete("/schedules/{$scheduleId}");
+
+        if ($this->wantsJson($input)) {
+            return $this->renderJson($output, $result);
+        }
 
         $output->writeln('<info>Schedule deleted: '.$scheduleId.'</info>');
 

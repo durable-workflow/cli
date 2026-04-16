@@ -47,7 +47,8 @@ HELP)
             ->addOption('jitter', null, InputOption::VALUE_REQUIRED, 'Jitter in seconds (0-3600)')
             ->addOption('max-runs', null, InputOption::VALUE_REQUIRED, 'Maximum number of runs before auto-delete')
             ->addOption('paused', null, InputOption::VALUE_NONE, 'Create in paused state')
-            ->addOption('note', null, InputOption::VALUE_OPTIONAL, 'Note');
+            ->addOption('note', null, InputOption::VALUE_OPTIONAL, 'Note')
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -85,6 +86,10 @@ HELP)
         ];
 
         $result = $this->client($input)->post('/schedules', $body);
+
+        if ($this->wantsJson($input)) {
+            return $this->renderJson($output, $result);
+        }
 
         $output->writeln('<info>Schedule created: '.$result['schedule_id'].'</info>');
 

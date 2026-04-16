@@ -8,6 +8,7 @@ use DurableWorkflow\Cli\Commands\BaseCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 class CreateCommand extends BaseCommand
@@ -28,7 +29,8 @@ and visibility queries can filter on it. Types are fixed at creation.
   <info>dw search-attribute:create Tags keyword_list</info>
 HELP)
             ->addArgument('name', InputArgument::REQUIRED, 'Attribute name (e.g. OrderStatus)')
-            ->addArgument('type', InputArgument::REQUIRED, 'Attribute type (keyword, text, int, double, bool, datetime, keyword_list)');
+            ->addArgument('type', InputArgument::REQUIRED, 'Attribute type (keyword, text, int, double, bool, datetime, keyword_list)')
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -37,6 +39,10 @@ HELP)
             'name' => $input->getArgument('name'),
             'type' => $input->getArgument('type'),
         ]);
+
+        if ($this->wantsJson($input)) {
+            return $this->renderJson($output, $result);
+        }
 
         $output->writeln(sprintf(
             '<info>Search attribute created: %s (%s)</info>',

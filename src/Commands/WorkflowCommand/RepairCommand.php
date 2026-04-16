@@ -8,6 +8,7 @@ use DurableWorkflow\Cli\Commands\BaseCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 class RepairCommand extends BaseCommand
@@ -26,7 +27,8 @@ safe to call on a healthy workflow — the server will no-op.
 
   <info>dw workflow:repair chk-42</info>
 HELP)
-            ->addArgument('workflow-id', InputArgument::REQUIRED, 'Workflow ID');
+            ->addArgument('workflow-id', InputArgument::REQUIRED, 'Workflow ID')
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -34,6 +36,10 @@ HELP)
         $workflowId = $input->getArgument('workflow-id');
 
         $result = $this->client($input)->post("/workflows/{$workflowId}/repair");
+
+        if ($this->wantsJson($input)) {
+            return $this->renderJson($output, $result);
+        }
 
         $output->writeln('<info>Repair requested</info>');
         $output->writeln('  Workflow ID: '.$result['workflow_id']);

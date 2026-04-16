@@ -33,18 +33,23 @@ HELP)
             ->addArgument('schedule-id', InputArgument::REQUIRED, 'Schedule ID')
             ->addOption('start-time', null, InputOption::VALUE_REQUIRED, 'Start time (ISO 8601)')
             ->addOption('end-time', null, InputOption::VALUE_REQUIRED, 'End time (ISO 8601)')
-            ->addOption('overlap-policy', null, InputOption::VALUE_OPTIONAL, 'Override overlap policy');
+            ->addOption('overlap-policy', null, InputOption::VALUE_OPTIONAL, 'Override overlap policy')
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $scheduleId = $input->getArgument('schedule-id');
 
-        $this->client($input)->post("/schedules/{$scheduleId}/backfill", array_filter([
+        $result = $this->client($input)->post("/schedules/{$scheduleId}/backfill", array_filter([
             'start_time' => $input->getOption('start-time'),
             'end_time' => $input->getOption('end-time'),
             'overlap_policy' => $input->getOption('overlap-policy'),
         ], fn ($v) => $v !== null));
+
+        if ($this->wantsJson($input)) {
+            return $this->renderJson($output, $result);
+        }
 
         $output->writeln('<info>Backfill started for: '.$scheduleId.'</info>');
 

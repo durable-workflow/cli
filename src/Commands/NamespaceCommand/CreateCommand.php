@@ -30,7 +30,8 @@ never appear in each other's lists.
 HELP)
             ->addArgument('name', InputArgument::REQUIRED, 'Namespace name')
             ->addOption('description', 'd', InputOption::VALUE_OPTIONAL, 'Description')
-            ->addOption('retention', 'r', InputOption::VALUE_OPTIONAL, 'Retention period in days', '30');
+            ->addOption('retention', 'r', InputOption::VALUE_OPTIONAL, 'Retention period in days', '30')
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -40,6 +41,10 @@ HELP)
             'description' => $input->getOption('description'),
             'retention_days' => (int) $input->getOption('retention'),
         ]);
+
+        if ($this->wantsJson($input)) {
+            return $this->renderJson($output, $result);
+        }
 
         $output->writeln('<info>Namespace created: '.$result['name'].'</info>');
 

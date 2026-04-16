@@ -276,6 +276,22 @@ echo $?  # 3 (NETWORK)
 Exit codes are defined in [`DurableWorkflow\Cli\Support\ExitCode`](src/Support/ExitCode.php)
 and are covered by [`tests/Commands/ExitCodePolicyTest.php`](tests/Commands/ExitCodePolicyTest.php).
 
+## JSON Output
+
+Every list, describe, read, and mutating command supports `--json` for
+machine-readable output. Mutating commands (POST/PUT/DELETE) return the
+server's raw response body when `--json` is set, making them safe to pipe
+into `jq` or feed into downstream tooling.
+
+```bash
+# Read surface — stable even when no --json flag is passed for list views.
+dw workflow:list --json | jq '.workflows[].workflow_id'
+
+# Mutating surface — capture server response for idempotent automation.
+wf_id=$(dw workflow:start --type=orders.Checkout --json | jq -r '.workflow_id')
+dw workflow:signal "$wf_id" approve --json | jq '.command_status'
+```
+
 ## License
 
 MIT

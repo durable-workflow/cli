@@ -38,7 +38,8 @@ HELP)
             ->addOption('overlap-policy', null, InputOption::VALUE_OPTIONAL, 'Overlap policy')
             ->addOption('jitter', null, InputOption::VALUE_REQUIRED, 'Jitter in seconds (0-3600)')
             ->addOption('max-runs', null, InputOption::VALUE_REQUIRED, 'Maximum number of runs')
-            ->addOption('note', null, InputOption::VALUE_OPTIONAL, 'Note');
+            ->addOption('note', null, InputOption::VALUE_OPTIONAL, 'Note')
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -93,7 +94,11 @@ HELP)
             return Command::FAILURE;
         }
 
-        $this->client($input)->put("/schedules/{$scheduleId}", $body);
+        $result = $this->client($input)->put("/schedules/{$scheduleId}", $body);
+
+        if ($this->wantsJson($input)) {
+            return $this->renderJson($output, $result);
+        }
 
         $output->writeln('<info>Schedule updated: '.$scheduleId.'</info>');
 

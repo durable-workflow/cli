@@ -30,7 +30,8 @@ HELP)
             ->addArgument('workflow-id', InputArgument::REQUIRED, 'Workflow ID')
             ->addArgument('query-name', InputArgument::REQUIRED, 'Query name')
             ->addOption('input', 'i', InputOption::VALUE_OPTIONAL, 'Query input JSON')
-            ->addOption('run-id', null, InputOption::VALUE_OPTIONAL, 'Target a specific run ID');
+            ->addOption('run-id', null, InputOption::VALUE_OPTIONAL, 'Target a specific run ID')
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -49,6 +50,10 @@ HELP)
             : "/workflows/{$workflowId}/query/{$queryName}";
 
         $result = $this->client($input)->post($path, $body);
+
+        if ($this->wantsJson($input)) {
+            return $this->renderJson($output, $result);
+        }
 
         $output->writeln('<info>Query result</info>');
         if (isset($result['query_name'])) {

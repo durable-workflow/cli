@@ -53,7 +53,8 @@ HELP)
             ->addOption('search-attr', null, InputOption::VALUE_OPTIONAL | InputOption::VALUE_IS_ARRAY, 'Search attributes (key=value)')
             ->addOption('execution-timeout', null, InputOption::VALUE_REQUIRED, 'Execution timeout in seconds (across all runs)')
             ->addOption('run-timeout', null, InputOption::VALUE_REQUIRED, 'Run timeout in seconds (single run)')
-            ->addOption('wait', null, InputOption::VALUE_NONE, 'Wait for the workflow to reach a terminal state');
+            ->addOption('wait', null, InputOption::VALUE_NONE, 'Wait for the workflow to reach a terminal state')
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -98,6 +99,10 @@ HELP)
         }
 
         $result = $client->post('/workflows', $body);
+
+        if ($this->wantsJson($input)) {
+            return $this->renderJson($output, $result);
+        }
 
         $output->writeln('<info>Workflow started</info>');
         $output->writeln('  Workflow ID: '.$result['workflow_id']);

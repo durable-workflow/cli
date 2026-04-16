@@ -8,6 +8,7 @@ use DurableWorkflow\Cli\Commands\BaseCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 class DeregisterCommand extends BaseCommand
@@ -25,13 +26,18 @@ workers re-register automatically on their next heartbeat.
 
   <info>dw worker:deregister py-worker-abc123</info>
 HELP)
-            ->addArgument('worker-id', InputArgument::REQUIRED, 'Worker ID to deregister');
+            ->addArgument('worker-id', InputArgument::REQUIRED, 'Worker ID to deregister')
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $workerId = $input->getArgument('worker-id');
         $result = $this->client($input)->delete("/workers/{$workerId}");
+
+        if ($this->wantsJson($input)) {
+            return $this->renderJson($output, $result);
+        }
 
         $outcome = $result['outcome'] ?? 'unknown';
 

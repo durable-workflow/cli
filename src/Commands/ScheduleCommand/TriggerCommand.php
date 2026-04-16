@@ -28,7 +28,8 @@ policy applies unless you override it with <comment>--overlap-policy</comment>.
   <info>dw schedule:trigger daily-report --overlap-policy=allow</info>
 HELP)
             ->addArgument('schedule-id', InputArgument::REQUIRED, 'Schedule ID')
-            ->addOption('overlap-policy', null, InputOption::VALUE_OPTIONAL, 'Override overlap policy');
+            ->addOption('overlap-policy', null, InputOption::VALUE_OPTIONAL, 'Override overlap policy')
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -38,6 +39,10 @@ HELP)
         $result = $this->client($input)->post("/schedules/{$scheduleId}/trigger", array_filter([
             'overlap_policy' => $input->getOption('overlap-policy'),
         ], fn ($v) => $v !== null));
+
+        if ($this->wantsJson($input)) {
+            return $this->renderJson($output, $result);
+        }
 
         $outcome = $result['outcome'] ?? 'unknown';
 

@@ -31,7 +31,8 @@ HELP)
             ->addArgument('workflow-id', InputArgument::REQUIRED, 'Workflow ID')
             ->addArgument('signal-name', InputArgument::REQUIRED, 'Signal name')
             ->addOption('input', 'i', InputOption::VALUE_OPTIONAL, 'Signal input JSON')
-            ->addOption('run-id', null, InputOption::VALUE_OPTIONAL, 'Target a specific run ID');
+            ->addOption('run-id', null, InputOption::VALUE_OPTIONAL, 'Target a specific run ID')
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -50,6 +51,10 @@ HELP)
             : "/workflows/{$workflowId}/signal/{$signalName}";
 
         $result = $this->client($input)->post($path, $body);
+
+        if ($this->wantsJson($input)) {
+            return $this->renderJson($output, $result);
+        }
 
         $output->writeln('<info>Signal sent</info>');
         $output->writeln('  Workflow ID: '.$result['workflow_id']);

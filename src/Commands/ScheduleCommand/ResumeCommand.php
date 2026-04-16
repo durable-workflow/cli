@@ -27,16 +27,21 @@ replayed unless you follow up with <comment>schedule:backfill</comment>.
   <info>dw schedule:resume daily-report --note="maintenance done"</info>
 HELP)
             ->addArgument('schedule-id', InputArgument::REQUIRED, 'Schedule ID')
-            ->addOption('note', null, InputOption::VALUE_OPTIONAL, 'Note');
+            ->addOption('note', null, InputOption::VALUE_OPTIONAL, 'Note')
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $scheduleId = $input->getArgument('schedule-id');
 
-        $this->client($input)->post("/schedules/{$scheduleId}/resume", array_filter([
+        $result = $this->client($input)->post("/schedules/{$scheduleId}/resume", array_filter([
             'note' => $input->getOption('note'),
         ], fn ($v) => $v !== null));
+
+        if ($this->wantsJson($input)) {
+            return $this->renderJson($output, $result);
+        }
 
         $output->writeln('<info>Schedule resumed: '.$scheduleId.'</info>');
 

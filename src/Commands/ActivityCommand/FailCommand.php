@@ -33,7 +33,8 @@ HELP)
             ->addOption('lease-owner', null, InputOption::VALUE_OPTIONAL, 'Lease owner identity', 'cli')
             ->addOption('message', 'm', InputOption::VALUE_REQUIRED, 'Failure message')
             ->addOption('type', 't', InputOption::VALUE_OPTIONAL, 'Failure type')
-            ->addOption('non-retryable', null, InputOption::VALUE_NONE, 'Mark as non-retryable');
+            ->addOption('non-retryable', null, InputOption::VALUE_NONE, 'Mark as non-retryable')
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -52,6 +53,10 @@ HELP)
         ];
 
         $result = $this->client($input)->post("/worker/activity-tasks/{$taskId}/fail", $body);
+
+        if ($this->wantsJson($input)) {
+            return $this->renderJson($output, $result);
+        }
 
         $output->writeln('<info>Activity failed</info>');
         $output->writeln('  Task ID: '.$result['task_id']);

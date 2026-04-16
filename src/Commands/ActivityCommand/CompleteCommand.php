@@ -29,7 +29,8 @@ HELP)
             ->addArgument('task-id', InputArgument::REQUIRED, 'Activity task ID')
             ->addArgument('attempt-id', InputArgument::REQUIRED, 'Leased activity attempt ID')
             ->addOption('lease-owner', null, InputOption::VALUE_OPTIONAL, 'Lease owner identity', 'cli')
-            ->addOption('result', 'r', InputOption::VALUE_OPTIONAL, 'Result JSON');
+            ->addOption('result', 'r', InputOption::VALUE_OPTIONAL, 'Result JSON')
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -46,6 +47,10 @@ HELP)
         }
 
         $result = $this->client($input)->post("/worker/activity-tasks/{$taskId}/complete", $body);
+
+        if ($this->wantsJson($input)) {
+            return $this->renderJson($output, $result);
+        }
 
         $output->writeln('<info>Activity completed</info>');
         $output->writeln('  Task ID: '.$result['task_id']);

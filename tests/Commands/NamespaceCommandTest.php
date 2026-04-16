@@ -62,6 +62,32 @@ class NamespaceCommandTest extends TestCase
         self::assertStringContainsString('No namespaces found', $tester->getDisplay());
     }
 
+    public function test_list_command_renders_json_output(): void
+    {
+        $command = new ListCommand();
+        $command->setServerClient(new NamespaceFakeClient([
+            'namespaces' => [
+                [
+                    'name' => 'default',
+                    'description' => 'Default namespace',
+                    'retention_days' => 30,
+                    'status' => 'active',
+                ],
+            ],
+        ]));
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            '--json' => true,
+        ]));
+
+        $decoded = json_decode($tester->getDisplay(), true);
+
+        self::assertIsArray($decoded);
+        self::assertSame('default', $decoded['namespaces'][0]['name']);
+    }
+
     public function test_create_command_sends_name_description_and_retention(): void
     {
         $client = new NamespaceFakeClient([
@@ -110,6 +136,30 @@ class NamespaceCommandTest extends TestCase
         self::assertStringContainsString('Default namespace', $display);
         self::assertStringContainsString('30', $display);
         self::assertStringContainsString('active', $display);
+    }
+
+    public function test_describe_command_renders_json_output(): void
+    {
+        $command = new DescribeCommand();
+        $command->setServerClient(new NamespaceFakeClient([
+            'name' => 'default',
+            'description' => 'Default namespace',
+            'retention_days' => 30,
+            'status' => 'active',
+        ]));
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            'name' => 'default',
+            '--json' => true,
+        ]));
+
+        $decoded = json_decode($tester->getDisplay(), true);
+
+        self::assertIsArray($decoded);
+        self::assertSame('default', $decoded['name']);
+        self::assertSame(30, $decoded['retention_days']);
     }
 
     public function test_update_command_sends_put_with_filtered_fields(): void

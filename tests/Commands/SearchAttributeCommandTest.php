@@ -56,6 +56,31 @@ class SearchAttributeCommandTest extends TestCase
         self::assertStringContainsString('No search attributes', $tester->getDisplay());
     }
 
+    public function test_list_command_renders_json_output(): void
+    {
+        $command = new ListCommand();
+        $command->setServerClient(new SearchAttributeFakeClient([
+            'system_attributes' => [
+                'WorkflowType' => 'keyword',
+            ],
+            'custom_attributes' => [
+                'OrderStatus' => 'keyword',
+            ],
+        ]));
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            '--json' => true,
+        ]));
+
+        $decoded = json_decode($tester->getDisplay(), true);
+
+        self::assertIsArray($decoded);
+        self::assertSame('keyword', $decoded['system_attributes']['WorkflowType']);
+        self::assertSame('keyword', $decoded['custom_attributes']['OrderStatus']);
+    }
+
     public function test_create_command_sends_name_and_type(): void
     {
         $client = new SearchAttributeFakeClient([

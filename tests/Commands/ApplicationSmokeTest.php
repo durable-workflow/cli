@@ -30,4 +30,21 @@ class ApplicationSmokeTest extends TestCase
             ]));
         }
     }
+
+    public function test_version_output_reports_build_identity(): void
+    {
+        $application = new Application();
+        $application->setAutoExit(false);
+
+        $tester = new ApplicationTester($application);
+
+        self::assertSame(0, $tester->run([
+            '--version' => true,
+        ]));
+
+        self::assertMatchesRegularExpression(
+            '/^dw \S+ \(commit [^)]+, built [^)]+\)/',
+            trim($tester->getDisplay()),
+        );
+    }
 }

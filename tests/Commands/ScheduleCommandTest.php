@@ -54,6 +54,31 @@ class ScheduleCommandTest extends TestCase
         self::assertStringContainsString('paused', $display);
     }
 
+    public function test_list_command_renders_json_output(): void
+    {
+        $command = new ListCommand();
+        $command->setServerClient(new ScheduleFakeClient([
+            'schedules' => [
+                [
+                    'schedule_id' => 'daily-report',
+                    'workflow_type' => 'reports.daily',
+                    'paused' => false,
+                ],
+            ],
+        ]));
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            '--json' => true,
+        ]));
+
+        $decoded = json_decode($tester->getDisplay(), true);
+
+        self::assertIsArray($decoded);
+        self::assertSame('daily-report', $decoded['schedules'][0]['schedule_id']);
+    }
+
     public function test_create_command_sends_cron_schedule(): void
     {
         $client = new ScheduleFakeClient([

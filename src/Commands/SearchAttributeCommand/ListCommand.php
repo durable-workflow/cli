@@ -7,6 +7,7 @@ namespace DurableWorkflow\Cli\Commands\SearchAttributeCommand;
 use DurableWorkflow\Cli\Commands\BaseCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 class ListCommand extends BaseCommand
@@ -15,12 +16,17 @@ class ListCommand extends BaseCommand
     {
         parent::configure();
         $this->setName('search-attribute:list')
-            ->setDescription('List search attribute definitions');
+            ->setDescription('List search attribute definitions')
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output as JSON');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $result = $this->client($input)->get('/search-attributes');
+
+        if ($input->getOption('json')) {
+            return $this->renderJson($output, $result);
+        }
 
         $rows = [];
 

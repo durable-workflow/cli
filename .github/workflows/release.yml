@@ -46,6 +46,9 @@ jobs:
           coverage: none
           ini-values: phar.readonly=0
 
+      - name: Generate build metadata
+        run: php scripts/generate-build-info.php
+
       - name: Install dependencies
         run: composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
 

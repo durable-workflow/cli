@@ -66,6 +66,7 @@ install_composer_deps() {
 
 build_phar() {
     ensure_tools
+    php scripts/generate-build-info.php
     install_composer_deps
     mkdir -p "$BUILD_DIR"
     echo ">> Building PHAR via Box"
@@ -96,6 +97,7 @@ build_binary() {
 
 clean() {
     rm -rf "$BUILD_DIR"
+    rm -f "$ROOT/src/GeneratedBuildInfo.php"
     echo ">> Cleaned $BUILD_DIR"
 }
 

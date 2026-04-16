@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Commands;
 
 use DurableWorkflow\Cli\Commands\TaskQueueCommand\DescribeCommand;
+use DurableWorkflow\Cli\Commands\TaskQueueCommand\ListCommand;
 use DurableWorkflow\Cli\Support\ServerClient;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
@@ -12,6 +13,29 @@ use Symfony\Component\Console\Tester\CommandTester;
 
 class TaskQueueDescribeCommandTest extends TestCase
 {
+    public function test_list_command_renders_json_output(): void
+    {
+        $command = new ListCommand();
+        $command->setServerClient(new FakeTaskQueueServerClient([
+            'task_queues' => [
+                [
+                    'name' => 'external-workflows',
+                ],
+            ],
+        ]));
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            '--json' => true,
+        ]));
+
+        $decoded = json_decode($tester->getDisplay(), true);
+
+        self::assertIsArray($decoded);
+        self::assertSame('external-workflows', $decoded['task_queues'][0]['name']);
+    }
+
     public function test_it_renders_backlog_poller_and_current_lease_sections(): void
     {
         $command = new DescribeCommand();

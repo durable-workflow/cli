@@ -8,6 +8,7 @@ use DurableWorkflow\Cli\Commands\BaseCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 class DescribeCommand extends BaseCommand
@@ -17,13 +18,18 @@ class DescribeCommand extends BaseCommand
         parent::configure();
         $this->setName('namespace:describe')
             ->setDescription('Show details of a namespace')
-            ->addArgument('name', InputArgument::REQUIRED, 'Namespace name');
+            ->addArgument('name', InputArgument::REQUIRED, 'Namespace name')
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output as JSON');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $name = $input->getArgument('name');
         $result = $this->client($input)->get("/namespaces/{$name}");
+
+        if ($input->getOption('json')) {
+            return $this->renderJson($output, $result);
+        }
 
         $output->writeln('<info>Namespace: '.$result['name'].'</info>');
         $output->writeln('  Description: '.($result['description'] ?? '-'));

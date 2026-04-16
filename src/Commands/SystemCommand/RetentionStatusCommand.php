@@ -17,6 +17,14 @@ class RetentionStatusCommand extends BaseCommand
         parent::configure();
         $this->setName('system:retention-status')
             ->setDescription('Show history retention diagnostics for the current namespace')
+            ->setHelp(<<<'HELP'
+Show how many terminal runs are older than the namespace's retention
+window and are eligible for pruning.
+
+<comment>Example:</comment>
+
+  <info>dw system:retention-status --namespace=billing</info>
+HELP)
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output as JSON');
     }
 

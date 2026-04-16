@@ -18,6 +18,17 @@ class HistoryCommand extends BaseCommand
         parent::configure();
         $this->setName('workflow:history')
             ->setDescription('Show event history for a workflow run')
+            ->setHelp(<<<'HELP'
+Print every history event for a specific run. Use
+<comment>--follow</comment> to long-poll for new events as they arrive;
+the command exits when the run reaches a terminal state.
+
+<comment>Examples:</comment>
+
+  <info>dw workflow:history chk-42 01HZ...</info>
+  <info>dw workflow:history chk-42 01HZ... --follow</info>
+  <info>dw workflow:history chk-42 01HZ... --json | jq '.events[].event_type'</info>
+HELP)
             ->addArgument('workflow-id', InputArgument::REQUIRED, 'Workflow ID')
             ->addArgument('run-id', InputArgument::REQUIRED, 'Run ID')
             ->addOption('follow', 'f', InputOption::VALUE_NONE, 'Follow new events (long-poll)')

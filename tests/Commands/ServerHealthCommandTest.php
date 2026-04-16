@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Tests\Commands;
 
 use DurableWorkflow\Cli\Commands\ServerCommand\HealthCommand;
+use DurableWorkflow\Cli\Support\ExitCode;
+use DurableWorkflow\Cli\Support\NetworkException;
 use DurableWorkflow\Cli\Support\ServerClient;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
@@ -56,14 +58,14 @@ class ServerHealthCommandTest extends TestCase
         self::assertStringContainsString('error', $display);
     }
 
-    public function test_health_command_returns_failure_on_connection_error(): void
+    public function test_health_command_returns_network_exit_code_on_connection_error(): void
     {
         $command = new HealthCommand();
         $command->setServerClient(new HealthFailingClient());
 
         $tester = new CommandTester($command);
 
-        self::assertSame(Command::FAILURE, $tester->execute([]));
+        self::assertSame(ExitCode::NETWORK, $tester->execute([]));
 
         self::assertStringContainsString('Connection refused', $tester->getDisplay());
     }
@@ -88,6 +90,6 @@ class HealthFailingClient extends ServerClient
 
     public function get(string $path, array $query = []): array
     {
-        throw new \RuntimeException('Connection refused');
+        throw new NetworkException('Connection refused');
     }
 }

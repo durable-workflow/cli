@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace DurableWorkflow\Cli\Support;
 
 use Symfony\Component\HttpClient\HttpClient;
+use Symfony\Contracts\HttpClient\Exception\TimeoutExceptionInterface;
+use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\HttpClient\ResponseInterface;
 
@@ -186,18 +188,32 @@ class ServerClient
 
     private function request(string $method, string $path, array $options = []): array
     {
-        $response = $this->http->request($method, '/api'.$path, $options);
+        try {
+            $response = $this->http->request($method, '/api'.$path, $options);
 
-        return $this->decode($response, $method, $path);
+            return $this->decode($response, $method, $path);
+        } catch (TimeoutExceptionInterface $e) {
+            throw new TimeoutException("Request timed out: {$e->getMessage()}", 0, $e);
+        } catch (TransportExceptionInterface $e) {
+            throw new NetworkException("Server unreachable: {$e->getMessage()}", 0, $e);
+        }
     }
 
     private function decode(ResponseInterface $response, string $method, string $path): array
     {
-        $statusCode = $response->getStatusCode();
+        try {
+            $statusCode = $response->getStatusCode();
+            $rawContent = $response->getContent(false);
+        } catch (TimeoutExceptionInterface $e) {
+            throw new TimeoutException("Request timed out: {$e->getMessage()}", 0, $e);
+        } catch (TransportExceptionInterface $e) {
+            throw new NetworkException("Server unreachable: {$e->getMessage()}", 0, $e);
+        }
+
         $body = $this->normalizePayload(
             $method,
             $path,
-            json_decode($response->getContent(false), true) ?? [],
+            json_decode($rawContent, true) ?? [],
             $response,
             $statusCode,
         );
@@ -208,7 +224,7 @@ class ServerClient
                 ?? $this->firstValidationMessage($body)
                 ?? (isset($body['rejection_reason']) ? 'Rejected: '.$body['rejection_reason'] : null)
                 ?? "HTTP {$statusCode}";
-            throw new \RuntimeException("Server error: {$message}", $statusCode);
+            throw new ServerHttpException("Server error: {$message}", $statusCode);
         }
 
         return $body;

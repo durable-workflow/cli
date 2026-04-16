@@ -23,6 +23,26 @@ class DescribeCommand extends BaseCommand
         parent::configure();
         $this->setName('workflow:describe')
             ->setDescription('Show detailed information about a workflow execution')
+            ->setHelp(<<<'HELP'
+Describe a workflow execution by ID. Returns the current run by default;
+pass <comment>--run-id</comment> to inspect a historical run, or
+<comment>--follow</comment> to stream status changes until the workflow
+reaches a terminal state.
+
+<comment>Examples:</comment>
+
+  # Human-readable summary
+  <info>dw workflow:describe chk-42</info>
+
+  # JSON suitable for jq / scripting
+  <info>dw workflow:describe chk-42 --json | jq '.status'</info>
+
+  # Follow a running workflow until it completes
+  <info>dw workflow:describe chk-42 --follow</info>
+
+  # Inspect a specific past run
+  <info>dw workflow:describe chk-42 --run-id=01HZ...</info>
+HELP)
             ->addArgument('workflow-id', InputArgument::REQUIRED, 'Workflow ID')
             ->addOption('run-id', 'r', InputOption::VALUE_OPTIONAL, 'Specific run ID')
             ->addOption('follow', 'f', InputOption::VALUE_NONE, 'Poll until the workflow reaches a terminal state')

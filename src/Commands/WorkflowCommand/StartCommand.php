@@ -22,6 +22,27 @@ class StartCommand extends BaseCommand
         parent::configure();
         $this->setName('workflow:start')
             ->setDescription('Start a new workflow execution')
+            ->setHelp(<<<'HELP'
+Start a workflow by type. The server accepts JSON input, memo, and
+search attributes. With <comment>--wait</comment> the command blocks until
+the workflow reaches a terminal state and exits with
+<comment>SUCCESS (0)</comment> on completion or <comment>FAILURE (1)</comment> on
+failure / cancellation / termination.
+
+<comment>Examples:</comment>
+
+  # Start with no input
+  <info>dw workflow:start --type=orders.Checkout</info>
+
+  # Start with JSON input and a custom workflow id
+  <info>dw workflow:start -t orders.Checkout -w chk-42 -i '{"order_id":42}'</info>
+
+  # Start, then wait for terminal state
+  <info>dw workflow:start -t orders.Checkout -i '{"order_id":42}' --wait</info>
+
+  # Start with search attributes for visibility filters
+  <info>dw workflow:start -t orders.Checkout --search-attr env=prod --search-attr tier=gold</info>
+HELP)
             ->addOption('type', 't', InputOption::VALUE_REQUIRED, 'Workflow type')
             ->addOption('workflow-id', 'w', InputOption::VALUE_OPTIONAL, 'Workflow ID (auto-generated if omitted)')
             ->addOption('business-key', null, InputOption::VALUE_OPTIONAL, 'Business key')

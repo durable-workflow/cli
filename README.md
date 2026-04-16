@@ -245,6 +245,37 @@ dw system:activity-timeout-pass --execution-id=EXEC_ID_1 --execution-id=EXEC_ID_
 | `--namespace` | Target namespace (default: `$DURABLE_WORKFLOW_NAMESPACE` or `default`) |
 | `--token` | Auth token (default: `$DURABLE_WORKFLOW_AUTH_TOKEN`) |
 
+## Exit Codes
+
+The CLI uses a stable exit-code policy so scripts and CI pipelines can react
+to specific failure modes without parsing stderr. Values follow Symfony
+Console's canonical `0`/`1`/`2` for success / failure / usage, and extend
+from there:
+
+| Code | Name | Meaning |
+|------|------|---------|
+| 0 | `SUCCESS` | Operation completed successfully. |
+| 1 | `FAILURE` | Generic failure — command ran but did not succeed. |
+| 2 | `INVALID` | Invalid usage — bad arguments, unknown options, or local validation. Also returned for HTTP 4xx responses that are not covered below (e.g. 400, 422). |
+| 3 | `NETWORK` | Could not reach the server (connection refused, DNS failure, TLS handshake failure, transport error). |
+| 4 | `AUTH` | Authentication or authorization failure. Returned for HTTP `401` and `403`. |
+| 5 | `NOT_FOUND` | Resource not found. Returned for HTTP `404`. |
+| 6 | `SERVER` | Server error. Returned for HTTP `5xx`. |
+| 7 | `TIMEOUT` | Request timed out before the server responded. Also returned for HTTP `408`. |
+
+Example:
+
+```bash
+dw workflow:describe chk-does-not-exist
+echo $?  # 5 (NOT_FOUND)
+
+dw server:health --server=http://unreachable:9999
+echo $?  # 3 (NETWORK)
+```
+
+Exit codes are defined in [`DurableWorkflow\Cli\Support\ExitCode`](src/Support/ExitCode.php)
+and are covered by [`tests/Commands/ExitCodePolicyTest.php`](tests/Commands/ExitCodePolicyTest.php).
+
 ## License
 
 MIT

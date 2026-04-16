@@ -18,6 +18,15 @@ class QueryCommand extends BaseCommand
         parent::configure();
         $this->setName('workflow:query')
             ->setDescription('Query a workflow\'s state')
+            ->setHelp(<<<'HELP'
+Invoke a side-effect-free query handler on a running workflow and
+print the handler's result. Queries do not mutate state.
+
+<comment>Examples:</comment>
+
+  <info>dw workflow:query chk-42 status</info>
+  <info>dw workflow:query chk-42 total --input='{"currency":"USD"}'</info>
+HELP)
             ->addArgument('workflow-id', InputArgument::REQUIRED, 'Workflow ID')
             ->addArgument('query-name', InputArgument::REQUIRED, 'Query name')
             ->addOption('input', 'i', InputOption::VALUE_OPTIONAL, 'Query input JSON')

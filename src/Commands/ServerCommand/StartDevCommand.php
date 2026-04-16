@@ -16,6 +16,18 @@ class StartDevCommand extends Command
     {
         $this->setName('server:start-dev')
             ->setDescription('Start a local development server with all dependencies')
+            ->setHelp(<<<'HELP'
+Boot a local development server for exploration. Uses SQLite by
+default so no external services are required; switch to
+<comment>mysql</comment> or <comment>pgsql</comment> to bring up
+Docker-backed dependencies.
+
+<comment>Examples:</comment>
+
+  <info>dw server:start-dev</info>
+  <info>dw server:start-dev --port=9000</info>
+  <info>dw server:start-dev --db=mysql</info>
+HELP)
             ->addOption('port', 'p', InputOption::VALUE_OPTIONAL, 'Server port', '8080')
             ->addOption('db', null, InputOption::VALUE_OPTIONAL, 'Database driver (sqlite, mysql, pgsql)', 'sqlite');
     }

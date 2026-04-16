@@ -18,6 +18,16 @@ class DescribeCommand extends BaseCommand
         parent::configure();
         $this->setName('task-queue:describe')
             ->setDescription('Show task queue details including pollers and backlog')
+            ->setHelp(<<<'HELP'
+Show backlog size, leased tasks, expired leases, and which workers are
+currently polling the queue. Use this when troubleshooting stalled
+workflows or runaway activity retries.
+
+<comment>Examples:</comment>
+
+  <info>dw task-queue:describe orders</info>
+  <info>dw task-queue:describe orders --json | jq '.stats.approximate_backlog_count'</info>
+HELP)
             ->addArgument('task-queue', InputArgument::REQUIRED, 'Task queue name')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output as JSON');
     }

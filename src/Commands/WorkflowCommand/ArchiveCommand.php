@@ -18,6 +18,15 @@ class ArchiveCommand extends BaseCommand
         parent::configure();
         $this->setName('workflow:archive')
             ->setDescription('Archive a terminal workflow run')
+            ->setHelp(<<<'HELP'
+Move a terminal workflow into the archive tier. Runs that are still
+active cannot be archived; cancel or terminate them first.
+
+<comment>Examples:</comment>
+
+  <info>dw workflow:archive chk-42</info>
+  <info>dw workflow:archive chk-42 --reason="GDPR erasure request"</info>
+HELP)
             ->addArgument('workflow-id', InputArgument::REQUIRED, 'Workflow ID')
             ->addOption('reason', null, InputOption::VALUE_OPTIONAL, 'Archive reason');
     }

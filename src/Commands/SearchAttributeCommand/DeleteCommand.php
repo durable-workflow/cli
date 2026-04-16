@@ -17,6 +17,15 @@ class DeleteCommand extends BaseCommand
         parent::configure();
         $this->setName('search-attribute:delete')
             ->setDescription('Remove a custom search attribute')
+            ->setHelp(<<<'HELP'
+Remove a custom search attribute. Existing workflows that indexed the
+attribute retain their stored values, but new workflows can no longer
+filter on it.
+
+<comment>Example:</comment>
+
+  <info>dw search-attribute:delete OrderStatus</info>
+HELP)
             ->addArgument('name', InputArgument::REQUIRED, 'Attribute name to remove');
     }
 

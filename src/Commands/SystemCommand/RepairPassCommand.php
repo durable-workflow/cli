@@ -17,6 +17,16 @@ class RepairPassCommand extends BaseCommand
         parent::configure();
         $this->setName('system:repair-pass')
             ->setDescription('Run one task repair sweep on the server')
+            ->setHelp(<<<'HELP'
+Trigger a single repair sweep. Without filters the server runs a
+full-scope pass; scope it narrowly to address a specific stuck run.
+
+<comment>Examples:</comment>
+
+  <info>dw system:repair-pass</info>
+  <info>dw system:repair-pass --instance-id=chk-42</info>
+  <info>dw system:repair-pass --run-id=01HZ... --run-id=01HY...</info>
+HELP)
             ->addOption('run-id', null, InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED, 'Limit to specific run IDs')
             ->addOption('instance-id', null, InputOption::VALUE_REQUIRED, 'Limit to a specific workflow instance ID')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output as JSON');

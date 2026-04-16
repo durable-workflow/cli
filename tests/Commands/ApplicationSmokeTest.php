@@ -47,4 +47,35 @@ class ApplicationSmokeTest extends TestCase
             trim($tester->getDisplay()),
         );
     }
+
+    public function test_every_command_has_description_and_help_with_example(): void
+    {
+        $application = new Application();
+        $application->setAutoExit(false);
+
+        foreach ($application->all() as $name => $command) {
+            if (in_array($name, ['help', 'list', '_complete', 'completion'], true)) {
+                continue;
+            }
+
+            self::assertNotSame(
+                '',
+                $command->getDescription(),
+                "Command {$name} is missing setDescription() text.",
+            );
+
+            $help = $command->getHelp();
+            self::assertNotSame(
+                '',
+                $help,
+                "Command {$name} is missing setHelp() text.",
+            );
+
+            self::assertStringContainsString(
+                'dw ',
+                $help,
+                "Command {$name} help is missing at least one 'dw ...' example.",
+            );
+        }
+    }
 }

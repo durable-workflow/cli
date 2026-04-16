@@ -17,6 +17,25 @@ class ListCommand extends BaseCommand
         parent::configure();
         $this->setName('workflow:list')
             ->setDescription('List workflow executions')
+            ->setHelp(<<<'HELP'
+List workflows in the current namespace. Filters combine: type,
+status bucket, and free-form visibility query can all be applied at
+once. <comment>--json</comment> is the stable interface for scripting.
+
+<comment>Examples:</comment>
+
+  # Last 20 workflows in the namespace
+  <info>dw workflow:list</info>
+
+  # Just the running ones, up to 100
+  <info>dw workflow:list --status=running --limit=100</info>
+
+  # Pipe into jq
+  <info>dw workflow:list --json | jq '.workflows[].workflow_id'</info>
+
+  # Visibility query (depends on search attributes in use)
+  <info>dw workflow:list --query='CustomerId="42" and Status="running"'</info>
+HELP)
             ->addOption('type', 't', InputOption::VALUE_OPTIONAL, 'Filter by workflow type')
             ->addOption('status', null, InputOption::VALUE_OPTIONAL, 'Filter by status bucket (running, completed, failed)')
             ->addOption('query', null, InputOption::VALUE_OPTIONAL, 'Visibility query')

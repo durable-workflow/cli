@@ -18,6 +18,14 @@ class CompleteCommand extends BaseCommand
         parent::configure();
         $this->setName('activity:complete')
             ->setDescription('Complete an activity task externally')
+            ->setHelp(<<<'HELP'
+Complete an activity from outside the worker process. You must supply
+the task's leased attempt ID so the server can validate ownership.
+
+<comment>Example:</comment>
+
+  <info>dw activity:complete act-123 att-456 --result='{"ok":true}'</info>
+HELP)
             ->addArgument('task-id', InputArgument::REQUIRED, 'Activity task ID')
             ->addArgument('attempt-id', InputArgument::REQUIRED, 'Leased activity attempt ID')
             ->addOption('lease-owner', null, InputOption::VALUE_OPTIONAL, 'Lease owner identity', 'cli')

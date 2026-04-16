@@ -17,6 +17,14 @@ class ListCommand extends BaseCommand
         parent::configure();
         $this->setName('task-queue:list')
             ->setDescription('List task queues with active pollers')
+            ->setHelp(<<<'HELP'
+List every task queue known to the namespace.
+
+<comment>Examples:</comment>
+
+  <info>dw task-queue:list</info>
+  <info>dw task-queue:list --json | jq '.task_queues[].name'</info>
+HELP)
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output as JSON');
     }
 

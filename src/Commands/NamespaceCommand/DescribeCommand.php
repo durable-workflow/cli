@@ -18,6 +18,15 @@ class DescribeCommand extends BaseCommand
         parent::configure();
         $this->setName('namespace:describe')
             ->setDescription('Show details of a namespace')
+            ->setHelp(<<<'HELP'
+Show configuration for a namespace — retention period, status, and
+audit timestamps.
+
+<comment>Examples:</comment>
+
+  <info>dw namespace:describe billing</info>
+  <info>dw namespace:describe billing --json | jq '.retention_days'</info>
+HELP)
             ->addArgument('name', InputArgument::REQUIRED, 'Namespace name')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output as JSON');
     }

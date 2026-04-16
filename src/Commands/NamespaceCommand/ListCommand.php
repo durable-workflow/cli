@@ -17,6 +17,14 @@ class ListCommand extends BaseCommand
         parent::configure();
         $this->setName('namespace:list')
             ->setDescription('List all namespaces')
+            ->setHelp(<<<'HELP'
+List every namespace the calling identity can see on the server.
+
+<comment>Examples:</comment>
+
+  <info>dw namespace:list</info>
+  <info>dw namespace:list --json | jq '.namespaces[].name'</info>
+HELP)
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output as JSON');
     }
 

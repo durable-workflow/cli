@@ -18,6 +18,17 @@ class UpdateCommand extends BaseCommand
         parent::configure();
         $this->setName('workflow:update')
             ->setDescription('Send an update to a workflow')
+            ->setHelp(<<<'HELP'
+Send a synchronous update to a workflow and wait for the outcome.
+<comment>--wait=accepted</comment> returns when the workflow has
+validated the update; <comment>--wait=completed</comment> returns when
+the handler has finished and a result is available.
+
+<comment>Examples:</comment>
+
+  <info>dw workflow:update chk-42 increase_quota -i '{"by":10}'</info>
+  <info>dw workflow:update chk-42 increase_quota -i '{"by":10}' --wait=completed</info>
+HELP)
             ->addArgument('workflow-id', InputArgument::REQUIRED, 'Workflow ID')
             ->addArgument('update-name', InputArgument::REQUIRED, 'Update name')
             ->addOption('input', 'i', InputOption::VALUE_OPTIONAL, 'Update input JSON')

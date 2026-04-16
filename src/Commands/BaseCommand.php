@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace DurableWorkflow\Cli\Commands;
 
+use DurableWorkflow\Cli\Support\ExitCode;
 use DurableWorkflow\Cli\Support\ServerClient;
+use DurableWorkflow\Cli\Support\ServerException;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Exception\ExceptionInterface as ConsoleException;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -19,6 +22,23 @@ abstract class BaseCommand extends Command
         $this->addOption('server', 's', InputOption::VALUE_OPTIONAL, 'Server URL', null);
         $this->addOption('namespace', null, InputOption::VALUE_OPTIONAL, 'Target namespace', null);
         $this->addOption('token', null, InputOption::VALUE_OPTIONAL, 'Auth token', null);
+    }
+
+    public function run(InputInterface $input, OutputInterface $output): int
+    {
+        try {
+            return parent::run($input, $output);
+        } catch (ConsoleException $e) {
+            throw $e;
+        } catch (ServerException $e) {
+            $output->writeln('<error>'.$e->getMessage().'</error>');
+
+            return $e->exitCode();
+        } catch (\Throwable $e) {
+            $output->writeln('<error>'.$e->getMessage().'</error>');
+
+            return ExitCode::FAILURE;
+        }
     }
 
     protected function client(InputInterface $input): ServerClient

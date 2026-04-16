@@ -17,6 +17,15 @@ class ListCommand extends BaseCommand
         parent::configure();
         $this->setName('search-attribute:list')
             ->setDescription('List search attribute definitions')
+            ->setHelp(<<<'HELP'
+List every search attribute — system-defined attributes shipped by the
+server and any custom attributes registered for this namespace.
+
+<comment>Examples:</comment>
+
+  <info>dw search-attribute:list</info>
+  <info>dw search-attribute:list --json | jq '.custom_attributes'</info>
+HELP)
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output as JSON');
     }
 

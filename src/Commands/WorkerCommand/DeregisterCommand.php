@@ -17,6 +17,14 @@ class DeregisterCommand extends BaseCommand
         parent::configure();
         $this->setName('worker:deregister')
             ->setDescription('Deregister a worker from the server')
+            ->setHelp(<<<'HELP'
+Remove a stale or retired worker entry from the fleet roster. Active
+workers re-register automatically on their next heartbeat.
+
+<comment>Example:</comment>
+
+  <info>dw worker:deregister py-worker-abc123</info>
+HELP)
             ->addArgument('worker-id', InputArgument::REQUIRED, 'Worker ID to deregister');
     }
 

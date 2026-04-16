@@ -23,6 +23,17 @@ class ShowRunCommand extends BaseCommand
         parent::configure();
         $this->setName('workflow:show-run')
             ->setDescription('Show detailed information about a specific workflow run')
+            ->setHelp(<<<'HELP'
+Show status, timing, timeouts, input, output, memo, and enabled
+actions for a specific run. <comment>--follow</comment> polls until the
+run reaches a terminal state.
+
+<comment>Examples:</comment>
+
+  <info>dw workflow:show-run chk-42 01HZ...</info>
+  <info>dw workflow:show-run chk-42 01HZ... --follow</info>
+  <info>dw workflow:show-run chk-42 01HZ... --json</info>
+HELP)
             ->addArgument('workflow-id', InputArgument::REQUIRED, 'Workflow ID')
             ->addArgument('run-id', InputArgument::REQUIRED, 'Run ID')
             ->addOption('follow', 'f', InputOption::VALUE_NONE, 'Poll until the run reaches a terminal state')

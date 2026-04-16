@@ -18,6 +18,16 @@ class CreateCommand extends BaseCommand
         parent::configure();
         $this->setName('namespace:create')
             ->setDescription('Create a new namespace')
+            ->setHelp(<<<'HELP'
+Create a logical namespace for workflow executions. Namespaces
+partition the visibility surface — workflows in different namespaces
+never appear in each other's lists.
+
+<comment>Examples:</comment>
+
+  <info>dw namespace:create billing</info>
+  <info>dw namespace:create billing --description="prod invoicing" --retention=90</info>
+HELP)
             ->addArgument('name', InputArgument::REQUIRED, 'Namespace name')
             ->addOption('description', 'd', InputOption::VALUE_OPTIONAL, 'Description')
             ->addOption('retention', 'r', InputOption::VALUE_OPTIONAL, 'Retention period in days', '30');

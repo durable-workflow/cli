@@ -18,6 +18,15 @@ class UpdateCommand extends BaseCommand
         parent::configure();
         $this->setName('namespace:update')
             ->setDescription('Update a namespace')
+            ->setHelp(<<<'HELP'
+Change a namespace's description or retention window. Only fields that
+you pass are updated.
+
+<comment>Examples:</comment>
+
+  <info>dw namespace:update billing --retention=180</info>
+  <info>dw namespace:update billing -d "prod invoicing (2026)"</info>
+HELP)
             ->addArgument('name', InputArgument::REQUIRED, 'Namespace name')
             ->addOption('description', 'd', InputOption::VALUE_OPTIONAL, 'New description')
             ->addOption('retention', 'r', InputOption::VALUE_OPTIONAL, 'New retention period in days');

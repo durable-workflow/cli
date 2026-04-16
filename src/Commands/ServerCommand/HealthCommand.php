@@ -15,26 +15,28 @@ class HealthCommand extends BaseCommand
     {
         parent::configure();
         $this->setName('server:health')
-            ->setDescription('Check the health of the Durable Workflow server');
+            ->setDescription('Check the health of the Durable Workflow server')
+            ->setHelp(<<<'HELP'
+Check server health and exit with <comment>NETWORK (3)</comment> if the
+server is unreachable.
+
+<comment>Example:</comment>
+
+  <info>dw server:health</info>
+HELP);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        try {
-            $result = $this->client($input)->get('/health');
-            $output->writeln('<info>Server is '.$result['status'].'</info>');
-            $output->writeln('Timestamp: '.$result['timestamp']);
+        $result = $this->client($input)->get('/health');
+        $output->writeln('<info>Server is '.$result['status'].'</info>');
+        $output->writeln('Timestamp: '.$result['timestamp']);
 
-            foreach ($result['checks'] ?? [] as $check => $status) {
-                $tag = $status === 'ok' ? 'info' : 'error';
-                $output->writeln("  {$check}: <{$tag}>{$status}</{$tag}>");
-            }
-
-            return Command::SUCCESS;
-        } catch (\Throwable $e) {
-            $output->writeln('<error>Server unreachable: '.$e->getMessage().'</error>');
-
-            return Command::FAILURE;
+        foreach ($result['checks'] ?? [] as $check => $status) {
+            $tag = $status === 'ok' ? 'info' : 'error';
+            $output->writeln("  {$check}: <{$tag}>{$status}</{$tag}>");
         }
+
+        return Command::SUCCESS;
     }
 }

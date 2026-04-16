@@ -18,6 +18,16 @@ class CancelCommand extends BaseCommand
         parent::configure();
         $this->setName('workflow:cancel')
             ->setDescription('Request cancellation of a workflow')
+            ->setHelp(<<<'HELP'
+Request cooperative cancellation. The workflow receives a cancellation
+signal and has a chance to run its cancellation handlers.
+
+<comment>Examples:</comment>
+
+  <info>dw workflow:cancel chk-42</info>
+  <info>dw workflow:cancel chk-42 --reason="user cancelled in UI"</info>
+  <info>dw workflow:cancel chk-42 --run-id=01HZ...</info>
+HELP)
             ->addArgument('workflow-id', InputArgument::REQUIRED, 'Workflow ID')
             ->addOption('reason', null, InputOption::VALUE_OPTIONAL, 'Cancellation reason')
             ->addOption('run-id', null, InputOption::VALUE_OPTIONAL, 'Target a specific run ID');

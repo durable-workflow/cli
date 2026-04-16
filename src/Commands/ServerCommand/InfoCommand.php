@@ -15,7 +15,16 @@ class InfoCommand extends BaseCommand
     {
         parent::configure();
         $this->setName('server:info')
-            ->setDescription('Display server version and capabilities');
+            ->setDescription('Display server version and capabilities')
+            ->setHelp(<<<'HELP'
+Print server version, negotiated control-plane and worker protocol
+versions, and the canonical enum values the server accepts (duplicate
+policies, wait policies, etc.).
+
+<comment>Example:</comment>
+
+  <info>dw server:info</info>
+HELP);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int

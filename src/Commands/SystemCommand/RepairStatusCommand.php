@@ -17,6 +17,15 @@ class RepairStatusCommand extends BaseCommand
         parent::configure();
         $this->setName('system:repair-status')
             ->setDescription('Show task repair candidate diagnostics and policy')
+            ->setHelp(<<<'HELP'
+Show how many stuck tasks the repair loop would pick up on its next
+pass, broken out by scope, plus the policy that governs scanning.
+
+<comment>Examples:</comment>
+
+  <info>dw system:repair-status</info>
+  <info>dw system:repair-status --json | jq '.candidates.total_candidates'</info>
+HELP)
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output as JSON');
     }
 

@@ -18,6 +18,16 @@ class HistoryExportCommand extends BaseCommand
         parent::configure();
         $this->setName('workflow:history-export')
             ->setDescription('Export a workflow run history as a replay bundle')
+            ->setHelp(<<<'HELP'
+Export a run's full history as a self-contained JSON bundle suitable
+for deterministic replay. Without <comment>--output</comment> the bundle
+is printed to stdout.
+
+<comment>Examples:</comment>
+
+  <info>dw workflow:history-export chk-42 01HZ... -o bundle.json</info>
+  <info>dw workflow:history-export chk-42 01HZ... | jq '.events | length'</info>
+HELP)
             ->addArgument('workflow-id', InputArgument::REQUIRED, 'Workflow ID')
             ->addArgument('run-id', InputArgument::REQUIRED, 'Run ID')
             ->addOption('output', 'o', InputOption::VALUE_OPTIONAL, 'Write to file instead of stdout');

@@ -18,6 +18,14 @@ class ResumeCommand extends BaseCommand
         parent::configure();
         $this->setName('schedule:resume')
             ->setDescription('Resume a paused schedule')
+            ->setHelp(<<<'HELP'
+Restart a paused schedule. Missed fires during the pause are not
+replayed unless you follow up with <comment>schedule:backfill</comment>.
+
+<comment>Example:</comment>
+
+  <info>dw schedule:resume daily-report --note="maintenance done"</info>
+HELP)
             ->addArgument('schedule-id', InputArgument::REQUIRED, 'Schedule ID')
             ->addOption('note', null, InputOption::VALUE_OPTIONAL, 'Note');
     }

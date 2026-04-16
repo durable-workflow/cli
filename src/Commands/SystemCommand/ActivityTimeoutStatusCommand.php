@@ -17,6 +17,14 @@ class ActivityTimeoutStatusCommand extends BaseCommand
         parent::configure();
         $this->setName('system:activity-timeout-status')
             ->setDescription('Show expired activity execution diagnostics')
+            ->setHelp(<<<'HELP'
+Show activity executions that have exceeded their start-to-close or
+schedule-to-close deadline and are eligible for forced timeout.
+
+<comment>Example:</comment>
+
+  <info>dw system:activity-timeout-status --json</info>
+HELP)
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output as JSON');
     }
 

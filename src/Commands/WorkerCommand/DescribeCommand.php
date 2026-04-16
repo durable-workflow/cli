@@ -18,6 +18,15 @@ class DescribeCommand extends BaseCommand
         parent::configure();
         $this->setName('worker:describe')
             ->setDescription('Show details of a registered worker')
+            ->setHelp(<<<'HELP'
+Show the worker's runtime, SDK version, build ID, heartbeat cadence,
+and which workflow/activity types it is currently handling.
+
+<comment>Examples:</comment>
+
+  <info>dw worker:describe py-worker-abc123</info>
+  <info>dw worker:describe py-worker-abc123 --json | jq '.supported_activity_types'</info>
+HELP)
             ->addArgument('worker-id', InputArgument::REQUIRED, 'Worker ID')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output as JSON');
     }

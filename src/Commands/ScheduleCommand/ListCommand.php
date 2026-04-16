@@ -17,6 +17,15 @@ class ListCommand extends BaseCommand
         parent::configure();
         $this->setName('schedule:list')
             ->setDescription('List all schedules')
+            ->setHelp(<<<'HELP'
+List every schedule in the current namespace with next/last fire
+times.
+
+<comment>Examples:</comment>
+
+  <info>dw schedule:list</info>
+  <info>dw schedule:list --json | jq '.schedules[] | select(.paused)'</info>
+HELP)
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output as JSON');
     }
 

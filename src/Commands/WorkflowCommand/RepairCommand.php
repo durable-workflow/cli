@@ -17,6 +17,15 @@ class RepairCommand extends BaseCommand
         parent::configure();
         $this->setName('workflow:repair')
             ->setDescription('Request repair of a workflow run')
+            ->setHelp(<<<'HELP'
+Ask the server to re-enqueue the workflow's next task if it has
+stalled (stuck behind a lost worker, expired lease, etc.). This is
+safe to call on a healthy workflow — the server will no-op.
+
+<comment>Example:</comment>
+
+  <info>dw workflow:repair chk-42</info>
+HELP)
             ->addArgument('workflow-id', InputArgument::REQUIRED, 'Workflow ID');
     }
 

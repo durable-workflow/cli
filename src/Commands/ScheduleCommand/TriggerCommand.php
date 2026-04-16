@@ -18,6 +18,15 @@ class TriggerCommand extends BaseCommand
         parent::configure();
         $this->setName('schedule:trigger')
             ->setDescription('Trigger a schedule execution immediately')
+            ->setHelp(<<<'HELP'
+Fire a schedule once, right now. The schedule's configured overlap
+policy applies unless you override it with <comment>--overlap-policy</comment>.
+
+<comment>Examples:</comment>
+
+  <info>dw schedule:trigger daily-report</info>
+  <info>dw schedule:trigger daily-report --overlap-policy=allow</info>
+HELP)
             ->addArgument('schedule-id', InputArgument::REQUIRED, 'Schedule ID')
             ->addOption('overlap-policy', null, InputOption::VALUE_OPTIONAL, 'Override overlap policy');
     }

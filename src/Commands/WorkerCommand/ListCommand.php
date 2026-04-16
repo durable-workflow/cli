@@ -17,6 +17,17 @@ class ListCommand extends BaseCommand
         parent::configure();
         $this->setName('worker:list')
             ->setDescription('List registered workers')
+            ->setHelp(<<<'HELP'
+List workers registered in the current namespace. Filter by task queue
+or by fleet status (<comment>active</comment>, <comment>stale</comment>,
+<comment>draining</comment>).
+
+<comment>Examples:</comment>
+
+  <info>dw worker:list</info>
+  <info>dw worker:list --task-queue=orders</info>
+  <info>dw worker:list --status=stale --json | jq '.workers[].worker_id'</info>
+HELP)
             ->addOption('task-queue', null, InputOption::VALUE_OPTIONAL, 'Filter by task queue')
             ->addOption('status', null, InputOption::VALUE_OPTIONAL, 'Filter by status (active, stale, draining)')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output as JSON');

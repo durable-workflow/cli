@@ -17,6 +17,16 @@ class ActivityTimeoutPassCommand extends BaseCommand
         parent::configure();
         $this->setName('system:activity-timeout-pass')
             ->setDescription('Run one activity timeout enforcement sweep on the server')
+            ->setHelp(<<<'HELP'
+Force the server to enforce activity timeouts for any executions that
+have already passed their deadline.
+
+<comment>Examples:</comment>
+
+  <info>dw system:activity-timeout-pass</info>
+  <info>dw system:activity-timeout-pass --limit=100</info>
+  <info>dw system:activity-timeout-pass --execution-id=act-123</info>
+HELP)
             ->addOption('execution-id', null, InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED, 'Limit to specific execution IDs')
             ->addOption('limit', null, InputOption::VALUE_REQUIRED, 'Maximum executions to process')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output as JSON');

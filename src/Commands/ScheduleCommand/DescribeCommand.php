@@ -18,6 +18,15 @@ class DescribeCommand extends BaseCommand
         parent::configure();
         $this->setName('schedule:describe')
             ->setDescription('Show details of a schedule')
+            ->setHelp(<<<'HELP'
+Show a schedule's spec, action, state, overlap policy, buffered
+actions, and skip history.
+
+<comment>Examples:</comment>
+
+  <info>dw schedule:describe daily-report</info>
+  <info>dw schedule:describe daily-report --json | jq '.state'</info>
+HELP)
             ->addArgument('schedule-id', InputArgument::REQUIRED, 'Schedule ID')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output as JSON');
     }

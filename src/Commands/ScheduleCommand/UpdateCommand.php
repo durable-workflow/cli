@@ -18,6 +18,16 @@ class UpdateCommand extends BaseCommand
         parent::configure();
         $this->setName('schedule:update')
             ->setDescription('Update a schedule')
+            ->setHelp(<<<'HELP'
+Change a schedule in place. Pass only the fields you want to update —
+everything else is left alone. At least one field is required.
+
+<comment>Examples:</comment>
+
+  <info>dw schedule:update daily-report --cron="0 5 * * *"</info>
+  <info>dw schedule:update daily-report --overlap-policy=skip --jitter=60</info>
+  <info>dw schedule:update daily-report --max-runs=100</info>
+HELP)
             ->addArgument('schedule-id', InputArgument::REQUIRED, 'Schedule ID')
             ->addOption('cron', 'c', InputOption::VALUE_OPTIONAL, 'Cron expression')
             ->addOption('interval', null, InputOption::VALUE_OPTIONAL, 'Interval as ISO 8601 duration (e.g. PT30M, PT1H)')

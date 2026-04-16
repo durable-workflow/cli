@@ -17,6 +17,14 @@ class DeleteCommand extends BaseCommand
         parent::configure();
         $this->setName('schedule:delete')
             ->setDescription('Delete a schedule')
+            ->setHelp(<<<'HELP'
+Delete a schedule. In-flight runs it has already spawned keep running
+— only future fires are cancelled.
+
+<comment>Example:</comment>
+
+  <info>dw schedule:delete daily-report</info>
+HELP)
             ->addArgument('schedule-id', InputArgument::REQUIRED, 'Schedule ID');
     }
 

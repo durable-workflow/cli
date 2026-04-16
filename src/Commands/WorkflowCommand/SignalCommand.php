@@ -18,6 +18,16 @@ class SignalCommand extends BaseCommand
         parent::configure();
         $this->setName('workflow:signal')
             ->setDescription('Send a signal to a running workflow')
+            ->setHelp(<<<'HELP'
+Deliver an asynchronous signal to a running workflow. The signal is
+durably recorded in history even if the workflow is currently idle or
+waiting.
+
+<comment>Examples:</comment>
+
+  <info>dw workflow:signal chk-42 approve</info>
+  <info>dw workflow:signal chk-42 payment_received -i '{"amount":99.95}'</info>
+HELP)
             ->addArgument('workflow-id', InputArgument::REQUIRED, 'Workflow ID')
             ->addArgument('signal-name', InputArgument::REQUIRED, 'Signal name')
             ->addOption('input', 'i', InputOption::VALUE_OPTIONAL, 'Signal input JSON')

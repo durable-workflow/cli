@@ -18,6 +18,15 @@ class ListRunsCommand extends BaseCommand
         parent::configure();
         $this->setName('workflow:list-runs')
             ->setDescription('List all runs for a workflow execution')
+            ->setHelp(<<<'HELP'
+List every run (including retries and continue-as-new successors) for a
+workflow ID, oldest first.
+
+<comment>Examples:</comment>
+
+  <info>dw workflow:list-runs chk-42</info>
+  <info>dw workflow:list-runs chk-42 --json</info>
+HELP)
             ->addArgument('workflow-id', InputArgument::REQUIRED, 'Workflow ID')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output as JSON');
     }

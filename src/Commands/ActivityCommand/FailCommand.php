@@ -18,6 +18,16 @@ class FailCommand extends BaseCommand
         parent::configure();
         $this->setName('activity:fail')
             ->setDescription('Fail an activity task externally')
+            ->setHelp(<<<'HELP'
+Fail an activity from outside the worker process. <comment>--non-retryable</comment>
+tells the server to skip the workflow's retry policy and surface the
+failure to the workflow immediately.
+
+<comment>Examples:</comment>
+
+  <info>dw activity:fail act-123 att-456 -m "upstream returned 500"</info>
+  <info>dw activity:fail act-123 att-456 -m "bad input" -t ValidationError --non-retryable</info>
+HELP)
             ->addArgument('task-id', InputArgument::REQUIRED, 'Activity task ID')
             ->addArgument('attempt-id', InputArgument::REQUIRED, 'Leased activity attempt ID')
             ->addOption('lease-owner', null, InputOption::VALUE_OPTIONAL, 'Lease owner identity', 'cli')

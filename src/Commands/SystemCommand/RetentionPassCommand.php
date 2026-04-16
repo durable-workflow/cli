@@ -17,6 +17,15 @@ class RetentionPassCommand extends BaseCommand
         parent::configure();
         $this->setName('system:retention-pass')
             ->setDescription('Run one history retention enforcement sweep on the server')
+            ->setHelp(<<<'HELP'
+Force a retention sweep that prunes history for terminal runs older
+than the namespace's retention window.
+
+<comment>Examples:</comment>
+
+  <info>dw system:retention-pass</info>
+  <info>dw system:retention-pass --namespace=billing --limit=500</info>
+HELP)
             ->addOption('run-id', null, InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED, 'Limit to specific run IDs')
             ->addOption('limit', null, InputOption::VALUE_REQUIRED, 'Maximum runs to process')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output as JSON');

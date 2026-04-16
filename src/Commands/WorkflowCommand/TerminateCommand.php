@@ -18,6 +18,16 @@ class TerminateCommand extends BaseCommand
         parent::configure();
         $this->setName('workflow:terminate')
             ->setDescription('Terminate a workflow immediately')
+            ->setHelp(<<<'HELP'
+Force-stop a workflow. Unlike <comment>workflow:cancel</comment>,
+termination does not give the workflow a chance to clean up — use it
+for runaway or unreachable workflows.
+
+<comment>Examples:</comment>
+
+  <info>dw workflow:terminate chk-42 --reason="runaway loop"</info>
+  <info>dw workflow:terminate chk-42 --run-id=01HZ...</info>
+HELP)
             ->addArgument('workflow-id', InputArgument::REQUIRED, 'Workflow ID')
             ->addOption('reason', null, InputOption::VALUE_OPTIONAL, 'Termination reason')
             ->addOption('run-id', null, InputOption::VALUE_OPTIONAL, 'Target a specific run ID');

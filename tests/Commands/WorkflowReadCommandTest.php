@@ -211,6 +211,120 @@ class WorkflowReadCommandTest extends TestCase
         self::assertArrayNotHasKey('run_timeout_seconds', $client->lastPostBody);
     }
 
+    public function test_start_command_with_wait_and_json_emits_terminal_describe_and_success_exit(): void
+    {
+        // TD-S020: --wait --json previously returned the start response and exited
+        // before honoring --wait. The automation contract is: poll to terminal,
+        // then emit the terminal describe as JSON with the matching exit code.
+        $client = new WorkflowReadFakeServerClient([
+            'workflow_id' => 'wf-wait-json-1',
+            'run_id' => 'run-wait-json-1',
+            'workflow_type' => 'orders.process',
+            'status' => 'completed',
+            'status_bucket' => 'completed',
+            'is_terminal' => true,
+            'closed_at' => '2026-04-16T00:00:00Z',
+            'closed_reason' => 'completed',
+            'output' => ['order_id' => 42],
+            'outcome' => 'started_new',
+        ]);
+
+        $command = new StartCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            '--type' => 'orders.process',
+            '--wait' => true,
+            '--json' => true,
+        ]));
+
+        $display = trim($tester->getDisplay());
+
+        // Output must be a single JSON document — no human text mixed in —
+        // so that automation pipelines can parse stdout directly.
+        self::assertStringStartsWith('{', $display);
+        $parsed = json_decode($display, true, flags: JSON_THROW_ON_ERROR);
+
+        self::assertSame('wf-wait-json-1', $parsed['workflow_id']);
+        self::assertSame('completed', $parsed['status']);
+        self::assertSame('completed', $parsed['status_bucket']);
+        self::assertTrue($parsed['is_terminal']);
+        self::assertSame(['order_id' => 42], $parsed['output']);
+
+        self::assertStringNotContainsString('Workflow started', $display);
+        self::assertStringNotContainsString('Waiting for workflow', $display);
+    }
+
+    public function test_start_command_with_wait_and_json_returns_failure_for_non_completed_terminal(): void
+    {
+        $client = new WorkflowReadFakeServerClient([
+            'workflow_id' => 'wf-wait-json-2',
+            'run_id' => 'run-wait-json-2',
+            'workflow_type' => 'orders.process',
+            'status' => 'failed',
+            'status_bucket' => 'failed',
+            'is_terminal' => true,
+            'closed_at' => '2026-04-16T00:00:00Z',
+            'closed_reason' => 'activity_failed',
+            'outcome' => 'started_new',
+        ]);
+
+        $command = new StartCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        // Exit code must be FAILURE so automation callers can branch on
+        // the process status without parsing JSON.
+        self::assertSame(Command::FAILURE, $tester->execute([
+            '--type' => 'orders.process',
+            '--wait' => true,
+            '--json' => true,
+        ]));
+
+        $parsed = json_decode(trim($tester->getDisplay()), true, flags: JSON_THROW_ON_ERROR);
+
+        self::assertSame('failed', $parsed['status']);
+        self::assertSame('failed', $parsed['status_bucket']);
+        self::assertSame('activity_failed', $parsed['closed_reason']);
+    }
+
+    public function test_start_command_with_wait_without_json_renders_human_terminal_summary(): void
+    {
+        $client = new WorkflowReadFakeServerClient([
+            'workflow_id' => 'wf-wait-3',
+            'run_id' => 'run-wait-3',
+            'workflow_type' => 'orders.process',
+            'status' => 'completed',
+            'status_bucket' => 'completed',
+            'is_terminal' => true,
+            'closed_at' => '2026-04-16T00:00:00Z',
+            'closed_reason' => 'completed',
+            'output' => ['ok' => true],
+            'outcome' => 'started_new',
+        ]);
+
+        $command = new StartCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            '--type' => 'orders.process',
+            '--wait' => true,
+        ]));
+
+        $display = $tester->getDisplay();
+
+        self::assertStringContainsString('Workflow started', $display);
+        self::assertStringContainsString('Waiting for workflow to complete', $display);
+        self::assertStringContainsString('Workflow reached terminal state', $display);
+        self::assertStringContainsString('Status: completed', $display);
+        self::assertStringContainsString('Closed Reason: completed', $display);
+    }
+
     public function test_list_command_renders_business_keys_in_the_table(): void
     {
         $command = new ListCommand();

@@ -99,11 +99,100 @@ HELP)
         }
 
         $result = $client->post('/workflows', $body);
+        $wait = (bool) $input->getOption('wait');
+        $wantsJson = $this->wantsJson($input);
 
-        if ($this->wantsJson($input)) {
+        // --wait defers the final emit until the workflow reaches a terminal
+        // state, so automation callers using --json receive the terminal
+        // describe (and the matching success/failure exit code) instead of
+        // the transient start response.
+        if ($wait) {
+            return $this->waitAndEmit($client, $output, $result, $wantsJson);
+        }
+
+        if ($wantsJson) {
             return $this->renderJson($output, $result);
         }
 
+        $this->emitStartBanner($output, $result);
+
+        return Command::SUCCESS;
+    }
+
+    /**
+     * @param  array<string, mixed>  $startResult
+     */
+    private function waitAndEmit(
+        \DurableWorkflow\Cli\Support\ServerClient $client,
+        OutputInterface $output,
+        array $startResult,
+        bool $wantsJson,
+    ): int {
+        if (! $wantsJson) {
+            $this->emitStartBanner($output, $startResult);
+            $output->writeln('');
+            $output->writeln('<comment>Waiting for workflow to complete...</comment>');
+        }
+
+        $describe = $this->pollUntilTerminal(
+            $client,
+            $output,
+            (string) $startResult['workflow_id'],
+            $wantsJson,
+        );
+
+        $exit = ($describe['status_bucket'] ?? null) === 'completed'
+            ? Command::SUCCESS
+            : Command::FAILURE;
+
+        if ($wantsJson) {
+            $output->writeln(json_encode($describe, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+
+            return $exit;
+        }
+
+        $output->writeln('');
+        $output->writeln('<info>Workflow reached terminal state</info>');
+        $output->writeln('  Status: '.($describe['status'] ?? '-'));
+        $output->writeln('  Closed Reason: '.($describe['closed_reason'] ?? '-'));
+        $output->writeln('  Closed At: '.($describe['closed_at'] ?? '-'));
+
+        if (isset($describe['output'])) {
+            $output->writeln('  Output: '.json_encode($describe['output'], JSON_UNESCAPED_SLASHES));
+        }
+
+        return $exit;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function pollUntilTerminal(
+        \DurableWorkflow\Cli\Support\ServerClient $client,
+        OutputInterface $output,
+        string $workflowId,
+        bool $wantsJson,
+    ): array {
+        while (true) {
+            $describe = $client->get("/workflows/{$workflowId}");
+
+            if ($this->isTerminal($describe)) {
+                return $describe;
+            }
+
+            if (! $wantsJson) {
+                $output->write('.');
+            }
+
+            sleep(self::WAIT_POLL_INTERVAL_SECONDS);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $result
+     */
+    private function emitStartBanner(OutputInterface $output, array $result): void
+    {
         $output->writeln('<info>Workflow started</info>');
         $output->writeln('  Workflow ID: '.$result['workflow_id']);
         $output->writeln('  Run ID: '.$result['run_id']);
@@ -114,45 +203,6 @@ HELP)
             $output->writeln('  Payload Codec: '.$result['payload_codec']);
         }
         $output->writeln('  Outcome: '.$result['outcome']);
-
-        if ($input->getOption('wait')) {
-            return $this->waitForCompletion($client, $output, $result['workflow_id']);
-        }
-
-        return Command::SUCCESS;
-    }
-
-    private function waitForCompletion(
-        \DurableWorkflow\Cli\Support\ServerClient $client,
-        OutputInterface $output,
-        string $workflowId,
-    ): int {
-        $output->writeln('');
-        $output->writeln('<comment>Waiting for workflow to complete...</comment>');
-
-        while (true) {
-            sleep(self::WAIT_POLL_INTERVAL_SECONDS);
-
-            $describe = $client->get("/workflows/{$workflowId}");
-
-            if ($this->isTerminal($describe)) {
-                $output->writeln('');
-                $output->writeln('<info>Workflow reached terminal state</info>');
-                $output->writeln('  Status: '.($describe['status'] ?? '-'));
-                $output->writeln('  Closed Reason: '.($describe['closed_reason'] ?? '-'));
-                $output->writeln('  Closed At: '.($describe['closed_at'] ?? '-'));
-
-                if (isset($describe['output'])) {
-                    $output->writeln('  Output: '.json_encode($describe['output'], JSON_UNESCAPED_SLASHES));
-                }
-
-                $statusBucket = $describe['status_bucket'] ?? null;
-
-                return $statusBucket === 'completed' ? Command::SUCCESS : Command::FAILURE;
-            }
-
-            $output->write('.');
-        }
     }
 
     private function optionalString(mixed $value): ?string

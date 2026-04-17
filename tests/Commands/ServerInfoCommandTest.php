@@ -22,7 +22,7 @@ class ServerInfoCommandTest extends TestCase
             'default_namespace' => 'default',
             'capabilities' => [
                 'workflow_tasks' => true,
-                'payload_codecs' => ['json', 'avro'],
+                'payload_codecs' => ['avro'],
                 'payload_codecs_engine_specific' => [
                     'php' => ['workflow-serializer-y', 'workflow-serializer-base64'],
                 ],
@@ -131,7 +131,7 @@ class ServerInfoCommandTest extends TestCase
         self::assertStringContainsString('Workflow Task Poll Idempotency: yes', $display);
 
         // Flat list capabilities render inline.
-        self::assertStringContainsString('payload_codecs: json, avro', $display);
+        self::assertStringContainsString('payload_codecs: avro', $display);
 
         // Associative capability maps render as nested lines so
         // engine-specific payload codec splits stay readable

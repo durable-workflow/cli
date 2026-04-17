@@ -39,12 +39,7 @@ HELP);
         $output->writeln('Capabilities:');
 
         foreach ($result['capabilities'] ?? [] as $cap => $value) {
-            if (is_array($value)) {
-                $status = $value !== [] ? '<info>'.implode(', ', $value).'</info>' : '<comment>none</comment>';
-            } else {
-                $status = $value ? '<info>yes</info>' : '<comment>no</comment>';
-            }
-            $output->writeln("  {$cap}: {$status}");
+            $this->renderCapability($output, (string) $cap, $value, indent: 2);
         }
 
         $workerFleet = $result['worker_fleet'] ?? null;
@@ -170,6 +165,66 @@ HELP);
         }
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Render a single capability entry.
+     *
+     * Flat lists render inline (`commas`). Associative capability maps
+     * render as nested key/value lines so output stays readable for
+     * namespaced capabilities like `payload_codecs_engine_specific.php`.
+     */
+    private function renderCapability(OutputInterface $output, string $name, mixed $value, int $indent): void
+    {
+        $pad = str_repeat(' ', $indent);
+
+        if (is_array($value)) {
+            if ($value === []) {
+                $output->writeln(sprintf('%s%s: <comment>none</comment>', $pad, $name));
+                return;
+            }
+
+            if (array_is_list($value)) {
+                $allScalar = true;
+                foreach ($value as $item) {
+                    if (! is_string($item) && ! is_int($item) && ! is_float($item) && ! is_bool($item) && $item !== null) {
+                        $allScalar = false;
+                        break;
+                    }
+                }
+
+                if ($allScalar) {
+                    $output->writeln(sprintf(
+                        '%s%s: <info>%s</info>',
+                        $pad,
+                        $name,
+                        implode(', ', array_map(
+                            static fn (mixed $item): string => is_bool($item) ? ($item ? 'yes' : 'no') : (string) $item,
+                            $value,
+                        )),
+                    ));
+                    return;
+                }
+            }
+
+            $output->writeln(sprintf('%s%s:', $pad, $name));
+            foreach ($value as $childKey => $childValue) {
+                $this->renderCapability($output, (string) $childKey, $childValue, $indent + 2);
+            }
+            return;
+        }
+
+        if (is_bool($value)) {
+            $output->writeln(sprintf(
+                '%s%s: %s',
+                $pad,
+                $name,
+                $value ? '<info>yes</info>' : '<comment>no</comment>',
+            ));
+            return;
+        }
+
+        $output->writeln(sprintf('%s%s: <info>%s</info>', $pad, $name, (string) $value));
     }
 
     private function formatBytes(int $bytes): string

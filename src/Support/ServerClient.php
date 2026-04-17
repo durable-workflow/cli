@@ -37,7 +37,7 @@ class ServerClient
 
     private bool $controlPlaneRequestContractResolved = false;
 
-    private bool $serverVersionChecked = false;
+    private bool $serverCompatibilityChecked = false;
 
     public function __construct(
         ?string $baseUrl = null,
@@ -104,37 +104,39 @@ class ServerClient
         }
 
         $this->clusterInfoCache = $this->get('/cluster/info');
-        $this->checkServerVersion();
+        $this->checkServerCompatibility();
 
         return $this->clusterInfoCache;
     }
 
-    private function checkServerVersion(): void
+    private function checkServerCompatibility(): void
     {
-        if ($this->serverVersionChecked || ! is_array($this->clusterInfoCache)) {
+        if ($this->serverCompatibilityChecked || ! is_array($this->clusterInfoCache)) {
             return;
         }
 
-        $this->serverVersionChecked = true;
+        $this->serverCompatibilityChecked = true;
 
-        $serverVersion = $this->clusterInfoCache['version'] ?? 'unknown';
+        $controlPlane = $this->clusterInfoCache['control_plane'] ?? null;
 
-        // Parse major version (e.g., "0.1.9" -> 0, "2.0.0" -> 2)
-        if (preg_match('/^(\d+)/', (string) $serverVersion, $matches)) {
-            $major = (int) $matches[1];
-        } else {
-            // Unable to parse version, skip validation
-            return;
+        if (! is_array($controlPlane)) {
+            throw new \RuntimeException(
+                'Server compatibility error: missing control_plane manifest; expected control_plane.version '
+                .self::CONTROL_PLANE_VERSION.'.',
+            );
         }
 
-        // CLI 0.1.x is compatible with server 0.x (prerelease) and 2.x (stable)
-        // Not compatible with server 1.x (skipped version) or 3+ (future breaking)
-        if ($major !== 0 && $major !== 2) {
+        $controlPlaneVersion = $controlPlane['version'] ?? null;
+        if (! is_scalar($controlPlaneVersion) || trim((string) $controlPlaneVersion) !== self::CONTROL_PLANE_VERSION) {
             throw new \RuntimeException(sprintf(
-                'Server version %s is incompatible with dw CLI 0.1.x (requires server 0.x or 2.x). '.
-                'Upgrade the server or use a compatible CLI version.',
-                $serverVersion,
+                'Server compatibility error: unsupported control_plane.version [%s]; dw CLI 0.1.x requires control_plane.version %s.',
+                is_scalar($controlPlaneVersion) ? (string) $controlPlaneVersion : 'missing',
+                self::CONTROL_PLANE_VERSION,
             ));
+        }
+
+        if (! ControlPlaneRequestContract::fromClusterInfo($this->clusterInfoCache) instanceof ControlPlaneRequestContract) {
+            throw new \RuntimeException(ControlPlaneRequestContract::compatibilityErrorFromClusterInfo($this->clusterInfoCache));
         }
     }
 

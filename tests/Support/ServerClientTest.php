@@ -61,7 +61,9 @@ class ServerClientTest extends TestCase
     public function test_it_reads_the_server_published_request_contract_from_cluster_info(): void
     {
         $response = new MockResponse(json_encode([
+            'version' => '3.0.0',
             'control_plane' => [
+                'version' => ServerClient::CONTROL_PLANE_VERSION,
                 'request_contract' => [
                     'schema' => ControlPlaneRequestContract::SCHEMA,
                     'version' => ControlPlaneRequestContract::VERSION,
@@ -100,10 +102,84 @@ class ServerClientTest extends TestCase
         );
     }
 
+    public function test_it_uses_protocol_manifest_not_top_level_app_version_for_compatibility(): void
+    {
+        $response = new MockResponse(json_encode([
+            'version' => 'not-semver',
+            'control_plane' => [
+                'version' => ServerClient::CONTROL_PLANE_VERSION,
+                'request_contract' => [
+                    'schema' => ControlPlaneRequestContract::SCHEMA,
+                    'version' => ControlPlaneRequestContract::VERSION,
+                    'operations' => [],
+                ],
+            ],
+        ], JSON_THROW_ON_ERROR), [
+            'http_code' => 200,
+        ]);
+
+        $client = new ServerClient(
+            baseUrl: 'http://example.test',
+            namespace: 'default',
+            http: new MockHttpClient($response, 'http://example.test'),
+        );
+
+        self::assertSame('not-semver', $client->clusterInfo()['version']);
+    }
+
+    public function test_it_rejects_cluster_info_without_control_plane_manifest(): void
+    {
+        $response = new MockResponse(json_encode([
+            'version' => '2.0.0',
+        ], JSON_THROW_ON_ERROR), [
+            'http_code' => 200,
+        ]);
+
+        $client = new ServerClient(
+            baseUrl: 'http://example.test',
+            namespace: 'default',
+            http: new MockHttpClient($response, 'http://example.test'),
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('missing control_plane manifest');
+
+        $client->clusterInfo();
+    }
+
+    public function test_it_rejects_unsupported_control_plane_version(): void
+    {
+        $response = new MockResponse(json_encode([
+            'version' => '2.0.0',
+            'control_plane' => [
+                'version' => '3',
+                'request_contract' => [
+                    'schema' => ControlPlaneRequestContract::SCHEMA,
+                    'version' => ControlPlaneRequestContract::VERSION,
+                    'operations' => [],
+                ],
+            ],
+        ], JSON_THROW_ON_ERROR), [
+            'http_code' => 200,
+        ]);
+
+        $client = new ServerClient(
+            baseUrl: 'http://example.test',
+            namespace: 'default',
+            http: new MockHttpClient($response, 'http://example.test'),
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('unsupported control_plane.version [3]');
+
+        $client->clusterInfo();
+    }
+
     public function test_it_uses_the_server_request_contract_to_reject_non_canonical_request_values(): void
     {
         $response = new MockResponse(json_encode([
             'control_plane' => [
+                'version' => ServerClient::CONTROL_PLANE_VERSION,
                 'request_contract' => [
                     'schema' => ControlPlaneRequestContract::SCHEMA,
                     'version' => ControlPlaneRequestContract::VERSION,
@@ -143,6 +219,7 @@ class ServerClientTest extends TestCase
     {
         $response = new MockResponse(json_encode([
             'control_plane' => [
+                'version' => ServerClient::CONTROL_PLANE_VERSION,
                 'request_contract' => [
                     'start' => [
                         'fields' => [

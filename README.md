@@ -90,13 +90,17 @@ rejected aliases, and removed fields advertised by the target server.
 
 ## Compatibility
 
-CLI version 0.1.x requires **Server 2.x** (versions 2.0.0+).
+CLI version 0.1.x is compatible with servers that advertise
+`control_plane.version: "2"` and
+`control_plane.request_contract.schema: durable-workflow.v2.control-plane-request.contract`
+version `1` from `GET /api/cluster/info`.
 
-The CLI automatically validates server version on first invocation and raises a clear error if incompatible:
+The top-level server `version` is build identity only. The CLI validates the
+protocol manifests on first invocation and raises a clear error if incompatible:
 
 ```bash
 $ dw workflow:list
-Server version 3.0.0 is incompatible with dw CLI 0.1.x (requires server 2.x).
+Server compatibility error: unsupported control_plane.version [3]; dw CLI 0.1.x requires control_plane.version 2.
 Upgrade the server or use a compatible CLI version.
 ```
 

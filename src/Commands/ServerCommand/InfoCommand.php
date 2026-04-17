@@ -79,6 +79,19 @@ HELP);
             }
         }
 
+        $clientCompatibility = $result['client_compatibility'] ?? null;
+
+        if (is_array($clientCompatibility) && $clientCompatibility !== []) {
+            $output->writeln('');
+            $output->writeln('Client Compatibility:');
+            $output->writeln('  Authority: '.($clientCompatibility['authority'] ?? 'unknown'));
+            $output->writeln('  Top-level Version Role: '.($clientCompatibility['top_level_version_role'] ?? 'unknown'));
+
+            if (array_key_exists('fail_closed', $clientCompatibility)) {
+                $output->writeln('  Fail Closed: '.($clientCompatibility['fail_closed'] === true ? 'yes' : 'no'));
+            }
+        }
+
         $controlPlane = $result['control_plane'] ?? null;
 
         if (is_array($controlPlane) && $controlPlane !== []) {

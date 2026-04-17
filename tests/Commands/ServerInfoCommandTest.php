@@ -35,6 +35,11 @@ class ServerInfoCommandTest extends TestCase
                 'build_ids' => ['build-a', 'build-b'],
                 'queues' => ['external-workflows'],
             ],
+            'client_compatibility' => [
+                'authority' => 'protocol_manifests',
+                'top_level_version_role' => 'informational',
+                'fail_closed' => true,
+            ],
             'control_plane' => [
                 'version' => '2',
                 'header' => 'X-Durable-Workflow-Control-Plane-Version',
@@ -97,6 +102,10 @@ class ServerInfoCommandTest extends TestCase
 
         self::assertStringContainsString('Worker Protocol:', $display);
         self::assertStringContainsString('Worker Fleet:', $display);
+        self::assertStringContainsString('Client Compatibility:', $display);
+        self::assertStringContainsString('Authority: protocol_manifests', $display);
+        self::assertStringContainsString('Top-level Version Role: informational', $display);
+        self::assertStringContainsString('Fail Closed: yes', $display);
         self::assertStringContainsString('Control Plane:', $display);
         self::assertStringContainsString('Namespace: default', $display);
         self::assertStringContainsString('Active Workers: 2', $display);

@@ -183,6 +183,7 @@ class StubServerClient extends ServerClient
         return [
             'version' => '0.1.9',
             'control_plane' => [
+                'version' => ServerClient::CONTROL_PLANE_VERSION,
                 'request_contract' => [
                     'schema' => ControlPlaneRequestContract::SCHEMA,
                     'version' => ControlPlaneRequestContract::VERSION,

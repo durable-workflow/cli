@@ -137,7 +137,10 @@ class ScheduleCommandTest extends TestCase
 
         $tester = new CommandTester($command);
 
-        self::assertSame(Command::FAILURE, $tester->execute([
+        // Local validation — missing cron/interval is a usage error (exit 2)
+        // rather than a generic failure, so scripts can distinguish invalid
+        // input from server-side failure.
+        self::assertSame(Command::INVALID, $tester->execute([
             '--workflow-type' => 'reports.daily',
         ]));
 
@@ -323,6 +326,86 @@ class ScheduleCommandTest extends TestCase
         self::assertSame('allow_all', $client->lastPostBody['overlap_policy'] ?? null);
     }
 
+    public function test_trigger_command_returns_failure_for_trigger_failed_outcome(): void
+    {
+        $client = new ScheduleFakeClient([
+            'outcome' => 'trigger_failed',
+            'reason' => 'backend unavailable',
+        ]);
+
+        $command = new TriggerCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::FAILURE, $tester->execute([
+            'schedule-id' => 'daily-report',
+        ]));
+    }
+
+    public function test_trigger_command_returns_failure_on_unknown_outcome(): void
+    {
+        $client = new ScheduleFakeClient([
+            'outcome' => 'something-we-did-not-anticipate',
+        ]);
+
+        $command = new TriggerCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::FAILURE, $tester->execute([
+            'schedule-id' => 'daily-report',
+        ]));
+    }
+
+    public function test_trigger_command_json_mode_respects_outcome_exit_code(): void
+    {
+        // Regression: --json used to unconditionally exit 0 because
+        // renderJson() always returned SUCCESS. The JSON and human-readable
+        // paths must agree on the exit code so CI scripts can parse stdout
+        // AND key on $?.
+        $client = new ScheduleFakeClient([
+            'outcome' => 'trigger_failed',
+            'reason' => 'backend unavailable',
+        ]);
+
+        $command = new TriggerCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::FAILURE, $tester->execute([
+            'schedule-id' => 'daily-report',
+            '--json' => true,
+        ]));
+
+        // The raw server response is still rendered to stdout for scripting.
+        self::assertStringContainsString('trigger_failed', $tester->getDisplay());
+    }
+
+    public function test_create_command_rejects_malformed_input_json(): void
+    {
+        $client = new ScheduleFakeClient([]);
+
+        $command = new CreateCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        // Malformed JSON on --input is a local validation error (exit 2),
+        // not a silent null decode that reaches the server.
+        self::assertSame(Command::INVALID, $tester->execute([
+            '--schedule-id' => 'whatever',
+            '--workflow-type' => 'reports.daily',
+            '--cron' => '0 6 * * *',
+            '--input' => '{not-json',
+        ]));
+
+        self::assertSame(0, $client->postCalls);
+        self::assertStringContainsString('--input must be valid JSON', $tester->getDisplay());
+    }
+
     public function test_backfill_command_sends_time_range(): void
     {
         $client = new ScheduleFakeClient([]);
@@ -485,7 +568,9 @@ class ScheduleCommandTest extends TestCase
 
         $tester = new CommandTester($command);
 
-        self::assertSame(Command::FAILURE, $tester->execute([
+        // Local validation — schedule:update with no --cron/--interval/etc
+        // is a usage error (exit 2), not a generic failure.
+        self::assertSame(Command::INVALID, $tester->execute([
             'schedule-id' => 'daily-report',
         ]));
 

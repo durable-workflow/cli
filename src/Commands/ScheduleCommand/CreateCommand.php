@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DurableWorkflow\Cli\Commands\ScheduleCommand;
 
 use DurableWorkflow\Cli\Commands\BaseCommand;
+use DurableWorkflow\Cli\Support\InvalidOptionException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -57,9 +58,7 @@ HELP)
         $interval = $input->getOption('interval');
 
         if ($cron === null && $interval === null) {
-            $output->writeln('<error>Either --cron or --interval is required.</error>');
-
-            return Command::FAILURE;
+            throw new InvalidOptionException('Either --cron or --interval is required.');
         }
 
         $spec = array_filter([
@@ -74,7 +73,7 @@ HELP)
             'action' => array_filter([
                 'workflow_type' => $input->getOption('workflow-type'),
                 'task_queue' => $input->getOption('task-queue'),
-                'input' => $input->getOption('input') ? json_decode($input->getOption('input'), true) : null,
+                'input' => $this->parseJsonOption($input->getOption('input'), 'input'),
                 'execution_timeout_seconds' => $input->getOption('execution-timeout') !== null ? (int) $input->getOption('execution-timeout') : null,
                 'run_timeout_seconds' => $input->getOption('run-timeout') !== null ? (int) $input->getOption('run-timeout') : null,
             ], fn ($v) => $v !== null),

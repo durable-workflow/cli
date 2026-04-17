@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DurableWorkflow\Cli\Commands;
 
 use DurableWorkflow\Cli\Support\ExitCode;
+use DurableWorkflow\Cli\Support\InvalidOptionException;
 use DurableWorkflow\Cli\Support\ServerClient;
 use DurableWorkflow\Cli\Support\ServerException;
 use Symfony\Component\Console\Command\Command;
@@ -30,6 +31,10 @@ abstract class BaseCommand extends Command
             return parent::run($input, $output);
         } catch (ConsoleException $e) {
             throw $e;
+        } catch (InvalidOptionException $e) {
+            $output->writeln('<error>'.$e->getMessage().'</error>');
+
+            return $e->exitCode();
         } catch (ServerException $e) {
             $output->writeln('<error>'.$e->getMessage().'</error>');
 
@@ -85,6 +90,32 @@ abstract class BaseCommand extends Command
         }
 
         return true;
+    }
+
+    /**
+     * Parse a user-supplied option value that must be a JSON document.
+     *
+     * Returns null when the option was not provided. Throws
+     * {@see InvalidOptionException} (which maps to `ExitCode::INVALID`)
+     * when the string is not valid JSON — plain `json_decode` silently
+     * returns `null` on failure, which is indistinguishable from a
+     * successful null decode and ends up as a generic `FAILURE` exit.
+     */
+    protected function parseJsonOption(?string $value, string $optionName): mixed
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        try {
+            return json_decode($value, associative: true, flags: JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            throw new InvalidOptionException(sprintf(
+                '--%s must be valid JSON: %s',
+                $optionName,
+                $e->getMessage(),
+            ));
+        }
     }
 
     protected function renderJson(OutputInterface $output, array $data): int

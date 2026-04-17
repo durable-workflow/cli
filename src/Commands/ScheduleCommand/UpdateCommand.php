@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DurableWorkflow\Cli\Commands\ScheduleCommand;
 
 use DurableWorkflow\Cli\Commands\BaseCommand;
+use DurableWorkflow\Cli\Support\InvalidOptionException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -89,9 +90,9 @@ HELP)
         }
 
         if ($body === []) {
-            $output->writeln('<error>No update fields provided. Use --cron, --interval, --workflow-type, --task-queue, --execution-timeout, --run-timeout, --overlap-policy, --jitter, --max-runs, or --note.</error>');
-
-            return Command::FAILURE;
+            throw new InvalidOptionException(
+                'No update fields provided. Use --cron, --interval, --workflow-type, --task-queue, --execution-timeout, --run-timeout, --overlap-policy, --jitter, --max-runs, or --note.',
+            );
         }
 
         $result = $this->client($input)->put("/schedules/{$scheduleId}", $body);

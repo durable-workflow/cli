@@ -40,11 +40,14 @@ HELP)
             'overlap_policy' => $input->getOption('overlap-policy'),
         ], fn ($v) => $v !== null));
 
-        if ($this->wantsJson($input)) {
-            return $this->renderJson($output, $result);
-        }
-
         $outcome = $result['outcome'] ?? 'unknown';
+        $exitCode = self::exitCodeForOutcome($outcome);
+
+        if ($this->wantsJson($input)) {
+            $this->renderJson($output, $result);
+
+            return $exitCode;
+        }
 
         match ($outcome) {
             'triggered' => $output->writeln(sprintf(
@@ -79,6 +82,18 @@ HELP)
             )),
         };
 
+        return $exitCode;
+    }
+
+    /**
+     * Map a trigger outcome to the documented exit code.
+     *
+     * Kept in one place so `--json` and the human-readable path can't
+     * drift on each other — the JSON branch used to unconditionally
+     * exit 0, even on trigger_failed or an unknown outcome.
+     */
+    private static function exitCodeForOutcome(string $outcome): int
+    {
         return match ($outcome) {
             'triggered', 'buffered', 'buffer_full', 'skipped' => Command::SUCCESS,
             default => Command::FAILURE,

@@ -42,8 +42,9 @@ HELP)
             'activity_attempt_id' => $attemptId,
             'lease_owner' => $input->getOption('lease-owner'),
         ];
-        if ($input->getOption('result')) {
-            $body['result'] = json_decode($input->getOption('result'), true);
+        $parsedResult = $this->parseJsonOption($input->getOption('result'), 'result');
+        if ($parsedResult !== null) {
+            $body['result'] = $parsedResult;
         }
 
         $result = $this->client($input)->post("/worker/activity-tasks/{$taskId}/complete", $body);

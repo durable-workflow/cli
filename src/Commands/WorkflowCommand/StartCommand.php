@@ -82,8 +82,8 @@ HELP)
             'business_key' => $input->getOption('business-key'),
             'task_queue' => $input->getOption('task-queue'),
             'duplicate_policy' => $duplicatePolicy,
-            'input' => $input->getOption('input') ? json_decode($input->getOption('input'), true) : null,
-            'memo' => $input->getOption('memo') ? json_decode($input->getOption('memo'), true) : null,
+            'input' => $this->parseJsonOption($input->getOption('input'), 'input'),
+            'memo' => $this->parseJsonOption($input->getOption('memo'), 'memo'),
             'execution_timeout_seconds' => $executionTimeout !== null ? (int) $executionTimeout : null,
             'run_timeout_seconds' => $runTimeout !== null ? (int) $runTimeout : null,
         ], fn ($v) => $v !== null);

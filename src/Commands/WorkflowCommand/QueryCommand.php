@@ -41,8 +41,9 @@ HELP)
         $runId = $input->getOption('run-id');
 
         $body = [];
-        if ($input->getOption('input')) {
-            $body['input'] = json_decode($input->getOption('input'), true);
+        $parsedInput = $this->parseJsonOption($input->getOption('input'), 'input');
+        if ($parsedInput !== null) {
+            $body['input'] = $parsedInput;
         }
 
         $path = $runId !== null

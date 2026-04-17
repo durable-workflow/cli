@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Commands;
 
 use DurableWorkflow\Cli\Application;
+use DurableWorkflow\Cli\Support\ControlPlaneRequestContract;
 use DurableWorkflow\Cli\Support\ServerClient;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -59,6 +60,7 @@ class MutatingCommandJsonTest extends TestCase
         yield 'workflow:signal' => ['workflow:signal', ['workflow-id' => 'wf-1', 'signal-name' => 'approve']];
         yield 'workflow:terminate' => ['workflow:terminate', ['workflow-id' => 'wf-1']];
         yield 'workflow:query' => ['workflow:query', ['workflow-id' => 'wf-1', 'query-name' => 'status']];
+        yield 'workflow:update' => ['workflow:update', ['workflow-id' => 'wf-1', 'update-name' => 'noop']];
 
         yield 'activity:complete' => [
             'activity:complete',
@@ -126,6 +128,10 @@ class StubServerClient extends ServerClient
 
     public function get(string $path, array $query = []): array
     {
+        if ($path === '/cluster/info') {
+            return $this->stubClusterInfo();
+        }
+
         return $this->payload();
     }
 
@@ -162,6 +168,49 @@ class StubServerClient extends ServerClient
             'type' => 'keyword',
             'worker_id' => 'w-1',
             'result' => ['stub' => true],
+        ];
+    }
+
+    /**
+     * Minimal cluster-info stub so commands that consult the published
+     * control-plane request contract (workflow:update wait_for, workflow:start
+     * duplicate_policy, workflow:list status) can validate without a real server.
+     *
+     * @return array<string, mixed>
+     */
+    private function stubClusterInfo(): array
+    {
+        return [
+            'version' => '0.1.9',
+            'control_plane' => [
+                'request_contract' => [
+                    'schema' => ControlPlaneRequestContract::SCHEMA,
+                    'version' => ControlPlaneRequestContract::VERSION,
+                    'operations' => [
+                        'update' => [
+                            'fields' => [
+                                'wait_for' => [
+                                    'canonical_values' => ['accepted', 'completed'],
+                                ],
+                            ],
+                        ],
+                        'start' => [
+                            'fields' => [
+                                'duplicate_policy' => [
+                                    'canonical_values' => ['allow', 'reject', 'reject_duplicate'],
+                                ],
+                            ],
+                        ],
+                        'list' => [
+                            'fields' => [
+                                'status' => [
+                                    'canonical_values' => ['running', 'completed', 'failed', 'cancelled', 'terminated'],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
         ];
     }
 }

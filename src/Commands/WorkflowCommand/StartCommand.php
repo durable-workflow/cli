@@ -7,6 +7,7 @@ namespace DurableWorkflow\Cli\Commands\WorkflowCommand;
 use DurableWorkflow\Cli\Commands\BaseCommand;
 use DurableWorkflow\Cli\Support\CompletionValues;
 use DurableWorkflow\Cli\Support\DetectsTerminalStatus;
+use DurableWorkflow\Cli\Support\JsonPayloadEnvelope;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -83,7 +84,7 @@ HELP)
             'business_key' => $input->getOption('business-key'),
             'task_queue' => $input->getOption('task-queue'),
             'duplicate_policy' => $duplicatePolicy,
-            'input' => $this->parseJsonOption($input->getOption('input'), 'input'),
+            'input' => $this->jsonEnvelopeOption($input->getOption('input'), 'input'),
             'memo' => $this->parseJsonOption($input->getOption('memo'), 'memo'),
             'execution_timeout_seconds' => $executionTimeout !== null ? (int) $executionTimeout : null,
             'run_timeout_seconds' => $runTimeout !== null ? (int) $runTimeout : null,
@@ -187,6 +188,18 @@ HELP)
 
             sleep(self::WAIT_POLL_INTERVAL_SECONDS);
         }
+    }
+
+    /**
+     * @return array{codec: string, blob: string}|null
+     */
+    private function jsonEnvelopeOption(?string $value, string $optionName): ?array
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return JsonPayloadEnvelope::fromValue($this->parseJsonOption($value, $optionName));
     }
 
     /**

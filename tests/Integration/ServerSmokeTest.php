@@ -17,6 +17,8 @@ final class ServerSmokeTest extends TestCase
 
     private ?string $operatorToken;
 
+    private ?string $workerToken;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -40,14 +42,17 @@ final class ServerSmokeTest extends TestCase
         $sharedToken = $this->env('DURABLE_WORKFLOW_AUTH_TOKEN');
         $this->adminToken = $this->env('DURABLE_WORKFLOW_CLI_SMOKE_ADMIN_TOKEN') ?? $sharedToken;
         $this->operatorToken = $this->env('DURABLE_WORKFLOW_CLI_SMOKE_OPERATOR_TOKEN') ?? $sharedToken ?? $this->adminToken;
+        $this->workerToken = $this->env('DURABLE_WORKFLOW_CLI_SMOKE_WORKER_TOKEN') ?? $sharedToken ?? $this->adminToken;
     }
 
-    public function test_cli_control_plane_smoke_against_running_server(): void
+    public function test_cli_control_and_worker_plane_smoke_against_running_server(): void
     {
         $suffix = strtolower(bin2hex(random_bytes(4)));
         $namespace = 'cli-smoke-'.$suffix;
         $workflowId = 'cli-smoke-wf-'.$suffix;
+        $terminableWorkflowId = 'cli-smoke-wf-term-'.$suffix;
         $scheduleId = 'cli-smoke-schedule-'.$suffix;
+        $workerId = 'cli-smoke-worker-'.$suffix;
 
         $health = $this->runDw(['server:health'], 'default', $this->operatorToken);
         self::assertStringContainsString('Server is', $health);
@@ -110,6 +115,47 @@ final class ServerSmokeTest extends TestCase
         self::assertContains('StartAccepted', $historyEventTypes);
         self::assertContains('WorkflowStarted', $historyEventTypes);
 
+        $registeredWorker = $this->runJsonDw([
+            'worker:register',
+            $workerId,
+            '--task-queue=cli-smoke-workers',
+            '--runtime=php',
+            '--workflow-type=cli.smoke.workflow',
+            '--json',
+        ], $namespace, $this->workerToken);
+
+        self::assertSame($workerId, $registeredWorker['worker_id'] ?? null);
+        self::assertTrue((bool) ($registeredWorker['registered'] ?? false));
+
+        $polledTask = $this->runJsonDw([
+            'workflow-task:poll',
+            $workerId,
+            '--task-queue=cli-smoke-workers',
+            '--history-page-size=50',
+            '--json',
+        ], $namespace, $this->workerToken);
+
+        self::assertIsArray($polledTask['task'] ?? null);
+        self::assertSame($workflowId, $polledTask['task']['workflow_id'] ?? null);
+        self::assertSame($started['run_id'], $polledTask['task']['run_id'] ?? null);
+        self::assertSame($workerId, $polledTask['task']['lease_owner'] ?? null);
+
+        $completedTask = $this->runJsonDw([
+            'workflow-task:complete',
+            (string) $polledTask['task']['task_id'],
+            (string) $polledTask['task']['workflow_task_attempt'],
+            '--lease-owner='.$workerId,
+            '--complete-result={"status":"completed-by-cli-smoke"}',
+            '--json',
+        ], $namespace, $this->workerToken);
+
+        self::assertSame('completed', $completedTask['outcome'] ?? null);
+        self::assertSame('completed', $completedTask['run_status'] ?? null);
+
+        $completedWorkflow = $this->runJsonDw(['workflow:describe', $workflowId, '--json'], $namespace, $this->operatorToken);
+        self::assertSame('completed', $completedWorkflow['status_bucket'] ?? null);
+        self::assertSame('completed-by-cli-smoke', $completedWorkflow['output']['status'] ?? null);
+
         $createdSchedule = $this->runJsonDw([
             'schedule:create',
             '--schedule-id='.$scheduleId,
@@ -135,14 +181,24 @@ final class ServerSmokeTest extends TestCase
         $deletedSchedule = $this->runJsonDw(['schedule:delete', $scheduleId, '--json'], $namespace, $this->operatorToken);
         self::assertSame($scheduleId, $deletedSchedule['schedule_id'] ?? null);
 
+        $terminable = $this->runJsonDw([
+            'workflow:start',
+            '--type=cli.smoke.terminable',
+            '--workflow-id='.$terminableWorkflowId,
+            '--task-queue=cli-smoke-workers',
+            '--json',
+        ], $namespace, $this->operatorToken);
+
+        self::assertSame($terminableWorkflowId, $terminable['workflow_id'] ?? null);
+
         $terminated = $this->runJsonDw([
             'workflow:terminate',
-            $workflowId,
+            $terminableWorkflowId,
             '--reason=CLI smoke cleanup',
             '--json',
         ], $namespace, $this->operatorToken);
 
-        self::assertSame($workflowId, $terminated['workflow_id'] ?? null);
+        self::assertSame($terminableWorkflowId, $terminated['workflow_id'] ?? null);
     }
 
     /**

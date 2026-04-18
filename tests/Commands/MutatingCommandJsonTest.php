@@ -74,7 +74,13 @@ class MutatingCommandJsonTest extends TestCase
         yield 'namespace:create' => ['namespace:create', ['name' => 'ns-1']];
         yield 'namespace:update' => ['namespace:update', ['name' => 'ns-1', '--retention' => '7']];
 
+        yield 'worker:register' => ['worker:register', ['worker-id' => 'w-1']];
         yield 'worker:deregister' => ['worker:deregister', ['worker-id' => 'w-1']];
+        yield 'workflow-task:poll' => ['workflow-task:poll', ['worker-id' => 'w-1']];
+        yield 'workflow-task:complete' => [
+            'workflow-task:complete',
+            ['task-id' => 'task-1', 'attempt' => '1'],
+        ];
 
         yield 'search-attribute:create' => [
             'search-attribute:create',

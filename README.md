@@ -70,12 +70,14 @@ the target and credentials when needed:
 DURABLE_WORKFLOW_CLI_SMOKE_SERVER_URL=http://localhost:18082 \
 DURABLE_WORKFLOW_CLI_SMOKE_ADMIN_TOKEN=admin-token \
 DURABLE_WORKFLOW_CLI_SMOKE_OPERATOR_TOKEN=operator-token \
+DURABLE_WORKFLOW_CLI_SMOKE_WORKER_TOKEN=worker-token \
 make smoke-server
 ```
 
 The smoke path creates a disposable namespace, starts and inspects a workflow,
-reads its history, creates and deletes a paused schedule, and terminates the
-workflow it created.
+reads its history, registers a diagnostic worker, polls and completes the
+workflow task through the worker protocol, creates and deletes a paused
+schedule, and terminates a second cleanup workflow.
 
 ## Configuration
 
@@ -265,14 +267,27 @@ dw task-queue:list
 dw task-queue:describe default
 ```
 
+### Worker Protocol Diagnostics
+
+```bash
+# Register a diagnostic worker identity
+dw worker:register cli-worker --task-queue=orders --workflow-type=orders.Checkout
+
+# Poll and lease one workflow task
+dw workflow-task:poll cli-worker --task-queue=orders --json
+
+# Complete the leased workflow task with a JSON workflow result
+dw workflow-task:complete TASK_ID ATTEMPT --lease-owner=cli-worker --complete-result='{"ok":true}'
+```
+
 ### Activities
 
 ```bash
 # Complete an activity externally
-dw activity:complete TASK_ID --result='{"status":"done"}'
+dw activity:complete TASK_ID ATTEMPT_ID --result='{"status":"done"}'
 
 # Fail an activity externally
-dw activity:fail TASK_ID --message="External service unavailable" --non-retryable
+dw activity:fail TASK_ID ATTEMPT_ID --message="External service unavailable" --non-retryable
 ```
 
 ### System Operations

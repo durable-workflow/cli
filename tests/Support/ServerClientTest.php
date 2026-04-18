@@ -559,6 +559,84 @@ class ServerClientTest extends TestCase
         $client->post('/workflows/wf-123/signal/advance');
     }
 
+    public function test_it_accepts_versioned_worker_protocol_responses(): void
+    {
+        $response = new MockResponse(json_encode([
+            'worker_id' => 'worker-1',
+            'registered' => true,
+            'protocol_version' => ServerClient::WORKER_PROTOCOL_VERSION,
+            'server_capabilities' => [
+                'workflow_task_poll_request_idempotency' => true,
+            ],
+        ], JSON_THROW_ON_ERROR), [
+            'http_code' => 201,
+            'response_headers' => [
+                'X-Durable-Workflow-Protocol-Version: '.ServerClient::WORKER_PROTOCOL_VERSION,
+            ],
+        ]);
+
+        $client = new ServerClient(
+            baseUrl: 'http://example.test',
+            namespace: 'default',
+            http: new MockHttpClient($response, 'http://example.test'),
+        );
+
+        $payload = $client->post('/worker/register', [
+            'worker_id' => 'worker-1',
+            'task_queue' => 'default',
+            'runtime' => 'php',
+        ]);
+
+        self::assertSame('worker-1', $payload['worker_id']);
+        self::assertSame(ServerClient::WORKER_PROTOCOL_VERSION, $payload['protocol_version']);
+    }
+
+    public function test_it_rejects_worker_responses_without_the_worker_protocol_header(): void
+    {
+        $response = new MockResponse(json_encode([
+            'worker_id' => 'worker-1',
+            'registered' => true,
+            'protocol_version' => ServerClient::WORKER_PROTOCOL_VERSION,
+        ], JSON_THROW_ON_ERROR), [
+            'http_code' => 201,
+        ]);
+
+        $client = new ServerClient(
+            baseUrl: 'http://example.test',
+            namespace: 'default',
+            http: new MockHttpClient($response, 'http://example.test'),
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('invalid worker-protocol response version');
+
+        $client->post('/worker/register');
+    }
+
+    public function test_it_rejects_worker_responses_without_the_body_protocol_version(): void
+    {
+        $response = new MockResponse(json_encode([
+            'worker_id' => 'worker-1',
+            'registered' => true,
+        ], JSON_THROW_ON_ERROR), [
+            'http_code' => 201,
+            'response_headers' => [
+                'X-Durable-Workflow-Protocol-Version: '.ServerClient::WORKER_PROTOCOL_VERSION,
+            ],
+        ]);
+
+        $client = new ServerClient(
+            baseUrl: 'http://example.test',
+            namespace: 'default',
+            http: new MockHttpClient($response, 'http://example.test'),
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('invalid worker-protocol response body');
+
+        $client->post('/worker/register');
+    }
+
     public function test_it_keeps_control_plane_error_responses_usable_without_success_only_fields(): void
     {
         $response = new MockResponse(json_encode([

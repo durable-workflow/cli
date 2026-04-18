@@ -40,6 +40,29 @@ class WorkflowReadCommandTest extends TestCase
         self::assertStringContainsString('Payload Codec: json', $tester->getDisplay());
     }
 
+    public function test_start_command_sends_input_as_json_codec_envelope(): void
+    {
+        $client = new WorkflowReadFakeServerClient([
+            'workflow_id' => 'wf-123',
+            'run_id' => 'run-123',
+            'payload_codec' => 'json',
+            'outcome' => 'started_new',
+        ]);
+
+        $command = new StartCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            '--type' => 'orders.process',
+            '--input' => '["Ada"]',
+        ]));
+
+        self::assertSame('json', $client->lastPostBody['input']['codec'] ?? null);
+        self::assertSame('["Ada"]', $client->lastPostBody['input']['blob'] ?? null);
+    }
+
     public function test_start_command_sends_the_canonical_duplicate_policy_without_server_specific_translation(): void
     {
         $useExistingClient = new WorkflowReadFakeServerClient([

@@ -15,6 +15,7 @@ use DurableWorkflow\Cli\Commands\TaskQueueCommand;
 use DurableWorkflow\Cli\Commands\WatchCommand;
 use DurableWorkflow\Cli\Commands\WorkerCommand;
 use DurableWorkflow\Cli\Commands\WorkflowCommand;
+use DurableWorkflow\Cli\Commands\WorkflowTaskCommand;
 use Symfony\Component\Console\Application as ConsoleApplication;
 
 class Application extends ConsoleApplication
@@ -67,9 +68,14 @@ class Application extends ConsoleApplication
             new ScheduleCommand\BackfillCommand(),
 
             // Worker management
+            new WorkerCommand\RegisterCommand(),
             new WorkerCommand\ListCommand(),
             new WorkerCommand\DescribeCommand(),
             new WorkerCommand\DeregisterCommand(),
+
+            // Worker protocol diagnostics
+            new WorkflowTaskCommand\PollCommand(),
+            new WorkflowTaskCommand\CompleteCommand(),
 
             // Task queue inspection
             new TaskQueueCommand\ListCommand(),

@@ -1,10 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://durable-workflow.com/schemas/cli/output/worker-operation.schema.json",
-  "title": "dw worker:deregister --json",
+  "title": "dw worker register/deregister --json",
   "type": "object",
   "properties": {
     "worker_id": { "type": ["string", "null"] },
+    "registered": { "type": ["boolean", "null"] },
+    "acknowledged": { "type": ["boolean", "null"] },
     "outcome": { "type": ["string", "null"] }
   },
   "additionalProperties": true

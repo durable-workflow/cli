@@ -240,6 +240,30 @@ class ServerClient
         int $statusCode,
     ): array
     {
+        if (str_starts_with($path, '/worker')) {
+            $version = $this->responseHeader($response, self::WORKER_PROTOCOL_HEADER);
+
+            if ($version !== self::WORKER_PROTOCOL_VERSION) {
+                throw new \RuntimeException(sprintf(
+                    'Server error: invalid worker-protocol response version for [%s]; expected [%s], got [%s].',
+                    $path,
+                    self::WORKER_PROTOCOL_VERSION,
+                    $version ?? 'missing',
+                ));
+            }
+
+            $bodyVersion = $body['protocol_version'] ?? null;
+            if (! is_scalar($bodyVersion) || trim((string) $bodyVersion) !== self::WORKER_PROTOCOL_VERSION) {
+                throw new \RuntimeException(sprintf(
+                    'Server error: invalid worker-protocol response body for [%s]; expected protocol_version [%s].',
+                    $path,
+                    self::WORKER_PROTOCOL_VERSION,
+                ));
+            }
+
+            return $body;
+        }
+
         if (! str_starts_with($path, '/workflows') || str_contains($path, '/history/export')) {
             return $body;
         }

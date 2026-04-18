@@ -7,6 +7,7 @@ namespace Tests\Commands;
 use DurableWorkflow\Cli\Commands\WorkerCommand\DeregisterCommand;
 use DurableWorkflow\Cli\Commands\WorkerCommand\DescribeCommand;
 use DurableWorkflow\Cli\Commands\WorkerCommand\ListCommand;
+use DurableWorkflow\Cli\Commands\WorkerCommand\RegisterCommand;
 use DurableWorkflow\Cli\Support\ServerClient;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
@@ -14,6 +15,63 @@ use Symfony\Component\Console\Tester\CommandTester;
 
 class WorkerCommandTest extends TestCase
 {
+    public function test_register_command_sends_worker_capabilities(): void
+    {
+        $client = new WorkerFakeClient([
+            'worker_id' => 'worker-a',
+            'registered' => true,
+        ]);
+
+        $command = new RegisterCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            'worker-id' => 'worker-a',
+            '--task-queue' => 'queue-alpha',
+            '--runtime' => 'python',
+            '--sdk-version' => '1.0.0',
+            '--build-id' => 'build-42',
+            '--workflow-type' => ['orders.Process', 'orders.Refund'],
+            '--activity-type' => ['email.send'],
+            '--max-workflow-tasks' => '5',
+            '--max-activity-tasks' => '7',
+        ]));
+
+        self::assertSame('/worker/register', $client->lastPostPath);
+        self::assertSame('worker-a', $client->lastPostBody['worker_id']);
+        self::assertSame('queue-alpha', $client->lastPostBody['task_queue']);
+        self::assertSame('python', $client->lastPostBody['runtime']);
+        self::assertSame('1.0.0', $client->lastPostBody['sdk_version']);
+        self::assertSame('build-42', $client->lastPostBody['build_id']);
+        self::assertSame(['orders.Process', 'orders.Refund'], $client->lastPostBody['supported_workflow_types']);
+        self::assertSame(['email.send'], $client->lastPostBody['supported_activity_types']);
+        self::assertSame(5, $client->lastPostBody['max_concurrent_workflow_tasks']);
+        self::assertSame(7, $client->lastPostBody['max_concurrent_activity_tasks']);
+        self::assertStringContainsString('worker-a', $tester->getDisplay());
+    }
+
+    public function test_register_command_json_output(): void
+    {
+        $payload = [
+            'worker_id' => 'worker-a',
+            'registered' => true,
+        ];
+
+        $command = new RegisterCommand();
+        $command->setServerClient(new WorkerFakeClient($payload));
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            'worker-id' => 'worker-a',
+            '--json' => true,
+        ]));
+
+        self::assertSame($payload, json_decode($tester->getDisplay(), true));
+    }
+
     public function test_list_command_renders_workers_in_a_table(): void
     {
         $command = new ListCommand();
@@ -229,6 +287,11 @@ class WorkerCommandTest extends TestCase
 
 class WorkerFakeClient extends ServerClient
 {
+    /** @var array<string, mixed> */
+    public array $lastPostBody = [];
+
+    public string $lastPostPath = '';
+
     public string $lastGetPath = '';
 
     /** @var array<string, string> */
@@ -245,6 +308,14 @@ class WorkerFakeClient extends ServerClient
     {
         $this->lastGetPath = $path;
         $this->lastGetQuery = $query;
+
+        return $this->payload;
+    }
+
+    public function post(string $path, array $body = []): array
+    {
+        $this->lastPostPath = $path;
+        $this->lastPostBody = $body;
 
         return $this->payload;
     }

@@ -134,6 +134,11 @@
       "schema": "schemas/output/task-queue-list.schema.json",
       "schema_id": "https://durable-workflow.com/schemas/cli/output/task-queue-list.schema.json"
     },
+    "worker:register": {
+      "output": "--json",
+      "schema": "schemas/output/worker-operation.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/worker-operation.schema.json"
+    },
     "worker:deregister": {
       "output": "--json",
       "schema": "schemas/output/worker-operation.schema.json",
@@ -153,6 +158,16 @@
       "output": "--json",
       "schema": "schemas/output/workflow-operation.schema.json",
       "schema_id": "https://durable-workflow.com/schemas/cli/output/workflow-operation.schema.json"
+    },
+    "workflow-task:complete": {
+      "output": "--json",
+      "schema": "schemas/output/workflow-task-result.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/workflow-task-result.schema.json"
+    },
+    "workflow-task:poll": {
+      "output": "--json",
+      "schema": "schemas/output/workflow-task-poll.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/workflow-task-poll.schema.json"
     },
     "workflow:cancel": {
       "output": "--json",

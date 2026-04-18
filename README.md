@@ -176,6 +176,7 @@ dw workflow:update order-123 approve --input='{"approver":"admin"}'
 
 # Cancel a workflow (workflow code can observe and clean up)
 dw workflow:cancel order-123 --reason="Customer request"
+dw workflow:cancel --all-matching='customer-42' --yes --reason="Customer request"
 
 # Terminate a workflow (immediate, no cleanup)
 dw workflow:terminate order-123 --reason="Stuck workflow"

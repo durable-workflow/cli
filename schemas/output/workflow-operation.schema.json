@@ -3,7 +3,14 @@
   "$id": "https://durable-workflow.com/schemas/cli/output/workflow-operation.schema.json",
   "title": "dw workflow cancel/terminate/repair/archive --json",
   "type": "object",
-  "required": ["workflow_id", "outcome"],
+  "oneOf": [
+    {
+      "required": ["workflow_id", "outcome"]
+    },
+    {
+      "required": ["matched", "cancelled", "failed", "workflow_ids", "results", "failures"]
+    }
+  ],
   "properties": {
     "workflow_id": { "type": "string" },
     "run_id": { "type": ["string", "null"] },
@@ -13,7 +20,34 @@
     "control_plane_schema": { "type": ["string", "null"] },
     "control_plane_schema_version": { "type": ["integer", "null"] },
     "control_plane_operation": { "type": ["string", "null"] },
-    "control_plane_version": { "type": ["string", "null"] }
+    "control_plane_version": { "type": ["string", "null"] },
+    "query": { "type": ["string", "null"] },
+    "workflow_type": { "type": ["string", "null"] },
+    "status": { "type": ["string", "null"] },
+    "matched": { "type": "integer", "minimum": 0 },
+    "cancelled": { "type": "integer", "minimum": 0 },
+    "failed": { "type": "integer", "minimum": 0 },
+    "workflow_ids": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "results": {
+      "type": "array",
+      "items": { "type": "object", "additionalProperties": true }
+    },
+    "failures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["workflow_id", "message", "exit_code"],
+        "properties": {
+          "workflow_id": { "type": "string" },
+          "message": { "type": "string" },
+          "exit_code": { "type": "integer" }
+        },
+        "additionalProperties": true
+      }
+    }
   },
   "additionalProperties": true
 }

@@ -169,6 +169,184 @@ class WorkflowControlPlaneCommandTest extends TestCase
         self::assertSame('/workflows/wf-123/runs/run-456/cancel', $client->lastPostPath);
     }
 
+    public function test_cancel_command_batch_cancels_matching_workflows_after_confirmation(): void
+    {
+        $client = new BatchCancelFakeServerClient([
+            [
+                'workflows' => [
+                    ['workflow_id' => 'wf-1'],
+                    ['workflow_id' => 'wf-2'],
+                ],
+                'next_page_token' => null,
+            ],
+        ]);
+
+        $command = new CancelCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+        $tester->setInputs(['yes']);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            '--all-matching' => 'customer-42',
+            '--type' => 'orders.process',
+            '--status' => 'running',
+            '--limit' => '2',
+            '--reason' => 'customer request',
+        ]));
+
+        self::assertSame('/workflows', $client->getCalls[0]['path']);
+        self::assertSame([
+            'query' => 'customer-42',
+            'workflow_type' => 'orders.process',
+            'status' => 'running',
+            'page_size' => 2,
+        ], $client->getCalls[0]['query']);
+
+        self::assertSame(['/workflows/wf-1/cancel', '/workflows/wf-2/cancel'], array_column($client->postCalls, 'path'));
+        self::assertSame(['reason' => 'customer request'], $client->postCalls[0]['body']);
+        self::assertSame(['reason' => 'customer request'], $client->postCalls[1]['body']);
+
+        $display = $tester->getDisplay();
+        self::assertStringContainsString('Cancel 2 workflows matching [customer-42]?', $display);
+        self::assertStringContainsString('Cancellation requested for 2 workflows.', $display);
+        self::assertStringContainsString('Matched: 2', $display);
+        self::assertStringContainsString('wf-1', $display);
+        self::assertStringContainsString('wf-2', $display);
+    }
+
+    public function test_cancel_command_batch_json_requires_yes_to_avoid_prompting(): void
+    {
+        $client = new BatchCancelFakeServerClient([]);
+
+        $command = new CancelCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::INVALID, $tester->execute([
+            '--all-matching' => 'customer-42',
+            '--json' => true,
+        ]));
+
+        self::assertSame([], $client->getCalls);
+        self::assertStringContainsString('--yes is required when using --all-matching with --json.', $tester->getDisplay());
+    }
+
+    public function test_cancel_command_batch_json_renders_summary(): void
+    {
+        $client = new BatchCancelFakeServerClient([
+            [
+                'workflows' => [
+                    ['workflow_id' => 'wf-1'],
+                ],
+                'next_page_token' => null,
+            ],
+        ]);
+
+        $command = new CancelCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            '--all-matching' => 'customer-42',
+            '--yes' => true,
+            '--json' => true,
+        ]));
+
+        $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+
+        self::assertSame('customer-42', $decoded['query']);
+        self::assertSame('running', $decoded['status']);
+        self::assertSame(1, $decoded['matched']);
+        self::assertSame(1, $decoded['cancelled']);
+        self::assertSame(0, $decoded['failed']);
+        self::assertSame(['wf-1'], $decoded['workflow_ids']);
+        self::assertSame('cancelled', $decoded['results'][0]['outcome']);
+    }
+
+    public function test_cancel_command_batch_paginates_until_limit(): void
+    {
+        $client = new BatchCancelFakeServerClient([
+            [
+                'workflows' => [
+                    ['workflow_id' => 'wf-1'],
+                    ['workflow_id' => 'wf-2'],
+                ],
+                'next_page_token' => 'page-2',
+            ],
+            [
+                'workflows' => [
+                    ['workflow_id' => 'wf-3'],
+                    ['workflow_id' => 'wf-4'],
+                ],
+                'next_page_token' => null,
+            ],
+        ]);
+
+        $command = new CancelCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            '--all-matching' => 'customer-42',
+            '--yes' => true,
+            '--limit' => '3',
+        ]));
+
+        self::assertCount(2, $client->getCalls);
+        self::assertSame(3, $client->getCalls[0]['query']['page_size']);
+        self::assertSame('page-2', $client->getCalls[1]['query']['next_page_token']);
+        self::assertSame(1, $client->getCalls[1]['query']['page_size']);
+        self::assertSame(['/workflows/wf-1/cancel', '/workflows/wf-2/cancel', '/workflows/wf-3/cancel'], array_column($client->postCalls, 'path'));
+    }
+
+    public function test_cancel_command_batch_aborts_when_confirmation_is_declined(): void
+    {
+        $client = new BatchCancelFakeServerClient([
+            [
+                'workflows' => [
+                    ['workflow_id' => 'wf-1'],
+                ],
+                'next_page_token' => null,
+            ],
+        ]);
+
+        $command = new CancelCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+        $tester->setInputs(['no']);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            '--all-matching' => 'customer-42',
+        ]));
+
+        self::assertSame([], $client->postCalls);
+        self::assertStringContainsString('Batch cancellation aborted.', $tester->getDisplay());
+    }
+
+    public function test_cancel_command_rejects_missing_or_conflicting_batch_targets(): void
+    {
+        $command = new CancelCommand();
+        $command->setServerClient(new BatchCancelFakeServerClient([]));
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::INVALID, $tester->execute([]));
+        self::assertStringContainsString('workflow-id is required unless --all-matching is used.', $tester->getDisplay());
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::INVALID, $tester->execute([
+            'workflow-id' => 'wf-1',
+            '--all-matching' => 'customer-42',
+        ]));
+        self::assertStringContainsString('Pass either workflow-id or --all-matching, not both.', $tester->getDisplay());
+    }
+
     public function test_terminate_command_uses_run_targeted_path_when_run_id_is_provided(): void
     {
         $client = new FakeServerClient([
@@ -314,5 +492,69 @@ class FakeServerClient extends ServerClient
     public function controlPlaneRequestContract(): ?ControlPlaneRequestContract
     {
         return $this->requestContract;
+    }
+}
+
+class BatchCancelFakeServerClient extends ServerClient
+{
+    /**
+     * @var list<array<string, mixed>>
+     */
+    private array $pages;
+
+    /**
+     * @var list<array{path: string, query: array<string, mixed>}>
+     */
+    public array $getCalls = [];
+
+    /**
+     * @var list<array{path: string, body: array<string, mixed>}>
+     */
+    public array $postCalls = [];
+
+    /**
+     * @param list<array<string, mixed>> $pages
+     */
+    public function __construct(array $pages)
+    {
+        $this->pages = $pages;
+    }
+
+    public function get(string $path, array $query = []): array
+    {
+        $this->getCalls[] = ['path' => $path, 'query' => $query];
+
+        return array_shift($this->pages) ?? [
+            'workflows' => [],
+            'next_page_token' => null,
+        ];
+    }
+
+    public function post(string $path, array $body = []): array
+    {
+        $this->postCalls[] = ['path' => $path, 'body' => $body];
+
+        $workflowId = preg_match('#^/workflows/([^/]+)/cancel$#', $path, $matches) === 1
+            ? $matches[1]
+            : 'unknown';
+
+        return [
+            'workflow_id' => $workflowId,
+            'outcome' => 'cancelled',
+            'command_status' => 'accepted',
+        ];
+    }
+
+    public function controlPlaneRequestContract(): ?ControlPlaneRequestContract
+    {
+        return new ControlPlaneRequestContract([
+            'list' => [
+                'fields' => [
+                    'status' => [
+                        'canonical_values' => ['running', 'completed', 'failed'],
+                    ],
+                ],
+            ],
+        ]);
     }
 }

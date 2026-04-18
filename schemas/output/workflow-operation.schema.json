@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://durable-workflow.com/schemas/cli/output/workflow-operation.schema.json",
+  "title": "dw workflow cancel/terminate/repair/archive --json",
+  "type": "object",
+  "required": ["workflow_id", "outcome"],
+  "properties": {
+    "workflow_id": { "type": "string" },
+    "run_id": { "type": ["string", "null"] },
+    "outcome": { "type": "string" },
+    "command_status": { "type": ["string", "null"] },
+    "command_id": { "type": ["string", "null"] },
+    "control_plane_schema": { "type": ["string", "null"] },
+    "control_plane_schema_version": { "type": ["integer", "null"] },
+    "control_plane_operation": { "type": ["string", "null"] },
+    "control_plane_version": { "type": ["string", "null"] }
+  },
+  "additionalProperties": true
+}

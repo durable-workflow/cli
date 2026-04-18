@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://durable-workflow.com/schemas/cli/output/task-queue-list.schema.json",
+  "title": "dw task-queue:list --json",
+  "type": "object",
+  "required": ["task_queues"],
+  "properties": {
+    "task_queues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

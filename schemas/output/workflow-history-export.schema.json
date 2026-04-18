@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://durable-workflow.com/schemas/cli/output/workflow-history-export.schema.json",
+  "title": "dw workflow:history-export",
+  "type": "object",
+  "required": ["schema", "workflow", "events"],
+  "properties": {
+    "schema": { "const": "durable-workflow.v2.history-export" },
+    "workflow": {
+      "type": "object",
+      "required": ["instance_id", "run_id"],
+      "properties": {
+        "instance_id": { "type": "string" },
+        "run_id": { "type": "string" },
+        "workflow_type": { "type": ["string", "null"] }
+      },
+      "additionalProperties": true
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["event_type"],
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

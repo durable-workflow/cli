@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://durable-workflow.com/schemas/cli/output/schedule-operation.schema.json",
+  "title": "dw schedule delete/pause/resume/backfill --json",
+  "type": "object",
+  "properties": {
+    "schedule_id": { "type": ["string", "null"] },
+    "outcome": { "type": ["string", "null"] },
+    "note": { "type": ["string", "null"] },
+    "backfill_id": { "type": ["string", "null"] },
+    "accepted": { "type": ["boolean", "null"] }
+  },
+  "additionalProperties": true
+}

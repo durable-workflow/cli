@@ -3,7 +3,7 @@
     "main": "bin/dw",
     "output": "build/dw.phar",
     "chmod": "0755",
-    "directories": ["src"],
+    "directories": ["src", "schemas"],
     "finder": [
         {
             "name": "*.php",

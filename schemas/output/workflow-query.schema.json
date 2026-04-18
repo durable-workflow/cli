@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://durable-workflow.com/schemas/cli/output/workflow-query.schema.json",
+  "title": "dw workflow:query --json",
+  "type": "object",
+  "required": ["result"],
+  "properties": {
+    "workflow_id": { "type": ["string", "null"] },
+    "run_id": { "type": ["string", "null"] },
+    "query_name": { "type": ["string", "null"] },
+    "result": true,
+    "result_envelope": {
+      "type": ["object", "null"],
+      "properties": {
+        "codec": { "type": "string" },
+        "blob": { "type": "string" }
+      },
+      "required": ["codec", "blob"],
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

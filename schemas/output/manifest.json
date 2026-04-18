@@ -1,0 +1,223 @@
+{
+  "schema": "durable-workflow.cli.output-schema-manifest",
+  "version": 1,
+  "json_schema_draft": "https://json-schema.org/draft/2020-12/schema",
+  "stability": "patch-stable-additive",
+  "commands": {
+    "activity:complete": {
+      "output": "--json",
+      "schema": "schemas/output/activity-task-result.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/activity-task-result.schema.json"
+    },
+    "activity:fail": {
+      "output": "--json",
+      "schema": "schemas/output/activity-task-result.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/activity-task-result.schema.json"
+    },
+    "namespace:create": {
+      "output": "--json",
+      "schema": "schemas/output/namespace.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/namespace.schema.json"
+    },
+    "namespace:describe": {
+      "output": "--json",
+      "schema": "schemas/output/namespace.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/namespace.schema.json"
+    },
+    "namespace:list": {
+      "output": "--json",
+      "schema": "schemas/output/namespace-list.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/namespace-list.schema.json"
+    },
+    "namespace:update": {
+      "output": "--json",
+      "schema": "schemas/output/namespace.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/namespace.schema.json"
+    },
+    "schedule:backfill": {
+      "output": "--json",
+      "schema": "schemas/output/schedule-operation.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/schedule-operation.schema.json"
+    },
+    "schedule:create": {
+      "output": "--json",
+      "schema": "schemas/output/schedule.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/schedule.schema.json"
+    },
+    "schedule:delete": {
+      "output": "--json",
+      "schema": "schemas/output/schedule-operation.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/schedule-operation.schema.json"
+    },
+    "schedule:describe": {
+      "output": "--json",
+      "schema": "schemas/output/schedule.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/schedule.schema.json"
+    },
+    "schedule:list": {
+      "output": "--json",
+      "schema": "schemas/output/schedule-list.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/schedule-list.schema.json"
+    },
+    "schedule:pause": {
+      "output": "--json",
+      "schema": "schemas/output/schedule-operation.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/schedule-operation.schema.json"
+    },
+    "schedule:resume": {
+      "output": "--json",
+      "schema": "schemas/output/schedule-operation.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/schedule-operation.schema.json"
+    },
+    "schedule:trigger": {
+      "output": "--json",
+      "schema": "schemas/output/schedule-trigger.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/schedule-trigger.schema.json"
+    },
+    "schedule:update": {
+      "output": "--json",
+      "schema": "schemas/output/schedule.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/schedule.schema.json"
+    },
+    "search-attribute:create": {
+      "output": "--json",
+      "schema": "schemas/output/search-attribute.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/search-attribute.schema.json"
+    },
+    "search-attribute:delete": {
+      "output": "--json",
+      "schema": "schemas/output/search-attribute.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/search-attribute.schema.json"
+    },
+    "search-attribute:list": {
+      "output": "--json",
+      "schema": "schemas/output/search-attribute-list.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/search-attribute-list.schema.json"
+    },
+    "system:activity-timeout-pass": {
+      "output": "--json",
+      "schema": "schemas/output/activity-timeout-pass.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/activity-timeout-pass.schema.json"
+    },
+    "system:activity-timeout-status": {
+      "output": "--json",
+      "schema": "schemas/output/activity-timeout-status.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/activity-timeout-status.schema.json"
+    },
+    "system:repair-pass": {
+      "output": "--json",
+      "schema": "schemas/output/repair-pass.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/repair-pass.schema.json"
+    },
+    "system:repair-status": {
+      "output": "--json",
+      "schema": "schemas/output/repair-status.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/repair-status.schema.json"
+    },
+    "system:retention-pass": {
+      "output": "--json",
+      "schema": "schemas/output/retention-pass.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/retention-pass.schema.json"
+    },
+    "system:retention-status": {
+      "output": "--json",
+      "schema": "schemas/output/retention-status.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/retention-status.schema.json"
+    },
+    "task-queue:describe": {
+      "output": "--json",
+      "schema": "schemas/output/task-queue.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/task-queue.schema.json"
+    },
+    "task-queue:list": {
+      "output": "--json",
+      "schema": "schemas/output/task-queue-list.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/task-queue-list.schema.json"
+    },
+    "worker:deregister": {
+      "output": "--json",
+      "schema": "schemas/output/worker-operation.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/worker-operation.schema.json"
+    },
+    "worker:describe": {
+      "output": "--json",
+      "schema": "schemas/output/worker.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/worker.schema.json"
+    },
+    "worker:list": {
+      "output": "--json",
+      "schema": "schemas/output/worker-list.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/worker-list.schema.json"
+    },
+    "workflow:archive": {
+      "output": "--json",
+      "schema": "schemas/output/workflow-operation.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/workflow-operation.schema.json"
+    },
+    "workflow:cancel": {
+      "output": "--json",
+      "schema": "schemas/output/workflow-operation.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/workflow-operation.schema.json"
+    },
+    "workflow:describe": {
+      "output": "--json",
+      "schema": "schemas/output/workflow-run.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/workflow-run.schema.json"
+    },
+    "workflow:history": {
+      "output": "--json",
+      "schema": "schemas/output/workflow-history.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/workflow-history.schema.json"
+    },
+    "workflow:history-export": {
+      "output": "stdout-json",
+      "schema": "schemas/output/workflow-history-export.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/workflow-history-export.schema.json"
+    },
+    "workflow:list": {
+      "output": "--json",
+      "schema": "schemas/output/workflow-list.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/workflow-list.schema.json"
+    },
+    "workflow:list-runs": {
+      "output": "--json",
+      "schema": "schemas/output/workflow-runs.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/workflow-runs.schema.json"
+    },
+    "workflow:query": {
+      "output": "--json",
+      "schema": "schemas/output/workflow-query.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/workflow-query.schema.json"
+    },
+    "workflow:repair": {
+      "output": "--json",
+      "schema": "schemas/output/workflow-operation.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/workflow-operation.schema.json"
+    },
+    "workflow:show-run": {
+      "output": "--json",
+      "schema": "schemas/output/workflow-run.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/workflow-run.schema.json"
+    },
+    "workflow:signal": {
+      "output": "--json",
+      "schema": "schemas/output/workflow-signal.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/workflow-signal.schema.json"
+    },
+    "workflow:start": {
+      "output": "--json",
+      "schema": "schemas/output/workflow-start.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/workflow-start.schema.json"
+    },
+    "workflow:terminate": {
+      "output": "--json",
+      "schema": "schemas/output/workflow-operation.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/workflow-operation.schema.json"
+    },
+    "workflow:update": {
+      "output": "--json",
+      "schema": "schemas/output/workflow-update.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/workflow-update.schema.json"
+    }
+  }
+}

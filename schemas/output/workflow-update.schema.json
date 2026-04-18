@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://durable-workflow.com/schemas/cli/output/workflow-update.schema.json",
+  "title": "dw workflow:update --json",
+  "type": "object",
+  "required": ["workflow_id", "update_name", "update_id", "outcome"],
+  "properties": {
+    "workflow_id": { "type": "string" },
+    "run_id": { "type": ["string", "null"] },
+    "update_name": { "type": "string" },
+    "update_id": { "type": "string" },
+    "outcome": { "type": "string" },
+    "command_status": { "type": ["string", "null"] },
+    "update_status": { "type": ["string", "null"] },
+    "wait_for": { "type": ["string", "null"] },
+    "result": true,
+    "result_envelope": {
+      "type": ["object", "null"],
+      "properties": {
+        "codec": { "type": "string" },
+        "blob": { "type": "string" }
+      },
+      "required": ["codec", "blob"],
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

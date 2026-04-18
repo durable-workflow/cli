@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://durable-workflow.com/schemas/cli/output/namespace-list.schema.json",
+  "title": "dw namespace:list --json",
+  "type": "object",
+  "required": ["namespaces"],
+  "properties": {
+    "namespaces": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "description": { "type": ["string", "null"] },
+          "retention_days": { "type": ["integer", "null"] },
+          "status": { "type": ["string", "null"] },
+          "created_at": { "type": ["string", "null"] },
+          "updated_at": { "type": ["string", "null"] }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

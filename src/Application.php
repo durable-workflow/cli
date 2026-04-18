@@ -7,6 +7,7 @@ namespace DurableWorkflow\Cli;
 use DurableWorkflow\Cli\Commands\ActivityCommand;
 use DurableWorkflow\Cli\Commands\NamespaceCommand;
 use DurableWorkflow\Cli\Commands\ScheduleCommand;
+use DurableWorkflow\Cli\Commands\SchemaCommand;
 use DurableWorkflow\Cli\Commands\SearchAttributeCommand;
 use DurableWorkflow\Cli\Commands\ServerCommand;
 use DurableWorkflow\Cli\Commands\SystemCommand;
@@ -85,6 +86,11 @@ class Application extends ConsoleApplication
             new SystemCommand\ActivityTimeoutPassCommand(),
             new SystemCommand\RetentionStatusCommand(),
             new SystemCommand\RetentionPassCommand(),
+
+            // Published machine-readable contracts
+            new SchemaCommand\ListCommand(),
+            new SchemaCommand\ShowCommand(),
+            new SchemaCommand\ManifestCommand(),
         ]);
     }
 }

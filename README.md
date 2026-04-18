@@ -318,6 +318,20 @@ wf_id=$(dw workflow:start --type=orders.Checkout --json | jq -r '.workflow_id')
 dw workflow:signal "$wf_id" approve --json | jq '.command_status'
 ```
 
+The CLI publishes patch-stable JSON Schema files for every `--json` response
+and for `workflow:history-export` replay bundles. PHAR and standalone binary
+builds bundle the schema catalog under `schemas/output/`; operators can inspect
+the embedded catalog without unpacking the artifact:
+
+```bash
+dw schema:list
+dw schema:manifest | jq '.commands["workflow:list"]'
+dw schema:show workflow:list > workflow-list.schema.json
+```
+
+Schemas are additive across patch releases: new optional fields may appear, but
+required top-level fields and their basic types stay stable.
+
 ## License
 
 MIT

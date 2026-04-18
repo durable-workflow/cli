@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://durable-workflow.com/schemas/cli/output/workflow-runs.schema.json",
+  "title": "dw workflow:list-runs --json",
+  "type": "object",
+  "required": ["runs"],
+  "properties": {
+    "workflow_id": { "type": ["string", "null"] },
+    "run_count": { "type": ["integer", "null"] },
+    "runs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["run_id"],
+        "properties": {
+          "run_id": { "type": "string" },
+          "run_number": { "type": ["integer", "null"] },
+          "workflow_type": { "type": ["string", "null"] },
+          "status": { "type": ["string", "null"] },
+          "task_queue": { "type": ["string", "null"] },
+          "started_at": { "type": ["string", "null"] },
+          "closed_at": { "type": ["string", "null"] }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://durable-workflow.com/schemas/cli/output/worker.schema.json",
+  "title": "dw worker:describe --json",
+  "type": "object",
+  "required": ["worker_id"],
+  "properties": {
+    "worker_id": { "type": "string" },
+    "namespace": { "type": ["string", "null"] },
+    "task_queue": { "type": ["string", "null"] },
+    "runtime": { "type": ["string", "null"] },
+    "sdk_version": { "type": ["string", "null"] },
+    "build_id": { "type": ["string", "null"] },
+    "status": { "type": ["string", "null"] },
+    "max_concurrent_workflow_tasks": { "type": ["integer", "null"] },
+    "max_concurrent_activity_tasks": { "type": ["integer", "null"] },
+    "supported_workflow_types": { "type": ["array", "null"], "items": { "type": "string" } },
+    "supported_activity_types": { "type": ["array", "null"], "items": { "type": "string" } },
+    "last_heartbeat_at": { "type": ["string", "null"] },
+    "registered_at": { "type": ["string", "null"] },
+    "updated_at": { "type": ["string", "null"] }
+  },
+  "additionalProperties": true
+}

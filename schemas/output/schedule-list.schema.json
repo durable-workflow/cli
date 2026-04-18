@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://durable-workflow.com/schemas/cli/output/schedule-list.schema.json",
+  "title": "dw schedule:list --json",
+  "type": "object",
+  "required": ["schedules"],
+  "properties": {
+    "schedules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["schedule_id"],
+        "properties": {
+          "schedule_id": { "type": "string" },
+          "workflow_type": { "type": ["string", "null"] },
+          "paused": { "type": ["boolean", "null"] },
+          "next_fire": { "type": ["string", "null"] },
+          "next_fire_at": { "type": ["string", "null"] },
+          "last_fire": { "type": ["string", "null"] },
+          "last_fire_at": { "type": ["string", "null"] }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

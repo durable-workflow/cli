@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://durable-workflow.com/schemas/cli/output/worker-list.schema.json",
+  "title": "dw worker:list --json",
+  "type": "object",
+  "required": ["workers"],
+  "properties": {
+    "workers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["worker_id"],
+        "properties": {
+          "worker_id": { "type": "string" },
+          "task_queue": { "type": ["string", "null"] },
+          "runtime": { "type": ["string", "null"] },
+          "build_id": { "type": ["string", "null"] },
+          "status": { "type": ["string", "null"] },
+          "last_heartbeat_at": { "type": ["string", "null"] }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

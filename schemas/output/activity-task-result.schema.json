@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://durable-workflow.com/schemas/cli/output/activity-task-result.schema.json",
+  "title": "dw activity complete/fail --json",
+  "type": "object",
+  "required": ["task_id", "activity_attempt_id"],
+  "properties": {
+    "task_id": { "type": "string" },
+    "activity_attempt_id": { "type": "string" },
+    "outcome": { "type": ["string", "null"] },
+    "result": true,
+    "failure": {
+      "type": ["object", "null"],
+      "properties": {
+        "message": { "type": ["string", "null"] },
+        "type": { "type": ["string", "null"] },
+        "non_retryable": { "type": ["boolean", "null"] }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

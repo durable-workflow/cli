@@ -19,6 +19,9 @@ curl -fsSL https://durable-workflow.com/install.sh | sh
 irm https://durable-workflow.com/install.ps1 | iex
 ```
 
+The installers download the release `SHA256SUMS` manifest and verify the
+binary checksum before writing `dw` into the install directory.
+
 Or download a native binary directly from the [releases
 page](https://github.com/durable-workflow/cli/releases). Available assets:
 `dw-linux-x86_64`, `dw-linux-aarch64`,

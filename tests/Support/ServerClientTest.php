@@ -448,7 +448,7 @@ class ServerClientTest extends TestCase
         self::assertSame('next-token', $payload['next_page_token']);
     }
 
-    public function test_it_leaves_workflow_history_responses_outside_the_control_plane_contract(): void
+    public function test_it_normalizes_workflow_history_responses_with_the_control_plane_contract(): void
     {
         $response = new MockResponse(json_encode([
             'workflow_id' => 'wf-123',
@@ -457,6 +457,28 @@ class ServerClientTest extends TestCase
                 [
                     'sequence' => 1,
                     'event_type' => 'WorkflowStarted',
+                ],
+            ],
+            'next_page_token' => null,
+            'control_plane' => [
+                'schema' => 'durable-workflow.v2.control-plane-response',
+                'version' => 1,
+                'operation' => 'history',
+                'workflow_id' => 'wf-123',
+                'run_id' => 'run-123',
+                'next_page_token' => null,
+                'contract' => [
+                    'schema' => 'durable-workflow.v2.control-plane-response.contract',
+                    'version' => 1,
+                    'legacy_field_policy' => 'reject_non_canonical',
+                    'legacy_fields' => [
+                        'query' => 'query_name',
+                        'signal' => 'signal_name',
+                        'update' => 'update_name',
+                        'wait_policy' => 'wait_for',
+                    ],
+                    'required_fields' => ['workflow_id', 'run_id'],
+                    'success_fields' => ['next_page_token'],
                 ],
             ],
         ], JSON_THROW_ON_ERROR), [
@@ -477,6 +499,41 @@ class ServerClientTest extends TestCase
         self::assertSame('wf-123', $payload['workflow_id']);
         self::assertSame('run-123', $payload['run_id']);
         self::assertCount(1, $payload['events']);
+        self::assertSame('durable-workflow.v2.control-plane-response', $payload['control_plane_schema']);
+        self::assertSame(1, $payload['control_plane_schema_version']);
+        self::assertSame('history', $payload['control_plane_operation']);
+    }
+
+    public function test_it_leaves_workflow_history_export_bundles_outside_the_control_plane_contract(): void
+    {
+        $response = new MockResponse(json_encode([
+            'schema' => 'durable-workflow.v2.history-export',
+            'workflow' => [
+                'instance_id' => 'wf-123',
+                'run_id' => 'run-123',
+            ],
+            'history_events' => [],
+            'integrity' => [
+                'checksum_algorithm' => 'sha256',
+                'checksum' => str_repeat('a', 64),
+            ],
+        ], JSON_THROW_ON_ERROR), [
+            'http_code' => 200,
+            'response_headers' => [
+                'X-Durable-Workflow-Control-Plane-Version: 2',
+            ],
+        ]);
+
+        $client = new ServerClient(
+            baseUrl: 'http://example.test',
+            namespace: 'default',
+            http: new MockHttpClient($response, 'http://example.test'),
+        );
+
+        $payload = $client->get('/workflows/wf-123/runs/run-123/history/export');
+
+        self::assertSame('durable-workflow.v2.history-export', $payload['schema']);
+        self::assertSame('wf-123', $payload['workflow']['instance_id']);
         self::assertArrayNotHasKey('control_plane_schema', $payload);
     }
 

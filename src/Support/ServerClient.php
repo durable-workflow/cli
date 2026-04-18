@@ -240,7 +240,7 @@ class ServerClient
         int $statusCode,
     ): array
     {
-        if (! str_starts_with($path, '/workflows') || str_contains($path, '/history')) {
+        if (! str_starts_with($path, '/workflows') || str_contains($path, '/history/export')) {
             return $body;
         }
 

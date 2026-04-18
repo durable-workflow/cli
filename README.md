@@ -54,6 +54,29 @@ make clean     # Remove build artifacts
 Build artifacts land in `./build/`. See [scripts/build.sh](scripts/build.sh)
 for the underlying steps; tools are cached under `build/.tools/`.
 
+### Live Server Smoke Test
+
+Unit tests use mocked HTTP clients. To verify the packaged `dw` entrypoint
+against a real server, start a local Durable Workflow server first, then run:
+
+```bash
+make smoke-server
+```
+
+By default the smoke test targets `http://localhost:8080` with no token. Override
+the target and credentials when needed:
+
+```bash
+DURABLE_WORKFLOW_CLI_SMOKE_SERVER_URL=http://localhost:18082 \
+DURABLE_WORKFLOW_CLI_SMOKE_ADMIN_TOKEN=admin-token \
+DURABLE_WORKFLOW_CLI_SMOKE_OPERATOR_TOKEN=operator-token \
+make smoke-server
+```
+
+The smoke path creates a disposable namespace, starts and inspects a workflow,
+reads its history, creates and deletes a paused schedule, and terminates the
+workflow it created.
+
 ## Configuration
 
 Set the server URL and auth token via environment variables:

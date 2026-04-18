@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DurableWorkflow\Cli\Commands\ServerCommand;
 
+use DurableWorkflow\Cli\Support\CompletionValues;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -29,7 +30,7 @@ Docker-backed dependencies.
   <info>dw server:start-dev --db=mysql</info>
 HELP)
             ->addOption('port', 'p', InputOption::VALUE_OPTIONAL, 'Server port', '8080')
-            ->addOption('db', null, InputOption::VALUE_OPTIONAL, 'Database driver (sqlite, mysql, pgsql)', 'sqlite');
+            ->addOption('db', null, InputOption::VALUE_OPTIONAL, 'Database driver (sqlite, mysql, pgsql)', 'sqlite', CompletionValues::DEV_DATABASES);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DurableWorkflow\Cli\Commands\WorkflowCommand;
 
 use DurableWorkflow\Cli\Commands\BaseCommand;
+use DurableWorkflow\Cli\Support\CompletionValues;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -32,7 +33,7 @@ HELP)
             ->addArgument('workflow-id', InputArgument::REQUIRED, 'Workflow ID')
             ->addArgument('update-name', InputArgument::REQUIRED, 'Update name')
             ->addOption('input', 'i', InputOption::VALUE_OPTIONAL, 'Update input JSON')
-            ->addOption('wait', null, InputOption::VALUE_OPTIONAL, 'Wait policy (accepted, completed)', 'accepted')
+            ->addOption('wait', null, InputOption::VALUE_OPTIONAL, 'Wait policy (accepted, completed)', 'accepted', CompletionValues::UPDATE_WAIT_POLICIES)
             ->addOption('run-id', null, InputOption::VALUE_OPTIONAL, 'Target a specific run ID')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
     }

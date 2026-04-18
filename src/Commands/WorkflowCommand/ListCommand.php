@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DurableWorkflow\Cli\Commands\WorkflowCommand;
 
 use DurableWorkflow\Cli\Commands\BaseCommand;
+use DurableWorkflow\Cli\Support\CompletionValues;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -37,7 +38,7 @@ once. <comment>--json</comment> is the stable interface for scripting.
   <info>dw workflow:list --query='CustomerId="42" and Status="running"'</info>
 HELP)
             ->addOption('type', 't', InputOption::VALUE_OPTIONAL, 'Filter by workflow type')
-            ->addOption('status', null, InputOption::VALUE_OPTIONAL, 'Filter by status bucket (running, completed, failed)')
+            ->addOption('status', null, InputOption::VALUE_OPTIONAL, 'Filter by status bucket (running, completed, failed)', null, CompletionValues::WORKFLOW_STATUSES)
             ->addOption('query', null, InputOption::VALUE_OPTIONAL, 'Visibility query')
             ->addOption('limit', 'l', InputOption::VALUE_OPTIONAL, 'Page size', '20')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output as JSON');

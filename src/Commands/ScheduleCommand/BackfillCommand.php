@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DurableWorkflow\Cli\Commands\ScheduleCommand;
 
 use DurableWorkflow\Cli\Commands\BaseCommand;
+use DurableWorkflow\Cli\Support\CompletionValues;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -33,7 +34,7 @@ HELP)
             ->addArgument('schedule-id', InputArgument::REQUIRED, 'Schedule ID')
             ->addOption('start-time', null, InputOption::VALUE_REQUIRED, 'Start time (ISO 8601)')
             ->addOption('end-time', null, InputOption::VALUE_REQUIRED, 'End time (ISO 8601)')
-            ->addOption('overlap-policy', null, InputOption::VALUE_OPTIONAL, 'Override overlap policy')
+            ->addOption('overlap-policy', null, InputOption::VALUE_OPTIONAL, 'Override overlap policy', null, CompletionValues::SCHEDULE_OVERLAP_POLICIES)
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
     }
 

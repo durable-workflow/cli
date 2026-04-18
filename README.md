@@ -88,6 +88,28 @@ schema/version metadata as a compatibility error instead of silently guessing.
 Use `dw server:info` to inspect the current canonical values,
 rejected aliases, and removed fields advertised by the target server.
 
+## Shell Completion
+
+Generate shell completion scripts with the built-in `completion` command:
+
+```bash
+dw completion bash
+dw completion zsh
+dw completion fish
+```
+
+For ad-hoc use, evaluate the generated script in your current shell:
+
+```bash
+eval "$(dw completion bash)"
+```
+
+For persistent installation, write the script to a shell-specific completion
+location, or source it from your shell startup file. The completion endpoint
+suggests command names, option names, and stable values for enum-like fields
+such as workflow status, duplicate policy, update wait policy, schedule overlap
+policy, worker status, search attribute type, and local dev database driver.
+
 ## Compatibility
 
 CLI version 0.1.x is compatible with servers that advertise

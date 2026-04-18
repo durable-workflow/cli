@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DurableWorkflow\Cli\Commands\ScheduleCommand;
 
 use DurableWorkflow\Cli\Commands\BaseCommand;
+use DurableWorkflow\Cli\Support\CompletionValues;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -25,10 +26,10 @@ policy applies unless you override it with <comment>--overlap-policy</comment>.
 <comment>Examples:</comment>
 
   <info>dw schedule:trigger daily-report</info>
-  <info>dw schedule:trigger daily-report --overlap-policy=allow</info>
+  <info>dw schedule:trigger daily-report --overlap-policy=allow_all</info>
 HELP)
             ->addArgument('schedule-id', InputArgument::REQUIRED, 'Schedule ID')
-            ->addOption('overlap-policy', null, InputOption::VALUE_OPTIONAL, 'Override overlap policy')
+            ->addOption('overlap-policy', null, InputOption::VALUE_OPTIONAL, 'Override overlap policy', null, CompletionValues::SCHEDULE_OVERLAP_POLICIES)
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
     }
 

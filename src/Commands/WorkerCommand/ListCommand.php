@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DurableWorkflow\Cli\Commands\WorkerCommand;
 
 use DurableWorkflow\Cli\Commands\BaseCommand;
+use DurableWorkflow\Cli\Support\CompletionValues;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -29,7 +30,7 @@ or by fleet status (<comment>active</comment>, <comment>stale</comment>,
   <info>dw worker:list --status=stale --json | jq '.workers[].worker_id'</info>
 HELP)
             ->addOption('task-queue', null, InputOption::VALUE_OPTIONAL, 'Filter by task queue')
-            ->addOption('status', null, InputOption::VALUE_OPTIONAL, 'Filter by status (active, stale, draining)')
+            ->addOption('status', null, InputOption::VALUE_OPTIONAL, 'Filter by status (active, stale, draining)', null, CompletionValues::WORKER_STATUSES)
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output as JSON');
     }
 

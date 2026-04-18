@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DurableWorkflow\Cli\Commands\WorkflowCommand;
 
 use DurableWorkflow\Cli\Commands\BaseCommand;
+use DurableWorkflow\Cli\Support\CompletionValues;
 use DurableWorkflow\Cli\Support\DetectsTerminalStatus;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -47,7 +48,7 @@ HELP)
             ->addOption('workflow-id', 'w', InputOption::VALUE_OPTIONAL, 'Workflow ID (auto-generated if omitted)')
             ->addOption('business-key', null, InputOption::VALUE_OPTIONAL, 'Business key')
             ->addOption('task-queue', null, InputOption::VALUE_OPTIONAL, 'Task queue', 'default')
-            ->addOption('duplicate-policy', null, InputOption::VALUE_OPTIONAL, 'Duplicate policy (discover canonical values with server:info)')
+            ->addOption('duplicate-policy', null, InputOption::VALUE_OPTIONAL, 'Duplicate policy (discover canonical values with server:info)', null, CompletionValues::WORKFLOW_DUPLICATE_POLICIES)
             ->addOption('input', 'i', InputOption::VALUE_OPTIONAL, 'Input JSON')
             ->addOption('memo', null, InputOption::VALUE_OPTIONAL, 'Memo JSON')
             ->addOption('search-attr', null, InputOption::VALUE_OPTIONAL | InputOption::VALUE_IS_ARRAY, 'Search attributes (key=value)')

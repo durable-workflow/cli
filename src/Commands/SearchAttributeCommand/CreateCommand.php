@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DurableWorkflow\Cli\Commands\SearchAttributeCommand;
 
 use DurableWorkflow\Cli\Commands\BaseCommand;
+use DurableWorkflow\Cli\Support\CompletionValues;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -29,7 +30,7 @@ and visibility queries can filter on it. Types are fixed at creation.
   <info>dw search-attribute:create Tags keyword_list</info>
 HELP)
             ->addArgument('name', InputArgument::REQUIRED, 'Attribute name (e.g. OrderStatus)')
-            ->addArgument('type', InputArgument::REQUIRED, 'Attribute type (keyword, text, int, double, bool, datetime, keyword_list)')
+            ->addArgument('type', InputArgument::REQUIRED, 'Attribute type (keyword, text, int, double, bool, datetime, keyword_list)', null, CompletionValues::SEARCH_ATTRIBUTE_TYPES)
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
     }
 

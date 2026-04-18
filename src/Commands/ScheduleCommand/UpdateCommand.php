@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DurableWorkflow\Cli\Commands\ScheduleCommand;
 
 use DurableWorkflow\Cli\Commands\BaseCommand;
+use DurableWorkflow\Cli\Support\CompletionValues;
 use DurableWorkflow\Cli\Support\InvalidOptionException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -36,7 +37,7 @@ HELP)
             ->addOption('task-queue', null, InputOption::VALUE_OPTIONAL, 'Task queue')
             ->addOption('execution-timeout', null, InputOption::VALUE_REQUIRED, 'Workflow execution timeout in seconds')
             ->addOption('run-timeout', null, InputOption::VALUE_REQUIRED, 'Workflow run timeout in seconds')
-            ->addOption('overlap-policy', null, InputOption::VALUE_OPTIONAL, 'Overlap policy')
+            ->addOption('overlap-policy', null, InputOption::VALUE_OPTIONAL, 'Overlap policy', null, CompletionValues::SCHEDULE_OVERLAP_POLICIES)
             ->addOption('jitter', null, InputOption::VALUE_REQUIRED, 'Jitter in seconds (0-3600)')
             ->addOption('max-runs', null, InputOption::VALUE_REQUIRED, 'Maximum number of runs')
             ->addOption('note', null, InputOption::VALUE_OPTIONAL, 'Note')

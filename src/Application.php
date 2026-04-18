@@ -12,6 +12,7 @@ use DurableWorkflow\Cli\Commands\SearchAttributeCommand;
 use DurableWorkflow\Cli\Commands\ServerCommand;
 use DurableWorkflow\Cli\Commands\SystemCommand;
 use DurableWorkflow\Cli\Commands\TaskQueueCommand;
+use DurableWorkflow\Cli\Commands\WatchCommand;
 use DurableWorkflow\Cli\Commands\WorkerCommand;
 use DurableWorkflow\Cli\Commands\WorkflowCommand;
 use Symfony\Component\Console\Application as ConsoleApplication;
@@ -91,6 +92,9 @@ class Application extends ConsoleApplication
             new SchemaCommand\ListCommand(),
             new SchemaCommand\ShowCommand(),
             new SchemaCommand\ManifestCommand(),
+
+            // Long-running operator views
+            new WatchCommand(),
         ]);
     }
 }

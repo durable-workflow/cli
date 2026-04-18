@@ -161,6 +161,10 @@ dw workflow:list --type=order.process
 dw workflow:describe order-123
 dw workflow:describe order-123 --run-id=01HXYZ --json
 
+# Watch a long-running workflow and print state changes
+dw watch workflow order-123
+dw watch workflow order-123 --run-id=01HXYZ --interval=5 --max-polls=60
+
 # Send a signal
 dw workflow:signal order-123 payment-received --input='{"amount":99.99}'
 

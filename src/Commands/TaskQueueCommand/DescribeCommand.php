@@ -37,7 +37,7 @@ HELP)
         $taskQueue = $input->getArgument('task-queue');
         $result = $this->client($input)->get("/task-queues/{$taskQueue}");
 
-        if ($input->getOption('json')) {
+        if ($this->wantsJson($input)) {
             return $this->renderJson($output, $result);
         }
 

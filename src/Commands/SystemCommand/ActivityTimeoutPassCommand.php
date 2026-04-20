@@ -48,7 +48,7 @@ HELP)
 
         $result = $this->client($input)->post('/system/activity-timeouts/pass', $body);
 
-        if ($input->getOption('json')) {
+        if ($this->wantsJson($input)) {
             return $this->renderJson($output, $result);
         }
 

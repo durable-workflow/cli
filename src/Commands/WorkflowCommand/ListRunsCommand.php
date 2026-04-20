@@ -37,8 +37,8 @@ HELP)
 
         $result = $this->client($input)->get("/workflows/{$workflowId}/runs");
 
-        if ($input->getOption('json')) {
-            return $this->renderJson($output, $result);
+        if ($this->wantsJson($input)) {
+            return $this->renderJsonList($output, $input, $result, 'runs');
         }
 
         $runs = $result['runs'] ?? [];

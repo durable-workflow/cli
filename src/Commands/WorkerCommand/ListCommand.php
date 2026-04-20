@@ -50,8 +50,8 @@ HELP)
 
         $workers = $result['workers'] ?? [];
 
-        if ($input->getOption('json')) {
-            return $this->renderJson($output, $result);
+        if ($this->wantsJson($input)) {
+            return $this->renderJsonList($output, $input, $result, 'workers');
         }
 
         if (empty($workers)) {

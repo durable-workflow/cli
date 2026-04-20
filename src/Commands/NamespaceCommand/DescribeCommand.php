@@ -36,7 +36,7 @@ HELP)
         $name = $input->getArgument('name');
         $result = $this->client($input)->get("/namespaces/{$name}");
 
-        if ($input->getOption('json')) {
+        if ($this->wantsJson($input)) {
             return $this->renderJson($output, $result);
         }
 

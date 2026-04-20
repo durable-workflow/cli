@@ -66,11 +66,11 @@ HELP)
             $nextPageToken = $result['next_page_token'] ?? null;
         } while ($nextPageToken !== null);
 
-        if ($input->getOption('json')) {
+        if ($this->wantsJson($input)) {
             $result['events'] = $allEvents;
             unset($result['next_page_token']);
 
-            return $this->renderJson($output, $result);
+            return $this->renderJsonList($output, $input, $result, 'events');
         }
 
         if (empty($allEvents)) {

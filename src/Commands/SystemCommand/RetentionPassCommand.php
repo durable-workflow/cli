@@ -47,7 +47,7 @@ HELP)
 
         $result = $this->client($input)->post('/system/retention/pass', $body);
 
-        if ($input->getOption('json')) {
+        if ($this->wantsJson($input)) {
             return $this->renderJson($output, $result);
         }
 

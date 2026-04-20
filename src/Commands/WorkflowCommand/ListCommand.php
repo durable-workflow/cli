@@ -21,7 +21,9 @@ class ListCommand extends BaseCommand
             ->setHelp(<<<'HELP'
 List workflows in the current namespace. Filters combine: type,
 status bucket, and free-form visibility query can all be applied at
-once. <comment>--json</comment> is the stable interface for scripting.
+once. <comment>--output=json</comment> (or <comment>--json</comment>)
+emits a single JSON document; <comment>--output=jsonl</comment> streams
+one JSON object per line for scripting over large result sets.
 
 <comment>Examples:</comment>
 
@@ -31,8 +33,11 @@ once. <comment>--json</comment> is the stable interface for scripting.
   # Just the running ones, up to 100
   <info>dw workflow:list --status=running --limit=100</info>
 
-  # Pipe into jq
-  <info>dw workflow:list --json | jq '.workflows[].workflow_id'</info>
+  # Pipe into jq (single JSON document)
+  <info>dw workflow:list --output=json | jq '.workflows[].workflow_id'</info>
+
+  # Stream one workflow per line (NDJSON)
+  <info>dw workflow:list --output=jsonl | while read -r wf; do echo "$wf"; done</info>
 
   # Visibility query (depends on search attributes in use)
   <info>dw workflow:list --query='CustomerId="42" and Status="running"'</info>
@@ -65,8 +70,8 @@ HELP)
             'page_size' => (int) $input->getOption('limit'),
         ], fn ($v) => $v !== null));
 
-        if ($input->getOption('json')) {
-            return $this->renderJson($output, $result);
+        if ($this->wantsJson($input)) {
+            return $this->renderJsonList($output, $input, $result, 'workflows');
         }
 
         $workflows = $result['workflows'] ?? [];

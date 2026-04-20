@@ -64,7 +64,7 @@ class WorkflowHistoryExportTest extends TestCase
             self::assertSame(Command::SUCCESS, $tester->execute([
                 'workflow-id' => 'wf-456',
                 'run-id' => 'run-2',
-                '--output' => $outputFile,
+                '--output-file' => $outputFile,
             ]));
 
             self::assertStringContainsString($outputFile, $tester->getDisplay());

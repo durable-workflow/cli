@@ -36,7 +36,7 @@ HELP)
         $workerId = $input->getArgument('worker-id');
         $result = $this->client($input)->get("/workers/{$workerId}");
 
-        if ($input->getOption('json')) {
+        if ($this->wantsJson($input)) {
             return $this->renderJson($output, $result);
         }
 

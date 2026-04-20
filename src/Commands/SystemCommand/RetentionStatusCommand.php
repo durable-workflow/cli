@@ -32,7 +32,7 @@ HELP)
     {
         $result = $this->client($input)->get('/system/retention');
 
-        if ($input->getOption('json')) {
+        if ($this->wantsJson($input)) {
             return $this->renderJson($output, $result);
         }
 

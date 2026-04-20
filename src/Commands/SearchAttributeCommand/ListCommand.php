@@ -33,7 +33,9 @@ HELP)
     {
         $result = $this->client($input)->get('/search-attributes');
 
-        if ($input->getOption('json')) {
+        if ($this->wantsJson($input)) {
+            // system_attributes / custom_attributes are name→type maps, not
+            // lists, so jsonl would produce nonsense. Stick to a single doc.
             return $this->renderJson($output, $result);
         }
 

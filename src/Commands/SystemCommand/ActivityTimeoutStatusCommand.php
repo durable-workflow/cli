@@ -32,7 +32,7 @@ HELP)
     {
         $result = $this->client($input)->get('/system/activity-timeouts');
 
-        if ($input->getOption('json')) {
+        if ($this->wantsJson($input)) {
             return $this->renderJson($output, $result);
         }
 

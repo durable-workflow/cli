@@ -36,7 +36,7 @@ HELP)
         $scheduleId = $input->getArgument('schedule-id');
         $result = $this->client($input)->get("/schedules/{$scheduleId}");
 
-        if ($input->getOption('json')) {
+        if ($this->wantsJson($input)) {
             return $this->renderJson($output, $result);
         }
 

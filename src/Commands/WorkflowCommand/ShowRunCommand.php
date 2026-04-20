@@ -90,7 +90,7 @@ HELP)
      */
     private function renderResult(InputInterface $input, OutputInterface $output, array $result): int
     {
-        if ($input->getOption('json')) {
+        if ($this->wantsJson($input)) {
             return $this->renderJson($output, $result);
         }
 

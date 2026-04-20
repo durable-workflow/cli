@@ -33,7 +33,7 @@ HELP)
     {
         $result = $this->client($input)->get('/system/repair');
 
-        if ($input->getOption('json')) {
+        if ($this->wantsJson($input)) {
             return $this->renderJson($output, $result);
         }
 

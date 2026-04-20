@@ -32,8 +32,8 @@ HELP)
     {
         $result = $this->client($input)->get('/task-queues');
 
-        if ($input->getOption('json')) {
-            return $this->renderJson($output, $result);
+        if ($this->wantsJson($input)) {
+            return $this->renderJsonList($output, $input, $result, 'task_queues');
         }
 
         $queues = $result['task_queues'] ?? [];

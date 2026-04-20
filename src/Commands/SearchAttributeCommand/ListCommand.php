@@ -24,9 +24,9 @@ server and any custom attributes registered for this namespace.
 <comment>Examples:</comment>
 
   <info>dw search-attribute:list</info>
-  <info>dw search-attribute:list --json | jq '.custom_attributes'</info>
+  <info>dw search-attribute:list --output=json | jq '.custom_attributes'</info>
 HELP)
-            ->addOption('json', null, InputOption::VALUE_NONE, 'Output as JSON');
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output as JSON (alias for --output=json)');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int

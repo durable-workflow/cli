@@ -27,11 +27,12 @@ or by fleet status (<comment>active</comment>, <comment>stale</comment>,
 
   <info>dw worker:list</info>
   <info>dw worker:list --task-queue=orders</info>
-  <info>dw worker:list --status=stale --json | jq '.workers[].worker_id'</info>
+  <info>dw worker:list --status=stale --output=json | jq '.workers[].worker_id'</info>
+  <info>dw worker:list --status=stale --output=jsonl | jq '.worker_id'</info>
 HELP)
             ->addOption('task-queue', null, InputOption::VALUE_OPTIONAL, 'Filter by task queue')
             ->addOption('status', null, InputOption::VALUE_OPTIONAL, 'Filter by status (active, stale, draining)', null, CompletionValues::WORKER_STATUSES)
-            ->addOption('json', null, InputOption::VALUE_NONE, 'Output as JSON');
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output as JSON (alias for --output=json)');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int

@@ -117,6 +117,59 @@ class WorkflowHistoryQueryTest extends TestCase
         self::assertSame(2, $client->getCalls);
     }
 
+    public function test_history_command_jsonl_streams_events_across_pages(): void
+    {
+        $client = new HistoryQueryPaginatingClient([
+            [
+                'events' => [
+                    ['sequence' => 1, 'event_type' => 'workflow_started', 'timestamp' => '2026-04-13T00:00:00Z', 'payload' => []],
+                    ['sequence' => 2, 'event_type' => 'activity_scheduled', 'timestamp' => '2026-04-13T00:00:01Z', 'payload' => []],
+                ],
+                'next_page_token' => 'page-2',
+            ],
+            [
+                'events' => [
+                    ['sequence' => 3, 'event_type' => 'activity_completed', 'timestamp' => '2026-04-13T00:00:02Z', 'payload' => []],
+                ],
+                'next_page_token' => null,
+            ],
+        ]);
+
+        $command = new HistoryCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            'workflow-id' => 'wf-123',
+            'run-id' => 'run-1',
+            '--output' => 'jsonl',
+        ]));
+
+        $lines = array_values(array_filter(
+            explode("\n", $tester->getDisplay()),
+            static fn (string $line): bool => $line !== '',
+        ));
+
+        self::assertCount(3, $lines, 'jsonl must emit one line per event across every page');
+        self::assertSame(2, $client->getCalls, 'all history pages must be fetched');
+
+        $events = array_map(
+            static fn (string $line) => json_decode($line, true, 512, JSON_THROW_ON_ERROR),
+            $lines,
+        );
+
+        self::assertSame([1, 2, 3], array_column($events, 'sequence'));
+        self::assertSame(
+            ['workflow_started', 'activity_scheduled', 'activity_completed'],
+            array_column($events, 'event_type'),
+        );
+
+        foreach ($lines as $i => $line) {
+            self::assertStringNotContainsString("\n", rtrim($line, "\n"), "line {$i} must not embed newlines");
+        }
+    }
+
     public function test_history_command_sends_follow_flag_as_wait_new_event(): void
     {
         $client = new HistoryQueryFakeClient([

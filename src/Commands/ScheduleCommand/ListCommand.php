@@ -24,9 +24,10 @@ times.
 <comment>Examples:</comment>
 
   <info>dw schedule:list</info>
-  <info>dw schedule:list --json | jq '.schedules[] | select(.paused)'</info>
+  <info>dw schedule:list --output=json | jq '.schedules[] | select(.paused)'</info>
+  <info>dw schedule:list --output=jsonl | jq 'select(.paused)'</info>
 HELP)
-            ->addOption('json', null, InputOption::VALUE_NONE, 'Output as JSON');
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output as JSON (alias for --output=json)');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int

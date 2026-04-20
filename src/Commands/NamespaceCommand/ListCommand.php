@@ -23,9 +23,10 @@ List every namespace the calling identity can see on the server.
 <comment>Examples:</comment>
 
   <info>dw namespace:list</info>
-  <info>dw namespace:list --json | jq '.namespaces[].name'</info>
+  <info>dw namespace:list --output=json | jq '.namespaces[].name'</info>
+  <info>dw namespace:list --output=jsonl | jq '.name'</info>
 HELP)
-            ->addOption('json', null, InputOption::VALUE_NONE, 'Output as JSON');
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output as JSON (alias for --output=json)');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int

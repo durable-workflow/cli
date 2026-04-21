@@ -31,6 +31,24 @@ macOS x86_64 standalone binaries are not currently produced because the
 `macos-13` runner label is not available to this org; Intel Mac users can
 run the PHAR with a system PHP.
 
+To verify a direct download, fetch the matching `SHA256SUMS` file from the
+same release and check it before moving the binary into your PATH:
+
+```bash
+sha256sum -c SHA256SUMS --ignore-missing
+chmod +x dw-linux-x86_64
+./dw-linux-x86_64 --version
+```
+
+Windows operators can verify the same manifest from PowerShell:
+
+```powershell
+$expected = Select-String -Path .\SHA256SUMS -Pattern 'dw-windows-x86_64.exe'
+$actual = (Get-FileHash .\dw-windows-x86_64.exe -Algorithm SHA256).Hash.ToLower()
+if (-not $expected.Line.StartsWith($actual)) { throw 'Checksum mismatch' }
+.\dw-windows-x86_64.exe --version
+```
+
 **2. PHAR (requires PHP >= 8.2).** Download `dw.phar` from the
 [releases page](https://github.com/durable-workflow/cli/releases) and run it
 with `php dw.phar` (or `chmod +x` and call directly — the PHAR
@@ -53,6 +71,24 @@ make clean     # Remove build artifacts
 
 Build artifacts land in `./build/`. See [scripts/build.sh](scripts/build.sh)
 for the underlying steps; tools are cached under `build/.tools/`.
+
+### Release Policy
+
+Release assets are published from the tagged source by GitHub Actions. Each
+release includes `SHA256SUMS` for `dw.phar` and every native binary that was
+built for that tag. The release workflow waits for Linux, macOS, and Windows
+builders before publishing the manifest; Windows remains optional when that
+runner fails, and the manifest reflects the assets that are actually present.
+
+Native binaries and PHARs are not currently code-signed or notarized. Treat the
+GitHub release tag plus `SHA256SUMS` as the current provenance boundary. Signing
+and notarization are planned distribution hardening work, not an active install
+requirement for the 0.1.x line.
+
+`dw` does not auto-update itself. Re-run the installer or download a newer
+release when you choose to upgrade. The CLI also does not collect telemetry;
+there is no background network traffic beyond commands that explicitly contact
+the configured Durable Workflow server.
 
 ### Live Server Smoke Test
 

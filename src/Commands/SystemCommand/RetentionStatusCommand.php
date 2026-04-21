@@ -21,9 +21,10 @@ class RetentionStatusCommand extends BaseCommand
 Show how many terminal runs are older than the namespace's retention
 window and are eligible for pruning.
 
-<comment>Example:</comment>
+<comment>Examples:</comment>
 
   <info>dw system:retention-status --namespace=billing</info>
+  <info>dw system:retention-status --namespace=billing --json</info>
 HELP)
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output as JSON');
     }

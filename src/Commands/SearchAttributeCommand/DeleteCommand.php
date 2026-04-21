@@ -23,9 +23,10 @@ Remove a custom search attribute. Existing workflows that indexed the
 attribute retain their stored values, but new workflows can no longer
 filter on it.
 
-<comment>Example:</comment>
+<comment>Examples:</comment>
 
   <info>dw search-attribute:delete OrderStatus</info>
+  <info>dw search-attribute:delete OrderStatus --json</info>
 HELP)
             ->addArgument('name', InputArgument::REQUIRED, 'Attribute name to remove')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');

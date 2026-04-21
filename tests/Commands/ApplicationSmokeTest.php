@@ -49,7 +49,7 @@ class ApplicationSmokeTest extends TestCase
         );
     }
 
-    public function test_every_command_has_description_and_help_with_example(): void
+    public function test_every_command_has_description_and_help_with_operator_examples(): void
     {
         $application = new Application();
         $application->setAutoExit(false);
@@ -76,6 +76,12 @@ class ApplicationSmokeTest extends TestCase
                 'dw ',
                 $help,
                 "Command {$name} help is missing at least one 'dw ...' example.",
+            );
+
+            self::assertGreaterThanOrEqual(
+                2,
+                substr_count($help, 'dw '),
+                "Command {$name} help should include at least two concrete 'dw ...' examples.",
             );
         }
     }

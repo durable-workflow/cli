@@ -24,12 +24,13 @@ Fire every scheduled time that falls between <comment>--start-time</comment>
 and <comment>--end-time</comment>. Useful after a downtime to replay
 missed runs.
 
-<comment>Example:</comment>
+<comment>Examples:</comment>
 
   <info>dw schedule:backfill daily-report \\</info>
   <info>    --start-time=2026-04-01T00:00:00Z \\</info>
   <info>    --end-time=2026-04-07T00:00:00Z \\</info>
   <info>    --overlap-policy=skip</info>
+  <info>dw schedule:backfill daily-report --start-time=2026-04-01T00:00:00Z --end-time=2026-04-02T00:00:00Z --json</info>
 HELP)
             ->addArgument('schedule-id', InputArgument::REQUIRED, 'Schedule ID')
             ->addOption('start-time', null, InputOption::VALUE_REQUIRED, 'Start time (ISO 8601)')

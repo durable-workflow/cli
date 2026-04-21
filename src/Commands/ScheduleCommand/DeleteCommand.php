@@ -22,9 +22,10 @@ class DeleteCommand extends BaseCommand
 Delete a schedule. In-flight runs it has already spawned keep running
 — only future fires are cancelled.
 
-<comment>Example:</comment>
+<comment>Examples:</comment>
 
   <info>dw schedule:delete daily-report</info>
+  <info>dw schedule:delete daily-report --json</info>
 HELP)
             ->addArgument('schedule-id', InputArgument::REQUIRED, 'Schedule ID')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');

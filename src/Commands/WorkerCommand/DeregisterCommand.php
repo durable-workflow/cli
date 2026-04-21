@@ -22,9 +22,10 @@ class DeregisterCommand extends BaseCommand
 Remove a stale or retired worker entry from the fleet roster. Active
 workers re-register automatically on their next heartbeat.
 
-<comment>Example:</comment>
+<comment>Examples:</comment>
 
   <info>dw worker:deregister py-worker-abc123</info>
+  <info>dw worker:deregister py-worker-abc123 --json</info>
 HELP)
             ->addArgument('worker-id', InputArgument::REQUIRED, 'Worker ID to deregister')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');

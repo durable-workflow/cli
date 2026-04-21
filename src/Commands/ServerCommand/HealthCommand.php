@@ -20,9 +20,10 @@ class HealthCommand extends BaseCommand
 Check server health and exit with <comment>NETWORK (3)</comment> if the
 server is unreachable.
 
-<comment>Example:</comment>
+<comment>Examples:</comment>
 
   <info>dw server:health</info>
+  <info>dw server:health --server=http://localhost:8080</info>
 HELP);
     }
 

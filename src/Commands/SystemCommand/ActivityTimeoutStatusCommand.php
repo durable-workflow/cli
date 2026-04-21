@@ -21,8 +21,9 @@ class ActivityTimeoutStatusCommand extends BaseCommand
 Show activity executions that have exceeded their start-to-close or
 schedule-to-close deadline and are eligible for forced timeout.
 
-<comment>Example:</comment>
+<comment>Examples:</comment>
 
+  <info>dw system:activity-timeout-status</info>
   <info>dw system:activity-timeout-status --json</info>
 HELP)
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output as JSON');

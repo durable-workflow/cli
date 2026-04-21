@@ -23,9 +23,10 @@ Ask the server to re-enqueue the workflow's next task if it has
 stalled (stuck behind a lost worker, expired lease, etc.). This is
 safe to call on a healthy workflow — the server will no-op.
 
-<comment>Example:</comment>
+<comment>Examples:</comment>
 
   <info>dw workflow:repair chk-42</info>
+  <info>dw workflow:repair chk-42 --json</info>
 HELP)
             ->addArgument('workflow-id', InputArgument::REQUIRED, 'Workflow ID')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');

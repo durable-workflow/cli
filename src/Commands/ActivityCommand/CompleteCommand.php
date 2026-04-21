@@ -22,9 +22,10 @@ class CompleteCommand extends BaseCommand
 Complete an activity from outside the worker process. You must supply
 the task's leased attempt ID so the server can validate ownership.
 
-<comment>Example:</comment>
+<comment>Examples:</comment>
 
   <info>dw activity:complete act-123 att-456 --input='{"ok":true}'</info>
+  <info>dw activity:complete act-123 att-456 --input-file=result.json --json</info>
 HELP)
             ->addArgument('task-id', InputArgument::REQUIRED, 'Activity task ID')
             ->addArgument('attempt-id', InputArgument::REQUIRED, 'Leased activity attempt ID')

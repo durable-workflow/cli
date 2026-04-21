@@ -21,9 +21,10 @@ Print server version, negotiated control-plane and worker protocol
 versions, and the canonical enum values the server accepts (duplicate
 policies, wait policies, etc.).
 
-<comment>Example:</comment>
+<comment>Examples:</comment>
 
   <info>dw server:info</info>
+  <info>dw server:info --env=prod</info>
 HELP);
     }
 

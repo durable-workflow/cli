@@ -66,7 +66,7 @@ HELP)
             $worker['task_queue'] ?? '-',
             $worker['runtime'] ?? '-',
             $worker['build_id'] ?? '-',
-            $worker['status'] ?? '-',
+            $this->formatStatus($worker['status'] ?? null),
             $worker['last_heartbeat_at'] ?? '-',
         ], $workers);
 

@@ -112,6 +112,47 @@ class WorkerCommandTest extends TestCase
         self::assertStringContainsString('stale', $display);
     }
 
+    public function test_list_command_colors_statuses_only_when_output_is_decorated(): void
+    {
+        $payload = [
+            'workers' => [
+                [
+                    'worker_id' => 'worker-a',
+                    'task_queue' => 'queue-alpha',
+                    'runtime' => 'php',
+                    'build_id' => 'build-1',
+                    'status' => 'active',
+                    'last_heartbeat_at' => '2026-04-13T12:00:00Z',
+                ],
+                [
+                    'worker_id' => 'worker-b',
+                    'task_queue' => 'queue-beta',
+                    'runtime' => 'python',
+                    'build_id' => null,
+                    'status' => 'stale',
+                    'last_heartbeat_at' => '2026-04-13T11:00:00Z',
+                ],
+            ],
+        ];
+
+        $plainCommand = new ListCommand();
+        $plainCommand->setServerClient(new WorkerFakeClient($payload));
+        $plainTester = new CommandTester($plainCommand);
+
+        self::assertSame(Command::SUCCESS, $plainTester->execute([]));
+        self::assertStringContainsString('active', $plainTester->getDisplay());
+        self::assertStringNotContainsString("\033[", $plainTester->getDisplay());
+
+        $decoratedCommand = new ListCommand();
+        $decoratedCommand->setServerClient(new WorkerFakeClient($payload));
+        $decoratedTester = new CommandTester($decoratedCommand);
+
+        self::assertSame(Command::SUCCESS, $decoratedTester->execute([], ['decorated' => true]));
+        self::assertStringContainsString('active', $decoratedTester->getDisplay());
+        self::assertStringContainsString('stale', $decoratedTester->getDisplay());
+        self::assertStringContainsString("\033[", $decoratedTester->getDisplay());
+    }
+
     public function test_list_command_shows_message_when_no_workers_exist(): void
     {
         $command = new ListCommand();

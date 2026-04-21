@@ -86,7 +86,7 @@ HELP)
             $w['workflow_id'] ?? '-',
             $w['workflow_type'] ?? '-',
             $w['business_key'] ?? '-',
-            $w['status'] ?? '-',
+            $this->formatStatus($w['status'] ?? null),
             $w['started_at'] ?? '-',
             $w['closed_at'] ?? '-',
         ], $workflows);

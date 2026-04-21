@@ -47,9 +47,9 @@ HELP)
 
         $rows = array_map(fn ($q) => [
             $q['name'],
-            $this->admissionStatus($q, 'workflow_tasks'),
-            $this->admissionStatus($q, 'activity_tasks'),
-            $this->admissionStatus($q, 'query_tasks'),
+            $this->formatStatus($this->admissionStatus($q, 'workflow_tasks')),
+            $this->formatStatus($this->admissionStatus($q, 'activity_tasks')),
+            $this->formatStatus($this->admissionStatus($q, 'query_tasks')),
         ], $queues);
 
         $this->renderTable($output, ['Task Queue', 'Workflow Admission', 'Activity Admission', 'Query Admission'], $rows);

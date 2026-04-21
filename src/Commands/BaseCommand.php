@@ -490,6 +490,57 @@ abstract class BaseCommand extends Command
         $table->render();
     }
 
+    protected function formatStatus(mixed $status): string
+    {
+        if (! is_scalar($status) || (string) $status === '') {
+            return '-';
+        }
+
+        $value = (string) $status;
+        $statusToken = preg_split('/[\s(:]+/', $value, 2)[0] ?? $value;
+        $normalized = strtolower($statusToken);
+        $normalized = preg_replace('/[^a-z0-9]+/', '_', $normalized) ?? $normalized;
+        $normalized = trim($normalized, '_');
+
+        $tag = match ($normalized) {
+            'active',
+            'accepted',
+            'accepting',
+            'completed',
+            'healthy',
+            'ok',
+            'ready',
+            'success',
+            'succeeded' => 'info',
+            'backoff',
+            'degraded',
+            'draining',
+            'expired',
+            'full',
+            'no_slots',
+            'paused',
+            'pending',
+            'running',
+            'saturated',
+            'stale',
+            'throttled',
+            'unavailable',
+            'warning' => 'comment',
+            'cancelled',
+            'canceled',
+            'error',
+            'failed',
+            'failure',
+            'no_active_workers',
+            'timed_out',
+            'timeout',
+            'terminated' => 'error',
+            default => null,
+        };
+
+        return $tag === null ? $value : sprintf('<%s>%s</%s>', $tag, $value, $tag);
+    }
+
     /**
      * Machine-readable mode: emit a JSON envelope on stdout so scripts
      * have a parseable response on both success and failure. Human mode:

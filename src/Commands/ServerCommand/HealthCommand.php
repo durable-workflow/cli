@@ -30,12 +30,11 @@ HELP);
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $result = $this->client($input)->get('/health');
-        $output->writeln('<info>Server is '.$result['status'].'</info>');
+        $output->writeln('Server is '.$this->formatStatus($result['status'] ?? null));
         $output->writeln('Timestamp: '.$result['timestamp']);
 
         foreach ($result['checks'] ?? [] as $check => $status) {
-            $tag = $status === 'ok' ? 'info' : 'error';
-            $output->writeln("  {$check}: <{$tag}>{$status}</{$tag}>");
+            $output->writeln("  {$check}: ".$this->formatStatus($status));
         }
 
         return Command::SUCCESS;

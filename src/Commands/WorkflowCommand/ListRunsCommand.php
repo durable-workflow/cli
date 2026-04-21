@@ -57,7 +57,7 @@ HELP)
             $r['run_id'] ?? '-',
             $r['run_number'] ?? '-',
             $r['workflow_type'] ?? '-',
-            $r['status'] ?? '-',
+            $this->formatStatus($r['status'] ?? null),
             $r['task_queue'] ?? '-',
             $r['started_at'] ?? '-',
             $r['closed_at'] ?? '-',

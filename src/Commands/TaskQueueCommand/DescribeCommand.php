@@ -72,13 +72,13 @@ HELP)
 
         $leases = $result['current_leases'] ?? [];
         if (! empty($leases)) {
-            $rows = array_map(static fn (array $lease): array => [
+            $rows = array_map(fn (array $lease): array => [
                 $lease['task_id'] ?? '-',
                 $lease['task_type'] ?? '-',
                 $lease['workflow_id'] ?? '-',
                 $lease['lease_owner'] ?? '-',
                 $lease['lease_expires_at'] ?? '-',
-                ($lease['is_expired'] ?? false) ? 'EXPIRED' : 'active',
+                $this->formatStatus(($lease['is_expired'] ?? false) ? 'EXPIRED' : 'active'),
             ], $leases);
 
             $output->writeln('Current Leases:');
@@ -99,7 +99,7 @@ HELP)
                 $p['runtime'] ?? '-',
                 $p['build_id'] ?? '-',
                 $p['last_heartbeat_at'] ?? '-',
-                $p['status'] ?? '-',
+                $this->formatStatus($p['status'] ?? null),
             ], $pollers);
 
             $output->writeln('Pollers:');
@@ -121,7 +121,7 @@ HELP)
         }
 
         $parts = [
-            'status='.($admission['status'] ?? '-'),
+            'status='.$this->formatStatus($admission['status'] ?? null),
         ];
 
         if ($queryTasks) {

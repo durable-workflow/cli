@@ -49,7 +49,7 @@ HELP)
         $rows = array_map(fn ($s) => [
             $s['schedule_id'] ?? '-',
             $s['workflow_type'] ?? '-',
-            $s['paused'] ? 'paused' : 'active',
+            $this->formatStatus(($s['paused'] ?? false) ? 'paused' : 'active'),
             $s['next_fire'] ?? '-',
             $s['last_fire'] ?? '-',
         ], $schedules);

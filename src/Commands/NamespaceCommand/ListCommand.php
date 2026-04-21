@@ -49,7 +49,7 @@ HELP)
             $ns['name'],
             $ns['description'] ?? '-',
             $ns['retention_days'] ?? '-',
-            $ns['status'] ?? '-',
+            $this->formatStatus($ns['status'] ?? null),
         ], $namespaces);
 
         $this->renderTable($output, ['Name', 'Description', 'Retention (days)', 'Status'], $rows);

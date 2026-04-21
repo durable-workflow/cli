@@ -83,6 +83,7 @@ class DoctorCommandTest extends TestCase
         self::assertSame('1.0', $decoded['server']['worker_protocol']['version']);
         self::assertSame('server-1', $decoded['server']['cluster_info']['server_id']);
         self::assertSame([], $decoded['warnings']);
+        self::assertSame('doctor.clean', $decoded['recommendations'][0]['id']);
     }
 
     public function test_doctor_does_not_warn_on_compatible_protocols_when_server_app_version_differs(): void
@@ -116,6 +117,7 @@ class DoctorCommandTest extends TestCase
         $tester = new CommandTester($command);
 
         self::assertSame(Command::SUCCESS, $tester->execute([
+            '--token' => 'secret-token',
             '--output' => 'json',
         ]));
 
@@ -154,6 +156,7 @@ class DoctorCommandTest extends TestCase
         $tester = new CommandTester($command);
 
         self::assertSame(Command::SUCCESS, $tester->execute([
+            '--token' => 'secret-token',
             '--output' => 'json',
         ]));
 
@@ -161,6 +164,8 @@ class DoctorCommandTest extends TestCase
 
         self::assertCount(1, $decoded['warnings']);
         self::assertStringContainsString('server-advertised cli supported_versions [0.2.x]', $decoded['warnings'][0]);
+        self::assertSame('compatibility.warning', $decoded['recommendations'][0]['id']);
+        self::assertSame('dw server:info --output=json', $decoded['recommendations'][0]['command']);
     }
 
     public function test_doctor_reports_profile_token_source_and_tls_state(): void
@@ -202,6 +207,8 @@ class DoctorCommandTest extends TestCase
         self::assertTrue($decoded['connection']['token']['present']);
         self::assertSame('profile_env', $decoded['connection']['token']['source']);
         self::assertSame('DOCTOR_DW_TOKEN', $decoded['connection']['token']['env']);
+        self::assertSame('tls.verification_disabled', $decoded['recommendations'][0]['id']);
+        self::assertSame('dw env:set <name> --tls-verify=true', $decoded['recommendations'][0]['command']);
     }
 
     public function test_doctor_returns_network_exit_but_keeps_diagnostic_json(): void
@@ -221,6 +228,26 @@ class DoctorCommandTest extends TestCase
         self::assertSame('http://unreachable:9999', $decoded['connection']['server']);
         self::assertFalse($decoded['server']['reachable']);
         self::assertSame('Connection refused', $decoded['server']['error']);
+        self::assertSame('server.unreachable', $decoded['recommendations'][0]['id']);
+        self::assertSame('auth.token_missing', $decoded['recommendations'][1]['id']);
+    }
+
+    public function test_doctor_human_output_includes_next_steps_for_unreachable_server(): void
+    {
+        $command = new DoctorCommand();
+        $command->setServerClient(new DoctorFailingClient());
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(ExitCode::NETWORK, $tester->execute([
+            '--server' => 'http://unreachable:9999',
+        ]));
+
+        $display = $tester->getDisplay();
+
+        self::assertStringContainsString('Next steps:', $display);
+        self::assertStringContainsString('Check the server URL, DNS, port, and TLS settings', $display);
+        self::assertStringContainsString('Try: dw doctor --server=http://unreachable:9999 --output=json', $display);
     }
 }
 

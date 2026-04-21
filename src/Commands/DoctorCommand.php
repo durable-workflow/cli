@@ -55,6 +55,7 @@ HELP);
                 'reachable' => false,
             ],
             'warnings' => [],
+            'recommendations' => [],
         ];
         $exitCode = ExitCode::SUCCESS;
 
@@ -79,6 +80,8 @@ HELP);
             $diagnostic['server']['error'] = $exception->getMessage();
             $exitCode = ExitCode::FAILURE;
         }
+
+        $diagnostic['recommendations'] = $this->recommendations($diagnostic, $exitCode);
 
         if (OutputMode::isMachineReadable($this->outputMode($input))) {
             $this->renderJson($output, $diagnostic);
@@ -283,6 +286,91 @@ HELP);
                 $output->writeln('  '.$warning);
             }
         }
+
+        $recommendations = $diagnostic['recommendations'] ?? [];
+        if (is_array($recommendations) && $recommendations !== []) {
+            $output->writeln('');
+            $output->writeln('Next steps:');
+            foreach ($recommendations as $recommendation) {
+                if (! is_array($recommendation)) {
+                    continue;
+                }
+
+                $message = $this->scalarString($recommendation['message'] ?? null);
+                if ($message === null) {
+                    continue;
+                }
+
+                $output->writeln('  - '.$message);
+
+                $command = $this->scalarString($recommendation['command'] ?? null);
+                if ($command !== null) {
+                    $output->writeln('    Try: '.$command);
+                }
+            }
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $diagnostic
+     * @return list<array{id: string, severity: string, message: string, command?: string}>
+     */
+    private function recommendations(array $diagnostic, int $exitCode): array
+    {
+        $recommendations = [];
+        $connection = is_array($diagnostic['connection'] ?? null) ? $diagnostic['connection'] : [];
+        $server = is_array($diagnostic['server'] ?? null) ? $diagnostic['server'] : [];
+        $token = is_array($connection['token'] ?? null) ? $connection['token'] : [];
+        $tls = is_array($connection['tls'] ?? null) ? $connection['tls'] : [];
+
+        if (($server['reachable'] ?? false) !== true) {
+            $recommendations[] = [
+                'id' => $exitCode === ExitCode::NETWORK ? 'server.unreachable' : 'server.error',
+                'severity' => 'error',
+                'message' => $exitCode === ExitCode::NETWORK
+                    ? 'Check the server URL, DNS, port, and TLS settings for the selected environment.'
+                    : 'Inspect the server error, then retry with --output=json if support needs the full diagnostic payload.',
+                'command' => 'dw doctor --server='.($connection['server'] ?? 'http://localhost:8080').' --output=json',
+            ];
+        }
+
+        if (($token['present'] ?? false) !== true) {
+            $recommendations[] = [
+                'id' => 'auth.token_missing',
+                'severity' => 'warning',
+                'message' => 'Set an auth token if the target server requires authenticated operator requests.',
+                'command' => 'dw env:set <name> --token-env=DURABLE_WORKFLOW_AUTH_TOKEN',
+            ];
+        }
+
+        if (($tls['verify'] ?? true) !== true) {
+            $recommendations[] = [
+                'id' => 'tls.verification_disabled',
+                'severity' => 'warning',
+                'message' => 'Re-enable TLS verification before using this profile outside a local or disposable test server.',
+                'command' => 'dw env:set <name> --tls-verify=true',
+            ];
+        }
+
+        $warnings = $diagnostic['warnings'] ?? [];
+        if (is_array($warnings) && $warnings !== []) {
+            $recommendations[] = [
+                'id' => 'compatibility.warning',
+                'severity' => 'warning',
+                'message' => 'Review protocol compatibility before running mutating workflow or worker commands.',
+                'command' => 'dw server:info --output=json',
+            ];
+        }
+
+        if ($recommendations === []) {
+            $recommendations[] = [
+                'id' => 'doctor.clean',
+                'severity' => 'info',
+                'message' => 'Connection, auth discovery, TLS settings, and advertised protocol metadata look ready for CLI operations.',
+            ];
+        }
+
+        return $recommendations;
     }
 
     private function scalarString(mixed $value): ?string

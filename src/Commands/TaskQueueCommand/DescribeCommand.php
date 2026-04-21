@@ -140,22 +140,29 @@ HELP)
                 $parts[] = 'lock='.($admission['lock_supported'] ? 'yes' : 'no');
             }
         } else {
-            $active = $admission['active_lease_count'] ?? $admission['leased_count'] ?? null;
-            $limit = $admission['server_limit'] ?? $admission['configured_slot_count'] ?? null;
+            $active = $admission['server_active_lease_count'] ?? $admission['active_lease_count'] ?? $admission['leased_count'] ?? null;
+            $limit = $admission['server_max_active_leases_per_queue'] ?? $admission['server_limit'] ?? $admission['configured_slot_count'] ?? null;
 
             if ($active !== null || $limit !== null) {
                 $parts[] = sprintf('active=%s/%s', $active ?? '-', $limit ?? '-');
             }
 
-            if (array_key_exists('remaining_server_capacity', $admission)) {
+            if (array_key_exists('server_remaining_active_lease_capacity', $admission)) {
+                $parts[] = 'remaining='.$admission['server_remaining_active_lease_capacity'];
+            } elseif (array_key_exists('remaining_server_capacity', $admission)) {
                 $parts[] = 'remaining='.$admission['remaining_server_capacity'];
             } elseif (array_key_exists('available_slot_count', $admission)) {
                 $parts[] = 'remaining='.$admission['available_slot_count'];
             }
         }
 
-        if (isset($admission['budget_source'])) {
-            $parts[] = 'source='.$admission['budget_source'];
+        $source = $admission['budget_source'] ?? null;
+        if (! $queryTasks && ($admission['server_max_active_leases_per_queue'] ?? $admission['server_limit'] ?? null) !== null) {
+            $source = $admission['server_budget_source'] ?? $source;
+        }
+
+        if ($source !== null) {
+            $parts[] = 'source='.$source;
         }
 
         $output->writeln(sprintf('  %s: %s', $label, implode(' ', $parts)));

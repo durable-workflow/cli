@@ -53,11 +53,11 @@ class TaskQueueDescribeCommandTest extends TestCase
                     'admission' => [
                         'workflow_tasks' => [
                             'status' => 'accepting',
-                            'remaining_server_capacity' => 4,
+                            'server_remaining_active_lease_capacity' => 4,
                         ],
                         'activity_tasks' => [
                             'status' => 'throttled',
-                            'remaining_server_capacity' => 0,
+                            'server_remaining_active_lease_capacity' => 0,
                         ],
                         'query_tasks' => [
                             'status' => 'full',
@@ -108,17 +108,19 @@ class TaskQueueDescribeCommandTest extends TestCase
             'admission' => [
                 'workflow_tasks' => [
                     'status' => 'throttled',
-                    'active_lease_count' => 2,
-                    'server_limit' => 2,
-                    'remaining_server_capacity' => 0,
-                    'budget_source' => 'DW_WORKFLOW_TASK_MAX_ACTIVE_LEASES_PER_QUEUE',
+                    'server_active_lease_count' => 2,
+                    'server_max_active_leases_per_queue' => 2,
+                    'server_remaining_active_lease_capacity' => 0,
+                    'budget_source' => 'worker_registration.max_concurrent_workflow_tasks',
+                    'server_budget_source' => 'server.admission.workflow_tasks.max_active_leases_per_queue',
                 ],
                 'activity_tasks' => [
                     'status' => 'accepting',
-                    'active_lease_count' => 1,
-                    'server_limit' => 4,
-                    'remaining_server_capacity' => 3,
-                    'budget_source' => 'DW_ACTIVITY_TASK_MAX_ACTIVE_LEASES_PER_QUEUE',
+                    'server_active_lease_count' => 1,
+                    'server_max_active_leases_per_queue' => 4,
+                    'server_remaining_active_lease_capacity' => 3,
+                    'budget_source' => 'worker_registration.max_concurrent_activity_tasks',
+                    'server_budget_source' => 'server.admission.activity_tasks.max_active_leases_per_queue',
                 ],
                 'query_tasks' => [
                     'status' => 'full',
@@ -173,8 +175,8 @@ class TaskQueueDescribeCommandTest extends TestCase
         self::assertStringContainsString('Workflow Expired Leases: 1', $display);
         self::assertStringContainsString('Pollers: active=1 stale=1', $display);
         self::assertStringContainsString('Admission:', $display);
-        self::assertStringContainsString('Workflow Tasks: status=throttled active=2/2 remaining=0 source=DW_WORKFLOW_TASK_MAX_ACTIVE_LEASES_PER_QUEUE', $display);
-        self::assertStringContainsString('Activity Tasks: status=accepting active=1/4 remaining=3 source=DW_ACTIVITY_TASK_MAX_ACTIVE_LEASES_PER_QUEUE', $display);
+        self::assertStringContainsString('Workflow Tasks: status=throttled active=2/2 remaining=0 source=server.admission.workflow_tasks.max_active_leases_per_queue', $display);
+        self::assertStringContainsString('Activity Tasks: status=accepting active=1/4 remaining=3 source=server.admission.activity_tasks.max_active_leases_per_queue', $display);
         self::assertStringContainsString('Query Tasks: status=full pending=1/1 remaining=0 lock=yes source=server.query_tasks.max_pending_per_queue', $display);
         self::assertStringContainsString('Current Leases:', $display);
         self::assertStringContainsString('task-123', $display);

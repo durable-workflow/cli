@@ -76,7 +76,9 @@ HELP)
             return $remaining === null ? $status : sprintf('%s (%s left)', $status, $remaining);
         }
 
-        $remaining = $admission[$kind]['remaining_server_capacity'] ?? null;
+        $remaining = $admission[$kind]['server_remaining_active_lease_capacity']
+            ?? $admission[$kind]['remaining_server_capacity']
+            ?? null;
         if ($remaining === null) {
             $remaining = $admission[$kind]['available_slot_count'] ?? null;
         }

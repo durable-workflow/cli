@@ -1,0 +1,191 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Commands;
+
+use DurableWorkflow\Cli\Application;
+use DurableWorkflow\Cli\Support\ControlPlaneRequestContract;
+use DurableWorkflow\Cli\Support\ServerClient;
+use PHPUnit\Framework\TestCase;
+use Symfony\Component\Console\Tester\ApplicationTester;
+
+class ApplicationCompatibilityWarningTest extends TestCase
+{
+    protected function setUp(): void
+    {
+        putenv('DW_CLI_VERSION=0.1.5');
+    }
+
+    protected function tearDown(): void
+    {
+        putenv('DW_CLI_VERSION');
+        putenv('DURABLE_WORKFLOW_SERVER_URL');
+        unset($_ENV['DURABLE_WORKFLOW_SERVER_URL']);
+    }
+
+    public function test_first_server_command_does_not_warn_when_only_server_app_version_differs(): void
+    {
+        $application = $this->applicationWithClient(new ApplicationCompatibilityFakeClient(
+            self::clusterInfo(serverVersion: '9.8.7', supportedCliVersions: '0.1.x'),
+        ));
+        $tester = new ApplicationTester($application);
+
+        self::assertSame(0, $tester->run([
+            'command' => 'server:health',
+        ]));
+
+        $display = $tester->getDisplay();
+        self::assertStringContainsString('Server is ok', $display);
+        self::assertStringNotContainsString('Compatibility warning:', $display);
+    }
+
+    public function test_first_server_command_warns_from_client_compatibility_metadata(): void
+    {
+        $application = $this->applicationWithClient(new ApplicationCompatibilityFakeClient(
+            self::clusterInfo(serverVersion: '9.8.7', supportedCliVersions: '0.2.x'),
+        ));
+        $tester = new ApplicationTester($application);
+
+        self::assertSame(0, $tester->run([
+            'command' => 'server:health',
+        ]));
+
+        $display = $tester->getDisplay();
+        self::assertStringContainsString(
+            'Compatibility warning: dw 0.1.5 is outside server-advertised cli supported_versions [0.2.x].',
+            $display,
+        );
+        self::assertStringContainsString('Run `dw doctor` for details.', $display);
+        self::assertStringContainsString('Server is ok', $display);
+    }
+
+    public function test_non_worker_command_does_not_warn_when_worker_protocol_metadata_is_absent(): void
+    {
+        $clusterInfo = self::clusterInfo(serverVersion: '9.8.7', supportedCliVersions: '0.1.x');
+        unset($clusterInfo['worker_protocol']);
+
+        $application = $this->applicationWithClient(new ApplicationCompatibilityFakeClient($clusterInfo));
+        $tester = new ApplicationTester($application);
+
+        self::assertSame(0, $tester->run([
+            'command' => 'server:health',
+        ]));
+
+        self::assertStringNotContainsString('worker_protocol.version', $tester->getDisplay());
+    }
+
+    public function test_worker_command_warns_when_worker_protocol_metadata_is_absent(): void
+    {
+        $clusterInfo = self::clusterInfo(serverVersion: '9.8.7', supportedCliVersions: '0.1.x');
+        unset($clusterInfo['worker_protocol']);
+
+        $application = $this->applicationWithClient(new ApplicationCompatibilityFakeClient($clusterInfo));
+        $tester = new ApplicationTester($application);
+
+        self::assertSame(0, $tester->run([
+            'command' => 'worker:list',
+        ]));
+
+        self::assertStringContainsString(
+            'Compatibility warning: server did not advertise worker_protocol.version; worker commands expect 1.0.',
+            $tester->getDisplay(),
+        );
+    }
+
+    public function test_version_output_warns_from_explicit_target_client_compatibility_metadata(): void
+    {
+        putenv('DURABLE_WORKFLOW_SERVER_URL=https://server.example');
+        $_ENV['DURABLE_WORKFLOW_SERVER_URL'] = 'https://server.example';
+
+        $application = $this->applicationWithClient(new ApplicationCompatibilityFakeClient(
+            self::clusterInfo(serverVersion: '9.8.7', supportedCliVersions: '0.2.x'),
+        ));
+        $tester = new ApplicationTester($application);
+
+        self::assertSame(0, $tester->run([
+            '--version' => true,
+        ]));
+
+        $display = $tester->getDisplay();
+        self::assertStringContainsString('dw 0.1.5', $display);
+        self::assertStringContainsString(
+            'Compatibility warning: dw 0.1.5 is outside server-advertised cli supported_versions [0.2.x].',
+            $display,
+        );
+        self::assertStringNotContainsString('server app version', $display);
+    }
+
+    private function applicationWithClient(ApplicationCompatibilityFakeClient $client): Application
+    {
+        $application = new Application(static fn ($resolved) => $client);
+        $application->setAutoExit(false);
+
+        return $application;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function clusterInfo(string $serverVersion, string $supportedCliVersions): array
+    {
+        return [
+            'server_id' => 'server-1',
+            'version' => $serverVersion,
+            'control_plane' => [
+                'version' => '2',
+                'request_contract' => [
+                    'schema' => ControlPlaneRequestContract::SCHEMA,
+                    'version' => ControlPlaneRequestContract::VERSION,
+                    'operations' => [],
+                ],
+            ],
+            'worker_protocol' => [
+                'version' => '1.0',
+            ],
+            'client_compatibility' => [
+                'authority' => 'protocol_manifests',
+                'top_level_version_role' => 'informational',
+                'clients' => [
+                    'cli' => [
+                        'supported_versions' => $supportedCliVersions,
+                    ],
+                ],
+            ],
+        ];
+    }
+}
+
+class ApplicationCompatibilityFakeClient extends ServerClient
+{
+    /**
+     * @param  array<string, mixed>  $clusterInfo
+     */
+    public function __construct(private readonly array $clusterInfo) {}
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function get(string $path, array $query = []): array
+    {
+        if ($path === '/cluster/info') {
+            return $this->clusterInfo;
+        }
+
+        if ($path === '/health') {
+            return [
+                'status' => 'ok',
+                'timestamp' => '2026-04-21T00:00:00Z',
+                'checks' => [],
+            ];
+        }
+
+        if ($path === '/workers') {
+            return [
+                'workers' => [],
+            ];
+        }
+
+        return [];
+    }
+}

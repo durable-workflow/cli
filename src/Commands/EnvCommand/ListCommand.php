@@ -17,6 +17,11 @@ use Symfony\Component\Console\Output\OutputInterface;
  */
 class ListCommand extends BaseCommand
 {
+    public function emitsSessionCompatibilityWarning(): bool
+    {
+        return false;
+    }
+
     protected function configure(): void
     {
         $this->registerOutputOption();

@@ -47,6 +47,7 @@ class ServerClient
         ?string $namespace = null,
         ?bool $tlsVerify = null,
         ?HttpClientInterface $http = null,
+        ?float $timeout = null,
     )
     {
         $this->baseUrl = rtrim($baseUrl ?? $this->resolveBaseUrl(), '/');
@@ -66,12 +67,18 @@ class ServerClient
             $headers['Authorization'] = 'Bearer '.$token;
         }
 
-        $this->http = $http ?? HttpClient::create([
+        $options = [
             'base_uri' => $this->baseUrl,
             'headers' => $headers,
             'verify_peer' => $this->tlsVerify,
             'verify_host' => $this->tlsVerify,
-        ]);
+        ];
+
+        if ($timeout !== null) {
+            $options['timeout'] = $timeout;
+        }
+
+        $this->http = $http ?? HttpClient::create($options);
     }
 
     public function get(string $path, array $query = []): array
@@ -105,12 +112,25 @@ class ServerClient
      */
     public function clusterInfo(): array
     {
+        $this->clusterInfoUnchecked();
+        $this->checkServerCompatibility();
+
+        return $this->clusterInfoCache;
+    }
+
+    /**
+     * Fetch `/api/cluster/info` without turning incompatible metadata into a
+     * hard error. Diagnostic callers use this for soft compatibility warnings.
+     *
+     * @return array<string, mixed>
+     */
+    public function clusterInfoUnchecked(): array
+    {
         if (is_array($this->clusterInfoCache)) {
             return $this->clusterInfoCache;
         }
 
         $this->clusterInfoCache = $this->get('/cluster/info');
-        $this->checkServerCompatibility();
 
         return $this->clusterInfoCache;
     }

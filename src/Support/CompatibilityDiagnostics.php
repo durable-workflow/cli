@@ -10,17 +10,22 @@ final class CompatibilityDiagnostics
      * @param  array<string, mixed>  $clusterInfo
      * @return list<string>
      */
-    public static function warnings(array $clusterInfo, string $cliVersion): array
+    public static function warnings(array $clusterInfo, string $cliVersion, bool $includeWorkerProtocol = true): array
     {
         $warnings = [];
 
-        foreach ([
+        $checks = [
             self::controlPlaneWarning($clusterInfo),
             self::requestContractWarning($clusterInfo),
-            self::workerProtocolWarning($clusterInfo),
             self::clientCompatibilityAuthorityWarning($clusterInfo),
             self::cliVersionSupportWarning($clusterInfo, $cliVersion),
-        ] as $warning) {
+        ];
+
+        if ($includeWorkerProtocol) {
+            $checks[] = self::workerProtocolWarning($clusterInfo);
+        }
+
+        foreach ($checks as $warning) {
             if ($warning !== null) {
                 $warnings[] = $warning;
             }

@@ -91,6 +91,11 @@ HELP);
         return $exitCode;
     }
 
+    public function emitsSessionCompatibilityWarning(): bool
+    {
+        return false;
+    }
+
     /**
      * @return array{name: string|null, source: string|null, config_path: string}
      */

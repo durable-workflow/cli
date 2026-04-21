@@ -29,6 +29,11 @@ use Symfony\Component\Console\Output\OutputInterface;
  */
 class SetCommand extends BaseCommand
 {
+    public function emitsSessionCompatibilityWarning(): bool
+    {
+        return false;
+    }
+
     protected function configure(): void
     {
         $this->registerOutputOption();

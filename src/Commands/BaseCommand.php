@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace DurableWorkflow\Cli\Commands;
 
+use DurableWorkflow\Cli\BuildInfo;
+use DurableWorkflow\Cli\Support\CompatibilityDiagnostics;
 use DurableWorkflow\Cli\Support\ExitCode;
 use DurableWorkflow\Cli\Support\InvalidOptionException;
 use DurableWorkflow\Cli\Support\OutputMode;
@@ -25,6 +27,11 @@ abstract class BaseCommand extends Command
     private const INPUT_ENCODINGS = ['json', 'raw', 'base64'];
 
     private ?ServerClient $serverClient = null;
+
+    /**
+     * @var (callable(ResolvedConnection): ServerClient)|null
+     */
+    private mixed $serverClientFactory = null;
 
     private ?ProfileStore $profileStore = null;
 
@@ -94,6 +101,10 @@ abstract class BaseCommand extends Command
 
         $resolved = $this->resolvedConnection($input);
 
+        if (is_callable($this->serverClientFactory)) {
+            return ($this->serverClientFactory)($resolved);
+        }
+
         return new ServerClient(
             baseUrl: $resolved->server,
             token: $resolved->token,
@@ -105,6 +116,14 @@ abstract class BaseCommand extends Command
     public function setServerClient(ServerClient $serverClient): void
     {
         $this->serverClient = $serverClient;
+    }
+
+    /**
+     * @param  callable(ResolvedConnection): ServerClient  $factory
+     */
+    public function setServerClientFactory(callable $factory): void
+    {
+        $this->serverClientFactory = $factory;
     }
 
     public function setProfileStore(ProfileStore $store): void
@@ -121,6 +140,43 @@ abstract class BaseCommand extends Command
         $this->profileStore = new ProfileStore();
 
         return $this->profileStore;
+    }
+
+    public function emitsSessionCompatibilityWarning(): bool
+    {
+        return true;
+    }
+
+    public function emitSessionCompatibilityWarning(InputInterface $input, OutputInterface $output): void
+    {
+        if (! $this->emitsSessionCompatibilityWarning()) {
+            return;
+        }
+
+        try {
+            $warnings = CompatibilityDiagnostics::warnings(
+                $this->client($input)->clusterInfoUnchecked(),
+                BuildInfo::version(),
+                $this->includeWorkerProtocolCompatibilityWarning(),
+            );
+        } catch (\Throwable) {
+            return;
+        }
+
+        if ($warnings === []) {
+            return;
+        }
+
+        $this->writeHumanWarning($output, $warnings[0].' Run `dw doctor` for details.');
+    }
+
+    protected function includeWorkerProtocolCompatibilityWarning(): bool
+    {
+        $name = (string) $this->getName();
+
+        return str_starts_with($name, 'worker:')
+            || str_starts_with($name, 'workflow-task:')
+            || str_starts_with($name, 'activity:');
     }
 
     protected function resolvedConnection(InputInterface $input): ResolvedConnection
@@ -476,6 +532,12 @@ abstract class BaseCommand extends Command
     {
         $target = $output instanceof ConsoleOutputInterface ? $output->getErrorOutput() : $output;
         $target->writeln('<error>'.$message.'</error>');
+    }
+
+    private function writeHumanWarning(OutputInterface $output, string $message): void
+    {
+        $target = $output instanceof ConsoleOutputInterface ? $output->getErrorOutput() : $output;
+        $target->writeln('<comment>'.$message.'</comment>');
     }
 
     private function resolveOutputMode(InputInterface $input): string

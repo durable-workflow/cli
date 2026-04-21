@@ -190,6 +190,12 @@ Server compatibility error: unsupported control_plane.version [3]; dw CLI 0.1.x 
 Upgrade the server or use a compatible CLI version.
 ```
 
+`dw --version` prints local build identity. When `DURABLE_WORKFLOW_SERVER_URL`
+or `DW_ENV` explicitly selects a target, it also performs a short best-effort
+compatibility probe and emits at most one warning from protocol/client metadata.
+The first server-talking command in a CLI process uses the same warning source
+and points to `dw doctor` for the full resolved diagnostic payload.
+
 See the [Version Compatibility](https://durable-workflow.github.io/docs/2.0/compatibility) documentation for the full compatibility matrix across all components.
 
 ## Commands

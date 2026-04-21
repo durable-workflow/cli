@@ -313,10 +313,10 @@ dw schedule:delete daily-report
 ### Task Queues
 
 ```bash
-# List task queues
+# List task queues with admission status
 dw task-queue:list
 
-# Describe a task queue (pollers, backlog)
+# Describe a task queue (pollers, backlog, admission budgets)
 dw task-queue:describe default
 ```
 

@@ -20,6 +20,12 @@ class TaskQueueDescribeCommandTest extends TestCase
             'task_queues' => [
                 [
                     'name' => 'external-workflows',
+                    'admission' => [
+                        'workflow_tasks' => [
+                            'status' => 'accepting',
+                            'remaining_server_capacity' => 3,
+                        ],
+                    ],
                 ],
             ],
         ]));
@@ -34,6 +40,46 @@ class TaskQueueDescribeCommandTest extends TestCase
 
         self::assertIsArray($decoded);
         self::assertSame('external-workflows', $decoded['task_queues'][0]['name']);
+        self::assertSame('accepting', $decoded['task_queues'][0]['admission']['workflow_tasks']['status']);
+    }
+
+    public function test_list_command_renders_admission_columns_for_human_output(): void
+    {
+        $command = new ListCommand();
+        $command->setServerClient(new FakeTaskQueueServerClient([
+            'task_queues' => [
+                [
+                    'name' => 'external-workflows',
+                    'admission' => [
+                        'workflow_tasks' => [
+                            'status' => 'accepting',
+                            'remaining_server_capacity' => 4,
+                        ],
+                        'activity_tasks' => [
+                            'status' => 'throttled',
+                            'remaining_server_capacity' => 0,
+                        ],
+                        'query_tasks' => [
+                            'status' => 'full',
+                            'remaining_pending_capacity' => 0,
+                        ],
+                    ],
+                ],
+            ],
+        ]));
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+
+        $display = $tester->getDisplay();
+
+        self::assertStringContainsString('Workflow Admission', $display);
+        self::assertStringContainsString('Activity Admission', $display);
+        self::assertStringContainsString('Query Admission', $display);
+        self::assertStringContainsString('accepting (4 left)', $display);
+        self::assertStringContainsString('throttled (0 left)', $display);
+        self::assertStringContainsString('full (0 left)', $display);
     }
 
     public function test_it_renders_backlog_poller_and_current_lease_sections(): void
@@ -57,6 +103,30 @@ class TaskQueueDescribeCommandTest extends TestCase
                 'pollers' => [
                     'active_count' => 1,
                     'stale_count' => 1,
+                ],
+            ],
+            'admission' => [
+                'workflow_tasks' => [
+                    'status' => 'throttled',
+                    'active_lease_count' => 2,
+                    'server_limit' => 2,
+                    'remaining_server_capacity' => 0,
+                    'budget_source' => 'DW_WORKFLOW_TASK_MAX_ACTIVE_LEASES_PER_QUEUE',
+                ],
+                'activity_tasks' => [
+                    'status' => 'accepting',
+                    'active_lease_count' => 1,
+                    'server_limit' => 4,
+                    'remaining_server_capacity' => 3,
+                    'budget_source' => 'DW_ACTIVITY_TASK_MAX_ACTIVE_LEASES_PER_QUEUE',
+                ],
+                'query_tasks' => [
+                    'status' => 'full',
+                    'approximate_pending_count' => 1,
+                    'max_pending_per_queue' => 1,
+                    'remaining_pending_capacity' => 0,
+                    'lock_supported' => true,
+                    'budget_source' => 'server.query_tasks.max_pending_per_queue',
                 ],
             ],
             'current_leases' => [
@@ -102,6 +172,10 @@ class TaskQueueDescribeCommandTest extends TestCase
         self::assertStringContainsString('Workflow Ready: 1', $display);
         self::assertStringContainsString('Workflow Expired Leases: 1', $display);
         self::assertStringContainsString('Pollers: active=1 stale=1', $display);
+        self::assertStringContainsString('Admission:', $display);
+        self::assertStringContainsString('Workflow Tasks: status=throttled active=2/2 remaining=0 source=DW_WORKFLOW_TASK_MAX_ACTIVE_LEASES_PER_QUEUE', $display);
+        self::assertStringContainsString('Activity Tasks: status=accepting active=1/4 remaining=3 source=DW_ACTIVITY_TASK_MAX_ACTIVE_LEASES_PER_QUEUE', $display);
+        self::assertStringContainsString('Query Tasks: status=full pending=1/1 remaining=0 lock=yes source=server.query_tasks.max_pending_per_queue', $display);
         self::assertStringContainsString('Current Leases:', $display);
         self::assertStringContainsString('task-123', $display);
         self::assertStringContainsString('EXPIRED', $display);

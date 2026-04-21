@@ -7,6 +7,7 @@
   "properties": {
     "name": { "type": "string" },
     "stats": { "type": ["object", "null"], "additionalProperties": true },
+    "admission": { "type": ["object", "null"], "additionalProperties": true },
     "current_leases": { "type": ["array", "null"], "items": { "type": "object", "additionalProperties": true } },
     "pollers": { "type": ["array", "null"], "items": { "type": "object", "additionalProperties": true } }
   },

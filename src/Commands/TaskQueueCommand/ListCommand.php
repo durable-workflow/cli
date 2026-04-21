@@ -47,10 +47,40 @@ HELP)
 
         $rows = array_map(fn ($q) => [
             $q['name'],
+            $this->admissionStatus($q, 'workflow_tasks'),
+            $this->admissionStatus($q, 'activity_tasks'),
+            $this->admissionStatus($q, 'query_tasks'),
         ], $queues);
 
-        $this->renderTable($output, ['Task Queue'], $rows);
+        $this->renderTable($output, ['Task Queue', 'Workflow Admission', 'Activity Admission', 'Query Admission'], $rows);
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * @param  array<string, mixed>  $queue
+     */
+    private function admissionStatus(array $queue, string $kind): string
+    {
+        $admission = $queue['admission'] ?? null;
+
+        if (! is_array($admission) || ! is_array($admission[$kind] ?? null)) {
+            return '-';
+        }
+
+        $status = (string) ($admission[$kind]['status'] ?? '-');
+
+        if ($kind === 'query_tasks') {
+            $remaining = $admission[$kind]['remaining_pending_capacity'] ?? null;
+
+            return $remaining === null ? $status : sprintf('%s (%s left)', $status, $remaining);
+        }
+
+        $remaining = $admission[$kind]['remaining_server_capacity'] ?? null;
+        if ($remaining === null) {
+            $remaining = $admission[$kind]['available_slot_count'] ?? null;
+        }
+
+        return $remaining === null ? $status : sprintf('%s (%s left)', $status, $remaining);
     }
 }

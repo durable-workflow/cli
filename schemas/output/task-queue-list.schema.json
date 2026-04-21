@@ -11,7 +11,8 @@
         "type": "object",
         "required": ["name"],
         "properties": {
-          "name": { "type": "string" }
+          "name": { "type": "string" },
+          "admission": { "type": ["object", "null"], "additionalProperties": true }
         },
         "additionalProperties": true
       }

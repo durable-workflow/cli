@@ -61,6 +61,15 @@ HELP)
         ));
         $output->writeln('');
 
+        $admission = $result['admission'] ?? [];
+        if (is_array($admission) && $admission !== []) {
+            $output->writeln('Admission:');
+            $this->renderAdmissionLine($output, 'Workflow Tasks', $admission['workflow_tasks'] ?? null, false);
+            $this->renderAdmissionLine($output, 'Activity Tasks', $admission['activity_tasks'] ?? null, false);
+            $this->renderAdmissionLine($output, 'Query Tasks', $admission['query_tasks'] ?? null, true);
+            $output->writeln('');
+        }
+
         $leases = $result['current_leases'] ?? [];
         if (! empty($leases)) {
             $rows = array_map(static fn (array $lease): array => [
@@ -98,5 +107,57 @@ HELP)
         }
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $admission
+     */
+    private function renderAdmissionLine(OutputInterface $output, string $label, mixed $admission, bool $queryTasks): void
+    {
+        if (! is_array($admission)) {
+            $output->writeln(sprintf('  %s: -', $label));
+
+            return;
+        }
+
+        $parts = [
+            'status='.($admission['status'] ?? '-'),
+        ];
+
+        if ($queryTasks) {
+            $pending = $admission['approximate_pending_count'] ?? null;
+            $limit = $admission['max_pending_per_queue'] ?? null;
+
+            if ($pending !== null || $limit !== null) {
+                $parts[] = sprintf('pending=%s/%s', $pending ?? '-', $limit ?? '-');
+            }
+
+            if (array_key_exists('remaining_pending_capacity', $admission)) {
+                $parts[] = 'remaining='.$admission['remaining_pending_capacity'];
+            }
+
+            if (array_key_exists('lock_supported', $admission)) {
+                $parts[] = 'lock='.($admission['lock_supported'] ? 'yes' : 'no');
+            }
+        } else {
+            $active = $admission['active_lease_count'] ?? $admission['leased_count'] ?? null;
+            $limit = $admission['server_limit'] ?? $admission['configured_slot_count'] ?? null;
+
+            if ($active !== null || $limit !== null) {
+                $parts[] = sprintf('active=%s/%s', $active ?? '-', $limit ?? '-');
+            }
+
+            if (array_key_exists('remaining_server_capacity', $admission)) {
+                $parts[] = 'remaining='.$admission['remaining_server_capacity'];
+            } elseif (array_key_exists('available_slot_count', $admission)) {
+                $parts[] = 'remaining='.$admission['available_slot_count'];
+            }
+        }
+
+        if (isset($admission['budget_source'])) {
+            $parts[] = 'source='.$admission['budget_source'];
+        }
+
+        $output->writeln(sprintf('  %s: %s', $label, implode(' ', $parts)));
     }
 }

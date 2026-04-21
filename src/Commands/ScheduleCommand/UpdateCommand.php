@@ -42,6 +42,7 @@ HELP)
             ->addOption('max-runs', null, InputOption::VALUE_REQUIRED, 'Maximum number of runs')
             ->addOption('note', null, InputOption::VALUE_OPTIONAL, 'Note')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
+        $this->addInputOptions('Scheduled workflow input payload');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -64,11 +65,13 @@ HELP)
         $taskQueue = $input->getOption('task-queue');
         $executionTimeout = $input->getOption('execution-timeout');
         $runTimeout = $input->getOption('run-timeout');
+        $actionInput = $this->parseInputArgumentsOption($input);
 
-        if ($workflowType !== null || $taskQueue !== null || $executionTimeout !== null || $runTimeout !== null) {
+        if ($workflowType !== null || $taskQueue !== null || $executionTimeout !== null || $runTimeout !== null || $actionInput !== null) {
             $body['action'] = array_filter([
                 'workflow_type' => $workflowType,
                 'task_queue' => $taskQueue,
+                'input' => $actionInput,
                 'execution_timeout_seconds' => $executionTimeout !== null ? (int) $executionTimeout : null,
                 'run_timeout_seconds' => $runTimeout !== null ? (int) $runTimeout : null,
             ], fn ($v) => $v !== null);
@@ -92,7 +95,7 @@ HELP)
 
         if ($body === []) {
             throw new InvalidOptionException(
-                'No update fields provided. Use --cron, --interval, --workflow-type, --task-queue, --execution-timeout, --run-timeout, --overlap-policy, --jitter, --max-runs, or --note.',
+                'No update fields provided. Use --cron, --interval, --workflow-type, --task-queue, --input, --input-file, --execution-timeout, --run-timeout, --overlap-policy, --jitter, --max-runs, or --note.',
             );
         }
 

@@ -29,9 +29,9 @@ print the handler's result. Queries do not mutate state.
 HELP)
             ->addArgument('workflow-id', InputArgument::REQUIRED, 'Workflow ID')
             ->addArgument('query-name', InputArgument::REQUIRED, 'Query name')
-            ->addOption('input', 'i', InputOption::VALUE_OPTIONAL, 'Query input JSON')
             ->addOption('run-id', null, InputOption::VALUE_OPTIONAL, 'Target a specific run ID')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
+        $this->addInputOptions('Query input payload');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -41,7 +41,7 @@ HELP)
         $runId = $input->getOption('run-id');
 
         $body = [];
-        $parsedInput = $this->parseJsonOption($input->getOption('input'), 'input');
+        $parsedInput = $this->parseInputArgumentsOption($input);
         if ($parsedInput !== null) {
             $body['input'] = $parsedInput;
         }

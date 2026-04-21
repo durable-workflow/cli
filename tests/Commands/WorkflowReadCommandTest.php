@@ -21,7 +21,7 @@ class WorkflowReadCommandTest extends TestCase
             'workflow_id' => 'wf-123',
             'run_id' => 'run-123',
             'business_key' => 'order-123',
-            'payload_codec' => 'json',
+            'payload_codec' => 'avro',
             'outcome' => 'started_new',
         ]);
 
@@ -37,15 +37,15 @@ class WorkflowReadCommandTest extends TestCase
 
         self::assertSame('order-123', $client->lastPostBody['business_key'] ?? null);
         self::assertStringContainsString('Business Key: order-123', $tester->getDisplay());
-        self::assertStringContainsString('Payload Codec: json', $tester->getDisplay());
+        self::assertStringContainsString('Payload Codec: avro', $tester->getDisplay());
     }
 
-    public function test_start_command_sends_input_as_json_codec_envelope(): void
+    public function test_start_command_sends_input_as_arguments_array(): void
     {
         $client = new WorkflowReadFakeServerClient([
             'workflow_id' => 'wf-123',
             'run_id' => 'run-123',
-            'payload_codec' => 'json',
+            'payload_codec' => 'avro',
             'outcome' => 'started_new',
         ]);
 
@@ -59,8 +59,89 @@ class WorkflowReadCommandTest extends TestCase
             '--input' => '["Ada"]',
         ]));
 
-        self::assertSame('json', $client->lastPostBody['input']['codec'] ?? null);
-        self::assertSame('["Ada"]', $client->lastPostBody['input']['blob'] ?? null);
+        self::assertSame(['Ada'], $client->lastPostBody['input'] ?? null);
+    }
+
+    public function test_start_command_reads_input_file(): void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'dw-cli-input-');
+        self::assertIsString($path);
+        file_put_contents($path, '["Ada","Lovelace"]');
+
+        try {
+            $client = new WorkflowReadFakeServerClient([
+                'workflow_id' => 'wf-123',
+                'run_id' => 'run-123',
+                'outcome' => 'started_new',
+            ]);
+
+            $command = new StartCommand();
+            $command->setServerClient($client);
+
+            $tester = new CommandTester($command);
+
+            self::assertSame(Command::SUCCESS, $tester->execute([
+                '--type' => 'orders.process',
+                '--input-file' => $path,
+            ]));
+
+            self::assertSame(['Ada', 'Lovelace'], $client->lastPostBody['input'] ?? null);
+        } finally {
+            @unlink($path);
+        }
+    }
+
+    public function test_start_command_decodes_base64_input_as_one_argument(): void
+    {
+        $client = new WorkflowReadFakeServerClient([
+            'workflow_id' => 'wf-123',
+            'run_id' => 'run-123',
+            'outcome' => 'started_new',
+        ]);
+
+        $command = new StartCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            '--type' => 'orders.process',
+            '--input' => base64_encode('opaque bytes'),
+            '--input-encoding' => 'base64',
+        ]));
+
+        self::assertSame(['opaque bytes'], $client->lastPostBody['input'] ?? null);
+    }
+
+    public function test_start_command_rejects_ambiguous_input_sources(): void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'dw-cli-input-');
+        self::assertIsString($path);
+        file_put_contents($path, '["Ada"]');
+
+        try {
+            $client = new WorkflowReadFakeServerClient([
+                'workflow_id' => 'wf-123',
+                'run_id' => 'run-123',
+                'outcome' => 'started_new',
+            ]);
+
+            $command = new StartCommand();
+            $command->setServerClient($client);
+
+            $tester = new CommandTester($command);
+
+            self::assertSame(Command::INVALID, $tester->execute([
+                '--type' => 'orders.process',
+                '--input' => '["inline"]',
+                '--input-file' => $path,
+            ]));
+
+            self::assertSame(0, $client->postCalls);
+            self::assertStringContainsString('Use either --input or --input-file, not both.', $tester->getDisplay());
+        } finally {
+            @unlink($path);
+        }
     }
 
     public function test_start_command_sends_the_canonical_duplicate_policy_without_server_specific_translation(): void
@@ -390,7 +471,7 @@ class WorkflowReadCommandTest extends TestCase
             'is_current_run' => true,
             'task_queue' => 'orders',
             'compatibility' => 'build-a',
-            'payload_codec' => 'json',
+            'payload_codec' => 'avro',
             'execution_timeout_seconds' => 86400,
             'run_timeout_seconds' => 3600,
             'execution_deadline_at' => '2026-04-13T00:00:00Z',
@@ -425,7 +506,7 @@ class WorkflowReadCommandTest extends TestCase
         self::assertStringContainsString('Business Key: order-123', $display);
         self::assertStringContainsString('Status Bucket: running', $display);
         self::assertStringContainsString('Run Count: 2', $display);
-        self::assertStringContainsString('Payload Codec: json', $display);
+        self::assertStringContainsString('Payload Codec: avro', $display);
         self::assertStringContainsString('Execution Timeout: 86400s', $display);
         self::assertStringContainsString('Run Timeout: 3600s', $display);
         self::assertStringContainsString('Execution Deadline: 2026-04-13T00:00:00Z', $display);

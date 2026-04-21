@@ -206,6 +206,8 @@ dw server:start-dev --port=9090 --db=sqlite
 ```bash
 # Start a workflow
 dw workflow:start --type=order.process --input='{"order_id":123}'
+dw workflow:start --type=order.process --input-file=payload.json
+dw workflow:start --type=order.process --input='b3BhcXVlLWlk' --input-encoding=base64
 dw workflow:start --type=order.process --workflow-id=order-123
 dw workflow:start --type=order.process --execution-timeout=3600 --run-timeout=600
 
@@ -264,6 +266,7 @@ dw namespace:update staging --retention=14
 ```bash
 # Create a schedule
 dw schedule:create --workflow-type=reports.daily --cron="0 9 * * *"
+dw schedule:create --workflow-type=reports.daily --cron="0 9 * * *" --input-file=payload.json
 dw schedule:create --schedule-id=daily-report --workflow-type=reports.daily --cron="0 9 * * *" --timezone=America/New_York
 
 # List schedules
@@ -313,11 +316,16 @@ dw workflow-task:complete TASK_ID ATTEMPT --lease-owner=cli-worker --complete-re
 
 ```bash
 # Complete an activity externally
-dw activity:complete TASK_ID ATTEMPT_ID --result='{"status":"done"}'
+dw activity:complete TASK_ID ATTEMPT_ID --input='{"status":"done"}'
+dw activity:complete TASK_ID ATTEMPT_ID --input-file=result.json
 
 # Fail an activity externally
 dw activity:fail TASK_ID ATTEMPT_ID --message="External service unavailable" --non-retryable
 ```
+
+Input-accepting commands use the same payload flags everywhere:
+`--input` for inline values, `--input-file` for a file path or `-` for stdin,
+and `--input-encoding=json|raw|base64` with `json` as the default.
 
 ### System Operations
 

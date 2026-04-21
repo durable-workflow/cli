@@ -51,10 +51,32 @@ class ActivityCommandTest extends TestCase
         self::assertSame(Command::SUCCESS, $tester->execute([
             'task-id' => 'task-1',
             'attempt-id' => 'attempt-1',
-            '--result' => '{"total": 42}',
+            '--input' => '{"total": 42}',
         ]));
 
         self::assertSame(['total' => 42], $client->lastPostBody['result']);
+    }
+
+    public function test_complete_command_accepts_raw_input_result(): void
+    {
+        $client = new ActivityFakeClient([
+            'task_id' => 'task-1',
+            'activity_attempt_id' => 'attempt-1',
+        ]);
+
+        $command = new CompleteCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            'task-id' => 'task-1',
+            'attempt-id' => 'attempt-1',
+            '--input' => 'plain result',
+            '--input-encoding' => 'raw',
+        ]));
+
+        self::assertSame('plain result', $client->lastPostBody['result']);
     }
 
     public function test_complete_command_accepts_custom_lease_owner(): void

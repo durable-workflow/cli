@@ -7,7 +7,6 @@ namespace DurableWorkflow\Cli\Commands\WorkflowCommand;
 use DurableWorkflow\Cli\Commands\BaseCommand;
 use DurableWorkflow\Cli\Support\CompletionValues;
 use DurableWorkflow\Cli\Support\DetectsTerminalStatus;
-use DurableWorkflow\Cli\Support\JsonPayloadEnvelope;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -50,13 +49,13 @@ HELP)
             ->addOption('business-key', null, InputOption::VALUE_OPTIONAL, 'Business key')
             ->addOption('task-queue', null, InputOption::VALUE_OPTIONAL, 'Task queue', 'default')
             ->addOption('duplicate-policy', null, InputOption::VALUE_OPTIONAL, 'Duplicate policy (discover canonical values with server:info)', null, CompletionValues::WORKFLOW_DUPLICATE_POLICIES)
-            ->addOption('input', 'i', InputOption::VALUE_OPTIONAL, 'Input JSON')
             ->addOption('memo', null, InputOption::VALUE_OPTIONAL, 'Memo JSON')
             ->addOption('search-attr', null, InputOption::VALUE_OPTIONAL | InputOption::VALUE_IS_ARRAY, 'Search attributes (key=value)')
             ->addOption('execution-timeout', null, InputOption::VALUE_REQUIRED, 'Execution timeout in seconds (across all runs)')
             ->addOption('run-timeout', null, InputOption::VALUE_REQUIRED, 'Run timeout in seconds (single run)')
             ->addOption('wait', null, InputOption::VALUE_NONE, 'Wait for the workflow to reach a terminal state')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
+        $this->addInputOptions('Workflow input payload');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -84,7 +83,7 @@ HELP)
             'business_key' => $input->getOption('business-key'),
             'task_queue' => $input->getOption('task-queue'),
             'duplicate_policy' => $duplicatePolicy,
-            'input' => $this->jsonEnvelopeOption($input->getOption('input'), 'input'),
+            'input' => $this->parseInputArgumentsOption($input),
             'memo' => $this->parseJsonOption($input->getOption('memo'), 'memo'),
             'execution_timeout_seconds' => $executionTimeout !== null ? (int) $executionTimeout : null,
             'run_timeout_seconds' => $runTimeout !== null ? (int) $runTimeout : null,
@@ -188,18 +187,6 @@ HELP)
 
             sleep(self::WAIT_POLL_INTERVAL_SECONDS);
         }
-    }
-
-    /**
-     * @return array{codec: string, blob: string}|null
-     */
-    private function jsonEnvelopeOption(?string $value, string $optionName): ?array
-    {
-        if ($value === null || $value === '') {
-            return null;
-        }
-
-        return JsonPayloadEnvelope::fromValue($this->parseJsonOption($value, $optionName));
     }
 
     /**

@@ -128,6 +128,34 @@ class ScheduleCommandTest extends TestCase
         self::assertSame('health.check', $client->lastPostBody['action']['workflow_type']);
     }
 
+    public function test_create_command_reads_input_file(): void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'dw-cli-input-');
+        self::assertIsString($path);
+        file_put_contents($path, '["daily"]');
+
+        try {
+            $client = new ScheduleFakeClient([
+                'schedule_id' => 'daily-report',
+            ]);
+
+            $command = new CreateCommand();
+            $command->setServerClient($client);
+
+            $tester = new CommandTester($command);
+
+            self::assertSame(Command::SUCCESS, $tester->execute([
+                '--workflow-type' => 'reports.daily',
+                '--cron' => '0 0 * * *',
+                '--input-file' => $path,
+            ]));
+
+            self::assertSame(['daily'], $client->lastPostBody['action']['input']);
+        } finally {
+            @unlink($path);
+        }
+    }
+
     public function test_create_command_fails_without_cron_or_interval(): void
     {
         $client = new ScheduleFakeClient([]);
@@ -493,6 +521,26 @@ class ScheduleCommandTest extends TestCase
 
         self::assertSame('reports.weekly', $client->lastPutBody['action']['workflow_type']);
         self::assertSame('reports-v2', $client->lastPutBody['action']['task_queue']);
+    }
+
+    public function test_update_command_sends_input_as_action_field(): void
+    {
+        $client = new ScheduleFakeClient([
+            'schedule_id' => 'daily-report',
+            'outcome' => 'updated',
+        ]);
+
+        $command = new UpdateCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            'schedule-id' => 'daily-report',
+            '--input' => '{"tenant":"acme"}',
+        ]));
+
+        self::assertSame(['tenant' => 'acme'], $client->lastPutBody['action']['input']);
     }
 
     public function test_create_command_sends_timeout_options(): void

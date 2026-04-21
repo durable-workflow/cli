@@ -22,6 +22,8 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 abstract class BaseCommand extends Command
 {
+    private const INPUT_ENCODINGS = ['json', 'raw', 'base64'];
+
     private ?ServerClient $serverClient = null;
 
     private ?ProfileStore $profileStore = null;
@@ -175,6 +177,64 @@ abstract class BaseCommand extends Command
     }
 
     /**
+     * Add the common caller-payload input contract used by workflow, schedule,
+     * and externally-completed activity commands.
+     */
+    protected function addInputOptions(string $description = 'Input payload'): void
+    {
+        $this->addOption('input', 'i', InputOption::VALUE_OPTIONAL, $description.' (inline)');
+        $this->addOption('input-file', null, InputOption::VALUE_OPTIONAL, $description.' file path; use - for stdin');
+        $this->addOption(
+            'input-encoding',
+            null,
+            InputOption::VALUE_OPTIONAL,
+            'Input encoding: json (default), raw, base64',
+            'json',
+            self::INPUT_ENCODINGS,
+        );
+    }
+
+    /**
+     * Parse the common input options into the payload value the caller supplied.
+     *
+     * `json` decodes a JSON document. `raw` passes text through unchanged.
+     * `base64` decodes strict base64 to a binary-safe PHP string.
+     */
+    protected function parseInputOption(InputInterface $input): mixed
+    {
+        [$value, $source] = $this->inputSource($input);
+
+        if ($value === null) {
+            return null;
+        }
+
+        return match ($this->inputEncoding($input)) {
+            'json' => $this->decodeJsonDocument($value, $source),
+            'raw' => $value,
+            'base64' => $this->decodeBase64Document($value, $source),
+        };
+    }
+
+    /**
+     * Parse the common input options for server fields that represent workflow
+     * argument lists. Scalars, raw text, and base64-decoded text become one
+     * positional argument so the HTTP request still satisfies the v2 `input`
+     * array contract.
+     *
+     * @return array<int|string, mixed>|null
+     */
+    protected function parseInputArgumentsOption(InputInterface $input): ?array
+    {
+        $value = $this->parseInputOption($input);
+
+        if ($value === null) {
+            return null;
+        }
+
+        return is_array($value) ? $value : [$value];
+    }
+
+    /**
      * Parse a user-supplied option value that must be a JSON document.
      *
      * Returns null when the option was not provided. Throws
@@ -189,15 +249,100 @@ abstract class BaseCommand extends Command
             return null;
         }
 
+        return $this->decodeJsonDocument($value, '--'.$optionName);
+    }
+
+    private function decodeJsonDocument(string $value, string $source): mixed
+    {
         try {
             return json_decode($value, associative: true, flags: JSON_THROW_ON_ERROR);
         } catch (\JsonException $e) {
             throw new InvalidOptionException(sprintf(
-                '--%s must be valid JSON: %s',
-                $optionName,
+                '%s must be valid JSON: %s',
+                $source,
                 $e->getMessage(),
             ));
         }
+    }
+
+    private function decodeBase64Document(string $value, string $source): string
+    {
+        $decoded = base64_decode(trim($value), true);
+
+        if ($decoded === false) {
+            throw new InvalidOptionException(sprintf(
+                '%s must be valid base64 when --input-encoding=base64.',
+                $source,
+            ));
+        }
+
+        return $decoded;
+    }
+
+    /**
+     * @return array{0: string|null, 1: string}
+     */
+    private function inputSource(InputInterface $input): array
+    {
+        $inline = $input->hasOption('input') ? $input->getOption('input') : null;
+        $file = $input->hasOption('input-file') ? $input->getOption('input-file') : null;
+        $hasInline = is_string($inline) && $inline !== '';
+        $hasFile = is_string($file) && $file !== '';
+
+        if ($hasInline && $hasFile) {
+            throw new InvalidOptionException('Use either --input or --input-file, not both.');
+        }
+
+        if ($hasFile) {
+            return [$this->readInputFile($file), '--input-file'];
+        }
+
+        if ($hasInline) {
+            return [$inline, '--input'];
+        }
+
+        return [null, '--input'];
+    }
+
+    private function readInputFile(string $path): string
+    {
+        if ($path === '-') {
+            $contents = stream_get_contents(STDIN);
+
+            if ($contents === false) {
+                throw new InvalidOptionException('--input-file could not read from stdin.');
+            }
+
+            return $contents;
+        }
+
+        if (! is_file($path) || ! is_readable($path)) {
+            throw new InvalidOptionException(sprintf('--input-file must be a readable file: %s', $path));
+        }
+
+        $contents = file_get_contents($path);
+
+        if ($contents === false) {
+            throw new InvalidOptionException(sprintf('--input-file could not be read: %s', $path));
+        }
+
+        return $contents;
+    }
+
+    private function inputEncoding(InputInterface $input): string
+    {
+        $encoding = $input->hasOption('input-encoding')
+            ? (string) ($input->getOption('input-encoding') ?? 'json')
+            : 'json';
+
+        if (! in_array($encoding, self::INPUT_ENCODINGS, true)) {
+            throw new InvalidOptionException(sprintf(
+                '--input-encoding must be one of: %s',
+                implode(', ', self::INPUT_ENCODINGS),
+            ));
+        }
+
+        return $encoding;
     }
 
     /**

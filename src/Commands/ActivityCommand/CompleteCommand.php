@@ -24,13 +24,13 @@ the task's leased attempt ID so the server can validate ownership.
 
 <comment>Example:</comment>
 
-  <info>dw activity:complete act-123 att-456 --result='{"ok":true}'</info>
+  <info>dw activity:complete act-123 att-456 --input='{"ok":true}'</info>
 HELP)
             ->addArgument('task-id', InputArgument::REQUIRED, 'Activity task ID')
             ->addArgument('attempt-id', InputArgument::REQUIRED, 'Leased activity attempt ID')
             ->addOption('lease-owner', null, InputOption::VALUE_OPTIONAL, 'Lease owner identity', 'cli')
-            ->addOption('result', 'r', InputOption::VALUE_OPTIONAL, 'Result JSON')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
+        $this->addInputOptions('Activity result payload');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -42,7 +42,7 @@ HELP)
             'activity_attempt_id' => $attemptId,
             'lease_owner' => $input->getOption('lease-owner'),
         ];
-        $parsedResult = $this->parseJsonOption($input->getOption('result'), 'result');
+        $parsedResult = $this->parseInputOption($input);
         if ($parsedResult !== null) {
             $body['result'] = $parsedResult;
         }

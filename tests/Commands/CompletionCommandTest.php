@@ -66,6 +66,11 @@ class CompletionCommandTest extends TestCase
         );
 
         self::assertSame(
+            ['json', 'raw', 'base64'],
+            $this->completionLines($this->complete(2, ['dw', 'workflow:start', '--input-encoding=b'])),
+        );
+
+        self::assertSame(
             ['running', 'completed', 'failed'],
             $this->completionLines($this->complete(2, ['dw', 'workflow:list', '--status=r'])),
         );

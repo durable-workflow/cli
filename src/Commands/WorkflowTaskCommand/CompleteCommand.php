@@ -6,7 +6,6 @@ namespace DurableWorkflow\Cli\Commands\WorkflowTaskCommand;
 
 use DurableWorkflow\Cli\Commands\BaseCommand;
 use DurableWorkflow\Cli\Support\InvalidOptionException;
-use DurableWorkflow\Cli\Support\JsonPayloadEnvelope;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -91,9 +90,7 @@ HELP)
         $command = ['type' => 'complete_workflow'];
 
         if ($completeResult !== null && $completeResult !== '') {
-            $command['result'] = JsonPayloadEnvelope::fromValue(
-                $this->parseJsonOption($completeResult, 'complete-result'),
-            );
+            $command['result'] = $this->parseJsonOption($completeResult, 'complete-result');
         }
 
         return [$command];

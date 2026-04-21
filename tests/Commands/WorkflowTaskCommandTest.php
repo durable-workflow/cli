@@ -70,7 +70,7 @@ class WorkflowTaskCommandTest extends TestCase
         self::assertSame($payload, json_decode($tester->getDisplay(), true));
     }
 
-    public function test_complete_command_wraps_complete_result_in_json_codec_envelope(): void
+    public function test_complete_command_sends_complete_result_as_decoded_payload(): void
     {
         $client = new WorkflowTaskFakeClient([
             'task_id' => 'task-1',
@@ -95,8 +95,7 @@ class WorkflowTaskCommandTest extends TestCase
         self::assertSame('worker-1', $client->lastPostBody['lease_owner']);
         self::assertSame(1, $client->lastPostBody['workflow_task_attempt']);
         self::assertSame('complete_workflow', $client->lastPostBody['commands'][0]['type']);
-        self::assertSame('json', $client->lastPostBody['commands'][0]['result']['codec']);
-        self::assertSame('{"ok":true}', $client->lastPostBody['commands'][0]['result']['blob']);
+        self::assertSame(['ok' => true], $client->lastPostBody['commands'][0]['result']);
         self::assertStringContainsString('completed', $tester->getDisplay());
     }
 

@@ -41,7 +41,6 @@ HELP)
             ->addOption('cron', 'c', InputOption::VALUE_OPTIONAL, 'Cron expression')
             ->addOption('interval', null, InputOption::VALUE_OPTIONAL, 'Interval as ISO 8601 duration (e.g. PT30M, PT1H)')
             ->addOption('task-queue', null, InputOption::VALUE_OPTIONAL, 'Task queue')
-            ->addOption('input', 'i', InputOption::VALUE_OPTIONAL, 'Workflow input JSON')
             ->addOption('timezone', null, InputOption::VALUE_OPTIONAL, 'Timezone', 'UTC')
             ->addOption('execution-timeout', null, InputOption::VALUE_REQUIRED, 'Workflow execution timeout in seconds')
             ->addOption('run-timeout', null, InputOption::VALUE_REQUIRED, 'Workflow run timeout in seconds')
@@ -51,6 +50,7 @@ HELP)
             ->addOption('paused', null, InputOption::VALUE_NONE, 'Create in paused state')
             ->addOption('note', null, InputOption::VALUE_OPTIONAL, 'Note')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
+        $this->addInputOptions('Scheduled workflow input payload');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -74,7 +74,7 @@ HELP)
             'action' => array_filter([
                 'workflow_type' => $input->getOption('workflow-type'),
                 'task_queue' => $input->getOption('task-queue'),
-                'input' => $this->parseJsonOption($input->getOption('input'), 'input'),
+                'input' => $this->parseInputArgumentsOption($input),
                 'execution_timeout_seconds' => $input->getOption('execution-timeout') !== null ? (int) $input->getOption('execution-timeout') : null,
                 'run_timeout_seconds' => $input->getOption('run-timeout') !== null ? (int) $input->getOption('run-timeout') : null,
             ], fn ($v) => $v !== null),

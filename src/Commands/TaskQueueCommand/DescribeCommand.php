@@ -154,6 +154,17 @@ HELP)
             } elseif (array_key_exists('available_slot_count', $admission)) {
                 $parts[] = 'remaining='.$admission['available_slot_count'];
             }
+
+            $dispatchCount = $admission['server_dispatch_count_this_minute'] ?? null;
+            $dispatchLimit = $admission['server_max_dispatches_per_minute'] ?? null;
+
+            if ($dispatchCount !== null || $dispatchLimit !== null) {
+                $parts[] = sprintf('dispatches=%s/%s/min', $dispatchCount ?? '-', $dispatchLimit ?? '-');
+            }
+
+            if (array_key_exists('server_remaining_dispatch_capacity', $admission)) {
+                $parts[] = 'dispatch_remaining='.$admission['server_remaining_dispatch_capacity'];
+            }
         }
 
         $source = $admission['budget_source'] ?? null;

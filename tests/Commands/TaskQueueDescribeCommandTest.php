@@ -54,10 +54,12 @@ class TaskQueueDescribeCommandTest extends TestCase
                         'workflow_tasks' => [
                             'status' => 'accepting',
                             'server_remaining_active_lease_capacity' => 4,
+                            'server_remaining_dispatch_capacity' => 12,
                         ],
                         'activity_tasks' => [
                             'status' => 'throttled',
                             'server_remaining_active_lease_capacity' => 0,
+                            'server_remaining_dispatch_capacity' => 0,
                         ],
                         'query_tasks' => [
                             'status' => 'full',
@@ -77,8 +79,8 @@ class TaskQueueDescribeCommandTest extends TestCase
         self::assertStringContainsString('Workflow Admission', $display);
         self::assertStringContainsString('Activity Admission', $display);
         self::assertStringContainsString('Query Admission', $display);
-        self::assertStringContainsString('accepting (4 left)', $display);
-        self::assertStringContainsString('throttled (0 left)', $display);
+        self::assertStringContainsString('accepting (4 leases left, 12/min left)', $display);
+        self::assertStringContainsString('throttled (0 leases left, 0/min left)', $display);
         self::assertStringContainsString('full (0 left)', $display);
     }
 
@@ -111,6 +113,9 @@ class TaskQueueDescribeCommandTest extends TestCase
                     'server_active_lease_count' => 2,
                     'server_max_active_leases_per_queue' => 2,
                     'server_remaining_active_lease_capacity' => 0,
+                    'server_max_dispatches_per_minute' => 60,
+                    'server_dispatch_count_this_minute' => 60,
+                    'server_remaining_dispatch_capacity' => 0,
                     'budget_source' => 'worker_registration.max_concurrent_workflow_tasks',
                     'server_budget_source' => 'server.admission.workflow_tasks.max_active_leases_per_queue',
                 ],
@@ -119,6 +124,9 @@ class TaskQueueDescribeCommandTest extends TestCase
                     'server_active_lease_count' => 1,
                     'server_max_active_leases_per_queue' => 4,
                     'server_remaining_active_lease_capacity' => 3,
+                    'server_max_dispatches_per_minute' => 120,
+                    'server_dispatch_count_this_minute' => 12,
+                    'server_remaining_dispatch_capacity' => 108,
                     'budget_source' => 'worker_registration.max_concurrent_activity_tasks',
                     'server_budget_source' => 'server.admission.activity_tasks.max_active_leases_per_queue',
                 ],
@@ -175,8 +183,8 @@ class TaskQueueDescribeCommandTest extends TestCase
         self::assertStringContainsString('Workflow Expired Leases: 1', $display);
         self::assertStringContainsString('Pollers: active=1 stale=1', $display);
         self::assertStringContainsString('Admission:', $display);
-        self::assertStringContainsString('Workflow Tasks: status=throttled active=2/2 remaining=0 source=server.admission.workflow_tasks.max_active_leases_per_queue', $display);
-        self::assertStringContainsString('Activity Tasks: status=accepting active=1/4 remaining=3 source=server.admission.activity_tasks.max_active_leases_per_queue', $display);
+        self::assertStringContainsString('Workflow Tasks: status=throttled active=2/2 remaining=0 dispatches=60/60/min dispatch_remaining=0 source=server.admission.workflow_tasks.max_active_leases_per_queue', $display);
+        self::assertStringContainsString('Activity Tasks: status=accepting active=1/4 remaining=3 dispatches=12/120/min dispatch_remaining=108 source=server.admission.activity_tasks.max_active_leases_per_queue', $display);
         self::assertStringContainsString('Query Tasks: status=full pending=1/1 remaining=0 lock=yes source=server.query_tasks.max_pending_per_queue', $display);
         self::assertStringContainsString('Current Leases:', $display);
         self::assertStringContainsString('task-123', $display);

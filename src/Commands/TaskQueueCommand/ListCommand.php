@@ -76,13 +76,23 @@ HELP)
             return $remaining === null ? $status : sprintf('%s (%s left)', $status, $remaining);
         }
 
+        $details = [];
+
         $remaining = $admission[$kind]['server_remaining_active_lease_capacity']
             ?? $admission[$kind]['remaining_server_capacity']
             ?? null;
         if ($remaining === null) {
             $remaining = $admission[$kind]['available_slot_count'] ?? null;
         }
+        if ($remaining !== null) {
+            $details[] = sprintf('%s leases left', $remaining);
+        }
 
-        return $remaining === null ? $status : sprintf('%s (%s left)', $status, $remaining);
+        $dispatchRemaining = $admission[$kind]['server_remaining_dispatch_capacity'] ?? null;
+        if ($dispatchRemaining !== null) {
+            $details[] = sprintf('%s/min left', $dispatchRemaining);
+        }
+
+        return $details === [] ? $status : sprintf('%s (%s)', $status, implode(', ', $details));
     }
 }

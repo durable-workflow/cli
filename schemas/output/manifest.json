@@ -4,6 +4,11 @@
   "json_schema_draft": "https://json-schema.org/draft/2020-12/schema",
   "stability": "patch-stable-additive",
   "commands": {
+    "debug": {
+      "output": "--json",
+      "schema": "schemas/output/workflow-debug.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/workflow-debug.schema.json"
+    },
     "activity:complete": {
       "output": "--json",
       "schema": "schemas/output/activity-task-result.schema.json",

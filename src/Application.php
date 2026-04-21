@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DurableWorkflow\Cli;
 
 use DurableWorkflow\Cli\Commands\ActivityCommand;
+use DurableWorkflow\Cli\Commands\DebugCommand;
 use DurableWorkflow\Cli\Commands\DoctorCommand;
 use DurableWorkflow\Cli\Commands\EnvCommand;
 use DurableWorkflow\Cli\Commands\NamespaceCommand;
@@ -32,6 +33,7 @@ class Application extends ConsoleApplication
             new ServerCommand\InfoCommand(),
             new ServerCommand\StartDevCommand(),
             new DoctorCommand(),
+            new DebugCommand(),
 
             // Workflow operations
             new WorkflowCommand\StartCommand(),

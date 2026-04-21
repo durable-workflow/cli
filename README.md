@@ -147,6 +147,9 @@ rejected aliases, and removed fields advertised by the target server.
 Use `dw doctor` when you need the full resolved local/remote diagnostic state:
 CLI build identity, selected server/namespace/profile, redacted token source,
 TLS verification mode, `/api/cluster/info`, and any version-skew warning.
+Use `dw debug workflow <id>` when support needs a single stuck-run capture:
+execution state, pending workflow/activity tasks, task queue backlog and
+pollers, recent failures, and compatibility metadata.
 
 ## Shell Completion
 
@@ -226,6 +229,10 @@ dw workflow:list --type=order.process
 # Describe a workflow
 dw workflow:describe order-123
 dw workflow:describe order-123 --run-id=01HXYZ --json
+
+# Diagnose a stuck workflow in one command
+dw debug workflow order-123
+dw debug workflow order-123 --run-id=01HXYZ --output=json
 
 # Watch a long-running workflow and print state changes
 dw watch workflow order-123

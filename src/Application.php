@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DurableWorkflow\Cli;
 
 use DurableWorkflow\Cli\Commands\ActivityCommand;
+use DurableWorkflow\Cli\Commands\EnvCommand;
 use DurableWorkflow\Cli\Commands\NamespaceCommand;
 use DurableWorkflow\Cli\Commands\ScheduleCommand;
 use DurableWorkflow\Cli\Commands\SchemaCommand;
@@ -45,6 +46,13 @@ class Application extends ConsoleApplication
             new WorkflowCommand\ShowRunCommand(),
             new WorkflowCommand\HistoryCommand(),
             new WorkflowCommand\HistoryExportCommand(),
+
+            // Environment profiles (local config)
+            new EnvCommand\ListCommand(),
+            new EnvCommand\SetCommand(),
+            new EnvCommand\UseCommand(),
+            new EnvCommand\ShowCommand(),
+            new EnvCommand\DeleteCommand(),
 
             // Namespace management
             new NamespaceCommand\ListCommand(),

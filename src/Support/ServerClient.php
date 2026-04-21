@@ -26,6 +26,8 @@ class ServerClient
 
     private string $namespace;
 
+    private bool $tlsVerify;
+
     /**
      * @var array<string, mixed>|null
      */
@@ -43,11 +45,13 @@ class ServerClient
         ?string $baseUrl = null,
         ?string $token = null,
         ?string $namespace = null,
+        ?bool $tlsVerify = null,
         ?HttpClientInterface $http = null,
     )
     {
         $this->baseUrl = rtrim($baseUrl ?? $this->resolveBaseUrl(), '/');
         $this->namespace = $namespace ?? $this->resolveNamespace();
+        $this->tlsVerify = $tlsVerify ?? true;
 
         $headers = [
             'Accept' => 'application/json',
@@ -65,6 +69,8 @@ class ServerClient
         $this->http = $http ?? HttpClient::create([
             'base_uri' => $this->baseUrl,
             'headers' => $headers,
+            'verify_peer' => $this->tlsVerify,
+            'verify_host' => $this->tlsVerify,
         ]);
     }
 

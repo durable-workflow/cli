@@ -7,6 +7,9 @@ namespace DurableWorkflow\Cli\Commands;
 use DurableWorkflow\Cli\Support\ExitCode;
 use DurableWorkflow\Cli\Support\InvalidOptionException;
 use DurableWorkflow\Cli\Support\OutputMode;
+use DurableWorkflow\Cli\Support\ProfileResolver;
+use DurableWorkflow\Cli\Support\ProfileStore;
+use DurableWorkflow\Cli\Support\ResolvedConnection;
 use DurableWorkflow\Cli\Support\ServerClient;
 use DurableWorkflow\Cli\Support\ServerException;
 use DurableWorkflow\Cli\Support\ServerHttpException;
@@ -21,11 +24,31 @@ abstract class BaseCommand extends Command
 {
     private ?ServerClient $serverClient = null;
 
+    private ?ProfileStore $profileStore = null;
+
     protected function configure(): void
     {
         $this->addOption('server', 's', InputOption::VALUE_OPTIONAL, 'Server URL', null);
         $this->addOption('namespace', null, InputOption::VALUE_OPTIONAL, 'Target namespace', null);
         $this->addOption('token', null, InputOption::VALUE_OPTIONAL, 'Auth token', null);
+        $this->addOption(
+            'env',
+            null,
+            InputOption::VALUE_REQUIRED,
+            'Named dw environment to use (overrides $DW_ENV and any env set via `dw env:use`). Hard-fails when the profile does not exist.',
+            null,
+        );
+        $this->registerOutputOption();
+    }
+
+    /**
+     * Add the shared `--output` option. Kept as a separate helper so
+     * local-only commands (e.g. `dw env:*`, which never talk to the
+     * server) can opt in to the output contract without also picking
+     * up the server/namespace/token/env options.
+     */
+    protected function registerOutputOption(): void
+    {
         $this->addOption(
             'output',
             null,
@@ -67,16 +90,60 @@ abstract class BaseCommand extends Command
             return $this->serverClient;
         }
 
+        $resolved = $this->resolvedConnection($input);
+
         return new ServerClient(
-            baseUrl: $input->getOption('server'),
-            token: $input->getOption('token'),
-            namespace: $input->getOption('namespace'),
+            baseUrl: $resolved->server,
+            token: $resolved->token,
+            namespace: $resolved->namespace,
+            tlsVerify: $resolved->tlsVerify,
         );
     }
 
     public function setServerClient(ServerClient $serverClient): void
     {
         $this->serverClient = $serverClient;
+    }
+
+    public function setProfileStore(ProfileStore $store): void
+    {
+        $this->profileStore = $store;
+    }
+
+    protected function profileStore(): ProfileStore
+    {
+        if ($this->profileStore instanceof ProfileStore) {
+            return $this->profileStore;
+        }
+
+        $this->profileStore = new ProfileStore();
+
+        return $this->profileStore;
+    }
+
+    private function resolvedConnection(InputInterface $input): ResolvedConnection
+    {
+        return (new ProfileResolver($this->profileStore()))->resolve(
+            flagEnv: $this->optionValue($input, 'env'),
+            flagServer: $this->optionValue($input, 'server'),
+            flagNamespace: $this->optionValue($input, 'namespace'),
+            flagToken: $this->optionValue($input, 'token'),
+        );
+    }
+
+    private function optionValue(InputInterface $input, string $name): ?string
+    {
+        if (! $input->hasOption($name)) {
+            return null;
+        }
+
+        $value = $input->getOption($name);
+
+        if (! is_string($value) || $value === '') {
+            return null;
+        }
+
+        return $value;
     }
 
     protected function validateControlPlaneOption(
@@ -272,12 +339,36 @@ abstract class BaseCommand extends Command
             return OutputMode::TABLE;
         }
 
+        if ($input->hasOption('json') && $input->getOption('json') === true) {
+            return OutputMode::JSON;
+        }
+
         $mode = $input->getOption('output');
+
+        if ($this->optionWasProvided($input, 'output')) {
+            if ($mode === null || $mode === '') {
+                return OutputMode::TABLE;
+            }
+
+            return (string) $mode;
+        }
+
+        if ($input->hasOption('env')) {
+            $profileOutput = $this->resolvedConnection($input)->profile?->output;
+            if ($profileOutput !== null && $profileOutput !== '') {
+                return $profileOutput;
+            }
+        }
 
         if ($mode === null || $mode === '') {
             return OutputMode::TABLE;
         }
 
         return (string) $mode;
+    }
+
+    private function optionWasProvided(InputInterface $input, string $name): bool
+    {
+        return $input->hasParameterOption('--'.$name, true);
     }
 }

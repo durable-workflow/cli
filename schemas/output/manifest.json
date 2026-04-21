@@ -14,6 +14,31 @@
       "schema": "schemas/output/activity-task-result.schema.json",
       "schema_id": "https://durable-workflow.com/schemas/cli/output/activity-task-result.schema.json"
     },
+    "env:delete": {
+      "output": "--json",
+      "schema": "schemas/output/env-delete.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/env-delete.schema.json"
+    },
+    "env:list": {
+      "output": "--json",
+      "schema": "schemas/output/env-list.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/env-list.schema.json"
+    },
+    "env:set": {
+      "output": "--json",
+      "schema": "schemas/output/env-profile.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/env-profile.schema.json"
+    },
+    "env:show": {
+      "output": "--json",
+      "schema": "schemas/output/env-profile.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/env-profile.schema.json"
+    },
+    "env:use": {
+      "output": "--json",
+      "schema": "schemas/output/env-profile.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/env-profile.schema.json"
+    },
     "namespace:create": {
       "output": "--json",
       "schema": "schemas/output/namespace.schema.json",

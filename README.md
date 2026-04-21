@@ -81,7 +81,36 @@ schedule, and terminates a second cleanup workflow.
 
 ## Configuration
 
-Set the server URL and auth token via environment variables:
+For day-to-day work, create named environment profiles. Profiles keep the
+server URL, namespace, token source, TLS verification mode, and default output
+format together so commands do not drift between shell aliases:
+
+```bash
+dw env:set dev --server=http://localhost:8080 --namespace=default --make-default
+dw env:set prod --server=https://api.example.com --namespace=orders --token-env=PROD_DW_TOKEN --profile-output=json
+dw env:list
+dw env:show prod
+```
+
+Profiles are stored in `~/.config/dw/config.json` by default, or
+`$XDG_CONFIG_HOME/dw/config.json` when `XDG_CONFIG_HOME` is set. Set
+`DW_CONFIG_HOME` to point `dw` at a separate config directory.
+
+Profile selection is explicit and typo-safe:
+
+```bash
+dw env:use dev
+DW_ENV=prod dw workflow:list
+dw --env=prod workflow:list
+```
+
+Unknown names passed through `--env`, `DW_ENV`, or `dw env:use` fail instead
+of falling back to another target. Literal token values are redacted by
+`env:list` and `env:show` unless `--show-token` is passed; prefer
+`--token-env=NAME` so secrets stay out of the config file.
+
+For one-off automation, set the server URL and auth token via environment
+variables:
 
 ```bash
 export DURABLE_WORKFLOW_SERVER_URL=http://localhost:8080
@@ -314,6 +343,7 @@ dw system:activity-timeout-pass --execution-id=EXEC_ID_1 --execution-id=EXEC_ID_
 | Option | Description |
 |--------|-------------|
 | `--server`, `-s` | Server URL (default: `$DURABLE_WORKFLOW_SERVER_URL` or `http://localhost:8080`) |
+| `--env` | Named profile to use (overrides `$DW_ENV` and `dw env:use`; hard-fails if missing) |
 | `--namespace` | Target namespace (default: `$DURABLE_WORKFLOW_NAMESPACE` or `default`) |
 | `--token` | Auth token (default: `$DURABLE_WORKFLOW_AUTH_TOKEN`) |
 

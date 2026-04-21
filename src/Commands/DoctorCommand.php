@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DurableWorkflow\Cli\Commands;
 
 use DurableWorkflow\Cli\BuildInfo;
+use DurableWorkflow\Cli\Support\CompatibilityDiagnostics;
 use DurableWorkflow\Cli\Support\ExitCode;
 use DurableWorkflow\Cli\Support\OutputMode;
 use DurableWorkflow\Cli\Support\Profile;
@@ -70,10 +71,7 @@ HELP);
                 'cluster_info' => $clusterInfo,
             ];
 
-            $warning = $this->versionSkewWarning(BuildInfo::version(), $diagnostic['server']['version']);
-            if ($warning !== null) {
-                $diagnostic['warnings'][] = $warning;
-            }
+            $diagnostic['warnings'] = CompatibilityDiagnostics::warnings($clusterInfo, BuildInfo::version());
         } catch (ServerException $exception) {
             $diagnostic['server']['error'] = $exception->getMessage();
             $exitCode = $exception->exitCode();
@@ -280,42 +278,6 @@ HELP);
                 $output->writeln('  '.$warning);
             }
         }
-    }
-
-    private function versionSkewWarning(string $cliVersion, ?string $serverVersion): ?string
-    {
-        if ($serverVersion === null || $serverVersion === '') {
-            return null;
-        }
-
-        $client = $this->majorMinor($cliVersion);
-        $server = $this->majorMinor($serverVersion);
-
-        if ($client === null || $server === null) {
-            return null;
-        }
-
-        if ($client[0] !== $server[0] || abs($client[1] - $server[1]) > 1) {
-            return sprintf(
-                'Version skew: dw %s is connected to server %s; upgrade one side if commands behave unexpectedly.',
-                $cliVersion,
-                $serverVersion,
-            );
-        }
-
-        return null;
-    }
-
-    /**
-     * @return array{0: int, 1: int}|null
-     */
-    private function majorMinor(string $version): ?array
-    {
-        if (preg_match('/^v?(\\d+)\\.(\\d+)/', trim($version), $matches) !== 1) {
-            return null;
-        }
-
-        return [(int) $matches[1], (int) $matches[2]];
     }
 
     private function scalarString(mixed $value): ?string

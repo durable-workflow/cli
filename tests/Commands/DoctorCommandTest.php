@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Commands;
 
 use DurableWorkflow\Cli\Commands\DoctorCommand;
+use DurableWorkflow\Cli\Support\ControlPlaneRequestContract;
 use DurableWorkflow\Cli\Support\ExitCode;
 use DurableWorkflow\Cli\Support\NetworkException;
 use DurableWorkflow\Cli\Support\Profile;
@@ -21,10 +22,12 @@ class DoctorCommandTest extends TestCase
     protected function setUp(): void
     {
         $this->tmpConfig = sys_get_temp_dir().'/dw-cli-doctor-'.bin2hex(random_bytes(8)).'/config.json';
+        putenv('DW_CLI_VERSION=0.1.5');
     }
 
     protected function tearDown(): void
     {
+        putenv('DW_CLI_VERSION');
         putenv('DOCTOR_DW_TOKEN');
         unset($_ENV['DOCTOR_DW_TOKEN']);
 
@@ -45,8 +48,9 @@ class DoctorCommandTest extends TestCase
                 'version' => '2',
                 'header' => 'X-Durable-Workflow-Control-Plane-Version',
                 'request_contract' => [
-                    'schema' => 'durable-workflow.v2.control-plane-request.contract',
-                    'version' => 1,
+                    'schema' => ControlPlaneRequestContract::SCHEMA,
+                    'version' => ControlPlaneRequestContract::VERSION,
+                    'operations' => [],
                 ],
             ],
             'worker_protocol' => [
@@ -78,6 +82,85 @@ class DoctorCommandTest extends TestCase
         self::assertSame('2', $decoded['server']['control_plane']['version']);
         self::assertSame('1.0', $decoded['server']['worker_protocol']['version']);
         self::assertSame('server-1', $decoded['server']['cluster_info']['server_id']);
+        self::assertSame([], $decoded['warnings']);
+    }
+
+    public function test_doctor_does_not_warn_on_compatible_protocols_when_server_app_version_differs(): void
+    {
+        $command = new DoctorCommand();
+        $command->setServerClient(new DoctorFakeClient([
+            'server_id' => 'server-1',
+            'version' => '9.8.7',
+            'control_plane' => [
+                'version' => '2',
+                'request_contract' => [
+                    'schema' => ControlPlaneRequestContract::SCHEMA,
+                    'version' => ControlPlaneRequestContract::VERSION,
+                    'operations' => [],
+                ],
+            ],
+            'worker_protocol' => [
+                'version' => '1.0',
+            ],
+            'client_compatibility' => [
+                'authority' => 'protocol_manifests',
+                'top_level_version_role' => 'informational',
+                'clients' => [
+                    'cli' => [
+                        'supported_versions' => '0.1.x',
+                    ],
+                ],
+            ],
+        ]));
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            '--output' => 'json',
+        ]));
+
+        $decoded = json_decode(trim($tester->getDisplay()), true, 512, JSON_THROW_ON_ERROR);
+
+        self::assertSame('9.8.7', $decoded['server']['version']);
+        self::assertSame([], $decoded['warnings']);
+    }
+
+    public function test_doctor_warns_from_client_compatibility_metadata(): void
+    {
+        $command = new DoctorCommand();
+        $command->setServerClient(new DoctorFakeClient([
+            'version' => '0.1.0',
+            'control_plane' => [
+                'version' => '2',
+                'request_contract' => [
+                    'schema' => ControlPlaneRequestContract::SCHEMA,
+                    'version' => ControlPlaneRequestContract::VERSION,
+                    'operations' => [],
+                ],
+            ],
+            'worker_protocol' => [
+                'version' => '1.0',
+            ],
+            'client_compatibility' => [
+                'authority' => 'protocol_manifests',
+                'clients' => [
+                    'cli' => [
+                        'supported_versions' => '0.2.x',
+                    ],
+                ],
+            ],
+        ]));
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            '--output' => 'json',
+        ]));
+
+        $decoded = json_decode(trim($tester->getDisplay()), true, 512, JSON_THROW_ON_ERROR);
+
+        self::assertCount(1, $decoded['warnings']);
+        self::assertStringContainsString('server-advertised cli supported_versions [0.2.x]', $decoded['warnings'][0]);
     }
 
     public function test_doctor_reports_profile_token_source_and_tls_state(): void

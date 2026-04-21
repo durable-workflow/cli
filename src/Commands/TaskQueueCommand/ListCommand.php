@@ -88,9 +88,19 @@ HELP)
             $details[] = sprintf('%s leases left', $remaining);
         }
 
+        $namespaceRemaining = $admission[$kind]['server_remaining_namespace_active_lease_capacity'] ?? null;
+        if ($namespaceRemaining !== null) {
+            $details[] = sprintf('%s namespace leases left', $namespaceRemaining);
+        }
+
         $dispatchRemaining = $admission[$kind]['server_remaining_dispatch_capacity'] ?? null;
         if ($dispatchRemaining !== null) {
             $details[] = sprintf('%s/min left', $dispatchRemaining);
+        }
+
+        $namespaceDispatchRemaining = $admission[$kind]['server_remaining_namespace_dispatch_capacity'] ?? null;
+        if ($namespaceDispatchRemaining !== null) {
+            $details[] = sprintf('%s namespace/min left', $namespaceDispatchRemaining);
         }
 
         return $details === [] ? $status : sprintf('%s (%s)', $status, implode(', ', $details));

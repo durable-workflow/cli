@@ -147,12 +147,23 @@ HELP)
                 $parts[] = sprintf('active=%s/%s', $active ?? '-', $limit ?? '-');
             }
 
-            if (array_key_exists('server_remaining_active_lease_capacity', $admission)) {
+            if (($admission['server_remaining_active_lease_capacity'] ?? null) !== null) {
                 $parts[] = 'remaining='.$admission['server_remaining_active_lease_capacity'];
-            } elseif (array_key_exists('remaining_server_capacity', $admission)) {
+            } elseif (($admission['remaining_server_capacity'] ?? null) !== null) {
                 $parts[] = 'remaining='.$admission['remaining_server_capacity'];
-            } elseif (array_key_exists('available_slot_count', $admission)) {
+            } elseif (($admission['available_slot_count'] ?? null) !== null) {
                 $parts[] = 'remaining='.$admission['available_slot_count'];
+            }
+
+            $namespaceActive = $admission['server_namespace_active_lease_count'] ?? null;
+            $namespaceLimit = $admission['server_max_active_leases_per_namespace'] ?? null;
+
+            if ($namespaceActive !== null || $namespaceLimit !== null) {
+                $parts[] = sprintf('namespace_active=%s/%s', $namespaceActive ?? '-', $namespaceLimit ?? '-');
+            }
+
+            if (($admission['server_remaining_namespace_active_lease_capacity'] ?? null) !== null) {
+                $parts[] = 'namespace_remaining='.$admission['server_remaining_namespace_active_lease_capacity'];
             }
 
             $dispatchCount = $admission['server_dispatch_count_this_minute'] ?? null;
@@ -162,13 +173,29 @@ HELP)
                 $parts[] = sprintf('dispatches=%s/%s/min', $dispatchCount ?? '-', $dispatchLimit ?? '-');
             }
 
-            if (array_key_exists('server_remaining_dispatch_capacity', $admission)) {
+            if (($admission['server_remaining_dispatch_capacity'] ?? null) !== null) {
                 $parts[] = 'dispatch_remaining='.$admission['server_remaining_dispatch_capacity'];
+            }
+
+            $namespaceDispatchCount = $admission['server_namespace_dispatch_count_this_minute'] ?? null;
+            $namespaceDispatchLimit = $admission['server_max_dispatches_per_minute_per_namespace'] ?? null;
+
+            if ($namespaceDispatchCount !== null || $namespaceDispatchLimit !== null) {
+                $parts[] = sprintf('namespace_dispatches=%s/%s/min', $namespaceDispatchCount ?? '-', $namespaceDispatchLimit ?? '-');
+            }
+
+            if (($admission['server_remaining_namespace_dispatch_capacity'] ?? null) !== null) {
+                $parts[] = 'namespace_dispatch_remaining='.$admission['server_remaining_namespace_dispatch_capacity'];
             }
         }
 
         $source = $admission['budget_source'] ?? null;
-        if (! $queryTasks && ($admission['server_max_active_leases_per_queue'] ?? $admission['server_limit'] ?? null) !== null) {
+        if (! $queryTasks && (
+            ($admission['server_max_active_leases_per_queue'] ?? $admission['server_limit'] ?? null) !== null
+            || ($admission['server_max_active_leases_per_namespace'] ?? null) !== null
+            || ($admission['server_max_dispatches_per_minute'] ?? null) !== null
+            || ($admission['server_max_dispatches_per_minute_per_namespace'] ?? null) !== null
+        )) {
             $source = $admission['server_budget_source'] ?? $source;
         }
 

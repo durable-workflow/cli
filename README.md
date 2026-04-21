@@ -352,7 +352,7 @@ dw schedule:delete daily-report
 # List task queues with admission status
 dw task-queue:list
 
-# Describe a task queue (pollers, backlog, active-lease and dispatch-rate budgets)
+# Describe a task queue (pollers, backlog, queue and namespace admission budgets)
 dw task-queue:describe default
 ```
 

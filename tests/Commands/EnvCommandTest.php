@@ -167,6 +167,44 @@ class EnvCommandTest extends TestCase
         self::assertFalse($byName['dev']['current']);
     }
 
+    public function test_list_jsonl_streams_one_profile_per_line(): void
+    {
+        $this->store()->put(new Profile(name: 'dev', server: 'http://localhost:8080'));
+        $this->store()->put(new Profile(name: 'prod', server: 'https://api.example.com', namespace: 'orders'));
+        $this->store()->setCurrent('prod');
+
+        $command = new ListCommand();
+        $tester = $this->bind($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute(['--output' => 'jsonl']));
+
+        $lines = array_values(array_filter(
+            explode("\n", $tester->getDisplay()),
+            static fn (string $line): bool => $line !== '',
+        ));
+
+        self::assertCount(2, $lines);
+
+        $decoded = array_map(
+            static fn (string $line): array => json_decode($line, true, 512, JSON_THROW_ON_ERROR),
+            $lines,
+        );
+
+        self::assertSame(['dev', 'prod'], array_column($decoded, 'name'));
+        self::assertSame([false, true], array_column($decoded, 'current'));
+        self::assertArrayNotHasKey('envs', $decoded[0]);
+        self::assertArrayNotHasKey('current_env', $decoded[0]);
+    }
+
+    public function test_list_jsonl_empty_store_outputs_empty_stream(): void
+    {
+        $command = new ListCommand();
+        $tester = $this->bind($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute(['--output' => 'jsonl']));
+        self::assertSame('', trim($tester->getDisplay()));
+    }
+
     public function test_list_redacts_literal_token_by_default(): void
     {
         $this->store()->put(new Profile(

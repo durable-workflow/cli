@@ -32,6 +32,7 @@ Literal token values are redacted in the default output; pass
 
   <info>dw env:list</info>
   <info>dw env:list --output=json | jq '.envs[].name'</info>
+  <info>dw env:list --output=jsonl | jq '.name'</info>
   <info>dw env:list --show-token</info>
 HELP)
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output as JSON (alias for --output=json)')
@@ -59,7 +60,7 @@ HELP)
         ];
 
         if ($this->wantsJson($input)) {
-            return $this->renderJson($output, $envelope);
+            return $this->renderJsonList($output, $input, $envelope, 'envs');
         }
 
         if ($envelope['envs'] === []) {

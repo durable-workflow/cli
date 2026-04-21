@@ -123,7 +123,7 @@ abstract class BaseCommand extends Command
         return $this->profileStore;
     }
 
-    private function resolvedConnection(InputInterface $input): ResolvedConnection
+    protected function resolvedConnection(InputInterface $input): ResolvedConnection
     {
         return (new ProfileResolver($this->profileStore()))->resolve(
             flagEnv: $this->optionValue($input, 'env'),

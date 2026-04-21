@@ -144,6 +144,9 @@ sending the command. Supported servers publish schema
 schema/version metadata as a compatibility error instead of silently guessing.
 Use `dw server:info` to inspect the current canonical values,
 rejected aliases, and removed fields advertised by the target server.
+Use `dw doctor` when you need the full resolved local/remote diagnostic state:
+CLI build identity, selected server/namespace/profile, redacted token source,
+TLS verification mode, `/api/cluster/info`, and any version-skew warning.
 
 ## Shell Completion
 
@@ -195,6 +198,10 @@ dw server:health
 
 # Show server version and capabilities
 dw server:info
+
+# Diagnose the resolved connection and compatibility state
+dw doctor
+dw doctor --env=prod --output=json
 
 # Start a local development server
 dw server:start-dev

@@ -140,6 +140,8 @@ class OutputContractTest extends TestCase
         self::assertSame('Not found', $envelope['error']);
         self::assertSame(ExitCode::NOT_FOUND, $envelope['exit_code']);
         self::assertSame(404, $envelope['status_code']);
+        self::assertSame('resource.not_found', $envelope['recommendations'][0]['id'] ?? null);
+        self::assertSame('dw throwing:test --help', $envelope['recommendations'][0]['command'] ?? null);
     }
 
     public function test_error_envelope_on_legacy_json_flag(): void
@@ -147,7 +149,7 @@ class OutputContractTest extends TestCase
         $command = new ThrowingOutputCommand(new NetworkException('Connection refused'), enableJsonFlag: true);
         $tester = new CommandTester($command);
 
-        $exit = $tester->execute(['--json' => true]);
+        $exit = $tester->execute(['--json' => true, '--server' => 'http://unreachable:9999']);
 
         self::assertSame(ExitCode::NETWORK, $exit);
 
@@ -158,6 +160,11 @@ class OutputContractTest extends TestCase
         self::assertSame('Connection refused', $envelope['error']);
         self::assertSame(ExitCode::NETWORK, $envelope['exit_code']);
         self::assertArrayNotHasKey('status_code', $envelope, 'network errors have no HTTP status to surface');
+        self::assertSame('server.unreachable', $envelope['recommendations'][0]['id'] ?? null);
+        self::assertSame(
+            'dw doctor --server=http://unreachable:9999 --output=json',
+            $envelope['recommendations'][0]['command'] ?? null,
+        );
     }
 
     public function test_human_error_routes_to_stderr_in_table_mode(): void

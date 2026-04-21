@@ -49,6 +49,8 @@ class ExitCodePolicyTest extends TestCase
 
         self::assertSame(ExitCode::NETWORK, $tester->execute([]));
         self::assertStringContainsString('Connection refused', $tester->getDisplay());
+        self::assertStringContainsString('Next steps:', $tester->getDisplay());
+        self::assertStringContainsString('dw doctor --output=json', $tester->getDisplay());
     }
 
     public function test_base_command_translates_timeout_exception_to_timeout_exit_code(): void
@@ -67,6 +69,7 @@ class ExitCodePolicyTest extends TestCase
 
         self::assertSame(ExitCode::AUTH, $tester->execute([]));
         self::assertStringContainsString('Unauthorized', $tester->getDisplay());
+        self::assertStringContainsString('Check the selected environment, auth token source, and namespace permissions.', $tester->getDisplay());
     }
 
     public function test_base_command_translates_not_found_http_status_to_not_found_exit_code(): void
@@ -75,6 +78,7 @@ class ExitCodePolicyTest extends TestCase
         $tester = new CommandTester($command);
 
         self::assertSame(ExitCode::NOT_FOUND, $tester->execute([]));
+        self::assertStringContainsString('dw throwing --help', $tester->getDisplay());
     }
 
     public function test_base_command_translates_server_http_status_to_server_exit_code(): void
@@ -83,6 +87,7 @@ class ExitCodePolicyTest extends TestCase
         $tester = new CommandTester($command);
 
         self::assertSame(ExitCode::SERVER, $tester->execute([]));
+        self::assertStringContainsString('dw server:health --output=json', $tester->getDisplay());
     }
 
     public function test_base_command_translates_validation_http_status_to_invalid_exit_code(): void
@@ -91,6 +96,7 @@ class ExitCodePolicyTest extends TestCase
         $tester = new CommandTester($command);
 
         self::assertSame(ExitCode::INVALID, $tester->execute([]));
+        self::assertStringContainsString('Inspect the request options', $tester->getDisplay());
     }
 
     public function test_base_command_translates_unexpected_throwable_to_failure_exit_code(): void

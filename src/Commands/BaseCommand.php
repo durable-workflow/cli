@@ -8,6 +8,7 @@ use DurableWorkflow\Cli\BuildInfo;
 use DurableWorkflow\Cli\Support\CompatibilityDiagnostics;
 use DurableWorkflow\Cli\Support\ExitCode;
 use DurableWorkflow\Cli\Support\InvalidOptionException;
+use DurableWorkflow\Cli\Support\NetworkException;
 use DurableWorkflow\Cli\Support\OutputMode;
 use DurableWorkflow\Cli\Support\ProfileResolver;
 use DurableWorkflow\Cli\Support\ProfileStore;
@@ -15,6 +16,7 @@ use DurableWorkflow\Cli\Support\ResolvedConnection;
 use DurableWorkflow\Cli\Support\ServerClient;
 use DurableWorkflow\Cli\Support\ServerException;
 use DurableWorkflow\Cli\Support\ServerHttpException;
+use DurableWorkflow\Cli\Support\TimeoutException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Exception\ExceptionInterface as ConsoleException;
 use Symfony\Component\Console\Input\InputInterface;
@@ -504,17 +506,22 @@ abstract class BaseCommand extends Command
         }
 
         if ($jsonRequested) {
-            $output->writeln($this->encodeErrorEnvelope($e, $exitCode));
+            $output->writeln($this->encodeErrorEnvelope($e, $exitCode, $input));
 
             return $exitCode;
         }
 
         $this->writeHumanError($output, $e->getMessage());
 
+        $recommendations = $this->errorRecommendations($e, $input);
+        if ($recommendations !== []) {
+            $this->writeHumanNextSteps($output, $recommendations);
+        }
+
         return $exitCode;
     }
 
-    private function encodeErrorEnvelope(\Throwable $e, int $exitCode): string
+    private function encodeErrorEnvelope(\Throwable $e, int $exitCode, InputInterface $input): string
     {
         $envelope = [
             'error' => $e->getMessage(),
@@ -523,6 +530,11 @@ abstract class BaseCommand extends Command
 
         if ($e instanceof ServerHttpException) {
             $envelope['status_code'] = $e->statusCode;
+        }
+
+        $recommendations = $this->errorRecommendations($e, $input);
+        if ($recommendations !== []) {
+            $envelope['recommendations'] = $recommendations;
         }
 
         return json_encode($envelope, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
@@ -534,10 +546,131 @@ abstract class BaseCommand extends Command
         $target->writeln('<error>'.$message.'</error>');
     }
 
+    /**
+     * @param  list<array{id: string, severity: string, message: string, command?: string}>  $recommendations
+     */
+    private function writeHumanNextSteps(OutputInterface $output, array $recommendations): void
+    {
+        $target = $output instanceof ConsoleOutputInterface ? $output->getErrorOutput() : $output;
+        $target->writeln('Next steps:');
+
+        foreach ($recommendations as $recommendation) {
+            $target->writeln('  - '.$recommendation['message']);
+
+            if (isset($recommendation['command'])) {
+                $target->writeln('    Try: '.$recommendation['command']);
+            }
+        }
+    }
+
     private function writeHumanWarning(OutputInterface $output, string $message): void
     {
         $target = $output instanceof ConsoleOutputInterface ? $output->getErrorOutput() : $output;
         $target->writeln('<comment>'.$message.'</comment>');
+    }
+
+    /**
+     * @return list<array{id: string, severity: string, message: string, command?: string}>
+     */
+    private function errorRecommendations(\Throwable $e, ?InputInterface $input): array
+    {
+        if ($e instanceof NetworkException) {
+            return [[
+                'id' => 'server.unreachable',
+                'severity' => 'error',
+                'message' => 'Check the server URL, DNS, port, and TLS settings for the selected environment.',
+                'command' => $this->doctorCommand($input),
+            ]];
+        }
+
+        if ($e instanceof TimeoutException) {
+            return [[
+                'id' => 'server.timeout',
+                'severity' => 'error',
+                'message' => 'Check server load and network reachability, then retry with a smaller request or narrower query.',
+                'command' => $this->doctorCommand($input),
+            ]];
+        }
+
+        if ($e instanceof ServerHttpException) {
+            return $this->httpErrorRecommendations($e, $input);
+        }
+
+        if ($e instanceof InvalidOptionException) {
+            return [[
+                'id' => 'input.invalid',
+                'severity' => 'error',
+                'message' => 'Review the command usage and option values before retrying.',
+                'command' => sprintf('dw %s --help', (string) $this->getName()),
+            ]];
+        }
+
+        return [];
+    }
+
+    /**
+     * @return list<array{id: string, severity: string, message: string, command?: string}>
+     */
+    private function httpErrorRecommendations(ServerHttpException $e, ?InputInterface $input): array
+    {
+        if ($e->statusCode === 401 || $e->statusCode === 403) {
+            return [[
+                'id' => 'auth.failed',
+                'severity' => 'error',
+                'message' => 'Check the selected environment, auth token source, and namespace permissions.',
+                'command' => $this->doctorCommand($input),
+            ]];
+        }
+
+        if ($e->statusCode === 404) {
+            return [[
+                'id' => 'resource.not_found',
+                'severity' => 'error',
+                'message' => 'Check the namespace, workflow/run identifiers, and selected environment.',
+                'command' => sprintf('dw %s --help', (string) $this->getName()),
+            ]];
+        }
+
+        if ($e->statusCode >= 400 && $e->statusCode <= 499) {
+            return [[
+                'id' => 'request.invalid',
+                'severity' => 'error',
+                'message' => 'Inspect the request options and retry in JSON mode if support needs the exact error envelope.',
+                'command' => sprintf('dw %s --output=json', (string) $this->getName()),
+            ]];
+        }
+
+        if ($e->statusCode >= 500 && $e->statusCode <= 599) {
+            return [[
+                'id' => 'server.error',
+                'severity' => 'error',
+                'message' => 'Check server health and logs before retrying the command.',
+                'command' => 'dw server:health --output=json',
+            ]];
+        }
+
+        return [];
+    }
+
+    private function doctorCommand(?InputInterface $input): string
+    {
+        $server = $input instanceof InputInterface && $input->hasOption('server')
+            ? $input->getOption('server')
+            : null;
+
+        if (is_string($server) && $server !== '') {
+            return 'dw doctor --server='.$server.' --output=json';
+        }
+
+        $env = $input instanceof InputInterface && $input->hasOption('env')
+            ? $input->getOption('env')
+            : null;
+
+        if (is_string($env) && $env !== '') {
+            return 'dw doctor --env='.$env.' --output=json';
+        }
+
+        return 'dw doctor --output=json';
     }
 
     private function resolveOutputMode(InputInterface $input): string

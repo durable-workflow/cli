@@ -103,6 +103,19 @@ HELP)
             $details[] = sprintf('%s namespace/min left', $namespaceDispatchRemaining);
         }
 
+        $budgetGroup = $admission[$kind]['server_dispatch_budget_group'] ?? null;
+        $budgetGroupRemaining = $admission[$kind]['server_remaining_budget_group_dispatch_capacity'] ?? null;
+        if ($budgetGroup !== null && $budgetGroup !== '') {
+            $groupDetail = sprintf('group %s', $budgetGroup);
+            if ($budgetGroupRemaining !== null) {
+                $groupDetail .= sprintf(' %s/min left', $budgetGroupRemaining);
+            }
+
+            $details[] = $groupDetail;
+        } elseif ($budgetGroupRemaining !== null) {
+            $details[] = sprintf('%s group/min left', $budgetGroupRemaining);
+        }
+
         return $details === [] ? $status : sprintf('%s (%s)', $status, implode(', ', $details));
     }
 }

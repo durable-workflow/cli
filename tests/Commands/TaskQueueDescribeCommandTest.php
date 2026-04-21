@@ -57,6 +57,8 @@ class TaskQueueDescribeCommandTest extends TestCase
                             'server_remaining_namespace_active_lease_capacity' => 20,
                             'server_remaining_dispatch_capacity' => 12,
                             'server_remaining_namespace_dispatch_capacity' => 80,
+                            'server_dispatch_budget_group' => 'downstream-openai',
+                            'server_remaining_budget_group_dispatch_capacity' => 5,
                         ],
                         'activity_tasks' => [
                             'status' => 'throttled',
@@ -64,6 +66,8 @@ class TaskQueueDescribeCommandTest extends TestCase
                             'server_remaining_namespace_active_lease_capacity' => 0,
                             'server_remaining_dispatch_capacity' => 0,
                             'server_remaining_namespace_dispatch_capacity' => 0,
+                            'server_dispatch_budget_group' => 'downstream-db',
+                            'server_remaining_budget_group_dispatch_capacity' => 0,
                         ],
                         'query_tasks' => [
                             'status' => 'full',
@@ -83,8 +87,8 @@ class TaskQueueDescribeCommandTest extends TestCase
         self::assertStringContainsString('Workflow Admission', $display);
         self::assertStringContainsString('Activity Admission', $display);
         self::assertStringContainsString('Query Admission', $display);
-        self::assertStringContainsString('accepting (4 leases left, 20 namespace leases left, 12/min left, 80 namespace/min left)', $display);
-        self::assertStringContainsString('throttled (0 leases left, 0 namespace leases left, 0/min left, 0 namespace/min left)', $display);
+        self::assertStringContainsString('accepting (4 leases left, 20 namespace leases left, 12/min left, 80 namespace/min left, group downstream-openai 5/min left)', $display);
+        self::assertStringContainsString('throttled (0 leases left, 0 namespace leases left, 0/min left, 0 namespace/min left, group downstream-db 0/min left)', $display);
         self::assertStringContainsString('full (0 left)', $display);
     }
 
@@ -126,8 +130,12 @@ class TaskQueueDescribeCommandTest extends TestCase
                     'server_max_dispatches_per_minute_per_namespace' => 200,
                     'server_namespace_dispatch_count_this_minute' => 160,
                     'server_remaining_namespace_dispatch_capacity' => 40,
+                    'server_dispatch_budget_group' => 'downstream-openai',
+                    'server_max_dispatches_per_minute_per_budget_group' => 60,
+                    'server_budget_group_dispatch_count_this_minute' => 60,
+                    'server_remaining_budget_group_dispatch_capacity' => 0,
                     'budget_source' => 'worker_registration.max_concurrent_workflow_tasks',
-                    'server_budget_source' => 'server.admission.workflow_tasks.max_active_leases_per_queue',
+                    'server_budget_source' => 'server.admission.workflow_tasks.max_dispatches_per_minute_per_budget_group',
                 ],
                 'activity_tasks' => [
                     'status' => 'accepting',
@@ -143,6 +151,10 @@ class TaskQueueDescribeCommandTest extends TestCase
                     'server_max_dispatches_per_minute_per_namespace' => 500,
                     'server_namespace_dispatch_count_this_minute' => 40,
                     'server_remaining_namespace_dispatch_capacity' => 460,
+                    'server_dispatch_budget_group' => 'downstream-stripe',
+                    'server_max_dispatches_per_minute_per_budget_group' => 300,
+                    'server_budget_group_dispatch_count_this_minute' => 25,
+                    'server_remaining_budget_group_dispatch_capacity' => 275,
                     'budget_source' => 'worker_registration.max_concurrent_activity_tasks',
                     'server_budget_source' => 'server.admission.activity_tasks.max_active_leases_per_queue',
                 ],
@@ -199,8 +211,8 @@ class TaskQueueDescribeCommandTest extends TestCase
         self::assertStringContainsString('Workflow Expired Leases: 1', $display);
         self::assertStringContainsString('Pollers: active=1 stale=1', $display);
         self::assertStringContainsString('Admission:', $display);
-        self::assertStringContainsString('Workflow Tasks: status=throttled active=2/2 remaining=0 namespace_active=7/10 namespace_remaining=3 dispatches=60/60/min dispatch_remaining=0 namespace_dispatches=160/200/min namespace_dispatch_remaining=40 source=server.admission.workflow_tasks.max_active_leases_per_queue', $display);
-        self::assertStringContainsString('Activity Tasks: status=accepting active=1/4 remaining=3 namespace_active=2/12 namespace_remaining=10 dispatches=12/120/min dispatch_remaining=108 namespace_dispatches=40/500/min namespace_dispatch_remaining=460 source=server.admission.activity_tasks.max_active_leases_per_queue', $display);
+        self::assertStringContainsString('Workflow Tasks: status=throttled active=2/2 remaining=0 namespace_active=7/10 namespace_remaining=3 dispatches=60/60/min dispatch_remaining=0 namespace_dispatches=160/200/min namespace_dispatch_remaining=40 dispatch_group=downstream-openai group_dispatches=60/60/min group_dispatch_remaining=0 source=server.admission.workflow_tasks.max_dispatches_per_minute_per_budget_group', $display);
+        self::assertStringContainsString('Activity Tasks: status=accepting active=1/4 remaining=3 namespace_active=2/12 namespace_remaining=10 dispatches=12/120/min dispatch_remaining=108 namespace_dispatches=40/500/min namespace_dispatch_remaining=460 dispatch_group=downstream-stripe group_dispatches=25/300/min group_dispatch_remaining=275 source=server.admission.activity_tasks.max_active_leases_per_queue', $display);
         self::assertStringContainsString('Query Tasks: status=full pending=1/1 remaining=0 lock=yes source=server.query_tasks.max_pending_per_queue', $display);
         self::assertStringContainsString('Current Leases:', $display);
         self::assertStringContainsString('task-123', $display);

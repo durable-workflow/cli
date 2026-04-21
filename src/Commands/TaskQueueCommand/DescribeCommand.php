@@ -187,6 +187,26 @@ HELP)
             if (($admission['server_remaining_namespace_dispatch_capacity'] ?? null) !== null) {
                 $parts[] = 'namespace_dispatch_remaining='.$admission['server_remaining_namespace_dispatch_capacity'];
             }
+
+            $budgetGroup = $admission['server_dispatch_budget_group'] ?? null;
+            if ($budgetGroup !== null && $budgetGroup !== '') {
+                $parts[] = 'dispatch_group='.$budgetGroup;
+            }
+
+            $budgetGroupDispatchCount = $admission['server_budget_group_dispatch_count_this_minute'] ?? null;
+            $budgetGroupDispatchLimit = $admission['server_max_dispatches_per_minute_per_budget_group'] ?? null;
+
+            if ($budgetGroupDispatchCount !== null || $budgetGroupDispatchLimit !== null) {
+                $parts[] = sprintf(
+                    'group_dispatches=%s/%s/min',
+                    $budgetGroupDispatchCount ?? '-',
+                    $budgetGroupDispatchLimit ?? '-',
+                );
+            }
+
+            if (($admission['server_remaining_budget_group_dispatch_capacity'] ?? null) !== null) {
+                $parts[] = 'group_dispatch_remaining='.$admission['server_remaining_budget_group_dispatch_capacity'];
+            }
         }
 
         $source = $admission['budget_source'] ?? null;
@@ -195,6 +215,7 @@ HELP)
             || ($admission['server_max_active_leases_per_namespace'] ?? null) !== null
             || ($admission['server_max_dispatches_per_minute'] ?? null) !== null
             || ($admission['server_max_dispatches_per_minute_per_namespace'] ?? null) !== null
+            || ($admission['server_max_dispatches_per_minute_per_budget_group'] ?? null) !== null
         )) {
             $source = $admission['server_budget_source'] ?? $source;
         }

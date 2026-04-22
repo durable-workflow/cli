@@ -9,6 +9,7 @@ use DurableWorkflow\Cli\Commands\BaseCommand;
 use DurableWorkflow\Cli\Commands\BridgeCommand;
 use DurableWorkflow\Cli\Commands\DebugCommand;
 use DurableWorkflow\Cli\Commands\DoctorCommand;
+use DurableWorkflow\Cli\Commands\UpgradeCommand;
 use DurableWorkflow\Cli\Commands\EnvCommand;
 use DurableWorkflow\Cli\Commands\NamespaceCommand;
 use DurableWorkflow\Cli\Commands\QueryTaskCommand;
@@ -59,6 +60,7 @@ class Application extends ConsoleApplication
             new ServerCommand\StartDevCommand(),
             new DoctorCommand(),
             new DebugCommand(),
+            new UpgradeCommand(),
 
             // Workflow operations
             new WorkflowCommand\StartCommand(),

@@ -199,6 +199,16 @@
       "schema": "schemas/output/task-queue-build-ids.schema.json",
       "schema_id": "https://durable-workflow.com/schemas/cli/output/task-queue-build-ids.schema.json"
     },
+    "task-queue:drain": {
+      "output": "--json",
+      "schema": "schemas/output/task-queue-build-id-rollout.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/task-queue-build-id-rollout.schema.json"
+    },
+    "task-queue:resume": {
+      "output": "--json",
+      "schema": "schemas/output/task-queue-build-id-rollout.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/task-queue-build-id-rollout.schema.json"
+    },
     "task-queue:describe": {
       "output": "--json",
       "schema": "schemas/output/task-queue.schema.json",

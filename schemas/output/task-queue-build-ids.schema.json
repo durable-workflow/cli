@@ -30,6 +30,11 @@
             "type": "string",
             "enum": ["active", "active_with_draining", "draining", "stale_only", "no_workers"]
           },
+          "drain_intent": {
+            "type": "string",
+            "enum": ["active", "draining"]
+          },
+          "drained_at": { "type": ["string", "null"] },
           "active_worker_count": { "type": "integer", "minimum": 0 },
           "draining_worker_count": { "type": "integer", "minimum": 0 },
           "stale_worker_count": { "type": "integer", "minimum": 0 },

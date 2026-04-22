@@ -132,6 +132,8 @@ class Application extends ConsoleApplication
             new TaskQueueCommand\ListCommand(),
             new TaskQueueCommand\DescribeCommand(),
             new TaskQueueCommand\BuildIdsCommand(),
+            new TaskQueueCommand\DrainCommand(),
+            new TaskQueueCommand\ResumeCommand(),
 
             // Search attribute management
             new SearchAttributeCommand\ListCommand(),

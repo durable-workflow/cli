@@ -11,6 +11,7 @@ use DurableWorkflow\Cli\Commands\DebugCommand;
 use DurableWorkflow\Cli\Commands\DoctorCommand;
 use DurableWorkflow\Cli\Commands\EnvCommand;
 use DurableWorkflow\Cli\Commands\NamespaceCommand;
+use DurableWorkflow\Cli\Commands\QueryTaskCommand;
 use DurableWorkflow\Cli\Commands\ScheduleCommand;
 use DurableWorkflow\Cli\Commands\SchemaCommand;
 use DurableWorkflow\Cli\Commands\SearchAttributeCommand;
@@ -121,6 +122,9 @@ class Application extends ConsoleApplication
             new WorkflowTaskCommand\CompleteCommand(),
             new WorkflowTaskCommand\FailCommand(),
             new WorkflowTaskCommand\HistoryCommand(),
+            new QueryTaskCommand\PollCommand(),
+            new QueryTaskCommand\CompleteCommand(),
+            new QueryTaskCommand\FailCommand(),
 
             // Task queue inspection
             new TaskQueueCommand\ListCommand(),

@@ -69,6 +69,21 @@
       "schema": "schemas/output/namespace.schema.json",
       "schema_id": "https://durable-workflow.com/schemas/cli/output/namespace.schema.json"
     },
+    "query-task:complete": {
+      "output": "--json",
+      "schema": "schemas/output/query-task-result.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/query-task-result.schema.json"
+    },
+    "query-task:fail": {
+      "output": "--json",
+      "schema": "schemas/output/query-task-result.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/query-task-result.schema.json"
+    },
+    "query-task:poll": {
+      "output": "--json",
+      "schema": "schemas/output/query-task-poll.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/query-task-poll.schema.json"
+    },
     "namespace:set-storage-driver": {
       "output": "--json",
       "schema": "schemas/output/external-storage-policy.schema.json",

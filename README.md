@@ -425,6 +425,11 @@ dw workflow-task:fail TASK_ID ATTEMPT --lease-owner=cli-worker --message="replay
 
 # Fetch the next history page for a leased workflow task
 dw workflow-task:history TASK_ID PAGE_TOKEN --lease-owner=cli-worker --attempt=ATTEMPT --json
+
+# Poll and answer a routed query task
+dw query-task:poll cli-worker --task-queue=orders --json
+dw query-task:complete QUERY_TASK_ID ATTEMPT --lease-owner=cli-worker --result='{"ready":true}'
+dw query-task:fail QUERY_TASK_ID ATTEMPT --lease-owner=cli-worker --message="unknown query"
 ```
 
 ### Activities

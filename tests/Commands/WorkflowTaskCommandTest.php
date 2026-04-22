@@ -97,7 +97,10 @@ class WorkflowTaskCommandTest extends TestCase
 
         $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
         self::assertSame($fixture['response_body'], $decoded);
-        self::assertSame($fixture['semantic_body']['next_page_token'], $decoded['next_page_token'] ?? null);
+        self::assertSame(
+            $fixture['semantic_body']['next_history_page_token_response'],
+            $decoded['next_history_page_token'] ?? null,
+        );
     }
 
     public function test_poll_command_sends_worker_task_queue_and_history_options(): void
@@ -244,11 +247,11 @@ class WorkflowTaskCommandTest extends TestCase
     public function test_history_command_posts_page_token_and_attempt(): void
     {
         $client = new WorkflowTaskFakeClient([
-            'events' => [
+            'history_events' => [
                 ['event_type' => 'ActivityScheduled'],
             ],
-            'last_sequence' => 2,
-            'next_page_token' => null,
+            'total_history_events' => 2,
+            'next_history_page_token' => null,
         ]);
 
         $command = new HistoryCommand();

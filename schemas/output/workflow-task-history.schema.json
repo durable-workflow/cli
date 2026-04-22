@@ -3,9 +3,9 @@
   "$id": "https://durable-workflow.com/schemas/cli/output/workflow-task-history.schema.json",
   "title": "dw workflow-task:history --json",
   "type": "object",
-  "required": ["events"],
+  "required": ["history_events"],
   "properties": {
-    "events": {
+    "history_events": {
       "type": "array",
       "items": {
         "type": "object",
@@ -20,8 +20,8 @@
         "additionalProperties": true
       }
     },
-    "last_sequence": { "type": ["integer", "null"] },
-    "next_page_token": { "type": ["string", "null"] },
+    "total_history_events": { "type": ["integer", "null"] },
+    "next_history_page_token": { "type": ["string", "null"] },
     "protocol_version": { "type": ["string", "null"] }
   },
   "additionalProperties": true

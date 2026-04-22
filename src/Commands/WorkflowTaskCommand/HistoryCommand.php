@@ -51,14 +51,14 @@ HELP)
             return $this->renderJson($output, $result);
         }
 
-        $events = is_array($result['events'] ?? null) ? $result['events'] : [];
+        $events = is_array($result['history_events'] ?? null) ? $result['history_events'] : [];
         $output->writeln('<info>Workflow task history page fetched</info>');
         $output->writeln('  Task ID: '.$taskId);
         $output->writeln('  Attempt: '.$attempt);
         $output->writeln('  Events: '.count($events));
 
-        if (($result['next_page_token'] ?? null) !== null) {
-            $output->writeln('  Next Page Token: '.$result['next_page_token']);
+        if (($result['next_history_page_token'] ?? null) !== null) {
+            $output->writeln('  Next History Page Token: '.$result['next_history_page_token']);
         }
 
         return Command::SUCCESS;

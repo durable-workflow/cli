@@ -97,8 +97,13 @@ class WorkflowTaskCommandTest extends TestCase
 
         $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
         self::assertSame($fixture['response_body'], $decoded);
+        self::assertArrayHasKey('history_events', $decoded);
+        self::assertArrayHasKey('total_history_events', $decoded);
+        self::assertArrayHasKey('next_history_page_token', $decoded);
+        self::assertArrayNotHasKey('events', $decoded);
+        self::assertArrayNotHasKey('next_page_token', $decoded);
         self::assertSame(
-            $fixture['semantic_body']['next_history_page_token_response'],
+            $fixture['semantic_body']['response_next_history_page_token'],
             $decoded['next_history_page_token'] ?? null,
         );
     }

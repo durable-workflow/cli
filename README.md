@@ -343,6 +343,15 @@ dw namespace:describe staging
 dw namespace:update staging --retention=14
 ```
 
+Configure external payload storage for a namespace:
+
+```bash
+dw namespace:set-storage-driver billing s3 --bucket=dw-payloads --prefix=billing/ --threshold-bytes=2097152
+dw namespace:set-storage-driver dev local --uri=file:///var/lib/durable-workflow/payloads --json
+dw storage:test --namespace=billing --large-bytes=2097152
+dw storage:test --driver=s3 --json
+```
+
 ### Schedules
 
 ```bash

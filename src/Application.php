@@ -15,6 +15,7 @@ use DurableWorkflow\Cli\Commands\ScheduleCommand;
 use DurableWorkflow\Cli\Commands\SchemaCommand;
 use DurableWorkflow\Cli\Commands\SearchAttributeCommand;
 use DurableWorkflow\Cli\Commands\ServerCommand;
+use DurableWorkflow\Cli\Commands\StorageCommand;
 use DurableWorkflow\Cli\Commands\SystemCommand;
 use DurableWorkflow\Cli\Commands\TaskQueueCommand;
 use DurableWorkflow\Cli\Commands\WatchCommand;
@@ -86,6 +87,10 @@ class Application extends ConsoleApplication
             new NamespaceCommand\CreateCommand(),
             new NamespaceCommand\DescribeCommand(),
             new NamespaceCommand\UpdateCommand(),
+            new NamespaceCommand\SetStorageDriverCommand(),
+
+            // External payload storage diagnostics
+            new StorageCommand\TestCommand(),
 
             // Activity operations
             new ActivityCommand\CompleteCommand(),

@@ -69,6 +69,11 @@
       "schema": "schemas/output/namespace.schema.json",
       "schema_id": "https://durable-workflow.com/schemas/cli/output/namespace.schema.json"
     },
+    "namespace:set-storage-driver": {
+      "output": "--json",
+      "schema": "schemas/output/external-storage-policy.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/external-storage-policy.schema.json"
+    },
     "schedule:backfill": {
       "output": "--json",
       "schema": "schemas/output/schedule-operation.schema.json",
@@ -128,6 +133,11 @@
       "output": "--json",
       "schema": "schemas/output/search-attribute-list.schema.json",
       "schema_id": "https://durable-workflow.com/schemas/cli/output/search-attribute-list.schema.json"
+    },
+    "storage:test": {
+      "output": "--json",
+      "schema": "schemas/output/storage-test.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/storage-test.schema.json"
     },
     "system:activity-timeout-pass": {
       "output": "--json",

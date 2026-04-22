@@ -8,6 +8,8 @@ final class CompletionValues
 {
     public const DEV_DATABASES = ['sqlite', 'mysql', 'pgsql'];
 
+    public const EXTERNAL_STORAGE_DRIVERS = ['local', 's3', 'gcs', 'azure'];
+
     public const SCHEDULE_OVERLAP_POLICIES = [
         'skip',
         'buffer_one',

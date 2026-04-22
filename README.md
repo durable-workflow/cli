@@ -30,6 +30,11 @@ page](https://github.com/durable-workflow/cli/releases). Available assets:
 `dw-linux-x86_64`, `dw-linux-aarch64`,
 `dw-macos-aarch64`, `dw-windows-x86_64.exe`.
 
+Tagged releases also include `dw.rb`, a generated Homebrew formula for the
+macOS arm64 binary. Until the public tap is live, tap maintainers can copy that
+formula into a tap repository and users who trust the release can install from
+the downloaded formula after verifying the release asset attestations.
+
 macOS x86_64 standalone binaries are not currently produced because the
 `macos-13` runner label is not available to this org; Intel Mac users can
 run the PHAR with a system PHP.
@@ -93,10 +98,10 @@ builders before publishing the manifest; Windows remains optional when that
 runner fails, and the manifest reflects the assets that are actually present.
 
 The release workflow also publishes artifact attestations for every release
-asset, including `SHA256SUMS` and the installer scripts, so operators can
-verify both checksum integrity and GitHub Actions build provenance with
-`gh attestation verify`. These attestations are the current
-machine-verifiable provenance mechanism for the 0.1.x line.
+asset, including `SHA256SUMS`, the installer scripts, and the generated
+Homebrew formula, so operators can verify both checksum integrity and GitHub
+Actions build provenance with `gh attestation verify`. These attestations are
+the current machine-verifiable provenance mechanism for the 0.1.x line.
 
 Native binaries and PHARs are not currently code-signed or notarized. Treat the
 GitHub release tag, artifact attestations, and `SHA256SUMS` as the current

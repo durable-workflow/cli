@@ -24,7 +24,22 @@ final class ReleaseInstallerContractTest extends TestCase
         $buildWorkflow = self::readRepoFile('.github/workflows/build.yml');
 
         self::assertStringContainsString('sh -n scripts/install.sh', $buildWorkflow);
+        self::assertStringContainsString('sh -n scripts/generate-homebrew-formula.sh', $buildWorkflow);
         self::assertStringContainsString('scripts/install.ps1', $buildWorkflow);
+    }
+
+    public function test_release_publishes_generated_homebrew_formula(): void
+    {
+        $releaseWorkflow = self::readRepoFile('.github/workflows/release.yml');
+        $formulaGenerator = self::readRepoFile('scripts/generate-homebrew-formula.sh');
+        $readme = self::readRepoFile('README.md');
+
+        self::assertStringContainsString('Generate Homebrew formula', $releaseWorkflow);
+        self::assertStringContainsString('scripts/generate-homebrew-formula.sh dist "$GITHUB_REF_NAME"', $releaseWorkflow);
+        self::assertStringContainsString('dw.rb', $formulaGenerator);
+        self::assertStringContainsString('dw-macos-aarch64', $formulaGenerator);
+        self::assertStringContainsString('class Dw < Formula', $formulaGenerator);
+        self::assertStringContainsString('Tagged releases also include `dw.rb`', $readme);
     }
 
     public function test_installers_verify_release_checksums_before_installing(): void

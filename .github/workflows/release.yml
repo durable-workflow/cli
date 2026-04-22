@@ -267,6 +267,11 @@ jobs:
           pattern: dw-*
           merge-multiple: true
 
+      - name: Add installer scripts
+        run: |
+          cp scripts/install.sh dist/install.sh
+          cp scripts/install.ps1 dist/install.ps1
+
       - name: Validate release artifacts
         run: |
           set -euo pipefail
@@ -275,6 +280,8 @@ jobs:
             dw-linux-x86_64
             dw-linux-aarch64
             dw-macos-aarch64
+            install.sh
+            install.ps1
           )
           for artifact in "${required[@]}"; do
             if [ ! -s "dist/$artifact" ]; then
@@ -287,6 +294,9 @@ jobs:
             echo "::warning::Optional Windows release artifact is not present"
           fi
 
+          sh -n dist/install.sh
+          pwsh -NoProfile -Command '$null = [scriptblock]::Create((Get-Content -Raw dist/install.ps1))'
+
       - name: Generate checksums
         working-directory: dist
         run: sha256sum -- * > SHA256SUMS
@@ -294,9 +304,7 @@ jobs:
       - name: Attest release artifacts
         uses: actions/attest-build-provenance@v2
         with:
-          subject-path: |
-            dist/dw*
-            dist/SHA256SUMS
+          subject-path: dist/*
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

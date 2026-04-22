@@ -23,6 +23,10 @@ jobs:
           tools: composer:v2
           coverage: none
       - run: composer install --prefer-dist --no-interaction
+      - name: Validate installer scripts
+        run: |
+          sh -n scripts/install.sh
+          pwsh -NoProfile -Command '$null = [scriptblock]::Create((Get-Content -Raw scripts/install.ps1))'
       - run: composer test
 
   build-phar:

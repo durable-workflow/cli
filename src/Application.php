@@ -6,6 +6,7 @@ namespace DurableWorkflow\Cli;
 
 use DurableWorkflow\Cli\Commands\ActivityCommand;
 use DurableWorkflow\Cli\Commands\BaseCommand;
+use DurableWorkflow\Cli\Commands\BridgeCommand;
 use DurableWorkflow\Cli\Commands\DebugCommand;
 use DurableWorkflow\Cli\Commands\DoctorCommand;
 use DurableWorkflow\Cli\Commands\EnvCommand;
@@ -89,6 +90,9 @@ class Application extends ConsoleApplication
             // Activity operations
             new ActivityCommand\CompleteCommand(),
             new ActivityCommand\FailCommand(),
+
+            // Bridge adapter ingress and handoff
+            new BridgeCommand\WebhookCommand(),
 
             // Schedule management
             new ScheduleCommand\ListCommand(),

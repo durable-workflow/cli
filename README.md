@@ -311,6 +311,10 @@ dw workflow:query order-123 current-status
 # Send an update
 dw workflow:update order-123 approve --input='{"approver":"admin"}'
 
+# Send an integration event through a bounded bridge adapter
+dw bridge:webhook stripe --action=start_workflow --idempotency-key=stripe-event-1001 --target='{"workflow_type":"orders.fulfillment","task_queue":"external-workflows","business_key":"order-1001"}' --input='{"order_id":"order-1001"}'
+dw bridge:webhook pagerduty --action=signal_workflow --idempotency-key=pd-event-3003 --target='{"workflow_id":"wf-remediation-42","signal_name":"incident_escalated"}' --input='{"severity":"critical"}' --json
+
 # Cancel a workflow (workflow code can observe and clean up)
 dw workflow:cancel order-123 --reason="Customer request"
 dw workflow:cancel --all-matching='customer-42' --yes --reason="Customer request"

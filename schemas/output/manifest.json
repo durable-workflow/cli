@@ -19,6 +19,11 @@
       "schema": "schemas/output/activity-task-result.schema.json",
       "schema_id": "https://durable-workflow.com/schemas/cli/output/activity-task-result.schema.json"
     },
+    "bridge:webhook": {
+      "output": "--json",
+      "schema": "schemas/output/bridge-adapter-outcome.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/bridge-adapter-outcome.schema.json"
+    },
     "env:delete": {
       "output": "--json",
       "schema": "schemas/output/env-delete.schema.json",

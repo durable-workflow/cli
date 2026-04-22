@@ -271,6 +271,7 @@ jobs:
         run: |
           cp scripts/install.sh dist/install.sh
           cp scripts/install.ps1 dist/install.ps1
+          cp scripts/verify-release.sh dist/verify-release.sh
 
       - name: Validate release artifacts
         run: |
@@ -282,6 +283,7 @@ jobs:
             dw-macos-aarch64
             install.sh
             install.ps1
+            verify-release.sh
           )
           for artifact in "${required[@]}"; do
             if [ ! -s "dist/$artifact" ]; then
@@ -295,6 +297,7 @@ jobs:
           fi
 
           sh -n dist/install.sh
+          sh -n dist/verify-release.sh
           pwsh -NoProfile -Command '$null = [scriptblock]::Create((Get-Content -Raw dist/install.ps1))'
 
       - name: Generate Homebrew formula

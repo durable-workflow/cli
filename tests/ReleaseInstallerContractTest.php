@@ -14,8 +14,10 @@ final class ReleaseInstallerContractTest extends TestCase
 
         self::assertStringContainsString('cp scripts/install.sh dist/install.sh', $releaseWorkflow);
         self::assertStringContainsString('cp scripts/install.ps1 dist/install.ps1', $releaseWorkflow);
+        self::assertStringContainsString('cp scripts/verify-release.sh dist/verify-release.sh', $releaseWorkflow);
         self::assertStringContainsString('install.sh', $releaseWorkflow);
         self::assertStringContainsString('install.ps1', $releaseWorkflow);
+        self::assertStringContainsString('verify-release.sh', $releaseWorkflow);
         self::assertStringContainsString('subject-path: dist/*', $releaseWorkflow);
     }
 
@@ -25,7 +27,21 @@ final class ReleaseInstallerContractTest extends TestCase
 
         self::assertStringContainsString('sh -n scripts/install.sh', $buildWorkflow);
         self::assertStringContainsString('sh -n scripts/generate-homebrew-formula.sh', $buildWorkflow);
+        self::assertStringContainsString('sh -n scripts/verify-release.sh', $buildWorkflow);
         self::assertStringContainsString('scripts/install.ps1', $buildWorkflow);
+    }
+
+    public function test_release_includes_checksum_and_attestation_verifier(): void
+    {
+        $verifier = self::readRepoFile('scripts/verify-release.sh');
+        $readme = self::readRepoFile('README.md');
+
+        self::assertStringContainsString('SHA256SUMS', $verifier);
+        self::assertStringContainsString('sha256sum -c SHA256SUMS --ignore-missing', $verifier);
+        self::assertStringContainsString('gh attestation verify', $verifier);
+        self::assertStringContainsString('DURABLE_WORKFLOW_VERIFY_ATTESTATIONS', $verifier);
+        self::assertStringContainsString('Tagged releases include `verify-release.sh`', $readme);
+        self::assertStringContainsString('verify-release.sh --attest', $readme);
     }
 
     public function test_release_publishes_generated_homebrew_formula(): void
@@ -65,6 +81,8 @@ final class ReleaseInstallerContractTest extends TestCase
         self::assertStringContainsString('are published with each', $readme);
         self::assertStringContainsString('tagged release', $readme);
         self::assertStringContainsString('Release assets, including the installer scripts', $readme);
+        self::assertStringContainsString('Native binaries and PHARs are not currently code-signed or notarized.', $readme);
+        self::assertStringContainsString('The CLI also does not collect telemetry', $readme);
     }
 
     private static function readRepoFile(string $path): string

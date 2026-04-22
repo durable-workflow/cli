@@ -57,6 +57,15 @@ gh attestation verify dw-linux-x86_64 --repo durable-workflow/cli
 gh attestation verify SHA256SUMS --repo durable-workflow/cli
 ```
 
+Tagged releases include `verify-release.sh` for downloaded release
+directories. It verifies every local asset named in `SHA256SUMS`; pass
+`--attest` to also verify GitHub artifact attestations for the checked files:
+
+```bash
+sh verify-release.sh .
+sh verify-release.sh --attest .
+```
+
 Windows operators can verify the same manifest from PowerShell:
 
 ```powershell
@@ -100,8 +109,9 @@ runner fails, and the manifest reflects the assets that are actually present.
 The release workflow also publishes artifact attestations for every release
 asset, including `SHA256SUMS`, the installer scripts, and the generated
 Homebrew formula, so operators can verify both checksum integrity and GitHub
-Actions build provenance with `gh attestation verify`. These attestations are
-the current machine-verifiable provenance mechanism for the 0.1.x line.
+Actions build provenance with `gh attestation verify` or the release-bundled
+`verify-release.sh --attest` helper. These attestations are the current
+machine-verifiable provenance mechanism for the 0.1.x line.
 
 Native binaries and PHARs are not currently code-signed or notarized. Treat the
 GitHub release tag, artifact attestations, and `SHA256SUMS` as the current

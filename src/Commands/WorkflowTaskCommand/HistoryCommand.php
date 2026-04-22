@@ -42,7 +42,7 @@ HELP)
         $attempt = $this->positiveAttempt((string) $input->getOption('attempt'));
 
         $result = $this->client($input)->post("/worker/workflow-tasks/{$taskId}/history", [
-            'page_token' => $input->getArgument('page-token'),
+            'next_history_page_token' => $input->getArgument('page-token'),
             'lease_owner' => $input->getOption('lease-owner'),
             'workflow_task_attempt' => $attempt,
         ]);

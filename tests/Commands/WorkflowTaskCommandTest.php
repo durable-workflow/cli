@@ -265,7 +265,7 @@ class WorkflowTaskCommandTest extends TestCase
 
         self::assertSame('/worker/workflow-tasks/task-1/history', $client->lastPostPath);
         self::assertSame([
-            'page_token' => 'page-2',
+            'next_history_page_token' => 'page-2',
             'lease_owner' => 'worker-1',
             'workflow_task_attempt' => 2,
         ], $client->lastPostBody);

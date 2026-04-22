@@ -160,6 +160,17 @@ Or pass them as options to any command:
 dw --server=http://localhost:8080 --token=your-token --namespace=production workflow:list
 ```
 
+Connection settings resolve with one stable precedence contract: command-line
+flags win over environment variables, environment variables win over the
+selected profile, and profiles win over built-in defaults. Profile selection
+resolves as `--env`, then `DW_ENV`, then the `current_env` set by
+`dw env:use`. `DURABLE_WORKFLOW_SERVER_URL`,
+`DURABLE_WORKFLOW_NAMESPACE`, and `DURABLE_WORKFLOW_AUTH_TOKEN` are the
+portable environment variable names for carriers. Tokens are bearer-token
+credentials today; mTLS and signed-header credentials are reserved extension
+points and must be added as redacted references instead of echoed secret
+material.
+
 The CLI targets control-plane contract version `2` automatically via
 `X-Durable-Workflow-Control-Plane-Version: 2` and expects canonical v2
 response fields such as `*_name` and `wait_for`. Non-canonical legacy aliases
@@ -181,9 +192,11 @@ schema/version metadata as a compatibility error instead of silently guessing.
 Use `dw server:info` to inspect the current canonical values,
 rejected aliases, and removed fields advertised by the target server.
 Use `dw doctor` when you need the full resolved local/remote diagnostic state:
-CLI build identity, selected server/namespace/profile, redacted token source,
-TLS verification mode, `/api/cluster/info`, and compatibility warnings derived
-from the protocol manifests and `client_compatibility` metadata.
+CLI build identity, selected server/namespace/profile, a redacted
+`connection.effective_config` block that names which source won for each
+setting, TLS verification mode, `/api/cluster/info`, and compatibility
+warnings derived from the protocol manifests and `client_compatibility`
+metadata.
 Use `dw debug workflow <id>` when support needs a single stuck-run capture:
 execution state, pending workflow/activity tasks, task queue backlog and
 pollers, recent failures, and compatibility metadata.

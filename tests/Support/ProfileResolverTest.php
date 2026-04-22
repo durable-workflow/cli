@@ -217,4 +217,43 @@ class ProfileResolverTest extends TestCase
 
         self::assertSame('flag-token', $resolved->token);
     }
+
+    public function test_effective_config_records_winning_sources_without_exposing_token(): void
+    {
+        $store = new ProfileStore($this->tmpConfig);
+        $store->put(new Profile(
+            name: 'prod',
+            server: 'https://profile-server',
+            namespace: 'profile-ns',
+            tokenSource: ['type' => Profile::TOKEN_SOURCE_ENV, 'value' => 'DW_RESOLVER_TEST_TOKEN'],
+            tlsVerify: false,
+        ));
+        $store->setCurrent('prod');
+        $this->setEnv('DURABLE_WORKFLOW_NAMESPACE', 'env-ns');
+        $this->setEnv('DW_RESOLVER_TEST_TOKEN', 'resolved-prod-token');
+
+        $resolver = new ProfileResolver($store);
+        $resolved = $resolver->resolve(
+            flagEnv: null,
+            flagServer: 'https://flag-server',
+            flagNamespace: null,
+            flagToken: null,
+        );
+
+        $effective = $resolved->effectiveConfig($this->tmpConfig);
+
+        self::assertSame('https://flag-server', $effective['server']['value']);
+        self::assertSame('flag', $effective['server']['source']);
+        self::assertSame('env-ns', $effective['namespace']['value']);
+        self::assertSame('DURABLE_WORKFLOW_NAMESPACE', $effective['namespace']['source']);
+        self::assertSame('prod', $effective['profile']['name']);
+        self::assertSame('current_env', $effective['profile']['source']);
+        self::assertSame('profile_env', $effective['auth']['source']);
+        self::assertSame('DW_RESOLVER_TEST_TOKEN', $effective['auth']['env']);
+        self::assertSame('prod', $effective['auth']['profile']);
+        self::assertSame('redacted', $effective['auth']['value']);
+        self::assertFalse($effective['tls']['verify']);
+        self::assertSame('profile', $effective['tls']['source']);
+        self::assertStringNotContainsString('resolved-prod-token', json_encode($effective, JSON_THROW_ON_ERROR));
+    }
 }

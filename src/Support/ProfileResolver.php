@@ -37,21 +37,24 @@ final class ProfileResolver
         ?string $flagNamespace,
         ?string $flagToken,
     ): ResolvedConnection {
-        $profile = $this->selectProfile($flagEnv);
+        $selection = $this->selectProfile($flagEnv);
+        $profile = $selection['profile'];
 
-        $server = $flagServer
-            ?? self::envString('DURABLE_WORKFLOW_SERVER_URL')
-            ?? $profile?->server
-            ?? 'http://localhost:8080';
+        [$server, $serverSource] = $this->resolveString(
+            flagValue: $flagServer,
+            envName: 'DURABLE_WORKFLOW_SERVER_URL',
+            profileValue: $profile?->server,
+            defaultValue: 'http://localhost:8080',
+        );
 
-        $namespace = $flagNamespace
-            ?? self::envString('DURABLE_WORKFLOW_NAMESPACE')
-            ?? $profile?->namespace
-            ?? 'default';
+        [$namespace, $namespaceSource] = $this->resolveString(
+            flagValue: $flagNamespace,
+            envName: 'DURABLE_WORKFLOW_NAMESPACE',
+            profileValue: $profile?->namespace,
+            defaultValue: 'default',
+        );
 
-        $token = $flagToken
-            ?? self::envString('DURABLE_WORKFLOW_AUTH_TOKEN')
-            ?? $profile?->resolveToken();
+        [$token, $tokenSource] = $this->resolveToken($flagToken, $profile);
 
         return new ResolvedConnection(
             server: $server,
@@ -59,6 +62,13 @@ final class ProfileResolver
             token: $token,
             tlsVerify: $profile?->tlsVerify ?? true,
             profile: $profile,
+            sources: [
+                'server' => $serverSource,
+                'namespace' => $namespaceSource,
+                'profile' => $selection['source'],
+                'token' => $tokenSource,
+                'tls_verify' => $profile instanceof Profile ? 'profile' : 'default',
+            ],
         );
     }
 
@@ -66,24 +76,124 @@ final class ProfileResolver
      * Look up the profile specified by `--env`, `DW_ENV`, or
      * `current_env`, hard-failing if any explicit selection points
      * at a missing profile.
+     *
+     * @return array{profile: Profile|null, source: string|null}
      */
-    private function selectProfile(?string $flagEnv): ?Profile
+    private function selectProfile(?string $flagEnv): array
     {
         if ($flagEnv !== null && $flagEnv !== '') {
-            return $this->store->requireProfile($flagEnv, '--env');
+            return [
+                'profile' => $this->store->requireProfile($flagEnv, '--env'),
+                'source' => 'flag',
+            ];
         }
 
         $envName = self::envString('DW_ENV');
         if ($envName !== null) {
-            return $this->store->requireProfile($envName, 'DW_ENV');
+            return [
+                'profile' => $this->store->requireProfile($envName, 'DW_ENV'),
+                'source' => 'DW_ENV',
+            ];
         }
 
         $current = $this->store->currentEnvName();
         if ($current !== null) {
-            return $this->store->requireProfile($current, 'dw env:use (current_env in config)');
+            return [
+                'profile' => $this->store->requireProfile($current, 'dw env:use (current_env in config)'),
+                'source' => 'current_env',
+            ];
         }
 
-        return null;
+        return [
+            'profile' => null,
+            'source' => null,
+        ];
+    }
+
+    /**
+     * @return array{0: string, 1: string}
+     */
+    private function resolveString(
+        ?string $flagValue,
+        string $envName,
+        ?string $profileValue,
+        string $defaultValue,
+    ): array {
+        if ($flagValue !== null) {
+            return [$flagValue, 'flag'];
+        }
+
+        $envValue = self::envString($envName);
+        if ($envValue !== null) {
+            return [$envValue, $envName];
+        }
+
+        if ($profileValue !== null) {
+            return [$profileValue, 'profile'];
+        }
+
+        return [$defaultValue, 'default'];
+    }
+
+    /**
+     * @return array{0: string|null, 1: array{source: string, env?: string|null, profile?: string|null}}
+     */
+    private function resolveToken(?string $flagToken, ?Profile $profile): array
+    {
+        if ($flagToken !== null) {
+            return [
+                $flagToken,
+                [
+                    'source' => 'flag',
+                    'env' => null,
+                    'profile' => null,
+                ],
+            ];
+        }
+
+        $envToken = self::envString('DURABLE_WORKFLOW_AUTH_TOKEN');
+        if ($envToken !== null) {
+            return [
+                $envToken,
+                [
+                    'source' => 'DURABLE_WORKFLOW_AUTH_TOKEN',
+                    'env' => 'DURABLE_WORKFLOW_AUTH_TOKEN',
+                    'profile' => null,
+                ],
+            ];
+        }
+
+        $tokenSource = $profile?->tokenSource;
+        if (is_array($tokenSource)) {
+            if (($tokenSource['type'] ?? null) === Profile::TOKEN_SOURCE_ENV) {
+                return [
+                    $profile?->resolveToken(),
+                    [
+                        'source' => 'profile_env',
+                        'env' => is_string($tokenSource['value'] ?? null) ? $tokenSource['value'] : null,
+                        'profile' => $profile?->name,
+                    ],
+                ];
+            }
+
+            return [
+                $profile?->resolveToken(),
+                [
+                    'source' => 'profile_literal',
+                    'env' => null,
+                    'profile' => $profile?->name,
+                ],
+            ];
+        }
+
+        return [
+            null,
+            [
+                'source' => 'none',
+                'env' => null,
+                'profile' => null,
+            ],
+        ];
     }
 
     private static function envString(string $name): ?string

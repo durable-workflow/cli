@@ -77,6 +77,11 @@ class DoctorCommandTest extends TestCase
         self::assertTrue($decoded['connection']['token']['present']);
         self::assertSame('flag', $decoded['connection']['token']['source']);
         self::assertTrue($decoded['connection']['tls']['verify']);
+        self::assertSame('flag', $decoded['connection']['effective_config']['server']['source']);
+        self::assertSame('flag', $decoded['connection']['effective_config']['namespace']['source']);
+        self::assertSame('flag', $decoded['connection']['effective_config']['auth']['source']);
+        self::assertSame('redacted', $decoded['connection']['effective_config']['auth']['value']);
+        self::assertStringNotContainsString('secret-token', $tester->getDisplay());
         self::assertTrue($decoded['server']['reachable']);
         self::assertSame('0.1.0', $decoded['server']['version']);
         self::assertSame('2', $decoded['server']['control_plane']['version']);
@@ -204,9 +209,15 @@ class DoctorCommandTest extends TestCase
         self::assertSame('prod', $decoded['connection']['profile']['name']);
         self::assertSame('flag', $decoded['connection']['profile']['source']);
         self::assertFalse($decoded['connection']['tls']['verify']);
+        self::assertSame('profile', $decoded['connection']['tls']['source']);
         self::assertTrue($decoded['connection']['token']['present']);
         self::assertSame('profile_env', $decoded['connection']['token']['source']);
         self::assertSame('DOCTOR_DW_TOKEN', $decoded['connection']['token']['env']);
+        self::assertSame('profile', $decoded['connection']['effective_config']['server']['source']);
+        self::assertSame('profile_env', $decoded['connection']['effective_config']['auth']['source']);
+        self::assertSame('DOCTOR_DW_TOKEN', $decoded['connection']['effective_config']['auth']['env']);
+        self::assertSame('redacted', $decoded['connection']['effective_config']['auth']['value']);
+        self::assertStringNotContainsString('profile-secret', $tester->getDisplay());
         self::assertSame('tls.verification_disabled', $decoded['recommendations'][0]['id']);
         self::assertSame('dw env:set <name> --tls-verify=true', $decoded['recommendations'][0]['command']);
     }

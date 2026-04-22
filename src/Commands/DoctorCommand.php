@@ -36,6 +36,7 @@ HELP);
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $resolved = $this->resolvedConnection($input);
+        $effectiveConfig = $resolved->effectiveConfig($this->profileStore()->path());
         $diagnostic = [
             'dw' => [
                 'version' => BuildInfo::version(),
@@ -49,7 +50,9 @@ HELP);
                 'token' => $this->tokenDiagnostic($input, $resolved),
                 'tls' => [
                     'verify' => $resolved->tlsVerify,
+                    'source' => $effectiveConfig['tls']['source'] ?? 'default',
                 ],
+                'effective_config' => $effectiveConfig,
             ],
             'server' => [
                 'reachable' => false,

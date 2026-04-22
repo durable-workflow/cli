@@ -38,10 +38,56 @@ HELP);
         $output->writeln('Server is '.$this->formatStatus($result['status'] ?? null));
         $output->writeln('Timestamp: '.$result['timestamp']);
 
-        foreach ($result['checks'] ?? [] as $check => $status) {
-            $output->writeln("  {$check}: ".$this->formatStatus($status));
+        $checks = is_array($result['checks'] ?? null) ? $result['checks'] : [];
+        $unhealthyChecks = [];
+
+        if ($checks !== []) {
+            $rows = [];
+
+            foreach ($checks as $check => $status) {
+                $checkName = (string) $check;
+                $statusValue = is_scalar($status) ? (string) $status : 'unknown';
+                $healthy = $this->isHealthyCheckStatus($statusValue);
+
+                if (! $healthy) {
+                    $unhealthyChecks[] = $checkName;
+                }
+
+                $rows[] = [
+                    $checkName,
+                    $this->formatStatus($statusValue),
+                    $healthy ? '-' : $this->healthCheckAction($checkName),
+                ];
+            }
+
+            $this->renderTable($output, ['Check', 'Status', 'Action'], $rows);
+        }
+
+        if ($unhealthyChecks !== []) {
+            $output->writeln('');
+            $output->writeln('<comment>Next steps:</comment>');
+            $output->writeln('  - Run `dw doctor` with the same --env or --server options for connection and auth context.');
+            $output->writeln('  - Inspect server logs and dependencies for: '.implode(', ', $unhealthyChecks).'.');
         }
 
         return Command::SUCCESS;
+    }
+
+    private function isHealthyCheckStatus(string $status): bool
+    {
+        return in_array(strtolower($status), ['ok', 'healthy', 'success', 'succeeded'], true);
+    }
+
+    private function healthCheckAction(string $check): string
+    {
+        $normalized = strtolower(str_replace(['-', ' '], '_', $check));
+
+        return match (true) {
+            str_contains($normalized, 'database'), str_contains($normalized, 'mysql') => 'Check database connectivity and migrations.',
+            str_contains($normalized, 'redis'), str_contains($normalized, 'cache') => 'Check Redis/cache connectivity.',
+            str_contains($normalized, 'queue'), str_contains($normalized, 'worker') => 'Check workers and queue consumers.',
+            str_contains($normalized, 'storage'), str_contains($normalized, 'payload') => 'Check payload storage configuration.',
+            default => 'Inspect the server component named by this check.',
+        };
     }
 }

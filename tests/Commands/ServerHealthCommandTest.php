@@ -56,6 +56,10 @@ class ServerHealthCommandTest extends TestCase
 
         self::assertStringContainsString('degraded', $display);
         self::assertStringContainsString('error', $display);
+        self::assertStringContainsString('Check Redis/cache connectivity.', $display);
+        self::assertStringContainsString('Next steps:', $display);
+        self::assertStringContainsString('dw doctor', $display);
+        self::assertStringContainsString('redis', $display);
     }
 
     public function test_health_command_honors_json_output(): void

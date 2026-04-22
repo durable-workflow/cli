@@ -152,12 +152,13 @@ variables:
 export DURABLE_WORKFLOW_SERVER_URL=http://localhost:8080
 export DURABLE_WORKFLOW_AUTH_TOKEN=your-token
 export DURABLE_WORKFLOW_NAMESPACE=default
+export DURABLE_WORKFLOW_TLS_VERIFY=true
 ```
 
 Or pass them as options to any command:
 
 ```bash
-dw --server=http://localhost:8080 --token=your-token --namespace=production workflow:list
+dw --server=http://localhost:8080 --token=your-token --namespace=production --tls-verify=true workflow:list
 ```
 
 Connection settings resolve with one stable precedence contract: command-line
@@ -165,8 +166,10 @@ flags win over environment variables, environment variables win over the
 selected profile, and profiles win over built-in defaults. Profile selection
 resolves as `--env`, then `DW_ENV`, then the `current_env` set by
 `dw env:use`. `DURABLE_WORKFLOW_SERVER_URL`,
-`DURABLE_WORKFLOW_NAMESPACE`, and `DURABLE_WORKFLOW_AUTH_TOKEN` are the
-portable environment variable names for carriers. Tokens are bearer-token
+`DURABLE_WORKFLOW_NAMESPACE`, `DURABLE_WORKFLOW_AUTH_TOKEN`, and
+`DURABLE_WORKFLOW_TLS_VERIFY` are the portable environment variable names for
+carriers. `DURABLE_WORKFLOW_TLS_VERIFY` and `--tls-verify` accept `true`,
+`false`, `yes`, `no`, `on`, `off`, `1`, or `0`. Tokens are bearer-token
 credentials today; mTLS and signed-header credentials are reserved extension
 points and must be added as redacted references instead of echoed secret
 material.
@@ -424,6 +427,7 @@ dw system:activity-timeout-pass --execution-id=EXEC_ID_1 --execution-id=EXEC_ID_
 | `--env` | Named profile to use (overrides `$DW_ENV` and `dw env:use`; hard-fails if missing) |
 | `--namespace` | Target namespace (default: `$DURABLE_WORKFLOW_NAMESPACE` or `default`) |
 | `--token` | Auth token (default: `$DURABLE_WORKFLOW_AUTH_TOKEN`) |
+| `--tls-verify` | Verify TLS certificates (`true`/`false`; default: `$DURABLE_WORKFLOW_TLS_VERIFY`, profile setting, or `true`) |
 
 ## Exit Codes
 

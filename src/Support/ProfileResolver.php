@@ -36,6 +36,7 @@ final class ProfileResolver
         ?string $flagServer,
         ?string $flagNamespace,
         ?string $flagToken,
+        ?string $flagTlsVerify = null,
     ): ResolvedConnection {
         $selection = $this->selectProfile($flagEnv);
         $profile = $selection['profile'];
@@ -55,19 +56,20 @@ final class ProfileResolver
         );
 
         [$token, $tokenSource] = $this->resolveToken($flagToken, $profile);
+        [$tlsVerify, $tlsSource] = $this->resolveTlsVerify($flagTlsVerify, $profile);
 
         return new ResolvedConnection(
             server: $server,
             namespace: $namespace,
             token: $token,
-            tlsVerify: $profile?->tlsVerify ?? true,
+            tlsVerify: $tlsVerify,
             profile: $profile,
             sources: [
                 'server' => $serverSource,
                 'namespace' => $namespaceSource,
                 'profile' => $selection['source'],
                 'token' => $tokenSource,
-                'tls_verify' => $profile instanceof Profile ? 'profile' : 'default',
+                'tls_verify' => $tlsSource,
             ],
         );
     }
@@ -194,6 +196,38 @@ final class ProfileResolver
                 'profile' => null,
             ],
         ];
+    }
+
+    /**
+     * @return array{0: bool, 1: string}
+     */
+    private function resolveTlsVerify(?string $flagValue, ?Profile $profile): array
+    {
+        if ($flagValue !== null) {
+            return [self::parseBoolean($flagValue, '--tls-verify'), 'flag'];
+        }
+
+        $envValue = self::envString('DURABLE_WORKFLOW_TLS_VERIFY');
+        if ($envValue !== null) {
+            return [self::parseBoolean($envValue, 'DURABLE_WORKFLOW_TLS_VERIFY'), 'DURABLE_WORKFLOW_TLS_VERIFY'];
+        }
+
+        if ($profile instanceof Profile) {
+            return [$profile->tlsVerify, 'profile'];
+        }
+
+        return [true, 'default'];
+    }
+
+    private static function parseBoolean(string $value, string $source): bool
+    {
+        return match (strtolower(trim($value))) {
+            '1', 'true', 'yes', 'on' => true,
+            '0', 'false', 'no', 'off' => false,
+            default => throw new InvalidOptionException(
+                sprintf('%s must be one of: true, false, yes, no, on, off, 1, 0.', $source),
+            ),
+        };
     }
 
     private static function envString(string $name): ?string

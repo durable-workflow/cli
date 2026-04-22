@@ -167,6 +167,43 @@ class BaseCommandEnvResolutionTest extends TestCase
         self::assertFalse($decoded['tls_verify']);
     }
 
+    public function test_tls_verify_env_overrides_profile(): void
+    {
+        $this->setEnv('DURABLE_WORKFLOW_TLS_VERIFY', 'true');
+
+        $store = new ProfileStore($this->tmpConfig);
+        $store->put(new Profile(
+            name: 'insecure-dev',
+            server: 'https://self-signed.example',
+            tlsVerify: false,
+        ));
+        $store->setCurrent('insecure-dev');
+
+        $command = $this->probeCommand();
+        $command->setProfileStore($store);
+
+        $tester = new CommandTester($command);
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+
+        $decoded = json_decode($tester->getDisplay(), true);
+        self::assertTrue($decoded['tls_verify']);
+    }
+
+    public function test_tls_verify_flag_overrides_env(): void
+    {
+        $this->setEnv('DURABLE_WORKFLOW_TLS_VERIFY', 'true');
+
+        $command = $this->probeCommand();
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            '--tls-verify' => 'false',
+        ]));
+
+        $decoded = json_decode($tester->getDisplay(), true);
+        self::assertFalse($decoded['tls_verify']);
+    }
+
     public function test_dw_env_hard_fails_when_profile_missing(): void
     {
         $this->setEnv('DW_ENV', 'ghost');

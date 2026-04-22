@@ -29,7 +29,9 @@ class DoctorCommandTest extends TestCase
     {
         putenv('DW_CLI_VERSION');
         putenv('DOCTOR_DW_TOKEN');
+        putenv('DURABLE_WORKFLOW_TLS_VERIFY');
         unset($_ENV['DOCTOR_DW_TOKEN']);
+        unset($_ENV['DURABLE_WORKFLOW_TLS_VERIFY']);
 
         if ($this->tmpConfig !== '' && file_exists($this->tmpConfig)) {
             @unlink($this->tmpConfig);
@@ -217,9 +219,46 @@ class DoctorCommandTest extends TestCase
         self::assertSame('profile_env', $decoded['connection']['effective_config']['auth']['source']);
         self::assertSame('DOCTOR_DW_TOKEN', $decoded['connection']['effective_config']['auth']['env']);
         self::assertSame('redacted', $decoded['connection']['effective_config']['auth']['value']);
+        self::assertSame('profile', $decoded['connection']['effective_config']['tls']['source']);
         self::assertStringNotContainsString('profile-secret', $tester->getDisplay());
         self::assertSame('tls.verification_disabled', $decoded['recommendations'][0]['id']);
         self::assertSame('dw env:set <name> --tls-verify=true', $decoded['recommendations'][0]['command']);
+    }
+
+    public function test_doctor_reports_tls_flag_precedence_in_effective_config(): void
+    {
+        putenv('DURABLE_WORKFLOW_TLS_VERIFY=false');
+        $_ENV['DURABLE_WORKFLOW_TLS_VERIFY'] = 'false';
+
+        $store = new ProfileStore($this->tmpConfig);
+        $store->put(new Profile(
+            name: 'prod',
+            server: 'https://profile.example',
+            tlsVerify: false,
+        ));
+
+        $command = new DoctorCommand();
+        $command->setProfileStore($store);
+        $command->setServerClient(new DoctorFakeClient([
+            'version' => '0.1.0',
+            'control_plane' => ['version' => '2'],
+            'worker_protocol' => ['version' => '1.0'],
+        ]));
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            '--env' => 'prod',
+            '--tls-verify' => 'true',
+            '--output' => 'json',
+        ]));
+
+        $decoded = json_decode(trim($tester->getDisplay()), true, 512, JSON_THROW_ON_ERROR);
+
+        self::assertTrue($decoded['connection']['tls']['verify']);
+        self::assertSame('flag', $decoded['connection']['tls']['source']);
+        self::assertTrue($decoded['connection']['effective_config']['tls']['verify']);
+        self::assertSame('flag', $decoded['connection']['effective_config']['tls']['source']);
     }
 
     public function test_doctor_returns_network_exit_but_keeps_diagnostic_json(): void

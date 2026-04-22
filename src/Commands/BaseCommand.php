@@ -43,6 +43,13 @@ abstract class BaseCommand extends Command
         $this->addOption('namespace', null, InputOption::VALUE_OPTIONAL, 'Target namespace', null);
         $this->addOption('token', null, InputOption::VALUE_OPTIONAL, 'Auth token', null);
         $this->addOption(
+            'tls-verify',
+            null,
+            InputOption::VALUE_REQUIRED,
+            'Verify TLS certificates (true/false). Defaults to $DURABLE_WORKFLOW_TLS_VERIFY, then the selected profile, then true.',
+            null,
+        );
+        $this->addOption(
             'env',
             null,
             InputOption::VALUE_REQUIRED,
@@ -188,6 +195,7 @@ abstract class BaseCommand extends Command
             flagServer: $this->optionValue($input, 'server'),
             flagNamespace: $this->optionValue($input, 'namespace'),
             flagToken: $this->optionValue($input, 'token'),
+            flagTlsVerify: $this->optionValue($input, 'tls-verify'),
         );
     }
 

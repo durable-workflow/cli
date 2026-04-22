@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace Tests\Commands;
 
 use DurableWorkflow\Cli\Commands\ScheduleCommand\DescribeCommand;
+use DurableWorkflow\Cli\Commands\ScheduleCommand\DeleteCommand;
 use DurableWorkflow\Cli\Commands\ScheduleCommand\ListCommand;
+use DurableWorkflow\Cli\Commands\ScheduleCommand\PauseCommand;
+use DurableWorkflow\Cli\Commands\ScheduleCommand\ResumeCommand;
 use DurableWorkflow\Cli\Support\ServerClient;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
@@ -72,6 +75,75 @@ final class ScheduleParityFixtureTest extends TestCase
         self::assertSame($semantic['remaining_actions'], $decoded['remaining_actions'] ?? null);
     }
 
+    public function test_schedule_pause_matches_polyglot_request_fixture(): void
+    {
+        $fixture = self::fixture('schedule-pause-parity.json', 'schedule.pause');
+        $client = new ScheduleParityClient($fixture['response_body']);
+        $command = new PauseCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute($fixture['cli']['argv']));
+
+        self::assertSame($fixture['request']['method'], $client->lastMethod);
+        self::assertSame($fixture['request']['path'], $client->lastPath);
+        self::assertSame($fixture['request']['body'], $client->lastBody);
+
+        $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame($fixture['response_body'], $decoded);
+
+        $semantic = $fixture['semantic_body'];
+        self::assertSame($semantic['schedule_id'], $decoded['schedule_id'] ?? null);
+        self::assertSame($semantic['outcome'], $decoded['outcome'] ?? null);
+    }
+
+    public function test_schedule_resume_matches_polyglot_request_fixture(): void
+    {
+        $fixture = self::fixture('schedule-resume-parity.json', 'schedule.resume');
+        $client = new ScheduleParityClient($fixture['response_body']);
+        $command = new ResumeCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute($fixture['cli']['argv']));
+
+        self::assertSame($fixture['request']['method'], $client->lastMethod);
+        self::assertSame($fixture['request']['path'], $client->lastPath);
+        self::assertSame($fixture['request']['body'], $client->lastBody);
+
+        $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame($fixture['response_body'], $decoded);
+
+        $semantic = $fixture['semantic_body'];
+        self::assertSame($semantic['schedule_id'], $decoded['schedule_id'] ?? null);
+        self::assertSame($semantic['outcome'], $decoded['outcome'] ?? null);
+    }
+
+    public function test_schedule_delete_matches_polyglot_request_fixture(): void
+    {
+        $fixture = self::fixture('schedule-delete-parity.json', 'schedule.delete');
+        $client = new ScheduleParityClient($fixture['response_body']);
+        $command = new DeleteCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute($fixture['cli']['argv']));
+
+        self::assertSame($fixture['request']['method'], $client->lastMethod);
+        self::assertSame($fixture['request']['path'], $client->lastPath);
+        self::assertSame([], $client->lastBody);
+
+        $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame($fixture['response_body'], $decoded);
+
+        $semantic = $fixture['semantic_body'];
+        self::assertSame($semantic['schedule_id'], $decoded['schedule_id'] ?? null);
+        self::assertSame($semantic['outcome'], $decoded['outcome'] ?? null);
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -102,6 +174,11 @@ final class ScheduleParityClient extends ServerClient
     public array $lastQuery = [];
 
     /**
+     * @var array<string, mixed>
+     */
+    public array $lastBody = [];
+
+    /**
      * @param  array<string, mixed>  $response
      */
     public function __construct(private readonly array $response)
@@ -114,6 +191,24 @@ final class ScheduleParityClient extends ServerClient
         $this->lastMethod = 'GET';
         $this->lastPath = $path;
         $this->lastQuery = $query;
+
+        return $this->response;
+    }
+
+    public function post(string $path, array $body = []): array
+    {
+        $this->lastMethod = 'POST';
+        $this->lastPath = $path;
+        $this->lastBody = $body;
+
+        return $this->response;
+    }
+
+    public function delete(string $path): array
+    {
+        $this->lastMethod = 'DELETE';
+        $this->lastPath = $path;
+        $this->lastBody = [];
 
         return $this->response;
     }

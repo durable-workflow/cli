@@ -172,7 +172,11 @@ carriers. `DURABLE_WORKFLOW_TLS_VERIFY` and `--tls-verify` accept `true`,
 `false`, `yes`, `no`, `on`, `off`, `1`, or `0`. Tokens are bearer-token
 credentials today; mTLS and signed-header credentials are reserved extension
 points and must be added as redacted references instead of echoed secret
-material.
+material. External executor configs follow the same auth-composition contract:
+`auth_refs` may persist a profile name, environment variable name, token-file
+path, mTLS certificate path plus key reference, or signed-header key reference
+plus header allowlist. They must not persist bearer tokens, private keys, or
+signing secrets inline.
 
 The CLI targets control-plane contract version `2` automatically via
 `X-Durable-Workflow-Control-Plane-Version: 2` and expects canonical v2

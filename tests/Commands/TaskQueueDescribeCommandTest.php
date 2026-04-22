@@ -211,9 +211,21 @@ class TaskQueueDescribeCommandTest extends TestCase
         self::assertStringContainsString('Workflow Expired Leases: 1', $display);
         self::assertStringContainsString('Pollers: active=1 stale=1', $display);
         self::assertStringContainsString('Admission:', $display);
-        self::assertStringContainsString('Workflow Tasks: status=throttled active=2/2 remaining=0 namespace_active=7/10 namespace_remaining=3 dispatches=60/60/min dispatch_remaining=0 namespace_dispatches=160/200/min namespace_dispatch_remaining=40 dispatch_group=downstream-openai group_dispatches=60/60/min group_dispatch_remaining=0 source=server.admission.workflow_tasks.max_dispatches_per_minute_per_budget_group', $display);
-        self::assertStringContainsString('Activity Tasks: status=accepting active=1/4 remaining=3 namespace_active=2/12 namespace_remaining=10 dispatches=12/120/min dispatch_remaining=108 namespace_dispatches=40/500/min namespace_dispatch_remaining=460 dispatch_group=downstream-stripe group_dispatches=25/300/min group_dispatch_remaining=275 source=server.admission.activity_tasks.max_active_leases_per_queue', $display);
-        self::assertStringContainsString('Query Tasks: status=full pending=1/1 remaining=0 lock=yes source=server.query_tasks.max_pending_per_queue', $display);
+        self::assertStringContainsString('Kind', $display);
+        self::assertStringContainsString('Capacity', $display);
+        self::assertStringContainsString('Dispatch', $display);
+        self::assertStringContainsString('Workflow Tasks', $display);
+        self::assertStringContainsString('throttled', $display);
+        self::assertStringContainsString('active 2/2; remaining 0; namespace active 7/10; namespace remaining 3', $display);
+        self::assertStringContainsString('dispatch 60/60/min; dispatch remaining 0; namespace dispatch 160/200/min; namespace dispatch remaining 40; group downstream-openai 60/60/min; group remaining 0', $display);
+        self::assertStringContainsString('server.admission.workflow_tasks.max_dispatches_per_minute_per_budget_group', $display);
+        self::assertStringContainsString('Activity Tasks', $display);
+        self::assertStringContainsString('active 1/4; remaining 3; namespace active 2/12; namespace remaining 10', $display);
+        self::assertStringContainsString('dispatch 12/120/min; dispatch remaining 108; namespace dispatch 40/500/min; namespace dispatch remaining 460; group downstream-stripe 25/300/min; group remaining 275', $display);
+        self::assertStringContainsString('server.admission.activity_tasks.max_active_leases_per_queue', $display);
+        self::assertStringContainsString('Query Tasks', $display);
+        self::assertStringContainsString('pending 1/1; remaining 0; lock yes', $display);
+        self::assertStringContainsString('server.query_tasks.max_pending_per_queue', $display);
         self::assertStringContainsString('Current Leases:', $display);
         self::assertStringContainsString('task-123', $display);
         self::assertStringContainsString('EXPIRED', $display);
@@ -249,7 +261,9 @@ class TaskQueueDescribeCommandTest extends TestCase
 
         $display = $tester->getDisplay();
 
-        self::assertStringContainsString('Workflow Tasks: status=throttled active=1/- namespace_active=1/1 namespace_remaining=0 source=server.admission.workflow_tasks.max_active_leases_per_namespace', $display);
+        self::assertStringContainsString('Workflow Tasks', $display);
+        self::assertStringContainsString('active 1/-; namespace active 1/1; namespace remaining 0', $display);
+        self::assertStringContainsString('server.admission.workflow_tasks.max_active_leases_per_namespace', $display);
         self::assertStringNotContainsString('source=worker_registration.max_concurrent_workflow_tasks', $display);
     }
 }

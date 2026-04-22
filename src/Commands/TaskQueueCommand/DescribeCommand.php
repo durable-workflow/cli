@@ -64,9 +64,7 @@ HELP)
         $admission = $result['admission'] ?? [];
         if (is_array($admission) && $admission !== []) {
             $output->writeln('Admission:');
-            $this->renderAdmissionLine($output, 'Workflow Tasks', $admission['workflow_tasks'] ?? null, false);
-            $this->renderAdmissionLine($output, 'Activity Tasks', $admission['activity_tasks'] ?? null, false);
-            $this->renderAdmissionLine($output, 'Query Tasks', $admission['query_tasks'] ?? null, true);
+            $this->renderAdmissionTable($output, $admission);
             $output->writeln('');
         }
 
@@ -110,120 +108,130 @@ HELP)
     }
 
     /**
-     * @param  array<string, mixed>|null  $admission
+     * @param  array<string, mixed>  $admission
      */
-    private function renderAdmissionLine(OutputInterface $output, string $label, mixed $admission, bool $queryTasks): void
+    private function renderAdmissionTable(OutputInterface $output, array $admission): void
+    {
+        $this->renderTable($output, ['Kind', 'Status', 'Capacity', 'Dispatch', 'Source'], [
+            $this->admissionRow('Workflow Tasks', $admission['workflow_tasks'] ?? null, false),
+            $this->admissionRow('Activity Tasks', $admission['activity_tasks'] ?? null, false),
+            $this->admissionRow('Query Tasks', $admission['query_tasks'] ?? null, true),
+        ]);
+    }
+
+    /**
+     * @return array{0: string, 1: string, 2: string, 3: string, 4: string}
+     */
+    private function admissionRow(string $label, mixed $admission, bool $queryTasks): array
     {
         if (! is_array($admission)) {
-            $output->writeln(sprintf('  %s: -', $label));
-
-            return;
+            return [$label, '-', '-', '-', '-'];
         }
 
-        $parts = [
-            'status='.$this->formatStatus($admission['status'] ?? null),
-        ];
+        $capacity = [];
+        $dispatch = [];
+        $source = $admission['budget_source'] ?? null;
 
         if ($queryTasks) {
             $pending = $admission['approximate_pending_count'] ?? null;
             $limit = $admission['max_pending_per_queue'] ?? null;
 
             if ($pending !== null || $limit !== null) {
-                $parts[] = sprintf('pending=%s/%s', $pending ?? '-', $limit ?? '-');
+                $capacity[] = sprintf('pending %s/%s', $pending ?? '-', $limit ?? '-');
             }
 
             if (array_key_exists('remaining_pending_capacity', $admission)) {
-                $parts[] = 'remaining='.$admission['remaining_pending_capacity'];
+                $capacity[] = 'remaining '.$admission['remaining_pending_capacity'];
             }
 
             if (array_key_exists('lock_supported', $admission)) {
-                $parts[] = 'lock='.($admission['lock_supported'] ? 'yes' : 'no');
+                $capacity[] = 'lock '.($admission['lock_supported'] ? 'yes' : 'no');
             }
         } else {
             $active = $admission['server_active_lease_count'] ?? $admission['active_lease_count'] ?? $admission['leased_count'] ?? null;
             $limit = $admission['server_max_active_leases_per_queue'] ?? $admission['server_limit'] ?? $admission['configured_slot_count'] ?? null;
 
             if ($active !== null || $limit !== null) {
-                $parts[] = sprintf('active=%s/%s', $active ?? '-', $limit ?? '-');
+                $capacity[] = sprintf('active %s/%s', $active ?? '-', $limit ?? '-');
             }
 
             if (($admission['server_remaining_active_lease_capacity'] ?? null) !== null) {
-                $parts[] = 'remaining='.$admission['server_remaining_active_lease_capacity'];
+                $capacity[] = 'remaining '.$admission['server_remaining_active_lease_capacity'];
             } elseif (($admission['remaining_server_capacity'] ?? null) !== null) {
-                $parts[] = 'remaining='.$admission['remaining_server_capacity'];
+                $capacity[] = 'remaining '.$admission['remaining_server_capacity'];
             } elseif (($admission['available_slot_count'] ?? null) !== null) {
-                $parts[] = 'remaining='.$admission['available_slot_count'];
+                $capacity[] = 'remaining '.$admission['available_slot_count'];
             }
 
             $namespaceActive = $admission['server_namespace_active_lease_count'] ?? null;
             $namespaceLimit = $admission['server_max_active_leases_per_namespace'] ?? null;
 
             if ($namespaceActive !== null || $namespaceLimit !== null) {
-                $parts[] = sprintf('namespace_active=%s/%s', $namespaceActive ?? '-', $namespaceLimit ?? '-');
+                $capacity[] = sprintf('namespace active %s/%s', $namespaceActive ?? '-', $namespaceLimit ?? '-');
             }
 
             if (($admission['server_remaining_namespace_active_lease_capacity'] ?? null) !== null) {
-                $parts[] = 'namespace_remaining='.$admission['server_remaining_namespace_active_lease_capacity'];
+                $capacity[] = 'namespace remaining '.$admission['server_remaining_namespace_active_lease_capacity'];
             }
 
             $dispatchCount = $admission['server_dispatch_count_this_minute'] ?? null;
             $dispatchLimit = $admission['server_max_dispatches_per_minute'] ?? null;
 
             if ($dispatchCount !== null || $dispatchLimit !== null) {
-                $parts[] = sprintf('dispatches=%s/%s/min', $dispatchCount ?? '-', $dispatchLimit ?? '-');
+                $dispatch[] = sprintf('dispatch %s/%s/min', $dispatchCount ?? '-', $dispatchLimit ?? '-');
             }
 
             if (($admission['server_remaining_dispatch_capacity'] ?? null) !== null) {
-                $parts[] = 'dispatch_remaining='.$admission['server_remaining_dispatch_capacity'];
+                $dispatch[] = 'dispatch remaining '.$admission['server_remaining_dispatch_capacity'];
             }
 
             $namespaceDispatchCount = $admission['server_namespace_dispatch_count_this_minute'] ?? null;
             $namespaceDispatchLimit = $admission['server_max_dispatches_per_minute_per_namespace'] ?? null;
 
             if ($namespaceDispatchCount !== null || $namespaceDispatchLimit !== null) {
-                $parts[] = sprintf('namespace_dispatches=%s/%s/min', $namespaceDispatchCount ?? '-', $namespaceDispatchLimit ?? '-');
+                $dispatch[] = sprintf('namespace dispatch %s/%s/min', $namespaceDispatchCount ?? '-', $namespaceDispatchLimit ?? '-');
             }
 
             if (($admission['server_remaining_namespace_dispatch_capacity'] ?? null) !== null) {
-                $parts[] = 'namespace_dispatch_remaining='.$admission['server_remaining_namespace_dispatch_capacity'];
+                $dispatch[] = 'namespace dispatch remaining '.$admission['server_remaining_namespace_dispatch_capacity'];
             }
 
             $budgetGroup = $admission['server_dispatch_budget_group'] ?? null;
-            if ($budgetGroup !== null && $budgetGroup !== '') {
-                $parts[] = 'dispatch_group='.$budgetGroup;
-            }
-
             $budgetGroupDispatchCount = $admission['server_budget_group_dispatch_count_this_minute'] ?? null;
             $budgetGroupDispatchLimit = $admission['server_max_dispatches_per_minute_per_budget_group'] ?? null;
 
             if ($budgetGroupDispatchCount !== null || $budgetGroupDispatchLimit !== null) {
-                $parts[] = sprintf(
-                    'group_dispatches=%s/%s/min',
-                    $budgetGroupDispatchCount ?? '-',
-                    $budgetGroupDispatchLimit ?? '-',
-                );
+                $group = sprintf('group %s/%s/min', $budgetGroupDispatchCount ?? '-', $budgetGroupDispatchLimit ?? '-');
+                if ($budgetGroup !== null && $budgetGroup !== '') {
+                    $group = sprintf('group %s %s/%s/min', $budgetGroup, $budgetGroupDispatchCount ?? '-', $budgetGroupDispatchLimit ?? '-');
+                }
+
+                $dispatch[] = $group;
+            } elseif ($budgetGroup !== null && $budgetGroup !== '') {
+                $dispatch[] = 'group '.$budgetGroup;
             }
 
             if (($admission['server_remaining_budget_group_dispatch_capacity'] ?? null) !== null) {
-                $parts[] = 'group_dispatch_remaining='.$admission['server_remaining_budget_group_dispatch_capacity'];
+                $dispatch[] = 'group remaining '.$admission['server_remaining_budget_group_dispatch_capacity'];
+            }
+
+            if (
+                ($admission['server_max_active_leases_per_queue'] ?? $admission['server_limit'] ?? null) !== null
+                || ($admission['server_max_active_leases_per_namespace'] ?? null) !== null
+                || ($admission['server_max_dispatches_per_minute'] ?? null) !== null
+                || ($admission['server_max_dispatches_per_minute_per_namespace'] ?? null) !== null
+                || ($admission['server_max_dispatches_per_minute_per_budget_group'] ?? null) !== null
+            ) {
+                $source = $admission['server_budget_source'] ?? $source;
             }
         }
 
-        $source = $admission['budget_source'] ?? null;
-        if (! $queryTasks && (
-            ($admission['server_max_active_leases_per_queue'] ?? $admission['server_limit'] ?? null) !== null
-            || ($admission['server_max_active_leases_per_namespace'] ?? null) !== null
-            || ($admission['server_max_dispatches_per_minute'] ?? null) !== null
-            || ($admission['server_max_dispatches_per_minute_per_namespace'] ?? null) !== null
-            || ($admission['server_max_dispatches_per_minute_per_budget_group'] ?? null) !== null
-        )) {
-            $source = $admission['server_budget_source'] ?? $source;
-        }
-
-        if ($source !== null) {
-            $parts[] = 'source='.$source;
-        }
-
-        $output->writeln(sprintf('  %s: %s', $label, implode(' ', $parts)));
+        return [
+            $label,
+            $this->formatStatus($admission['status'] ?? null),
+            $capacity === [] ? '-' : implode('; ', $capacity),
+            $dispatch === [] ? '-' : implode('; ', $dispatch),
+            is_scalar($source) && (string) $source !== '' ? (string) $source : '-',
+        ];
     }
 }

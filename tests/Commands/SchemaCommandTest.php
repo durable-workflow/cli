@@ -24,6 +24,8 @@ class SchemaCommandTest extends TestCase
         self::assertStringContainsString('workflow:list', $display);
         self::assertStringContainsString('workflow-list.schema.json', $display);
         self::assertStringContainsString('workflow:history-export', $display);
+        self::assertStringContainsString('server:health', $display);
+        self::assertStringContainsString('server-info.schema.json', $display);
         self::assertStringContainsString('external-executor-config', $display);
         self::assertStringContainsString('external-executor.schema.json', $display);
     }
@@ -41,6 +43,10 @@ class SchemaCommandTest extends TestCase
         self::assertSame(
             'schemas/output/workflow-list.schema.json',
             $manifest['commands']['workflow:list']['schema'],
+        );
+        self::assertSame(
+            'schemas/output/server-health.schema.json',
+            $manifest['commands']['server:health']['schema'],
         );
         self::assertSame(
             'schemas/config/external-executor.schema.json',
@@ -80,6 +86,23 @@ class SchemaCommandTest extends TestCase
             $schema['$id'],
         );
         self::assertSame(['workflows'], $schema['required']);
+    }
+
+    public function test_show_command_outputs_schema_for_server_diagnostics(): void
+    {
+        $tester = new CommandTester(new ShowCommand());
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            'schema-name' => 'server:info',
+        ]));
+
+        $schema = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+
+        self::assertSame(
+            'https://durable-workflow.com/schemas/cli/output/server-info.schema.json',
+            $schema['$id'],
+        );
+        self::assertSame(['server_id', 'version'], $schema['required']);
     }
 
     public function test_show_command_rejects_unknown_command(): void

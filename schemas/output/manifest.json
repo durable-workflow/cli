@@ -149,6 +149,16 @@
       "schema": "schemas/output/search-attribute-list.schema.json",
       "schema_id": "https://durable-workflow.com/schemas/cli/output/search-attribute-list.schema.json"
     },
+    "server:health": {
+      "output": "--output=json",
+      "schema": "schemas/output/server-health.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/server-health.schema.json"
+    },
+    "server:info": {
+      "output": "--output=json",
+      "schema": "schemas/output/server-info.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/server-info.schema.json"
+    },
     "storage:test": {
       "output": "--json",
       "schema": "schemas/output/storage-test.schema.json",

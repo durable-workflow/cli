@@ -14,59 +14,23 @@ class BridgeCommandTest extends TestCase
 {
     public function test_webhook_command_posts_bridge_adapter_envelope(): void
     {
-        $client = new BridgeFakeServerClient([
-            'schema' => 'durable-workflow.v2.bridge-adapter-outcome.contract',
-            'version' => 1,
-            'adapter' => 'stripe',
-            'action' => 'start_workflow',
-            'accepted' => true,
-            'outcome' => 'accepted',
-            'idempotency_key' => 'stripe-event-1001',
-            'target' => [
-                'workflow_type' => 'orders.fulfillment',
-                'task_queue' => 'external-workflows',
-                'business_key' => 'order-1001',
-            ],
-            'workflow_id' => 'bridge-stripe-abc123',
-            'run_id' => 'run-1',
-        ]);
+        $fixture = self::bridgeWebhookFixture();
+        $client = new BridgeFakeServerClient($fixture['response_body']);
 
         $command = new WebhookCommand();
         $command->setServerClient($client);
 
         $tester = new CommandTester($command);
 
-        self::assertSame(Command::SUCCESS, $tester->execute([
-            'adapter' => 'stripe',
-            '--action' => 'start_workflow',
-            '--idempotency-key' => 'stripe-event-1001',
-            '--target' => '{"workflow_type":"orders.fulfillment","task_queue":"external-workflows","business_key":"order-1001"}',
-            '--input' => '{"order_id":"order-1001"}',
-            '--correlation' => '{"provider":"stripe","event_type":"checkout.session.completed"}',
-        ]));
+        self::assertSame(Command::SUCCESS, $tester->execute($fixture['cli']['argv']));
 
-        self::assertSame('/bridge-adapters/webhook/stripe', $client->lastPostPath);
-        self::assertSame([
-            'action' => 'start_workflow',
-            'idempotency_key' => 'stripe-event-1001',
-            'target' => [
-                'workflow_type' => 'orders.fulfillment',
-                'task_queue' => 'external-workflows',
-                'business_key' => 'order-1001',
-            ],
-            'input' => [
-                'order_id' => 'order-1001',
-            ],
-            'correlation' => [
-                'provider' => 'stripe',
-                'event_type' => 'checkout.session.completed',
-            ],
-        ], $client->lastPostBody);
+        self::assertSame($fixture['request']['path'], $client->lastPostPath);
+        self::assertSame($fixture['cli']['expected_body'], $client->lastPostBody);
 
         $display = $tester->getDisplay();
         self::assertStringContainsString('Bridge adapter outcome', $display);
         self::assertStringContainsString('Adapter: stripe', $display);
-        self::assertStringContainsString('Workflow ID: bridge-stripe-abc123', $display);
+        self::assertStringContainsString('Workflow ID: bridge-stripe-231', $display);
     }
 
     public function test_webhook_command_renders_json_response(): void
@@ -119,6 +83,18 @@ class BridgeCommandTest extends TestCase
         ]));
 
         self::assertStringContainsString('--target must be a JSON object.', $tester->getDisplay());
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function bridgeWebhookFixture(): array
+    {
+        $path = __DIR__.'/../fixtures/control-plane/bridge-webhook-parity.json';
+        $fixture = json_decode((string) file_get_contents($path), true, flags: JSON_THROW_ON_ERROR);
+        self::assertIsArray($fixture);
+
+        return $fixture;
     }
 }
 

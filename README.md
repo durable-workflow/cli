@@ -526,3 +526,6 @@ required top-level fields and their basic types stay stable.
 ## License
 
 MIT
+## Public Boundary Checks
+
+This is a public repository. Do not add private tracker names, workspace-only absolute paths, or automation metadata to files or new commit metadata. Run `scripts/check-public-boundary.sh` before publishing changes; CI runs the same scan on pushes and pull requests.

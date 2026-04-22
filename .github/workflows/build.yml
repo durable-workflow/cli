@@ -47,3 +47,18 @@ jobs:
       - run: box compile --no-parallel
       - run: box info build/dw.phar
       - run: php build/dw.phar list
+
+  sdk-python-parity:
+    name: SDK-Python parity fixtures
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: cli
+      - uses: actions/checkout@v4
+        with:
+          repository: durable-workflow/sdk-python
+          path: sdk-python
+      - name: Compare shared control-plane parity fixtures
+        working-directory: cli
+        run: scripts/check-sdk-python-parity.sh ../sdk-python

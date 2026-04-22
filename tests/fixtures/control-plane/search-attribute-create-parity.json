@@ -30,7 +30,7 @@
     "method": "create_search_attribute",
     "args": {
       "name": "OrderStatus",
-      "type": "keyword"
+      "attribute_type": "keyword"
     }
   }
 }

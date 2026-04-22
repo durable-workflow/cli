@@ -129,6 +129,7 @@ class Application extends ConsoleApplication
             // Task queue inspection
             new TaskQueueCommand\ListCommand(),
             new TaskQueueCommand\DescribeCommand(),
+            new TaskQueueCommand\BuildIdsCommand(),
 
             // Search attribute management
             new SearchAttributeCommand\ListCommand(),

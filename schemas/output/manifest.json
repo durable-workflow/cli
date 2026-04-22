@@ -194,6 +194,11 @@
       "schema": "schemas/output/retention-status.schema.json",
       "schema_id": "https://durable-workflow.com/schemas/cli/output/retention-status.schema.json"
     },
+    "task-queue:build-ids": {
+      "output": "--json",
+      "schema": "schemas/output/task-queue-build-ids.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/task-queue-build-ids.schema.json"
+    },
     "task-queue:describe": {
       "output": "--json",
       "schema": "schemas/output/task-queue.schema.json",

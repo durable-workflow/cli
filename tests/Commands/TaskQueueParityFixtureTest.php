@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Commands;
 
+use DurableWorkflow\Cli\Commands\TaskQueueCommand\BuildIdsCommand;
 use DurableWorkflow\Cli\Commands\TaskQueueCommand\DescribeCommand;
 use DurableWorkflow\Cli\Commands\TaskQueueCommand\ListCommand;
 use DurableWorkflow\Cli\Support\ServerClient;
@@ -69,6 +70,42 @@ final class TaskQueueParityFixtureTest extends TestCase
         self::assertSame($semantic['query_admission_status'], $decoded['admission']['query_tasks']['status'] ?? null);
         self::assertSame($semantic['active_pollers'], $decoded['stats']['pollers']['active_count'] ?? null);
         self::assertSame($semantic['current_lease_ids'], array_column($decoded['current_leases'] ?? [], 'task_id'));
+    }
+
+    public function test_task_queue_build_ids_matches_polyglot_request_fixture(): void
+    {
+        $fixture = self::fixture('task-queue-build-ids-parity.json', 'task_queue.build_ids');
+        $client = new TaskQueueParityClient($fixture['response_body']);
+        $command = new BuildIdsCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute($fixture['cli']['argv']));
+
+        self::assertSame($fixture['request']['method'], $client->lastMethod);
+        self::assertSame($fixture['request']['path'], $client->lastPath);
+        self::assertSame([], $client->lastQuery);
+
+        $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame($fixture['response_body'], $decoded);
+
+        $semantic = $fixture['semantic_body'];
+        self::assertSame($semantic['namespace'], $decoded['namespace'] ?? null);
+        self::assertSame($semantic['task_queue'], $decoded['task_queue'] ?? null);
+
+        $actualBuildIds = array_map(
+            static fn (array $entry): mixed => $entry['build_id'],
+            $decoded['build_ids'] ?? [],
+        );
+        self::assertSame($semantic['build_ids'], $actualBuildIds);
+
+        $expectedStatuses = $semantic['rollout_statuses'];
+        foreach ($decoded['build_ids'] ?? [] as $entry) {
+            $key = $entry['build_id'] ?? 'unversioned';
+            self::assertArrayHasKey($key, $expectedStatuses);
+            self::assertSame($expectedStatuses[$key], $entry['rollout_status']);
+        }
     }
 
     /**

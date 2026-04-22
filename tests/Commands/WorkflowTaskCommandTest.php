@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Tests\Commands;
 
 use DurableWorkflow\Cli\Commands\WorkflowTaskCommand\CompleteCommand;
+use DurableWorkflow\Cli\Commands\WorkflowTaskCommand\FailCommand;
+use DurableWorkflow\Cli\Commands\WorkflowTaskCommand\HistoryCommand;
 use DurableWorkflow\Cli\Commands\WorkflowTaskCommand\PollCommand;
 use DurableWorkflow\Cli\Support\ExitCode;
 use DurableWorkflow\Cli\Support\ServerClient;
@@ -54,6 +56,48 @@ class WorkflowTaskCommandTest extends TestCase
         $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
         self::assertSame($fixture['response_body'], $decoded);
         self::assertSame($fixture['semantic_body']['outcome'], $decoded['outcome'] ?? null);
+    }
+
+    public function test_fail_command_matches_polyglot_request_fixture(): void
+    {
+        $fixture = self::fixture('workflow-task-fail-parity.json', 'workflow-task.fail');
+        $client = new WorkflowTaskFakeClient($fixture['response_body']);
+
+        $command = new FailCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute($fixture['cli']['argv']));
+
+        self::assertSame($fixture['request']['method'], $client->lastMethod);
+        self::assertSame($fixture['request']['path'], $client->lastPostPath);
+        self::assertSame($fixture['request']['body'], $client->lastPostBody);
+
+        $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame($fixture['response_body'], $decoded);
+        self::assertSame($fixture['semantic_body']['outcome'], $decoded['outcome'] ?? null);
+    }
+
+    public function test_history_command_matches_polyglot_request_fixture(): void
+    {
+        $fixture = self::fixture('workflow-task-history-parity.json', 'workflow-task.history');
+        $client = new WorkflowTaskFakeClient($fixture['response_body']);
+
+        $command = new HistoryCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute($fixture['cli']['argv']));
+
+        self::assertSame($fixture['request']['method'], $client->lastMethod);
+        self::assertSame($fixture['request']['path'], $client->lastPostPath);
+        self::assertSame($fixture['request']['body'], $client->lastPostBody);
+
+        $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame($fixture['response_body'], $decoded);
+        self::assertSame($fixture['semantic_body']['next_page_token'], $decoded['next_page_token'] ?? null);
     }
 
     public function test_poll_command_sends_worker_task_queue_and_history_options(): void
@@ -163,6 +207,69 @@ class WorkflowTaskCommandTest extends TestCase
         self::assertSame([
             ['type' => 'fail_workflow', 'message' => 'boom'],
         ], $client->lastPostBody['commands']);
+    }
+
+    public function test_fail_command_sends_nested_failure_payload(): void
+    {
+        $client = new WorkflowTaskFakeClient([
+            'task_id' => 'task-1',
+            'workflow_task_attempt' => 1,
+            'outcome' => 'failed',
+        ]);
+
+        $command = new FailCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            'task-id' => 'task-1',
+            'attempt' => '1',
+            '--lease-owner' => 'worker-1',
+            '--message' => 'replay mismatch',
+            '--type' => 'NonDeterminism',
+            '--stack-trace' => 'traceback',
+        ]));
+
+        self::assertSame('/worker/workflow-tasks/task-1/fail', $client->lastPostPath);
+        self::assertSame('worker-1', $client->lastPostBody['lease_owner']);
+        self::assertSame(1, $client->lastPostBody['workflow_task_attempt']);
+        self::assertSame([
+            'message' => 'replay mismatch',
+            'type' => 'NonDeterminism',
+            'stack_trace' => 'traceback',
+        ], $client->lastPostBody['failure']);
+    }
+
+    public function test_history_command_posts_page_token_and_attempt(): void
+    {
+        $client = new WorkflowTaskFakeClient([
+            'events' => [
+                ['event_type' => 'ActivityScheduled'],
+            ],
+            'last_sequence' => 2,
+            'next_page_token' => null,
+        ]);
+
+        $command = new HistoryCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            'task-id' => 'task-1',
+            'page-token' => 'page-2',
+            '--lease-owner' => 'worker-1',
+            '--attempt' => '2',
+        ]));
+
+        self::assertSame('/worker/workflow-tasks/task-1/history', $client->lastPostPath);
+        self::assertSame([
+            'page_token' => 'page-2',
+            'lease_owner' => 'worker-1',
+            'workflow_task_attempt' => 2,
+        ], $client->lastPostBody);
+        self::assertStringContainsString('Events: 1', $tester->getDisplay());
     }
 
     public function test_complete_command_rejects_ambiguous_command_options(): void

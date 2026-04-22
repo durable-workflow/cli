@@ -81,6 +81,14 @@ class MutatingCommandJsonTest extends TestCase
             'workflow-task:complete',
             ['task-id' => 'task-1', 'attempt' => '1'],
         ];
+        yield 'workflow-task:fail' => [
+            'workflow-task:fail',
+            ['task-id' => 'task-1', 'attempt' => '1', '--message' => 'boom'],
+        ];
+        yield 'workflow-task:history' => [
+            'workflow-task:history',
+            ['task-id' => 'task-1', 'page-token' => 'page-2', '--attempt' => '1'],
+        ];
 
         yield 'search-attribute:create' => [
             'search-attribute:create',

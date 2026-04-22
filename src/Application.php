@@ -119,6 +119,8 @@ class Application extends ConsoleApplication
             // Worker protocol diagnostics
             new WorkflowTaskCommand\PollCommand(),
             new WorkflowTaskCommand\CompleteCommand(),
+            new WorkflowTaskCommand\FailCommand(),
+            new WorkflowTaskCommand\HistoryCommand(),
 
             // Task queue inspection
             new TaskQueueCommand\ListCommand(),

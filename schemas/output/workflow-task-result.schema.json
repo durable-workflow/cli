@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://durable-workflow.com/schemas/cli/output/workflow-task-result.schema.json",
-  "title": "dw workflow-task:complete --json",
+  "title": "dw workflow-task:complete/fail --json",
   "type": "object",
   "required": ["task_id", "workflow_task_attempt"],
   "properties": {

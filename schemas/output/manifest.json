@@ -209,6 +209,16 @@
       "schema": "schemas/output/workflow-task-result.schema.json",
       "schema_id": "https://durable-workflow.com/schemas/cli/output/workflow-task-result.schema.json"
     },
+    "workflow-task:fail": {
+      "output": "--json",
+      "schema": "schemas/output/workflow-task-result.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/workflow-task-result.schema.json"
+    },
+    "workflow-task:history": {
+      "output": "--json",
+      "schema": "schemas/output/workflow-task-history.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/workflow-task-history.schema.json"
+    },
     "workflow-task:poll": {
       "output": "--json",
       "schema": "schemas/output/workflow-task-poll.schema.json",

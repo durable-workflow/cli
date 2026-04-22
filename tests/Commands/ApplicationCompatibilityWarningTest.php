@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Commands;
 
 use DurableWorkflow\Cli\Application;
+use DurableWorkflow\Cli\Support\AuthCompositionContract;
 use DurableWorkflow\Cli\Support\ControlPlaneRequestContract;
 use DurableWorkflow\Cli\Support\ServerClient;
 use PHPUnit\Framework\TestCase;
@@ -73,6 +74,50 @@ class ApplicationCompatibilityWarningTest extends TestCase
         ]));
 
         self::assertStringNotContainsString('worker_protocol.version', $tester->getDisplay());
+    }
+
+    public function test_warns_when_server_requires_auth_composition_contract_but_omits_manifest(): void
+    {
+        $clusterInfo = self::clusterInfo(serverVersion: '9.8.7', supportedCliVersions: '0.1.x');
+        $clusterInfo['client_compatibility']['required_protocols'] = [
+            'auth_composition' => [
+                'schema' => AuthCompositionContract::SCHEMA,
+                'version' => AuthCompositionContract::VERSION,
+            ],
+        ];
+
+        $application = $this->applicationWithClient(new ApplicationCompatibilityFakeClient($clusterInfo));
+        $tester = new ApplicationTester($application);
+
+        self::assertSame(0, $tester->run([
+            'command' => 'server:health',
+        ]));
+
+        self::assertStringContainsString(
+            'Compatibility warning: server did not advertise auth_composition_contract; dw CLI expects durable-workflow.v2.auth-composition.contract v1.',
+            $tester->getDisplay(),
+        );
+    }
+
+    public function test_warns_when_server_auth_composition_contract_version_drifts(): void
+    {
+        $clusterInfo = self::clusterInfo(serverVersion: '9.8.7', supportedCliVersions: '0.1.x');
+        $clusterInfo['auth_composition_contract'] = [
+            'schema' => AuthCompositionContract::SCHEMA,
+            'version' => 2,
+        ];
+
+        $application = $this->applicationWithClient(new ApplicationCompatibilityFakeClient($clusterInfo));
+        $tester = new ApplicationTester($application);
+
+        self::assertSame(0, $tester->run([
+            'command' => 'server:health',
+        ]));
+
+        self::assertStringContainsString(
+            'Compatibility warning: server advertises auth_composition_contract [durable-workflow.v2.auth-composition.contract v2]; dw CLI expects durable-workflow.v2.auth-composition.contract v1.',
+            $tester->getDisplay(),
+        );
     }
 
     public function test_worker_command_warns_when_worker_protocol_metadata_is_absent(): void

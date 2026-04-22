@@ -17,6 +17,7 @@ final class CompatibilityDiagnostics
         $checks = [
             self::controlPlaneWarning($clusterInfo),
             self::requestContractWarning($clusterInfo),
+            self::authCompositionWarning($clusterInfo),
             self::clientCompatibilityAuthorityWarning($clusterInfo),
             self::cliVersionSupportWarning($clusterInfo, $cliVersion),
         ];
@@ -58,6 +59,82 @@ final class CompatibilityDiagnostics
         }
 
         return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $clusterInfo
+     */
+    private static function authCompositionWarning(array $clusterInfo): ?string
+    {
+        if (! self::serverRequiresAuthComposition($clusterInfo) && ! isset($clusterInfo['auth_composition_contract'])) {
+            return null;
+        }
+
+        $expected = sprintf('%s v%d', AuthCompositionContract::SCHEMA, AuthCompositionContract::VERSION);
+        $contract = $clusterInfo['auth_composition_contract'] ?? null;
+
+        if (! is_array($contract)) {
+            return sprintf(
+                'Compatibility warning: server did not advertise auth_composition_contract; dw CLI expects %s.',
+                $expected,
+            );
+        }
+
+        $schema = $contract['schema'] ?? null;
+        $version = $contract['version'] ?? null;
+        $versionMatches = is_int($version) || (is_string($version) && ctype_digit($version))
+            ? (int) $version === AuthCompositionContract::VERSION
+            : false;
+
+        if ($schema !== AuthCompositionContract::SCHEMA || ! $versionMatches) {
+            return sprintf(
+                'Compatibility warning: server advertises auth_composition_contract [%s v%s]; dw CLI expects %s.',
+                is_scalar($schema) ? (string) $schema : 'missing',
+                is_scalar($version) ? (string) $version : 'missing',
+                $expected,
+            );
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $clusterInfo
+     */
+    private static function serverRequiresAuthComposition(array $clusterInfo): bool
+    {
+        $compatibility = $clusterInfo['client_compatibility'] ?? null;
+        if (! is_array($compatibility)) {
+            return false;
+        }
+
+        $requiredProtocols = $compatibility['required_protocols'] ?? null;
+        if (is_array($requiredProtocols) && array_key_exists('auth_composition', $requiredProtocols)) {
+            return true;
+        }
+
+        $clients = $compatibility['clients'] ?? null;
+        if (! is_array($clients)) {
+            return false;
+        }
+
+        $cli = $clients['cli'] ?? null;
+        if (! is_array($cli)) {
+            return false;
+        }
+
+        $requires = $cli['requires'] ?? null;
+        if (! is_array($requires)) {
+            return false;
+        }
+
+        foreach ($requires as $requirement) {
+            if (is_string($requirement) && str_starts_with($requirement, 'auth_composition.')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

@@ -197,9 +197,10 @@ rejected aliases, and removed fields advertised by the target server.
 Use `dw doctor` when you need the full resolved local/remote diagnostic state:
 CLI build identity, selected server/namespace/profile, a redacted
 `connection.effective_config` block that names which source won for each
-setting, TLS verification mode, `/api/cluster/info`, and compatibility
-warnings derived from the protocol manifests and `client_compatibility`
-metadata.
+setting, normalized auth-composition source names, TLS verification mode,
+server-advertised `auth_composition_contract` metadata, `/api/cluster/info`,
+and compatibility warnings derived from the protocol manifests and
+`client_compatibility` metadata.
 Use `dw debug workflow <id>` when support needs a single stuck-run capture:
 execution state, pending workflow/activity tasks, task queue backlog and
 pollers, recent failures, and compatibility metadata.

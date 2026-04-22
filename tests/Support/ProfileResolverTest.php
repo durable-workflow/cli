@@ -242,18 +242,28 @@ class ProfileResolverTest extends TestCase
 
         $effective = $resolved->effectiveConfig($this->tmpConfig);
 
+        self::assertSame('durable-workflow.v2.auth-composition.contract', $effective['contract']['schema']);
+        self::assertSame(1, $effective['contract']['version']);
         self::assertSame('https://flag-server', $effective['server']['value']);
         self::assertSame('flag', $effective['server']['source']);
+        self::assertSame($effective['server'], $effective['server_url']);
         self::assertSame('env-ns', $effective['namespace']['value']);
         self::assertSame('DURABLE_WORKFLOW_NAMESPACE', $effective['namespace']['source']);
+        self::assertSame('environment', $effective['namespace']['contract_source']);
         self::assertSame('prod', $effective['profile']['name']);
         self::assertSame('current_env', $effective['profile']['source']);
+        self::assertSame('current_profile', $effective['profile']['contract_source']);
         self::assertSame('profile_env', $effective['auth']['source']);
+        self::assertSame('profile_env', $effective['auth']['contract_source']);
+        self::assertSame('token', $effective['auth']['type']);
+        self::assertSame('bearer_authorization_header', $effective['auth']['transport']);
         self::assertSame('DW_RESOLVER_TEST_TOKEN', $effective['auth']['env']);
         self::assertSame('prod', $effective['auth']['profile']);
         self::assertSame('redacted', $effective['auth']['value']);
         self::assertFalse($effective['tls']['verify']);
         self::assertSame('profile', $effective['tls']['source']);
+        self::assertSame('selected_profile', $effective['tls']['contract_source']);
+        self::assertSame(['subject' => null, 'roles' => [], 'source' => 'server', 'asserted' => false], $effective['identity']);
         self::assertStringNotContainsString('resolved-prod-token', json_encode($effective, JSON_THROW_ON_ERROR));
     }
 }

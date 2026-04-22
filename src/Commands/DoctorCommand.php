@@ -69,6 +69,7 @@ HELP);
                 'version' => $this->scalarString($clusterInfo['version'] ?? null),
                 'server_id' => $this->scalarString($clusterInfo['server_id'] ?? null),
                 'default_namespace' => $this->scalarString($clusterInfo['default_namespace'] ?? null),
+                'auth_composition_contract' => $this->authCompositionDiagnostic($clusterInfo),
                 'control_plane' => $this->controlPlaneDiagnostic($clusterInfo),
                 'worker_protocol' => $this->workerProtocolDiagnostic($clusterInfo),
                 'client_compatibility' => $clusterInfo['client_compatibility'] ?? null,
@@ -180,6 +181,31 @@ HELP);
             'source' => 'none',
             'env' => null,
             'profile' => null,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $clusterInfo
+     * @return array<string, mixed>|null
+     */
+    private function authCompositionDiagnostic(array $clusterInfo): ?array
+    {
+        $contract = $clusterInfo['auth_composition_contract'] ?? null;
+
+        if (! is_array($contract)) {
+            return null;
+        }
+
+        return [
+            'schema' => $this->scalarString($contract['schema'] ?? null),
+            'version' => is_scalar($contract['version'] ?? null) ? (int) $contract['version'] : null,
+            'scope' => $this->scalarString($contract['scope'] ?? null),
+            'canonical_environment' => is_array($contract['canonical_environment'] ?? null)
+                ? $contract['canonical_environment']
+                : null,
+            'auth_material' => is_array($contract['auth_material'] ?? null)
+                ? $contract['auth_material']
+                : null,
         ];
     }
 

@@ -32,32 +32,55 @@ final class ResolvedConnection
     public function effectiveConfig(string $configPath): array
     {
         $tokenSource = $this->sourceDetail('token');
+        $serverSource = $this->sourceName('server', 'default');
+        $namespaceSource = $this->sourceName('namespace', 'default');
+        $profileSource = $this->sourceName('profile', null);
+        $tlsSource = $this->sourceName('tls_verify', 'default');
+        $authSource = is_string($tokenSource['source'] ?? null) ? $tokenSource['source'] : 'none';
+        $server = [
+            'value' => $this->server,
+            'source' => $serverSource,
+            'contract_source' => self::contractSource($serverSource),
+        ];
 
         return [
-            'server' => [
-                'value' => $this->server,
-                'source' => $this->sourceName('server', 'default'),
+            'contract' => [
+                'schema' => AuthCompositionContract::SCHEMA,
+                'version' => AuthCompositionContract::VERSION,
             ],
+            'server' => $server,
+            'server_url' => $server,
             'namespace' => [
                 'value' => $this->namespace,
-                'source' => $this->sourceName('namespace', 'default'),
+                'source' => $namespaceSource,
+                'contract_source' => self::contractSource($namespaceSource),
             ],
             'profile' => [
                 'name' => $this->profile?->name,
-                'source' => $this->sourceName('profile', null),
+                'source' => $profileSource,
+                'contract_source' => self::profileContractSource($profileSource),
                 'config_path' => $configPath,
             ],
             'auth' => [
-                'type' => 'bearer_token',
+                'type' => $this->token !== null ? 'token' : 'none',
+                'transport' => $this->token !== null ? 'bearer_authorization_header' : null,
                 'present' => $this->token !== null,
-                'source' => $tokenSource['source'] ?? 'none',
+                'source' => $authSource,
+                'contract_source' => self::authContractSource($authSource),
                 'env' => $tokenSource['env'] ?? null,
                 'profile' => $tokenSource['profile'] ?? null,
                 'value' => $this->token !== null ? 'redacted' : null,
             ],
             'tls' => [
                 'verify' => $this->tlsVerify,
-                'source' => $this->sourceName('tls_verify', 'default'),
+                'source' => $tlsSource,
+                'contract_source' => self::contractSource($tlsSource),
+            ],
+            'identity' => [
+                'subject' => null,
+                'roles' => [],
+                'source' => 'server',
+                'asserted' => false,
             ],
         ];
     }
@@ -93,5 +116,41 @@ final class ResolvedConnection
         }
 
         return [];
+    }
+
+    private static function contractSource(?string $source): ?string
+    {
+        if ($source === null) {
+            return null;
+        }
+
+        if ($source === 'profile') {
+            return 'selected_profile';
+        }
+
+        if (str_starts_with($source, 'DURABLE_WORKFLOW_') || $source === 'DW_ENV') {
+            return 'environment';
+        }
+
+        return $source;
+    }
+
+    private static function profileContractSource(?string $source): ?string
+    {
+        return match ($source) {
+            'flag' => 'flag_env',
+            'DW_ENV' => 'DW_ENV',
+            'current_env' => 'current_profile',
+            default => $source,
+        };
+    }
+
+    private static function authContractSource(string $source): string
+    {
+        return match ($source) {
+            'DURABLE_WORKFLOW_AUTH_TOKEN' => 'environment',
+            'profile_literal' => 'selected_profile',
+            default => $source,
+        };
     }
 }

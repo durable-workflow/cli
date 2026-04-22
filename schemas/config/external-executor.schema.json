@@ -28,12 +28,18 @@
         "type": "object",
         "required": ["type"],
         "properties": {
-          "type": { "type": "string", "enum": ["profile", "env", "token_file", "mtls"] },
+          "type": { "type": "string", "enum": ["profile", "env", "token_file", "mtls", "signed_headers"] },
           "profile": { "type": "string", "minLength": 1 },
           "env": { "type": "string", "pattern": "^[A-Z_][A-Z0-9_]*$" },
           "path": { "type": "string", "minLength": 1 },
           "cert": { "type": "string", "minLength": 1 },
-          "key": { "type": "string", "minLength": 1 }
+          "key": { "type": "string", "minLength": 1 },
+          "key_ref": { "type": "string", "minLength": 1 },
+          "header_allowlist": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "uniqueItems": true
+          }
         },
         "additionalProperties": false
       }

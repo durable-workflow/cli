@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Commands;
 
 use DurableWorkflow\Cli\Commands\DoctorCommand;
+use DurableWorkflow\Cli\Support\AuthCompositionContract;
 use DurableWorkflow\Cli\Support\ControlPlaneRequestContract;
 use DurableWorkflow\Cli\Support\ExitCode;
 use DurableWorkflow\Cli\Support\NetworkException;
@@ -46,6 +47,25 @@ class DoctorCommandTest extends TestCase
             'server_id' => 'server-1',
             'version' => '0.1.0',
             'default_namespace' => 'default',
+            'auth_composition_contract' => [
+                'schema' => AuthCompositionContract::SCHEMA,
+                'version' => AuthCompositionContract::VERSION,
+                'scope' => 'external_execution_carriers',
+                'canonical_environment' => [
+                    'auth_token' => 'DURABLE_WORKFLOW_AUTH_TOKEN',
+                ],
+                'auth_material' => [
+                    'token' => [
+                        'status' => 'supported',
+                    ],
+                    'mtls' => [
+                        'status' => 'reserved',
+                    ],
+                    'signed_headers' => [
+                        'status' => 'reserved',
+                    ],
+                ],
+            ],
             'control_plane' => [
                 'version' => '2',
                 'header' => 'X-Durable-Workflow-Control-Plane-Version',
@@ -87,6 +107,9 @@ class DoctorCommandTest extends TestCase
         self::assertTrue($decoded['server']['reachable']);
         self::assertSame('0.1.0', $decoded['server']['version']);
         self::assertSame('2', $decoded['server']['control_plane']['version']);
+        self::assertSame(AuthCompositionContract::SCHEMA, $decoded['server']['auth_composition_contract']['schema']);
+        self::assertSame(AuthCompositionContract::VERSION, $decoded['server']['auth_composition_contract']['version']);
+        self::assertSame('DURABLE_WORKFLOW_AUTH_TOKEN', $decoded['server']['auth_composition_contract']['canonical_environment']['auth_token']);
         self::assertSame('1.0', $decoded['server']['worker_protocol']['version']);
         self::assertSame('server-1', $decoded['server']['cluster_info']['server_id']);
         self::assertSame([], $decoded['warnings']);

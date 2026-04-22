@@ -1,0 +1,43 @@
+{
+  "schema": "durable-workflow.polyglot.external-task-failure-fixture",
+  "version": 1,
+  "cases": [
+    {
+      "name": "retryable_timeout",
+      "failure": {
+        "message": "Deadline exceeded while calling the inventory API.",
+        "type": "TimeoutError",
+        "kind": "timeout",
+        "retryable": true,
+        "non_retryable": false,
+        "timeout_type": "start_to_close",
+        "cancelled": false,
+        "malformed_output": false
+      }
+    },
+    {
+      "name": "permanent_validation_error",
+      "failure": {
+        "message": "Request payload failed validation.",
+        "type": "ValidationError",
+        "kind": "application",
+        "retryable": false,
+        "non_retryable": true,
+        "cancelled": false,
+        "malformed_output": false
+      }
+    },
+    {
+      "name": "malformed_handler_output",
+      "failure": {
+        "message": "Handler wrote non-JSON output.",
+        "type": "MalformedOutput",
+        "kind": "malformed_output",
+        "retryable": false,
+        "non_retryable": true,
+        "cancelled": false,
+        "malformed_output": true
+      }
+    }
+  ]
+}

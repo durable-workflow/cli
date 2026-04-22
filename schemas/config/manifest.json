@@ -1,0 +1,17 @@
+{
+  "schema": "durable-workflow.cli.config-schema-manifest",
+  "version": 1,
+  "json_schema_draft": "https://json-schema.org/draft/2020-12/schema",
+  "stability": "patch-stable-additive",
+  "schemas": {
+    "external-executor-config": {
+      "purpose": "Activity-grade external executor handler mappings",
+      "schema": "schemas/config/external-executor.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/config/external-executor.schema.json",
+      "examples": [
+        "examples/external-executor/operator-task-runner.dw-executor.json",
+        "examples/external-executor/integration-bridge.dw-executor.json"
+      ]
+    }
+  }
+}

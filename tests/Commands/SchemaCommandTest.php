@@ -24,6 +24,8 @@ class SchemaCommandTest extends TestCase
         self::assertStringContainsString('workflow:list', $display);
         self::assertStringContainsString('workflow-list.schema.json', $display);
         self::assertStringContainsString('workflow:history-export', $display);
+        self::assertStringContainsString('external-executor-config', $display);
+        self::assertStringContainsString('external-executor.schema.json', $display);
     }
 
     public function test_manifest_command_outputs_machine_readable_manifest(): void
@@ -40,6 +42,27 @@ class SchemaCommandTest extends TestCase
             'schemas/output/workflow-list.schema.json',
             $manifest['commands']['workflow:list']['schema'],
         );
+        self::assertSame(
+            'schemas/config/external-executor.schema.json',
+            $manifest['config_schemas']['external-executor-config']['schema'],
+        );
+    }
+
+    public function test_show_command_outputs_config_schema(): void
+    {
+        $tester = new CommandTester(new ShowCommand());
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            'schema-name' => 'external-executor-config',
+        ]));
+
+        $schema = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+
+        self::assertSame(
+            'https://durable-workflow.com/schemas/cli/config/external-executor.schema.json',
+            $schema['$id'],
+        );
+        self::assertContains('duplicate_mapping_name', $schema['x-durable-workflow-validation']['named_errors']);
     }
 
     public function test_show_command_outputs_schema_for_command(): void
@@ -47,7 +70,7 @@ class SchemaCommandTest extends TestCase
         $tester = new CommandTester(new ShowCommand());
 
         self::assertSame(Command::SUCCESS, $tester->execute([
-            'command-name' => 'workflow:list',
+            'schema-name' => 'workflow:list',
         ]));
 
         $schema = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
@@ -64,9 +87,9 @@ class SchemaCommandTest extends TestCase
         $tester = new CommandTester(new ShowCommand());
 
         self::assertSame(Command::INVALID, $tester->execute([
-            'command-name' => 'not-a-command',
+            'schema-name' => 'not-a-command',
         ]));
 
-        self::assertStringContainsString('No output schema is published', $tester->getDisplay());
+        self::assertStringContainsString('No config schema is published', $tester->getDisplay());
     }
 }

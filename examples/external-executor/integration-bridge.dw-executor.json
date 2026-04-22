@@ -1,0 +1,48 @@
+{
+  "schema": "durable-workflow.external-executor.config",
+  "version": 1,
+  "defaults": {
+    "profile": "prod",
+    "namespace": "integrations",
+    "auth_ref": "bridge-token"
+  },
+  "auth_refs": {
+    "bridge-token": {
+      "type": "env",
+      "env": "DURABLE_WORKFLOW_BRIDGE_TOKEN"
+    }
+  },
+  "carriers": {
+    "eventbridge-receiver": {
+      "type": "http",
+      "url": "https://bridge.example.com/durable/events",
+      "method": "POST",
+      "timeout_seconds": 30,
+      "capabilities": ["workflow_start", "workflow_signal"]
+    }
+  },
+  "mappings": [
+    {
+      "name": "stripe.invoice-paid.start",
+      "kind": "workflow_start",
+      "workflow_type": "Billing\\InvoicePaidWorkflow",
+      "carrier": "eventbridge-receiver",
+      "handler": "stripe.invoice.paid",
+      "idempotency_key": "event.id",
+      "rollout": {
+        "version": "stripe-v1",
+        "percentage": 25,
+        "capability": "workflow_start"
+      }
+    },
+    {
+      "name": "stripe.invoice-paid.signal",
+      "kind": "workflow_signal",
+      "workflow_type": "Billing\\InvoiceWorkflow",
+      "signal_name": "invoicePaid",
+      "carrier": "eventbridge-receiver",
+      "handler": "stripe.invoice.paid",
+      "idempotency_key": "event.id"
+    }
+  ]
+}

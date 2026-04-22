@@ -1,0 +1,42 @@
+{
+  "schema": "durable-workflow.external-executor.config",
+  "version": 1,
+  "defaults": {
+    "profile": "prod",
+    "namespace": "operations",
+    "task_queue": "operator-tasks",
+    "auth_ref": "prod-profile"
+  },
+  "auth_refs": {
+    "prod-profile": {
+      "type": "profile",
+      "profile": "prod"
+    }
+  },
+  "carriers": {
+    "artisan-operator": {
+      "type": "process",
+      "command": ["php", "artisan", "durable:external-handler"],
+      "timeout_seconds": 900,
+      "capabilities": ["activity_task"],
+      "environment": {
+        "APP_ENV": "production"
+      }
+    }
+  },
+  "mappings": [
+    {
+      "name": "billing.backfill-invoices",
+      "kind": "activity",
+      "task_queue": "operator-tasks",
+      "activity_type": "billing.backfill-invoices",
+      "carrier": "artisan-operator",
+      "handler": "App\\Durable\\Handlers\\BackfillInvoices",
+      "timeout_seconds": 900,
+      "rollout": {
+        "version": "2026-04-22",
+        "percentage": 100
+      }
+    }
+  ]
+}

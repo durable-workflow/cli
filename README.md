@@ -25,6 +25,10 @@ scripts live in this repository under `scripts/` and are published with each
 tagged release so the one-line install path is versioned with the binaries it
 downloads.
 
+Set `DURABLE_WORKFLOW_INSTALL_VERIFY_ATTESTATIONS=1` when the GitHub CLI is
+installed to make the installer also verify artifact attestations for the
+downloaded binary and `SHA256SUMS` before installation.
+
 Or download a native binary directly from the [releases
 page](https://github.com/durable-workflow/cli/releases). Available assets:
 `dw-linux-x86_64`, `dw-linux-aarch64`,
@@ -111,7 +115,9 @@ asset, including `SHA256SUMS`, the installer scripts, and the generated
 Homebrew formula, so operators can verify both checksum integrity and GitHub
 Actions build provenance with `gh attestation verify` or the release-bundled
 `verify-release.sh --attest` helper. These attestations are the current
-machine-verifiable provenance mechanism for the 0.1.x line.
+machine-verifiable provenance mechanism for the 0.1.x line. The one-line
+installers keep checksum verification as the baseline and add attestation
+verification when `DURABLE_WORKFLOW_INSTALL_VERIFY_ATTESTATIONS=1` is set.
 
 Native binaries and PHARs are not currently code-signed or notarized. Treat the
 GitHub release tag, artifact attestations, and `SHA256SUMS` as the current

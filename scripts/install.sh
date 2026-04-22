@@ -9,6 +9,8 @@
 #   DURABLE_WORKFLOW_INSTALL_DIR         Install directory (default: ~/.local/bin).
 #   DURABLE_WORKFLOW_BIN_NAME            Executable name (default: dw).
 #   DURABLE_WORKFLOW_RELEASE_BASE_URL    Release base URL override for tests.
+#   DURABLE_WORKFLOW_INSTALL_VERIFY_ATTESTATIONS
+#                                        Set to 1 to verify GitHub artifact attestations with gh.
 
 set -eu
 
@@ -18,6 +20,7 @@ INSTALL_DIR="${DURABLE_WORKFLOW_INSTALL_DIR:-$HOME/.local/bin}"
 VERSION="${VERSION:-latest}"
 RELEASE_BASE_URL="${DURABLE_WORKFLOW_RELEASE_BASE_URL:-https://github.com/${REPO}/releases}"
 RELEASE_BASE_URL="${RELEASE_BASE_URL%/}"
+VERIFY_ATTESTATIONS="${DURABLE_WORKFLOW_INSTALL_VERIFY_ATTESTATIONS:-0}"
 
 err() { printf '\033[31merror:\033[0m %s\n' "$*" >&2; exit 1; }
 info() { printf '\033[32m==>\033[0m %s\n' "$*"; }
@@ -69,9 +72,10 @@ sha256_file() {
 }
 
 mkdir -p "$INSTALL_DIR"
-tmp=$(mktemp)
-sums=$(mktemp)
-trap 'rm -f "$tmp" "$sums"' EXIT
+tmpdir=$(mktemp -d)
+tmp="$tmpdir/$asset"
+sums="$tmpdir/SHA256SUMS"
+trap 'rm -rf "$tmpdir"' EXIT
 
 info "Downloading $asset"
 if ! curl -fsSL --retry 3 -o "$tmp" "$url"; then
@@ -99,9 +103,17 @@ if [ "$actual_sha" != "$expected_sha" ]; then
     err "checksum verification failed for $asset"
 fi
 
+if [ "$VERIFY_ATTESTATIONS" = "1" ]; then
+    command -v gh >/dev/null 2>&1 || err "gh is required when DURABLE_WORKFLOW_INSTALL_VERIFY_ATTESTATIONS=1"
+
+    info "Verifying GitHub artifact attestations"
+    gh attestation verify "$tmp" --repo "$REPO"
+    gh attestation verify "$sums" --repo "$REPO"
+fi
+
 chmod +x "$tmp"
 mv "$tmp" "$INSTALL_DIR/$BIN_NAME"
-rm -f "$sums"
+rm -rf "$tmpdir"
 trap - EXIT
 
 info "Installed $BIN_NAME to $INSTALL_DIR"

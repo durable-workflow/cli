@@ -65,10 +65,16 @@ final class ReleaseInstallerContractTest extends TestCase
 
         self::assertStringContainsString('SHA256SUMS', $shellInstaller);
         self::assertStringContainsString('checksum verification failed', $shellInstaller);
+        self::assertStringContainsString('DURABLE_WORKFLOW_INSTALL_VERIFY_ATTESTATIONS', $shellInstaller);
+        self::assertStringContainsString('gh attestation verify "$tmp" --repo "$REPO"', $shellInstaller);
+        self::assertStringContainsString('gh attestation verify "$sums" --repo "$REPO"', $shellInstaller);
         self::assertStringContainsString('mv "$tmp" "$INSTALL_DIR/$BIN_NAME"', $shellInstaller);
 
         self::assertStringContainsString('SHA256SUMS', $powershellInstaller);
         self::assertStringContainsString('Checksum verification failed', $powershellInstaller);
+        self::assertStringContainsString('DURABLE_WORKFLOW_INSTALL_VERIFY_ATTESTATIONS', $powershellInstaller);
+        self::assertStringContainsString('gh attestation verify $tmp --repo $repo', $powershellInstaller);
+        self::assertStringContainsString('gh attestation verify $sums --repo $repo', $powershellInstaller);
         self::assertStringContainsString('Move-Item -Force -Path $tmp -Destination $dest', $powershellInstaller);
     }
 

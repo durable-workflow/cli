@@ -14,6 +14,48 @@ use Symfony\Component\Console\Tester\CommandTester;
 
 class WorkflowTaskCommandTest extends TestCase
 {
+    public function test_poll_command_matches_polyglot_request_fixture(): void
+    {
+        $fixture = self::fixture('workflow-task-poll-parity.json', 'workflow-task.poll');
+        $client = new WorkflowTaskFakeClient($fixture['response_body']);
+
+        $command = new PollCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute($fixture['cli']['argv']));
+
+        self::assertSame($fixture['request']['method'], $client->lastMethod);
+        self::assertSame($fixture['request']['path'], $client->lastPostPath);
+        self::assertSame($fixture['request']['body'], $client->lastPostBody);
+
+        $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame($fixture['response_body'], $decoded);
+        self::assertSame($fixture['semantic_body']['task_id'], $decoded['task']['task_id'] ?? null);
+    }
+
+    public function test_complete_command_matches_polyglot_request_fixture(): void
+    {
+        $fixture = self::fixture('workflow-task-complete-parity.json', 'workflow-task.complete');
+        $client = new WorkflowTaskFakeClient($fixture['response_body']);
+
+        $command = new CompleteCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute($fixture['cli']['argv']));
+
+        self::assertSame($fixture['request']['method'], $client->lastMethod);
+        self::assertSame($fixture['request']['path'], $client->lastPostPath);
+        self::assertSame($fixture['request']['body'], $client->lastPostBody);
+
+        $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame($fixture['response_body'], $decoded);
+        self::assertSame($fixture['semantic_body']['outcome'], $decoded['outcome'] ?? null);
+    }
+
     public function test_poll_command_sends_worker_task_queue_and_history_options(): void
     {
         $client = new WorkflowTaskFakeClient([
@@ -139,12 +181,30 @@ class WorkflowTaskCommandTest extends TestCase
 
         self::assertStringContainsString('Use either --command or --complete-result', $tester->getDisplay());
     }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function fixture(string $file, string $operation): array
+    {
+        $contents = file_get_contents(__DIR__.'/../fixtures/control-plane/'.$file);
+        self::assertIsString($contents);
+
+        $fixture = json_decode($contents, true, flags: JSON_THROW_ON_ERROR);
+        self::assertIsArray($fixture);
+        self::assertSame('durable-workflow.polyglot.control-plane-request-fixture', $fixture['schema'] ?? null);
+        self::assertSame($operation, $fixture['operation'] ?? null);
+
+        return $fixture;
+    }
 }
 
 class WorkflowTaskFakeClient extends ServerClient
 {
     /** @var array<string, mixed> */
     public array $lastPostBody = [];
+
+    public ?string $lastMethod = null;
 
     public string $lastPostPath = '';
 
@@ -155,6 +215,7 @@ class WorkflowTaskFakeClient extends ServerClient
 
     public function post(string $path, array $body = []): array
     {
+        $this->lastMethod = 'POST';
         $this->lastPostPath = $path;
         $this->lastPostBody = $body;
 

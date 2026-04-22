@@ -7,6 +7,7 @@ namespace Tests\Commands;
 use DurableWorkflow\Cli\Commands\DoctorCommand;
 use DurableWorkflow\Cli\Support\AuthCompositionContract;
 use DurableWorkflow\Cli\Support\ControlPlaneRequestContract;
+use DurableWorkflow\Cli\Support\ExternalTaskInputContract;
 use DurableWorkflow\Cli\Support\ExternalTaskResultContract;
 use DurableWorkflow\Cli\Support\ExitCode;
 use DurableWorkflow\Cli\Support\NetworkException;
@@ -16,6 +17,7 @@ use DurableWorkflow\Cli\Support\ServerClient;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
+use Tests\Support\ExternalTaskInputContractTest;
 use Tests\Support\ExternalTaskResultContractTest;
 
 class DoctorCommandTest extends TestCase
@@ -82,6 +84,7 @@ class DoctorCommandTest extends TestCase
                 'server_capabilities' => [
                     'workflow_task_poll_request_idempotency' => true,
                 ],
+                'external_task_input_contract' => ExternalTaskInputContractTest::manifest(),
                 'external_task_result_contract' => ExternalTaskResultContractTest::manifest(),
             ],
         ]));
@@ -114,6 +117,16 @@ class DoctorCommandTest extends TestCase
         self::assertSame(AuthCompositionContract::VERSION, $decoded['server']['auth_composition_contract']['version']);
         self::assertSame('DURABLE_WORKFLOW_AUTH_TOKEN', $decoded['server']['auth_composition_contract']['canonical_environment']['auth_token']);
         self::assertSame('1.0', $decoded['server']['worker_protocol']['version']);
+        self::assertSame(
+            ExternalTaskInputContract::CONTRACT_SCHEMA,
+            $decoded['server']['worker_protocol']['external_task_input_contract']['schema'],
+        );
+        self::assertTrue($decoded['server']['worker_protocol']['external_task_input_contract']['valid']);
+        self::assertContains('activity_task', $decoded['server']['worker_protocol']['external_task_input_contract']['fixtures']);
+        self::assertContains(
+            'activity_task',
+            $decoded['server']['worker_protocol']['external_task_input_contract']['activity_grade_fixture_keys'],
+        );
         self::assertSame(
             ExternalTaskResultContract::SCHEMA,
             $decoded['server']['worker_protocol']['external_task_result_contract']['schema'],

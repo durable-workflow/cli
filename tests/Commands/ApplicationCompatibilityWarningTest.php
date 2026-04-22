@@ -7,10 +7,12 @@ namespace Tests\Commands;
 use DurableWorkflow\Cli\Application;
 use DurableWorkflow\Cli\Support\AuthCompositionContract;
 use DurableWorkflow\Cli\Support\ControlPlaneRequestContract;
+use DurableWorkflow\Cli\Support\ExternalTaskInputContract;
 use DurableWorkflow\Cli\Support\ExternalTaskResultContract;
 use DurableWorkflow\Cli\Support\ServerClient;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Tester\ApplicationTester;
+use Tests\Support\ExternalTaskInputContractTest;
 use Tests\Support\ExternalTaskResultContractTest;
 
 class ApplicationCompatibilityWarningTest extends TestCase
@@ -143,6 +145,51 @@ class ApplicationCompatibilityWarningTest extends TestCase
 
         self::assertStringContainsString(
             'Compatibility warning: server did not advertise worker_protocol.external_task_result_contract; dw CLI expects durable-workflow.v2.external-task-result.contract v1.',
+            $tester->getDisplay(),
+        );
+    }
+
+    public function test_warns_when_server_requires_external_task_input_contract_but_omits_manifest(): void
+    {
+        $clusterInfo = self::clusterInfo(serverVersion: '9.8.7', supportedCliVersions: '0.1.x');
+        $clusterInfo['client_compatibility']['required_protocols'] = [
+            'worker_protocol' => [
+                'external_task_input_contract' => [
+                    'schema' => ExternalTaskInputContract::CONTRACT_SCHEMA,
+                    'version' => ExternalTaskInputContract::VERSION,
+                ],
+            ],
+        ];
+
+        $application = $this->applicationWithClient(new ApplicationCompatibilityFakeClient($clusterInfo));
+        $tester = new ApplicationTester($application);
+
+        self::assertSame(0, $tester->run([
+            'command' => 'server:health',
+        ]));
+
+        self::assertStringContainsString(
+            'Compatibility warning: server did not advertise worker_protocol.external_task_input_contract; dw CLI expects durable-workflow.v2.external-task-input.contract v1.',
+            $tester->getDisplay(),
+        );
+    }
+
+    public function test_warns_when_server_external_task_input_fixture_artifacts_are_incomplete(): void
+    {
+        $clusterInfo = self::clusterInfo(serverVersion: '9.8.7', supportedCliVersions: '0.1.x');
+        $manifest = ExternalTaskInputContractTest::manifest();
+        unset($manifest['fixtures']['activity_task']);
+        $clusterInfo['worker_protocol']['external_task_input_contract'] = $manifest;
+
+        $application = $this->applicationWithClient(new ApplicationCompatibilityFakeClient($clusterInfo));
+        $tester = new ApplicationTester($application);
+
+        self::assertSame(0, $tester->run([
+            'command' => 'server:health',
+        ]));
+
+        self::assertStringContainsString(
+            'Compatibility warning: server worker_protocol.external_task_input_contract is missing consumable fixture artifact coverage: missing fixture [activity_task].',
             $tester->getDisplay(),
         );
     }

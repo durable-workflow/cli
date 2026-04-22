@@ -50,6 +50,50 @@ final class ExternalTaskInputContractTest extends TestCase
         self::assertSame('attempt_01HV7D3KJ1C8WQNNY8MVM8J40X', $taskInput->task['idempotency_key']);
     }
 
+    public function test_validates_embedded_input_fixture_artifact_manifest(): void
+    {
+        $manifest = self::manifest();
+
+        self::assertSame([], ExternalTaskInputContract::validateManifest($manifest));
+        self::assertSame(['workflow_task', 'activity_task'], ExternalTaskInputContract::fixtureNames());
+    }
+
+    public function test_rejects_missing_scope_and_incomplete_fixture_contracts(): void
+    {
+        $manifest = self::manifest();
+        unset($manifest['scope']['activity_grade_external_execution'], $manifest['fixtures']['workflow_task']);
+        $manifest['fixtures']['activity_task']['path'] = 'tests/fixtures/external-task-input/activity-task.v1.json';
+        $manifest['fixtures']['activity_task']['sha256'] = 'not-the-example-hash';
+
+        $errors = ExternalTaskInputContract::validateManifest($manifest);
+
+        self::assertContains(
+            'scope.activity_grade_external_execution must include fixture [activity_task]',
+            $errors,
+        );
+        self::assertContains('missing fixture [workflow_task]', $errors);
+        self::assertContains('fixture [activity_task] sha256 does not match embedded example', $errors);
+    }
+
+    public function test_warns_from_cluster_info_when_required_input_artifacts_are_missing(): void
+    {
+        $clusterInfo = [
+            'worker_protocol' => [
+                'version' => '1.0',
+                'external_task_input_contract' => [
+                    'schema' => ExternalTaskInputContract::CONTRACT_SCHEMA,
+                    'version' => ExternalTaskInputContract::VERSION,
+                    'fixtures' => [],
+                ],
+            ],
+        ];
+
+        self::assertSame(
+            'Compatibility warning: server worker_protocol.external_task_input_contract is missing consumable fixture artifact coverage: scope must describe activity_grade_external_execution and worker_protocol_runtime.',
+            ExternalTaskInputContract::warning($clusterInfo),
+        );
+    }
+
     public function test_fixture_artifact_rejects_checksum_drift(): void
     {
         $artifact = self::artifactFor('activity-task.v1', self::fixture('activity-task.v1.json'));
@@ -114,6 +158,37 @@ final class ExternalTaskInputContractTest extends TestCase
     {
         yield 'schema' => ['schema', 'wrong.schema'];
         yield 'version' => ['version', 2];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function manifest(): array
+    {
+        return [
+            'schema' => ExternalTaskInputContract::CONTRACT_SCHEMA,
+            'version' => ExternalTaskInputContract::VERSION,
+            'scope' => [
+                'activity_grade_external_execution' => [
+                    'task_kinds' => ['activity_task'],
+                    'fixture_keys' => ['activity_task'],
+                ],
+                'worker_protocol_runtime' => [
+                    'task_kinds' => ['workflow_task'],
+                    'fixture_keys' => ['workflow_task'],
+                ],
+            ],
+            'fixtures' => [
+                'workflow_task' => self::artifactFor(
+                    'workflow-task.v1',
+                    self::fixture('workflow-task.v1.json'),
+                ),
+                'activity_task' => self::artifactFor(
+                    'activity-task.v1',
+                    self::fixture('activity-task.v1.json'),
+                ),
+            ],
+        ];
     }
 
     /**

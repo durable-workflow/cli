@@ -18,6 +18,7 @@ final class CompatibilityDiagnostics
             self::controlPlaneWarning($clusterInfo),
             self::requestContractWarning($clusterInfo),
             self::authCompositionWarning($clusterInfo),
+            ExternalTaskInputContract::warning($clusterInfo),
             ExternalTaskResultContract::warning($clusterInfo),
             self::clientCompatibilityAuthorityWarning($clusterInfo),
             self::cliVersionSupportWarning($clusterInfo, $cliVersion),

@@ -14,6 +14,120 @@ final class ExternalTaskInputContract
 
     public const VERSION = 1;
 
+    private const REQUIRED_FIXTURES = [
+        'workflow_task' => 'durable-workflow.v2.external-task-input.workflow-task.v1',
+        'activity_task' => 'durable-workflow.v2.external-task-input.activity-task.v1',
+    ];
+
+    /**
+     * @return list<string>
+     */
+    public static function fixtureNames(): array
+    {
+        return array_keys(self::REQUIRED_FIXTURES);
+    }
+
+    public static function expected(): string
+    {
+        return sprintf('%s v%d', self::CONTRACT_SCHEMA, self::VERSION);
+    }
+
+    /**
+     * @param  array<string, mixed>  $clusterInfo
+     */
+    public static function warning(array $clusterInfo): ?string
+    {
+        if (! self::serverRequiresContract($clusterInfo) && ! self::hasPublishedManifest($clusterInfo)) {
+            return null;
+        }
+
+        $workerProtocol = $clusterInfo['worker_protocol'] ?? null;
+        $manifest = is_array($workerProtocol) ? $workerProtocol['external_task_input_contract'] ?? null : null;
+
+        if (! is_array($manifest)) {
+            return sprintf(
+                'Compatibility warning: server did not advertise worker_protocol.external_task_input_contract; dw CLI expects %s.',
+                self::expected(),
+            );
+        }
+
+        $schema = $manifest['schema'] ?? null;
+        $version = $manifest['version'] ?? null;
+        if ($schema !== self::CONTRACT_SCHEMA || ! self::versionMatches($version)) {
+            return sprintf(
+                'Compatibility warning: server advertises worker_protocol.external_task_input_contract [%s v%s]; dw CLI expects %s.',
+                is_scalar($schema) ? (string) $schema : 'missing',
+                is_scalar($version) ? (string) $version : 'missing',
+                self::expected(),
+            );
+        }
+
+        $errors = self::validateManifest($manifest);
+        if ($errors !== []) {
+            return sprintf(
+                'Compatibility warning: server worker_protocol.external_task_input_contract is missing consumable fixture artifact coverage: %s.',
+                $errors[0],
+            );
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $clusterInfo
+     * @return array<string, mixed>|null
+     */
+    public static function diagnostic(array $clusterInfo): ?array
+    {
+        $workerProtocol = $clusterInfo['worker_protocol'] ?? null;
+        $manifest = is_array($workerProtocol) ? $workerProtocol['external_task_input_contract'] ?? null : null;
+
+        if (! is_array($manifest)) {
+            return null;
+        }
+
+        $fixtures = is_array($manifest['fixtures'] ?? null) ? $manifest['fixtures'] : [];
+        $scope = is_array($manifest['scope'] ?? null) ? $manifest['scope'] : [];
+
+        return [
+            'schema' => is_scalar($manifest['schema'] ?? null) ? (string) $manifest['schema'] : null,
+            'version' => is_scalar($manifest['version'] ?? null) ? (int) $manifest['version'] : null,
+            'fixtures' => array_values(array_intersect(array_keys($fixtures), self::fixtureNames())),
+            'activity_grade_fixture_keys' => self::scopeFixtureKeys($scope, 'activity_grade_external_execution'),
+            'worker_protocol_fixture_keys' => self::scopeFixtureKeys($scope, 'worker_protocol_runtime'),
+            'valid' => self::validateManifest($manifest) === [],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $manifest
+     * @return list<string>
+     */
+    public static function validateManifest(array $manifest): array
+    {
+        $errors = [];
+        $fixtures = $manifest['fixtures'] ?? null;
+
+        if (! is_array($fixtures)) {
+            return ['fixtures must be an object keyed by artifact role'];
+        }
+
+        $errors = array_merge($errors, self::validateScope($manifest));
+
+        foreach (self::REQUIRED_FIXTURES as $name => $artifactName) {
+            $artifact = $fixtures[$name] ?? null;
+            if (! is_array($artifact)) {
+                $errors[] = sprintf('missing fixture [%s]', $name);
+
+                continue;
+            }
+
+            $errors = array_merge($errors, self::validateArtifact($name, $artifactName, $artifact));
+        }
+
+        return $errors;
+    }
+
     /**
      * @param  array<string, mixed>  $envelope
      */
@@ -87,6 +201,156 @@ final class ExternalTaskInputContract
         }
 
         return self::parseEnvelope($example);
+    }
+
+    /**
+     * @param  array<string, mixed>  $clusterInfo
+     */
+    private static function hasPublishedManifest(array $clusterInfo): bool
+    {
+        $workerProtocol = $clusterInfo['worker_protocol'] ?? null;
+
+        return is_array($workerProtocol) && array_key_exists('external_task_input_contract', $workerProtocol);
+    }
+
+    /**
+     * @param  array<string, mixed>  $clusterInfo
+     */
+    private static function serverRequiresContract(array $clusterInfo): bool
+    {
+        $compatibility = $clusterInfo['client_compatibility'] ?? null;
+        if (! is_array($compatibility)) {
+            return false;
+        }
+
+        $requiredProtocols = $compatibility['required_protocols'] ?? null;
+        if (is_array($requiredProtocols)) {
+            $workerProtocol = $requiredProtocols['worker_protocol'] ?? null;
+            if (is_array($workerProtocol) && array_key_exists('external_task_input_contract', $workerProtocol)) {
+                return true;
+            }
+        }
+
+        $clients = $compatibility['clients'] ?? null;
+        $cli = is_array($clients) ? $clients['cli'] ?? null : null;
+        $requires = is_array($cli) ? $cli['requires'] ?? null : null;
+        if (! is_array($requires)) {
+            return false;
+        }
+
+        foreach ($requires as $requirement) {
+            if (is_string($requirement) && str_starts_with($requirement, 'worker_protocol.external_task_input_contract')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function versionMatches(mixed $version): bool
+    {
+        return is_int($version) || (is_string($version) && ctype_digit($version))
+            ? (int) $version === self::VERSION
+            : false;
+    }
+
+    /**
+     * @param  array<string, mixed>  $manifest
+     * @return list<string>
+     */
+    private static function validateScope(array $manifest): array
+    {
+        $scope = $manifest['scope'] ?? null;
+        if (! is_array($scope)) {
+            return ['scope must describe activity_grade_external_execution and worker_protocol_runtime'];
+        }
+
+        $activityKeys = self::scopeFixtureKeys($scope, 'activity_grade_external_execution');
+        $workerKeys = self::scopeFixtureKeys($scope, 'worker_protocol_runtime');
+        $errors = [];
+
+        if (! in_array('activity_task', $activityKeys, true)) {
+            $errors[] = 'scope.activity_grade_external_execution must include fixture [activity_task]';
+        }
+
+        if (! in_array('workflow_task', $workerKeys, true)) {
+            $errors[] = 'scope.worker_protocol_runtime must include fixture [workflow_task]';
+        }
+
+        return $errors;
+    }
+
+    /**
+     * @param  array<string, mixed>  $scope
+     * @return list<string>
+     */
+    private static function scopeFixtureKeys(array $scope, string $scopeName): array
+    {
+        $section = $scope[$scopeName] ?? null;
+        $keys = is_array($section) ? $section['fixture_keys'] ?? null : null;
+
+        if (! is_array($keys)) {
+            return [];
+        }
+
+        return array_values(array_filter($keys, static fn ($key): bool => is_string($key)));
+    }
+
+    /**
+     * @param  array<string, mixed>  $artifact
+     * @return list<string>
+     */
+    private static function validateArtifact(string $name, string $artifactName, array $artifact): array
+    {
+        $errors = [];
+
+        if (($artifact['artifact'] ?? null) !== $artifactName) {
+            $errors[] = sprintf('fixture [%s] has artifact [%s]', $name, self::display($artifact['artifact'] ?? null));
+        }
+
+        if (($artifact['media_type'] ?? null) !== self::MEDIA_TYPE) {
+            $errors[] = sprintf('fixture [%s] has media type [%s]', $name, self::display($artifact['media_type'] ?? null));
+        }
+
+        if (($artifact['schema'] ?? null) !== self::SCHEMA || ! self::versionMatches($artifact['version'] ?? null)) {
+            $errors[] = sprintf('fixture [%s] has unsupported envelope schema/version', $name);
+        }
+
+        $example = $artifact['example'] ?? null;
+        if (! is_array($example)) {
+            $errors[] = sprintf('fixture [%s] is missing an embedded example', $name);
+
+            return $errors;
+        }
+
+        $sha = self::sha256Json($example);
+        if (($artifact['sha256'] ?? null) !== $sha) {
+            $errors[] = sprintf('fixture [%s] sha256 does not match embedded example', $name);
+        }
+
+        try {
+            $parsed = self::parseEnvelope($example);
+            if ($parsed->kind !== $name) {
+                $errors[] = sprintf('fixture [%s] example has task kind [%s]', $name, $parsed->kind);
+            }
+        } catch (\InvalidArgumentException $exception) {
+            $errors[] = sprintf('fixture [%s] example is invalid: %s', $name, $exception->getMessage());
+        }
+
+        return $errors;
+    }
+
+    private static function display(mixed $value): string
+    {
+        if ($value === null) {
+            return 'missing';
+        }
+
+        if (is_scalar($value)) {
+            return (string) $value;
+        }
+
+        return get_debug_type($value);
     }
 
     /**

@@ -6,6 +6,7 @@ namespace DurableWorkflow\Cli\Commands;
 
 use DurableWorkflow\Cli\BuildInfo;
 use DurableWorkflow\Cli\Support\CompatibilityDiagnostics;
+use DurableWorkflow\Cli\Support\ExternalTaskInputContract;
 use DurableWorkflow\Cli\Support\ExternalTaskResultContract;
 use DurableWorkflow\Cli\Support\ExitCode;
 use DurableWorkflow\Cli\Support\OutputMode;
@@ -249,6 +250,7 @@ HELP);
         return [
             'version' => $this->scalarString($workerProtocol['version'] ?? null),
             'server_capabilities' => $workerProtocol['server_capabilities'] ?? null,
+            'external_task_input_contract' => ExternalTaskInputContract::diagnostic($clusterInfo),
             'external_task_result_contract' => ExternalTaskResultContract::diagnostic($clusterInfo),
         ];
     }

@@ -58,6 +58,29 @@ class ServerHealthCommandTest extends TestCase
         self::assertStringContainsString('error', $display);
     }
 
+    public function test_health_command_honors_json_output(): void
+    {
+        $command = new HealthCommand();
+        $command->setServerClient(new HealthFakeClient([
+            'status' => 'ok',
+            'timestamp' => '2026-04-13T14:00:00Z',
+            'checks' => [
+                'database' => 'ok',
+                'redis' => 'ok',
+            ],
+        ]));
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute(['--output' => 'json']));
+
+        $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+
+        self::assertSame('ok', $decoded['status']);
+        self::assertSame('2026-04-13T14:00:00Z', $decoded['timestamp']);
+        self::assertSame('ok', $decoded['checks']['database']);
+    }
+
     public function test_health_command_returns_network_exit_code_on_connection_error(): void
     {
         $command = new HealthCommand();

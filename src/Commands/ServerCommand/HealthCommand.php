@@ -30,6 +30,11 @@ HELP);
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $result = $this->client($input)->get('/health');
+
+        if ($this->wantsJson($input)) {
+            return $this->renderJson($output, $result);
+        }
+
         $output->writeln('Server is '.$this->formatStatus($result['status'] ?? null));
         $output->writeln('Timestamp: '.$result['timestamp']);
 

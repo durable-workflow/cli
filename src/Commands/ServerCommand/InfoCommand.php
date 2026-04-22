@@ -32,6 +32,10 @@ HELP);
     {
         $result = $this->client($input)->clusterInfo();
 
+        if ($this->wantsJson($input)) {
+            return $this->renderJson($output, $result);
+        }
+
         $output->writeln('<info>Durable Workflow Server</info>');
         $output->writeln('  Server ID: '.($result['server_id'] ?? 'unknown'));
         $output->writeln('  Version: '.($result['version'] ?? 'unknown'));

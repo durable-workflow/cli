@@ -154,6 +154,44 @@ class ServerInfoCommandTest extends TestCase
         // Nested map renders without "Array" or array-to-string warnings.
         self::assertStringNotContainsString('Array', $display);
     }
+
+    public function test_it_honors_json_output(): void
+    {
+        $command = new InfoCommand();
+        $command->setServerClient(new ServerInfoFakeClient([
+            'server_id' => 'server-1',
+            'version' => '0.1.0',
+            'default_namespace' => 'default',
+            'capabilities' => [
+                'workflow_tasks' => true,
+            ],
+            'control_plane' => [
+                'version' => '2',
+                'request_contract' => [
+                    'schema' => ControlPlaneRequestContract::SCHEMA,
+                    'version' => ControlPlaneRequestContract::VERSION,
+                    'operations' => [],
+                ],
+            ],
+            'worker_protocol' => [
+                'version' => '1',
+                'server_capabilities' => [
+                    'long_poll_timeout' => 30,
+                ],
+            ],
+        ]));
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute(['--output' => 'json']));
+
+        $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+
+        self::assertSame('server-1', $decoded['server_id']);
+        self::assertSame('0.1.0', $decoded['version']);
+        self::assertTrue($decoded['capabilities']['workflow_tasks']);
+        self::assertSame(30, $decoded['worker_protocol']['server_capabilities']['long_poll_timeout']);
+    }
 }
 
 class ServerInfoFakeClient extends ServerClient

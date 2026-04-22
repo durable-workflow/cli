@@ -4,11 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\Commands;
 
+use DurableWorkflow\Cli\Commands\ScheduleCommand\BackfillCommand;
+use DurableWorkflow\Cli\Commands\ScheduleCommand\CreateCommand;
 use DurableWorkflow\Cli\Commands\ScheduleCommand\DescribeCommand;
 use DurableWorkflow\Cli\Commands\ScheduleCommand\DeleteCommand;
 use DurableWorkflow\Cli\Commands\ScheduleCommand\ListCommand;
 use DurableWorkflow\Cli\Commands\ScheduleCommand\PauseCommand;
 use DurableWorkflow\Cli\Commands\ScheduleCommand\ResumeCommand;
+use DurableWorkflow\Cli\Commands\ScheduleCommand\TriggerCommand;
+use DurableWorkflow\Cli\Commands\ScheduleCommand\UpdateCommand;
 use DurableWorkflow\Cli\Support\ServerClient;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
@@ -16,6 +20,29 @@ use Symfony\Component\Console\Tester\CommandTester;
 
 final class ScheduleParityFixtureTest extends TestCase
 {
+    public function test_schedule_create_matches_polyglot_request_fixture(): void
+    {
+        $fixture = self::fixture('schedule-create-parity.json', 'schedule.create');
+        $client = new ScheduleParityClient($fixture['response_body']);
+        $command = new CreateCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute($fixture['cli']['argv']));
+
+        self::assertSame($fixture['request']['method'], $client->lastMethod);
+        self::assertSame($fixture['request']['path'], $client->lastPath);
+        self::assertSame($fixture['request']['body'], $client->lastBody);
+
+        $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame($fixture['response_body'], $decoded);
+
+        $semantic = $fixture['semantic_body'];
+        self::assertSame($semantic['schedule_id'], $decoded['schedule_id'] ?? null);
+        self::assertSame($semantic['outcome'], $decoded['outcome'] ?? null);
+    }
+
     public function test_schedule_list_matches_polyglot_request_fixture(): void
     {
         $fixture = self::fixture('schedule-list-parity.json', 'schedule.list');
@@ -75,6 +102,29 @@ final class ScheduleParityFixtureTest extends TestCase
         self::assertSame($semantic['remaining_actions'], $decoded['remaining_actions'] ?? null);
     }
 
+    public function test_schedule_update_matches_polyglot_request_fixture(): void
+    {
+        $fixture = self::fixture('schedule-update-parity.json', 'schedule.update');
+        $client = new ScheduleParityClient($fixture['response_body']);
+        $command = new UpdateCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute($fixture['cli']['argv']));
+
+        self::assertSame($fixture['request']['method'], $client->lastMethod);
+        self::assertSame($fixture['request']['path'], $client->lastPath);
+        self::assertSame($fixture['request']['body'], $client->lastBody);
+
+        $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame($fixture['response_body'], $decoded);
+
+        $semantic = $fixture['semantic_body'];
+        self::assertSame($semantic['schedule_id'], $decoded['schedule_id'] ?? null);
+        self::assertSame($semantic['outcome'], $decoded['outcome'] ?? null);
+    }
+
     public function test_schedule_pause_matches_polyglot_request_fixture(): void
     {
         $fixture = self::fixture('schedule-pause-parity.json', 'schedule.pause');
@@ -96,6 +146,55 @@ final class ScheduleParityFixtureTest extends TestCase
         $semantic = $fixture['semantic_body'];
         self::assertSame($semantic['schedule_id'], $decoded['schedule_id'] ?? null);
         self::assertSame($semantic['outcome'], $decoded['outcome'] ?? null);
+    }
+
+    public function test_schedule_trigger_matches_polyglot_request_fixture(): void
+    {
+        $fixture = self::fixture('schedule-trigger-parity.json', 'schedule.trigger');
+        $client = new ScheduleParityClient($fixture['response_body']);
+        $command = new TriggerCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute($fixture['cli']['argv']));
+
+        self::assertSame($fixture['request']['method'], $client->lastMethod);
+        self::assertSame($fixture['request']['path'], $client->lastPath);
+        self::assertSame($fixture['request']['body'], $client->lastBody);
+
+        $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame($fixture['response_body'], $decoded);
+
+        $semantic = $fixture['semantic_body'];
+        self::assertSame($semantic['schedule_id'], $decoded['schedule_id'] ?? null);
+        self::assertSame($semantic['outcome'], $decoded['outcome'] ?? null);
+        self::assertSame($semantic['workflow_id'], $decoded['workflow_id'] ?? null);
+        self::assertSame($semantic['run_id'], $decoded['run_id'] ?? null);
+    }
+
+    public function test_schedule_backfill_matches_polyglot_request_fixture(): void
+    {
+        $fixture = self::fixture('schedule-backfill-parity.json', 'schedule.backfill');
+        $client = new ScheduleParityClient($fixture['response_body']);
+        $command = new BackfillCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute($fixture['cli']['argv']));
+
+        self::assertSame($fixture['request']['method'], $client->lastMethod);
+        self::assertSame($fixture['request']['path'], $client->lastPath);
+        self::assertSame($fixture['request']['body'], $client->lastBody);
+
+        $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame($fixture['response_body'], $decoded);
+
+        $semantic = $fixture['semantic_body'];
+        self::assertSame($semantic['schedule_id'], $decoded['schedule_id'] ?? null);
+        self::assertSame($semantic['outcome'], $decoded['outcome'] ?? null);
+        self::assertSame($semantic['fires_attempted'], $decoded['fires_attempted'] ?? null);
     }
 
     public function test_schedule_resume_matches_polyglot_request_fixture(): void
@@ -198,6 +297,15 @@ final class ScheduleParityClient extends ServerClient
     public function post(string $path, array $body = []): array
     {
         $this->lastMethod = 'POST';
+        $this->lastPath = $path;
+        $this->lastBody = $body;
+
+        return $this->response;
+    }
+
+    public function put(string $path, array $body = []): array
+    {
+        $this->lastMethod = 'PUT';
         $this->lastPath = $path;
         $this->lastBody = $body;
 

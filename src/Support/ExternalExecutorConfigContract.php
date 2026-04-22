@@ -41,6 +41,9 @@ final class ExternalExecutorConfigContract
         if ($carriers === []) {
             $errors[] = 'carriers must contain at least one carrier';
         }
+        foreach ($carriers as $name => $carrier) {
+            array_push($errors, ...self::validateCarrier($name, $carrier));
+        }
 
         $mappingNames = [];
         foreach (self::list($config['mappings'] ?? []) as $index => $mapping) {
@@ -155,6 +158,100 @@ final class ExternalExecutorConfigContract
         }
 
         return $errors;
+    }
+
+    /**
+     * @param  array<string, mixed>  $carrier
+     * @return list<string>
+     */
+    private static function validateCarrier(string $name, array $carrier): array
+    {
+        $type = self::string($carrier['type'] ?? null);
+
+        if ($type !== 'invocable_http') {
+            return [];
+        }
+
+        $errors = [];
+        $capabilities = $carrier['capabilities'] ?? null;
+
+        if (is_array($capabilities)) {
+            $invalid = [];
+            foreach ($capabilities as $capability) {
+                if ($capability !== 'activity_task') {
+                    $invalid[] = (string) $capability;
+                }
+            }
+
+            if ($invalid !== []) {
+                $errors[] = sprintf(
+                    'carrier [%s] type [invocable_http] only supports activity_task capability',
+                    $name,
+                );
+            }
+        }
+
+        $url = self::string($carrier['url'] ?? null);
+        if ($url === null) {
+            $errors[] = sprintf('carrier [%s] type [invocable_http] requires url', $name);
+        } else {
+            array_push($errors, ...self::validateInvocableUrl($name, $url));
+        }
+
+        $method = strtoupper(self::string($carrier['method'] ?? 'POST') ?? 'POST');
+        if ($method !== 'POST') {
+            $errors[] = sprintf('carrier [%s] type [invocable_http] only supports POST method', $name);
+        }
+
+        if (array_key_exists('timeout_seconds', $carrier)) {
+            $timeout = $carrier['timeout_seconds'];
+            if (! is_int($timeout) || $timeout < 1 || $timeout > 900) {
+                $errors[] = sprintf(
+                    'carrier [%s] type [invocable_http] timeout_seconds must be an integer between 1 and 900',
+                    $name,
+                );
+            }
+        }
+
+        return $errors;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function validateInvocableUrl(string $name, string $url): array
+    {
+        $parts = parse_url($url);
+
+        if (! is_array($parts) || self::string($parts['scheme'] ?? null) === null || self::string($parts['host'] ?? null) === null) {
+            return [sprintf('carrier [%s] type [invocable_http] url must be absolute', $name)];
+        }
+
+        if (array_key_exists('user', $parts) || array_key_exists('pass', $parts)) {
+            return [sprintf('carrier [%s] type [invocable_http] url must not include credentials', $name)];
+        }
+
+        $scheme = strtolower((string) $parts['scheme']);
+        $host = strtolower((string) $parts['host']);
+
+        if ($scheme === 'https') {
+            return [];
+        }
+
+        if ($scheme === 'http' && self::isLoopbackHost($host)) {
+            return [];
+        }
+
+        return [sprintf(
+            'carrier [%s] type [invocable_http] url must use https, except http loopback for local development',
+            $name,
+        )];
+    }
+
+    private static function isLoopbackHost(string $host): bool
+    {
+        return in_array($host, ['localhost', '127.0.0.1', '::1'], true)
+            || str_starts_with($host, '127.');
     }
 
     /**

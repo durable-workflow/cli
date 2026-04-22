@@ -91,6 +91,72 @@ final class ExternalExecutorConfigContractTest extends TestCase
         self::assertSame([], ExternalExecutorConfigContract::validate($config));
     }
 
+    public function test_invocable_http_carriers_follow_activity_only_target_contract(): void
+    {
+        $config = self::validConfig();
+        $config['carriers'] = [
+            'invocable' => [
+                'type' => 'invocable_http',
+                'url' => 'https://handlers.example.com/durable/activity',
+                'method' => 'POST',
+                'timeout_seconds' => 45,
+                'capabilities' => ['activity_task'],
+            ],
+        ];
+        $config['mappings'][0]['carrier'] = 'invocable';
+
+        self::assertSame([], ExternalExecutorConfigContract::validate($config));
+    }
+
+    public function test_invocable_http_carriers_fail_closed_on_unsafe_targets(): void
+    {
+        $config = self::validConfig();
+        $config['carriers'] = [
+            'invocable' => [
+                'type' => 'invocable_http',
+                'url' => 'http://user:secret@example.com/durable/activity',
+                'method' => 'PUT',
+                'timeout_seconds' => 901,
+                'capabilities' => ['activity_task', 'workflow_start'],
+            ],
+        ];
+        $config['mappings'][0]['carrier'] = 'invocable';
+
+        $errors = ExternalExecutorConfigContract::validate($config);
+
+        self::assertContains(
+            'carrier [invocable] type [invocable_http] only supports activity_task capability',
+            $errors,
+        );
+        self::assertContains(
+            'carrier [invocable] type [invocable_http] url must not include credentials',
+            $errors,
+        );
+        self::assertContains(
+            'carrier [invocable] type [invocable_http] only supports POST method',
+            $errors,
+        );
+        self::assertContains(
+            'carrier [invocable] type [invocable_http] timeout_seconds must be an integer between 1 and 900',
+            $errors,
+        );
+    }
+
+    public function test_invocable_http_allows_loopback_http_for_local_development(): void
+    {
+        $config = self::validConfig();
+        $config['carriers'] = [
+            'local-invocable' => [
+                'type' => 'invocable_http',
+                'url' => 'http://127.0.0.1:8081/durable/activity',
+                'capabilities' => ['activity_task'],
+            ],
+        ];
+        $config['mappings'][0]['carrier'] = 'local-invocable';
+
+        self::assertSame([], ExternalExecutorConfigContract::validate($config));
+    }
+
     /**
      * @return array<string, mixed>
      */

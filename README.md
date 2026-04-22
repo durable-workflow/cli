@@ -217,6 +217,16 @@ path, mTLS certificate path plus key reference, or signed-header key reference
 plus header allowlist. They must not persist bearer tokens, private keys, or
 signing secrets inline.
 
+Invocable activity handlers use the `invocable_http` carrier type in the same
+external executor config file. The CLI validates that these targets stay
+activity-only, use `POST`, declare an absolute HTTPS URL, avoid embedded URL
+credentials, and keep `timeout_seconds` within the server-published
+invocable-carrier envelope. Loopback HTTP is accepted only for local
+development. `dw server:info` and `dw doctor --output=json` expose the
+server-advertised `worker_protocol.invocable_carrier_contract` so operators can
+verify the request/response content types, task-kind scope, idempotency key
+source, and retry-authority boundary before enabling a mapping.
+
 The CLI targets control-plane contract version `2` automatically via
 `X-Durable-Workflow-Control-Plane-Version: 2` and expects canonical v2
 response fields such as `*_name` and `wait_for`. Non-canonical legacy aliases

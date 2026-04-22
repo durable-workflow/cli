@@ -30,6 +30,7 @@ class ConfigSchemaRegistryTest extends TestCase
         self::assertSame(['schema', 'version', 'mappings', 'carriers'], $schema['required']);
         self::assertContains('process', $schema['properties']['carriers']['additionalProperties']['properties']['type']['enum']);
         self::assertContains('http', $schema['properties']['carriers']['additionalProperties']['properties']['type']['enum']);
+        self::assertContains('invocable_http', $schema['properties']['carriers']['additionalProperties']['properties']['type']['enum']);
         self::assertContains('signed_headers', $schema['properties']['auth_refs']['additionalProperties']['properties']['type']['enum']);
         self::assertArrayHasKey('header_allowlist', $schema['properties']['auth_refs']['additionalProperties']['properties']);
         self::assertContains('activity', $schema['$defs']['mapping']['properties']['kind']['enum']);

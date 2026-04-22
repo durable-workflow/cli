@@ -10,6 +10,7 @@
       "schema_id": "https://durable-workflow.com/schemas/cli/config/external-executor.schema.json",
       "examples": [
         "examples/external-executor/operator-task-runner.dw-executor.json",
+        "examples/external-executor/invocable-activity.dw-executor.json",
         "examples/external-executor/integration-bridge.dw-executor.json"
       ]
     }

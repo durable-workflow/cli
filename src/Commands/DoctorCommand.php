@@ -250,8 +250,38 @@ HELP);
         return [
             'version' => $this->scalarString($workerProtocol['version'] ?? null),
             'server_capabilities' => $workerProtocol['server_capabilities'] ?? null,
+            'invocable_carrier_contract' => $this->invocableCarrierDiagnostic($workerProtocol),
             'external_task_input_contract' => ExternalTaskInputContract::diagnostic($clusterInfo),
             'external_task_result_contract' => ExternalTaskResultContract::diagnostic($clusterInfo),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $workerProtocol
+     * @return array<string, mixed>|null
+     */
+    private function invocableCarrierDiagnostic(array $workerProtocol): ?array
+    {
+        $contract = $workerProtocol['invocable_carrier_contract'] ?? null;
+
+        if (! is_array($contract)) {
+            return null;
+        }
+
+        $scope = is_array($contract['scope'] ?? null) ? $contract['scope'] : [];
+        $request = is_array($contract['request'] ?? null) ? $contract['request'] : [];
+        $response = is_array($contract['response'] ?? null) ? $contract['response'] : [];
+        $rollout = is_array($contract['rollout_safety'] ?? null) ? $contract['rollout_safety'] : [];
+
+        return [
+            'schema' => $this->scalarString($contract['schema'] ?? null),
+            'version' => is_scalar($contract['version'] ?? null) ? (int) $contract['version'] : null,
+            'carrier_type' => $this->scalarString($contract['carrier_type'] ?? null),
+            'task_kinds' => is_array($scope['task_kinds'] ?? null) ? array_values($scope['task_kinds']) : [],
+            'request_content_type' => $this->scalarString($request['content_type'] ?? null),
+            'response_content_type' => $this->scalarString($response['content_type'] ?? null),
+            'idempotency_key_source' => $this->scalarString($request['idempotency_key_source'] ?? null),
+            'retry_authority' => $this->scalarString($rollout['retry_authority'] ?? null),
         ];
     }
 
@@ -308,6 +338,17 @@ HELP);
             $workerProtocol = is_array($server['worker_protocol'] ?? null) ? $server['worker_protocol'] : [];
             if ($workerProtocol !== []) {
                 $output->writeln('  Worker Protocol: '.($workerProtocol['version'] ?? 'unknown'));
+                $invocable = is_array($workerProtocol['invocable_carrier_contract'] ?? null)
+                    ? $workerProtocol['invocable_carrier_contract']
+                    : null;
+                if ($invocable !== null) {
+                    $output->writeln(sprintf(
+                        '  Invocable Carrier: %s v%s (%s)',
+                        $invocable['schema'] ?? 'unknown',
+                        $invocable['version'] ?? 'unknown',
+                        $invocable['carrier_type'] ?? 'unknown',
+                    ));
+                }
             }
         }
 

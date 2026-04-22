@@ -86,6 +86,24 @@ class DoctorCommandTest extends TestCase
                 ],
                 'external_task_input_contract' => ExternalTaskInputContractTest::manifest(),
                 'external_task_result_contract' => ExternalTaskResultContractTest::manifest(),
+                'invocable_carrier_contract' => [
+                    'schema' => 'durable-workflow.v2.invocable-carrier.contract',
+                    'version' => 1,
+                    'carrier_type' => 'invocable_http',
+                    'scope' => [
+                        'task_kinds' => ['activity_task'],
+                    ],
+                    'request' => [
+                        'content_type' => 'application/vnd.durable-workflow.external-task-input+json',
+                        'idempotency_key_source' => 'task.idempotency_key',
+                    ],
+                    'response' => [
+                        'content_type' => 'application/vnd.durable-workflow.external-task-result+json',
+                    ],
+                    'rollout_safety' => [
+                        'retry_authority' => 'carrier policy may retry transport failures, but durable activity retry policy remains the server/runtime authority',
+                    ],
+                ],
             ],
         ]));
 
@@ -117,6 +135,26 @@ class DoctorCommandTest extends TestCase
         self::assertSame(AuthCompositionContract::VERSION, $decoded['server']['auth_composition_contract']['version']);
         self::assertSame('DURABLE_WORKFLOW_AUTH_TOKEN', $decoded['server']['auth_composition_contract']['canonical_environment']['auth_token']);
         self::assertSame('1.0', $decoded['server']['worker_protocol']['version']);
+        self::assertSame(
+            'durable-workflow.v2.invocable-carrier.contract',
+            $decoded['server']['worker_protocol']['invocable_carrier_contract']['schema'],
+        );
+        self::assertSame(
+            'invocable_http',
+            $decoded['server']['worker_protocol']['invocable_carrier_contract']['carrier_type'],
+        );
+        self::assertContains(
+            'activity_task',
+            $decoded['server']['worker_protocol']['invocable_carrier_contract']['task_kinds'],
+        );
+        self::assertSame(
+            'task.idempotency_key',
+            $decoded['server']['worker_protocol']['invocable_carrier_contract']['idempotency_key_source'],
+        );
+        self::assertStringContainsString(
+            'durable activity retry policy remains the server/runtime authority',
+            $decoded['server']['worker_protocol']['invocable_carrier_contract']['retry_authority'],
+        );
         self::assertSame(
             ExternalTaskInputContract::CONTRACT_SCHEMA,
             $decoded['server']['worker_protocol']['external_task_input_contract']['schema'],

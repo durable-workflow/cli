@@ -1,0 +1,41 @@
+{
+  "schema": "durable-workflow.external-executor.config",
+  "version": 1,
+  "defaults": {
+    "profile": "prod",
+    "namespace": "operations",
+    "task_queue": "operator-tasks",
+    "auth_ref": "handler-token"
+  },
+  "auth_refs": {
+    "handler-token": {
+      "type": "env",
+      "env": "DURABLE_WORKFLOW_HANDLER_TOKEN"
+    }
+  },
+  "carriers": {
+    "ops-invocable": {
+      "type": "invocable_http",
+      "url": "https://handlers.example.com/durable/activity",
+      "method": "POST",
+      "timeout_seconds": 60,
+      "capabilities": ["activity_task"]
+    }
+  },
+  "mappings": [
+    {
+      "name": "billing.reconcile-ledger",
+      "kind": "activity",
+      "task_queue": "operator-tasks",
+      "activity_type": "billing.reconcile-ledger",
+      "carrier": "ops-invocable",
+      "handler": "billing.reconcile-ledger",
+      "timeout_seconds": 60,
+      "rollout": {
+        "version": "invocable-v1",
+        "percentage": 100,
+        "capability": "activity_task"
+      }
+    }
+  ]
+}

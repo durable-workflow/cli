@@ -90,6 +90,25 @@ class ServerInfoCommandTest extends TestCase
                         'schedule_activity',
                     ],
                     'workflow_task_poll_request_idempotency' => true,
+                    'invocable_carrier' => [
+                        'schema' => 'durable-workflow.v2.invocable-carrier.contract',
+                        'version' => 1,
+                        'carrier_type' => 'invocable_http',
+                    ],
+                ],
+                'invocable_carrier_contract' => [
+                    'schema' => 'durable-workflow.v2.invocable-carrier.contract',
+                    'version' => 1,
+                    'carrier_type' => 'invocable_http',
+                    'scope' => [
+                        'task_kinds' => ['activity_task'],
+                    ],
+                    'request' => [
+                        'content_type' => 'application/vnd.durable-workflow.external-task-input+json',
+                    ],
+                    'response' => [
+                        'content_type' => 'application/vnd.durable-workflow.external-task-result+json',
+                    ],
                 ],
             ],
         ]));
@@ -138,6 +157,24 @@ class ServerInfoCommandTest extends TestCase
             $display,
         );
         self::assertStringContainsString('Workflow Task Poll Idempotency: yes', $display);
+        self::assertStringContainsString(
+            'Invocable Carrier: durable-workflow.v2.invocable-carrier.contract v1 (invocable_http)',
+            $display,
+        );
+        self::assertStringContainsString(
+            'Invocable Carrier Contract: durable-workflow.v2.invocable-carrier.contract v1',
+            $display,
+        );
+        self::assertStringContainsString('Invocable Carrier Type: invocable_http', $display);
+        self::assertStringContainsString('Invocable Task Kinds: activity_task', $display);
+        self::assertStringContainsString(
+            'Invocable Request Content-Type: application/vnd.durable-workflow.external-task-input+json',
+            $display,
+        );
+        self::assertStringContainsString(
+            'Invocable Response Content-Type: application/vnd.durable-workflow.external-task-result+json',
+            $display,
+        );
 
         // Flat list capabilities render inline.
         self::assertStringContainsString('payload_codecs: avro', $display);

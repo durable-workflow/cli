@@ -179,6 +179,44 @@ HELP);
                         $output->writeln('  History Compression Threshold: '.$threshold.' events');
                     }
                 }
+
+                $invocable = $serverCapabilities['invocable_carrier'] ?? null;
+                if (is_array($invocable)) {
+                    $output->writeln(sprintf(
+                        '  Invocable Carrier: %s v%s (%s)',
+                        $invocable['schema'] ?? 'unknown',
+                        $invocable['version'] ?? 'unknown',
+                        $invocable['carrier_type'] ?? 'unknown',
+                    ));
+                }
+            }
+
+            $invocableContract = $workerProtocol['invocable_carrier_contract'] ?? null;
+            if (is_array($invocableContract)) {
+                $output->writeln(sprintf(
+                    '  Invocable Carrier Contract: %s v%s',
+                    $invocableContract['schema'] ?? 'unknown',
+                    $invocableContract['version'] ?? 'unknown',
+                ));
+                $output->writeln('  Invocable Carrier Type: '.($invocableContract['carrier_type'] ?? 'unknown'));
+
+                $scope = $invocableContract['scope'] ?? null;
+                $taskKinds = is_array($scope) && is_array($scope['task_kinds'] ?? null)
+                    ? $scope['task_kinds']
+                    : [];
+                if ($taskKinds !== []) {
+                    $output->writeln('  Invocable Task Kinds: '.implode(', ', $taskKinds));
+                }
+
+                $request = $invocableContract['request'] ?? null;
+                if (is_array($request)) {
+                    $output->writeln('  Invocable Request Content-Type: '.($request['content_type'] ?? 'unknown'));
+                }
+
+                $response = $invocableContract['response'] ?? null;
+                if (is_array($response)) {
+                    $output->writeln('  Invocable Response Content-Type: '.($response['content_type'] ?? 'unknown'));
+                }
             }
         }
 

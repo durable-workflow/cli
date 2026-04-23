@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Commands;
 
+use DurableWorkflow\Cli\Commands\SystemCommand\ActivityTimeoutPassCommand;
+use DurableWorkflow\Cli\Commands\SystemCommand\ActivityTimeoutStatusCommand;
 use DurableWorkflow\Cli\Commands\SystemCommand\RepairPassCommand;
 use DurableWorkflow\Cli\Commands\SystemCommand\RepairStatusCommand;
+use DurableWorkflow\Cli\Commands\SystemCommand\RetentionPassCommand;
+use DurableWorkflow\Cli\Commands\SystemCommand\RetentionStatusCommand;
 use DurableWorkflow\Cli\Support\ServerClient;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
@@ -71,6 +75,137 @@ final class SystemParityFixtureTest extends TestCase
         self::assertSame($semantic['selected_missing_task_candidates'], $decoded['selected_missing_task_candidates']);
         self::assertSame($semantic['existing_task_failures'], $decoded['existing_task_failures']);
         self::assertSame($semantic['missing_run_failures'], $decoded['missing_run_failures']);
+    }
+
+    public function test_system_retention_status_matches_polyglot_request_fixture(): void
+    {
+        $fixture = self::fixture('system-retention-status-parity.json', 'system.retention.status');
+        $client = new SystemParityClient($fixture['response_body']);
+        $command = new RetentionStatusCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute($fixture['cli']['argv']));
+
+        self::assertSame($fixture['request']['method'], $client->lastMethod);
+        self::assertSame($fixture['request']['path'], $client->lastPath);
+        self::assertSame([], $client->lastQuery);
+
+        $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame($fixture['response_body'], $decoded);
+
+        $semantic = $fixture['semantic_body'];
+        self::assertSame($semantic['namespace'], $decoded['namespace']);
+        self::assertSame($semantic['retention_days'], $decoded['retention_days']);
+        self::assertSame($semantic['cutoff'], $decoded['cutoff']);
+        self::assertSame($semantic['expired_run_count'], $decoded['expired_run_count']);
+        self::assertSame($semantic['expired_run_ids'], $decoded['expired_run_ids']);
+        self::assertSame($semantic['scan_limit'], $decoded['scan_limit']);
+        self::assertSame($semantic['scan_pressure'], $decoded['scan_pressure']);
+    }
+
+    public function test_system_retention_pass_matches_polyglot_request_fixture(): void
+    {
+        $fixture = self::fixture('system-retention-pass-parity.json', 'system.retention.pass');
+        $client = new SystemParityClient($fixture['response_body']);
+        $command = new RetentionPassCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute($fixture['cli']['argv']));
+
+        self::assertSame($fixture['request']['method'], $client->lastMethod);
+        self::assertSame($fixture['request']['path'], $client->lastPath);
+        self::assertSame($fixture['request']['body'], $client->lastBody);
+
+        $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame($fixture['response_body'], $decoded);
+
+        $semantic = $fixture['semantic_body'];
+        self::assertSame($semantic['processed'], $decoded['processed']);
+        self::assertSame($semantic['pruned'], $decoded['pruned']);
+        self::assertSame($semantic['skipped'], $decoded['skipped']);
+        self::assertSame($semantic['failed'], $decoded['failed']);
+
+        $pruned = array_values(array_filter(
+            $decoded['results'],
+            static fn (array $r): bool => ($r['outcome'] ?? null) === 'pruned',
+        ));
+        $skipped = array_values(array_filter(
+            $decoded['results'],
+            static fn (array $r): bool => ($r['outcome'] ?? null) === 'skipped',
+        ));
+        self::assertSame($semantic['pruned_run_ids'], array_column($pruned, 'run_id'));
+        self::assertSame($semantic['skipped_run_ids'], array_column($skipped, 'run_id'));
+    }
+
+    public function test_system_activity_timeout_status_matches_polyglot_request_fixture(): void
+    {
+        $fixture = self::fixture(
+            'system-activity-timeout-status-parity.json',
+            'system.activity_timeout.status',
+        );
+        $client = new SystemParityClient($fixture['response_body']);
+        $command = new ActivityTimeoutStatusCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute($fixture['cli']['argv']));
+
+        self::assertSame($fixture['request']['method'], $client->lastMethod);
+        self::assertSame($fixture['request']['path'], $client->lastPath);
+        self::assertSame([], $client->lastQuery);
+
+        $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame($fixture['response_body'], $decoded);
+
+        $semantic = $fixture['semantic_body'];
+        self::assertSame($semantic['expired_count'], $decoded['expired_count']);
+        self::assertSame($semantic['expired_execution_ids'], $decoded['expired_execution_ids']);
+        self::assertSame($semantic['scan_limit'], $decoded['scan_limit']);
+        self::assertSame($semantic['scan_pressure'], $decoded['scan_pressure']);
+    }
+
+    public function test_system_activity_timeout_pass_matches_polyglot_request_fixture(): void
+    {
+        $fixture = self::fixture(
+            'system-activity-timeout-pass-parity.json',
+            'system.activity_timeout.pass',
+        );
+        $client = new SystemParityClient($fixture['response_body']);
+        $command = new ActivityTimeoutPassCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute($fixture['cli']['argv']));
+
+        self::assertSame($fixture['request']['method'], $client->lastMethod);
+        self::assertSame($fixture['request']['path'], $client->lastPath);
+        self::assertSame($fixture['request']['body'], $client->lastBody);
+
+        $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame($fixture['response_body'], $decoded);
+
+        $semantic = $fixture['semantic_body'];
+        self::assertSame($semantic['processed'], $decoded['processed']);
+        self::assertSame($semantic['enforced'], $decoded['enforced']);
+        self::assertSame($semantic['skipped'], $decoded['skipped']);
+        self::assertSame($semantic['failed'], $decoded['failed']);
+
+        $enforced = array_values(array_filter(
+            $decoded['results'],
+            static fn (array $r): bool => ($r['outcome'] ?? null) === 'enforced',
+        ));
+        $skipped = array_values(array_filter(
+            $decoded['results'],
+            static fn (array $r): bool => ($r['outcome'] ?? null) === 'skipped',
+        ));
+        self::assertSame($semantic['enforced_execution_ids'], array_column($enforced, 'execution_id'));
+        self::assertSame($semantic['skipped_execution_ids'], array_column($skipped, 'execution_id'));
     }
 
     /**

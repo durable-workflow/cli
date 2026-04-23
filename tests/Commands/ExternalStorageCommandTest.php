@@ -22,6 +22,7 @@ class ExternalStorageCommandTest extends TestCase
                 'enabled' => true,
                 'threshold_bytes' => 2097152,
                 'config' => [
+                    'disk' => 'external-payload-objects',
                     'bucket' => 'dw-payloads',
                     'prefix' => 'billing/',
                 ],
@@ -36,6 +37,7 @@ class ExternalStorageCommandTest extends TestCase
         self::assertSame(Command::SUCCESS, $tester->execute([
             'name' => 'billing',
             'driver' => 's3',
+            '--disk' => 'external-payload-objects',
             '--bucket' => 'dw-payloads',
             '--prefix' => 'billing/',
             '--region' => 'us-east-1',
@@ -46,6 +48,7 @@ class ExternalStorageCommandTest extends TestCase
         self::assertSame('s3', $client->lastPutBody['driver']);
         self::assertTrue($client->lastPutBody['enabled']);
         self::assertSame(2097152, $client->lastPutBody['threshold_bytes']);
+        self::assertSame('external-payload-objects', $client->lastPutBody['config']['disk']);
         self::assertSame('dw-payloads', $client->lastPutBody['config']['bucket']);
         self::assertSame('billing/', $client->lastPutBody['config']['prefix']);
         self::assertSame('us-east-1', $client->lastPutBody['config']['region']);

@@ -25,13 +25,14 @@ when encoded workflow payloads exceed the namespace threshold.
 
 <comment>Examples:</comment>
 
-  <info>dw namespace:set-storage-driver billing s3 --bucket=dw-payloads --prefix=billing/ --threshold-bytes=2097152</info>
+  <info>dw namespace:set-storage-driver billing s3 --disk=external-payload-objects --bucket=dw-payloads --prefix=billing/ --threshold-bytes=2097152</info>
   <info>dw namespace:set-storage-driver dev local --uri=file:///var/lib/durable-workflow/payloads --json</info>
 HELP)
             ->addArgument('name', InputArgument::REQUIRED, 'Namespace name')
             ->addArgument('driver', InputArgument::REQUIRED, 'Storage driver (local, s3, gcs, azure)', null, CompletionValues::EXTERNAL_STORAGE_DRIVERS)
             ->addOption('threshold-bytes', null, InputOption::VALUE_OPTIONAL, 'Encoded payload size threshold before offload')
             ->addOption('uri', null, InputOption::VALUE_OPTIONAL, 'Driver URI for local/dev or externally managed storage')
+            ->addOption('disk', null, InputOption::VALUE_OPTIONAL, 'Server-side filesystem disk name backing the s3, gcs, or azure driver')
             ->addOption('bucket', null, InputOption::VALUE_OPTIONAL, 'Object storage bucket or container name')
             ->addOption('prefix', null, InputOption::VALUE_OPTIONAL, 'Object key prefix for this namespace')
             ->addOption('region', null, InputOption::VALUE_OPTIONAL, 'Object storage region')
@@ -56,6 +57,7 @@ HELP)
 
         $config = array_filter([
             'uri' => $this->stringOption($input, 'uri'),
+            'disk' => $this->stringOption($input, 'disk'),
             'bucket' => $this->stringOption($input, 'bucket'),
             'prefix' => $this->stringOption($input, 'prefix'),
             'region' => $this->stringOption($input, 'region'),

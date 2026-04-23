@@ -36,6 +36,7 @@ final class ExternalStorageParityFixtureTest extends TestCase
         self::assertSame($semantic['driver'], $decoded['external_payload_storage']['driver'] ?? null);
         self::assertSame($semantic['enabled'], $decoded['external_payload_storage']['enabled'] ?? null);
         self::assertSame($semantic['threshold_bytes'], $decoded['external_payload_storage']['threshold_bytes'] ?? null);
+        self::assertSame($semantic['disk'], $decoded['external_payload_storage']['config']['disk'] ?? null);
         self::assertSame($semantic['bucket'], $decoded['external_payload_storage']['config']['bucket'] ?? null);
     }
 

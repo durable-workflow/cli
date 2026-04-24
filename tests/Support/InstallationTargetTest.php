@@ -9,6 +9,16 @@ use PHPUnit\Framework\TestCase;
 
 class InstallationTargetTest extends TestCase
 {
+    private string $originalPath = '';
+
+    private string $originalPathExt = '';
+
+    protected function setUp(): void
+    {
+        $this->originalPath = getenv('PATH') ?: '';
+        $this->originalPathExt = getenv('PATHEXT') ?: '';
+    }
+
     public function test_detects_standalone_binary_on_linux_x86_64(): void
     {
         $path = $this->tempFile('dw');
@@ -171,6 +181,28 @@ class InstallationTargetTest extends TestCase
         self::assertFalse($target->upgradeable);
     }
 
+    public function test_detect_resolves_bare_command_name_from_path(): void
+    {
+        $dir = $this->tempDir('path-lookup');
+        $binary = $dir.'/dw';
+        file_put_contents($binary, "#!/bin/sh\nexit 0\n");
+        chmod($binary, 0755);
+
+        putenv('PATH='.$dir);
+
+        $target = InstallationTarget::detect(
+            argv0: 'dw',
+            pharRunning: '',
+            osFamily: 'Linux',
+            arch: 'x86_64',
+        );
+
+        self::assertSame(InstallationTarget::KIND_BINARY, $target->kind);
+        self::assertSame($binary, $target->path);
+        self::assertTrue($target->upgradeable);
+        self::assertSame('dw-linux-x86_64', $target->assetName);
+    }
+
     private function tempFile(string $name): string
     {
         $dir = $this->tempDir('installation-'.bin2hex(random_bytes(4)));
@@ -199,6 +231,13 @@ class InstallationTargetTest extends TestCase
 
     protected function tearDown(): void
     {
+        putenv('PATH='.$this->originalPath);
+        if ($this->originalPathExt === '') {
+            putenv('PATHEXT');
+        } else {
+            putenv('PATHEXT='.$this->originalPathExt);
+        }
+
         foreach ($this->cleanups as $path) {
             $this->rmrf($path);
         }

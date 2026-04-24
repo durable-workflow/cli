@@ -71,7 +71,7 @@ final class InstallationTarget
         // file on disk.
         $pharPath = $pharRunning !== '' ? $pharRunning : '';
 
-        $resolved = $argv0 !== '' ? (realpath($argv0) ?: $argv0) : '';
+        $resolved = self::resolveExecutablePath($argv0, $osFamily);
         $pharResolved = $pharPath !== '' ? (realpath($pharPath) ?: $pharPath) : '';
 
         // Traditional PHAR invocation: `php path/to/dw.phar`.
@@ -172,6 +172,75 @@ final class InstallationTarget
     private static function looksLikePhar(string $path): bool
     {
         return (bool) preg_match('/\.phar$/i', $path);
+    }
+
+    private static function resolveExecutablePath(string $argv0, string $osFamily): string
+    {
+        if ($argv0 === '') {
+            return '';
+        }
+
+        $resolved = realpath($argv0);
+        if ($resolved !== false) {
+            return $resolved;
+        }
+
+        if (self::looksLikePath($argv0)) {
+            return $argv0;
+        }
+
+        foreach (self::pathLookupCandidates($argv0, $osFamily) as $candidate) {
+            if (! is_file($candidate) || ! is_executable($candidate)) {
+                continue;
+            }
+
+            return realpath($candidate) ?: $candidate;
+        }
+
+        return $argv0;
+    }
+
+    private static function looksLikePath(string $value): bool
+    {
+        return str_contains($value, '/')
+            || str_contains($value, '\\')
+            || preg_match('/^[A-Za-z]:[\\\\\/]/', $value) === 1;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function pathLookupCandidates(string $argv0, string $osFamily): array
+    {
+        $path = getenv('PATH');
+        if (! is_string($path) || trim($path) === '') {
+            return [];
+        }
+
+        $extensions = [''];
+        if ($osFamily === 'Windows' || $osFamily === 'WINNT') {
+            $pathExt = getenv('PATHEXT');
+            $extensions = is_string($pathExt) && trim($pathExt) !== ''
+                ? array_values(array_filter(array_map('trim', explode(';', $pathExt)), static fn (string $ext): bool => $ext !== ''))
+                : ['.exe', '.bat', '.cmd', '.com'];
+
+            if (pathinfo($argv0, PATHINFO_EXTENSION) !== '') {
+                $extensions = [''];
+            }
+        }
+
+        $candidates = [];
+        foreach (explode(PATH_SEPARATOR, $path) as $dir) {
+            if ($dir === '') {
+                continue;
+            }
+
+            foreach ($extensions as $extension) {
+                $candidates[] = rtrim($dir, DIRECTORY_SEPARATOR).'/' . $argv0 . $extension;
+            }
+        }
+
+        return $candidates;
     }
 
     private static function isInsideVendor(string $path): bool

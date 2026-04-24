@@ -134,6 +134,10 @@ HELP)
         $output->writeln(sprintf('  Repair needed runs:   %d', (int) ($backlog['repair_needed_runs'] ?? 0)));
         $output->writeln(sprintf('  Claim failed runs:    %d', (int) ($backlog['claim_failed_runs'] ?? 0)));
         $output->writeln(sprintf('  Compatibility blocked runs: %d', (int) ($backlog['compatibility_blocked_runs'] ?? 0)));
+        $output->writeln(sprintf('  Oldest compatibility-blocked age: %d ms', (int) ($backlog['max_compatibility_blocked_age_ms'] ?? 0)));
+        if (is_string($backlog['oldest_compatibility_blocked_started_at'] ?? null)) {
+            $output->writeln(sprintf('  Oldest compatibility-blocked at:  %s', $backlog['oldest_compatibility_blocked_started_at']));
+        }
         $output->writeln('');
     }
 

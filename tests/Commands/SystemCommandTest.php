@@ -519,6 +519,8 @@ class SystemCommandTest extends TestCase
         self::assertStringContainsString('Leased tasks:         5', $display);
         self::assertStringContainsString('Unhealthy tasks:      11', $display);
         self::assertStringContainsString('Compatibility blocked runs: 1', $display);
+        self::assertStringContainsString('Oldest compatibility-blocked age: 185000 ms', $display);
+        self::assertStringContainsString('Oldest compatibility-blocked at:  2026-04-24T11:26:55Z', $display);
 
         self::assertStringContainsString('Missing-task candidates: 3 (2 selected this pass)', $display);
         self::assertStringContainsString('Oldest missing-task age: 125000 ms', $display);
@@ -586,6 +588,20 @@ class SystemCommandTest extends TestCase
         );
     }
 
+    public function test_operator_metrics_schema_pins_compatibility_blocked_age_keys(): void
+    {
+        $schema = json_decode(
+            (string) file_get_contents(__DIR__.'/../../schemas/output/operator-metrics.schema.json'),
+            true,
+            flags: JSON_THROW_ON_ERROR,
+        );
+
+        $backlog = $schema['properties']['operator_metrics']['properties']['backlog']['properties'];
+
+        self::assertSame(['string', 'null'], $backlog['oldest_compatibility_blocked_started_at']['type']);
+        self::assertSame(['integer', 'null'], $backlog['max_compatibility_blocked_age_ms']['type']);
+    }
+
     public function test_operator_metrics_command_tolerates_minimal_payload(): void
     {
         $command = new OperatorMetricsCommand();
@@ -635,6 +651,8 @@ class SystemCommandTest extends TestCase
                     'repair_needed_runs' => 4,
                     'claim_failed_runs' => 2,
                     'compatibility_blocked_runs' => 1,
+                    'oldest_compatibility_blocked_started_at' => '2026-04-24T11:26:55Z',
+                    'max_compatibility_blocked_age_ms' => 185000,
                 ],
                 'repair' => [
                     'missing_task_candidates' => 3,

@@ -43,7 +43,9 @@
             "unhealthy_tasks": { "type": ["integer", "null"] },
             "repair_needed_runs": { "type": ["integer", "null"] },
             "claim_failed_runs": { "type": ["integer", "null"] },
-            "compatibility_blocked_runs": { "type": ["integer", "null"] }
+            "compatibility_blocked_runs": { "type": ["integer", "null"] },
+            "oldest_compatibility_blocked_started_at": { "type": ["string", "null"] },
+            "max_compatibility_blocked_age_ms": { "type": ["integer", "null"] }
           },
           "additionalProperties": true
         },

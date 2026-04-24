@@ -118,6 +118,15 @@
             "failure_backoff_max_seconds": { "type": ["integer", "null"] }
           },
           "additionalProperties": true
+        },
+        "matching_role": {
+          "type": "object",
+          "properties": {
+            "queue_wake_enabled": { "type": ["boolean", "null"] },
+            "shape": { "type": ["string", "null"] },
+            "task_dispatch_mode": { "type": ["string", "null"] }
+          },
+          "additionalProperties": true
         }
       },
       "additionalProperties": true

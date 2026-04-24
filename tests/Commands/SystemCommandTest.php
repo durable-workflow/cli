@@ -549,6 +549,11 @@ class SystemCommandTest extends TestCase
         self::assertStringContainsString('Database:              mysql/mysql', $display);
         self::assertStringContainsString('Cache:                 redis/redis', $display);
 
+        self::assertStringContainsString('Matching-role (this node)', $display);
+        self::assertStringContainsString('Queue wake enabled:   yes', $display);
+        self::assertStringContainsString('Shape:                in_worker', $display);
+        self::assertStringContainsString('Task dispatch mode:   queue', $display);
+
         self::assertStringContainsString('Active 4, paused 1, missed 1, oldest overdue 5000 ms', $display);
         self::assertStringContainsString('Lifetime fires: 128 (3 failures)', $display);
 
@@ -668,6 +673,43 @@ class SystemCommandTest extends TestCase
         self::assertSame(['integer', 'null'], $runs['max_wait_age_ms']['type']);
     }
 
+    public function test_operator_metrics_schema_pins_matching_role_keys(): void
+    {
+        $schema = json_decode(
+            (string) file_get_contents(__DIR__.'/../../schemas/output/operator-metrics.schema.json'),
+            true,
+            flags: JSON_THROW_ON_ERROR,
+        );
+
+        $matchingRole = $schema['properties']['operator_metrics']['properties']['matching_role']['properties'];
+
+        self::assertSame(['boolean', 'null'], $matchingRole['queue_wake_enabled']['type']);
+        self::assertSame(['string', 'null'], $matchingRole['shape']['type']);
+        self::assertSame(['string', 'null'], $matchingRole['task_dispatch_mode']['type']);
+    }
+
+    public function test_operator_metrics_command_renders_dedicated_matching_role_shape(): void
+    {
+        $payload = self::operatorMetricsPayload();
+        $payload['operator_metrics']['matching_role'] = [
+            'queue_wake_enabled' => false,
+            'shape' => 'dedicated',
+            'task_dispatch_mode' => 'poll',
+        ];
+
+        $command = new OperatorMetricsCommand();
+        $command->setServerClient(new SystemFakeClient($payload));
+
+        $tester = new CommandTester($command);
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+
+        $display = $tester->getDisplay();
+
+        self::assertStringContainsString('Queue wake enabled:   no', $display);
+        self::assertStringContainsString('Shape:                dedicated', $display);
+        self::assertStringContainsString('Task dispatch mode:   poll', $display);
+    }
+
     public function test_operator_metrics_command_tolerates_minimal_payload(): void
     {
         $command = new OperatorMetricsCommand();
@@ -780,6 +822,11 @@ class SystemCommandTest extends TestCase
                     'loop_throttle_seconds' => 10,
                     'scan_limit' => 100,
                     'failure_backoff_max_seconds' => 300,
+                ],
+                'matching_role' => [
+                    'queue_wake_enabled' => true,
+                    'shape' => 'in_worker',
+                    'task_dispatch_mode' => 'queue',
                 ],
             ],
         ];

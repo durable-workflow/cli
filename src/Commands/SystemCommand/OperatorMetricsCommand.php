@@ -38,8 +38,11 @@ advertises so mixed-build state is visible without log archaeology.
   <info>dw system:operator-metrics --json | jq '.operator_metrics.workers'</info>
 
 The contract guarantees the frozen key inventory under
-`operator_metrics.{runs,tasks,backlog,repair,workers,backend,schedules,repair_policy}`;
-consumers MAY add derived keys but MUST NOT rename these.
+`operator_metrics.{runs,tasks,backlog,repair,workers,backend,schedules,repair_policy,matching_role}`;
+consumers MAY add derived keys but MUST NOT rename these. The
+`matching_role` block is per-process and reflects only the node
+serving the request; read one snapshot per node to see the full
+deployment shape.
 HELP)
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output as JSON');
     }
@@ -68,6 +71,7 @@ HELP)
         $this->renderRepair($output, $this->sectionArray($metrics, 'repair'));
         $this->renderWorkers($output, $this->sectionArray($metrics, 'workers'));
         $this->renderBackend($output, $this->sectionArray($metrics, 'backend'));
+        $this->renderMatchingRole($output, $this->sectionArray($metrics, 'matching_role'));
         $this->renderSchedules($output, $this->sectionArray($metrics, 'schedules'));
         $this->renderRepairPolicy($output, $this->sectionArray($metrics, 'repair_policy'));
 
@@ -284,6 +288,35 @@ HELP)
                 $output->writeln(sprintf('    [%s] %s', $severity, $summary));
             }
         }
+        $output->writeln('');
+    }
+
+    /**
+     * @param  array<string, mixed>  $matchingRole
+     */
+    private function renderMatchingRole(OutputInterface $output, array $matchingRole): void
+    {
+        if ($matchingRole === []) {
+            return;
+        }
+
+        $output->writeln('<info>Matching-role (this node)</info>');
+
+        if (array_key_exists('queue_wake_enabled', $matchingRole)) {
+            $output->writeln(sprintf(
+                '  Queue wake enabled:   %s',
+                ((bool) $matchingRole['queue_wake_enabled']) ? 'yes' : 'no',
+            ));
+        }
+
+        if (is_string($matchingRole['shape'] ?? null) && $matchingRole['shape'] !== '') {
+            $output->writeln(sprintf('  Shape:                %s', $matchingRole['shape']));
+        }
+
+        if (is_string($matchingRole['task_dispatch_mode'] ?? null) && $matchingRole['task_dispatch_mode'] !== '') {
+            $output->writeln(sprintf('  Task dispatch mode:   %s', $matchingRole['task_dispatch_mode']));
+        }
+
         $output->writeln('');
     }
 

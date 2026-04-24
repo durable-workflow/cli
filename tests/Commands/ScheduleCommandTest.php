@@ -8,6 +8,7 @@ use DurableWorkflow\Cli\Commands\ScheduleCommand\BackfillCommand;
 use DurableWorkflow\Cli\Commands\ScheduleCommand\CreateCommand;
 use DurableWorkflow\Cli\Commands\ScheduleCommand\DeleteCommand;
 use DurableWorkflow\Cli\Commands\ScheduleCommand\DescribeCommand;
+use DurableWorkflow\Cli\Commands\ScheduleCommand\HistoryCommand;
 use DurableWorkflow\Cli\Commands\ScheduleCommand\ListCommand;
 use DurableWorkflow\Cli\Commands\ScheduleCommand\PauseCommand;
 use DurableWorkflow\Cli\Commands\ScheduleCommand\ResumeCommand;
@@ -624,6 +625,256 @@ class ScheduleCommandTest extends TestCase
 
         self::assertNull($client->lastPutPath);
     }
+
+    public function test_history_command_renders_events_in_a_table(): void
+    {
+        $client = new ScheduleFakeClient([
+            'schedule_id' => 'daily-report',
+            'namespace' => 'default',
+            'events' => [
+                [
+                    'id' => 'evt-1',
+                    'sequence' => 1,
+                    'event_type' => 'ScheduleCreated',
+                    'recorded_at' => '2026-04-01T00:00:00+00:00',
+                    'workflow_instance_id' => null,
+                    'workflow_run_id' => null,
+                    'payload' => [],
+                ],
+                [
+                    'id' => 'evt-2',
+                    'sequence' => 2,
+                    'event_type' => 'ScheduleTriggered',
+                    'recorded_at' => '2026-04-02T00:00:00+00:00',
+                    'workflow_instance_id' => 'wf-abc',
+                    'workflow_run_id' => 'run-abc',
+                    'payload' => ['outcome' => 'triggered'],
+                ],
+            ],
+            'has_more' => false,
+            'next_cursor' => null,
+        ]);
+
+        $command = new HistoryCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            'schedule-id' => 'daily-report',
+        ]));
+
+        self::assertSame('/schedules/daily-report/history', $client->lastGetPath);
+        self::assertSame([], $client->lastGetQuery);
+
+        $display = $tester->getDisplay();
+        self::assertStringContainsString('ScheduleCreated', $display);
+        self::assertStringContainsString('ScheduleTriggered', $display);
+        self::assertStringContainsString('wf=wf-abc', $display);
+        self::assertStringContainsString('run=run-abc', $display);
+    }
+
+    public function test_history_command_forwards_limit_and_after_sequence(): void
+    {
+        $client = new ScheduleFakeClient([
+            'schedule_id' => 'daily-report',
+            'namespace' => 'default',
+            'events' => [],
+            'has_more' => false,
+            'next_cursor' => null,
+        ]);
+
+        $command = new HistoryCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            'schedule-id' => 'daily-report',
+            '--limit' => '50',
+            '--after-sequence' => '7',
+        ]));
+
+        self::assertSame('/schedules/daily-report/history', $client->lastGetPath);
+        self::assertSame(['limit' => '50', 'after_sequence' => '7'], $client->lastGetQuery);
+    }
+
+    public function test_history_command_surfaces_has_more_hint(): void
+    {
+        $client = new ScheduleFakeClient([
+            'schedule_id' => 'daily-report',
+            'namespace' => 'default',
+            'events' => [
+                [
+                    'sequence' => 1,
+                    'event_type' => 'SchedulePaused',
+                    'recorded_at' => '2026-04-01T00:00:00+00:00',
+                    'payload' => [],
+                ],
+            ],
+            'has_more' => true,
+            'next_cursor' => 1,
+        ]);
+
+        $command = new HistoryCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            'schedule-id' => 'daily-report',
+        ]));
+
+        $display = $tester->getDisplay();
+        self::assertStringContainsString('More events available', $display);
+        self::assertStringContainsString('--after-sequence=1', $display);
+    }
+
+    public function test_history_command_fetches_all_pages_with_all_flag(): void
+    {
+        $client = new ScheduleFakeClient([]);
+        $client->queueGetResponses([
+            [
+                'schedule_id' => 'daily-report',
+                'namespace' => 'default',
+                'events' => [
+                    ['sequence' => 1, 'event_type' => 'ScheduleCreated', 'recorded_at' => '2026-04-01T00:00:00+00:00', 'payload' => []],
+                    ['sequence' => 2, 'event_type' => 'SchedulePaused', 'recorded_at' => '2026-04-02T00:00:00+00:00', 'payload' => []],
+                ],
+                'has_more' => true,
+                'next_cursor' => 2,
+            ],
+            [
+                'schedule_id' => 'daily-report',
+                'namespace' => 'default',
+                'events' => [
+                    ['sequence' => 3, 'event_type' => 'ScheduleResumed', 'recorded_at' => '2026-04-03T00:00:00+00:00', 'payload' => []],
+                ],
+                'has_more' => false,
+                'next_cursor' => null,
+            ],
+        ]);
+
+        $command = new HistoryCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            'schedule-id' => 'daily-report',
+            '--all' => true,
+            '--json' => true,
+        ]));
+
+        self::assertCount(2, $client->getCalls);
+        self::assertSame(['after_sequence' => '2'], $client->getCalls[1]['query']);
+
+        $decoded = json_decode($tester->getDisplay(), true);
+        self::assertIsArray($decoded);
+        self::assertCount(3, $decoded['events']);
+        self::assertSame(false, $decoded['has_more']);
+        self::assertSame([1, 2, 3], array_column($decoded['events'], 'sequence'));
+    }
+
+    public function test_history_command_emits_jsonl_one_event_per_line(): void
+    {
+        $client = new ScheduleFakeClient([
+            'schedule_id' => 'daily-report',
+            'namespace' => 'default',
+            'events' => [
+                ['sequence' => 1, 'event_type' => 'ScheduleCreated', 'recorded_at' => '2026-04-01T00:00:00+00:00', 'payload' => []],
+                ['sequence' => 2, 'event_type' => 'ScheduleDeleted', 'recorded_at' => '2026-04-02T00:00:00+00:00', 'payload' => []],
+            ],
+            'has_more' => false,
+            'next_cursor' => null,
+        ]);
+
+        $command = new HistoryCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            'schedule-id' => 'daily-report',
+            '--output' => 'jsonl',
+        ]));
+
+        $lines = array_values(array_filter(
+            preg_split('/\r?\n/', trim($tester->getDisplay())),
+            static fn (string $l): bool => $l !== '',
+        ));
+
+        self::assertCount(2, $lines);
+
+        $first = json_decode($lines[0], true);
+        $second = json_decode($lines[1], true);
+
+        self::assertSame('ScheduleCreated', $first['event_type']);
+        self::assertSame('ScheduleDeleted', $second['event_type']);
+    }
+
+    public function test_history_command_rejects_invalid_limit(): void
+    {
+        $command = new HistoryCommand();
+        $command->setServerClient(new ScheduleFakeClient([]));
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::INVALID, $tester->execute([
+            'schedule-id' => 'daily-report',
+            '--limit' => '0',
+        ]));
+
+        self::assertSame(Command::INVALID, $tester->execute([
+            'schedule-id' => 'daily-report',
+            '--limit' => '9999',
+        ]));
+
+        self::assertSame(Command::INVALID, $tester->execute([
+            'schedule-id' => 'daily-report',
+            '--limit' => 'not-a-number',
+        ]));
+    }
+
+    public function test_history_command_rejects_invalid_after_sequence(): void
+    {
+        $command = new HistoryCommand();
+        $command->setServerClient(new ScheduleFakeClient([]));
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::INVALID, $tester->execute([
+            'schedule-id' => 'daily-report',
+            '--after-sequence' => '-3',
+        ]));
+
+        self::assertSame(Command::INVALID, $tester->execute([
+            'schedule-id' => 'daily-report',
+            '--after-sequence' => 'not-a-number',
+        ]));
+    }
+
+    public function test_history_command_notes_empty_audit_stream(): void
+    {
+        $client = new ScheduleFakeClient([
+            'schedule_id' => 'daily-report',
+            'namespace' => 'default',
+            'events' => [],
+            'has_more' => false,
+            'next_cursor' => null,
+        ]);
+
+        $command = new HistoryCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            'schedule-id' => 'daily-report',
+        ]));
+
+        self::assertStringContainsString('No audit events recorded', $tester->getDisplay());
+    }
 }
 
 class ScheduleFakeClient extends ServerClient
@@ -642,13 +893,42 @@ class ScheduleFakeClient extends ServerClient
 
     public int $postCalls = 0;
 
+    public ?string $lastGetPath = null;
+
+    /** @var array<string, mixed> */
+    public array $lastGetQuery = [];
+
+    /** @var list<array<string, array<string, mixed>>> */
+    public array $getCalls = [];
+
+    /** @var list<array<string, mixed>> */
+    private array $getResponseQueue;
+
     /** @param array<string, mixed> $payload */
     public function __construct(
         private readonly array $payload,
-    ) {}
+    ) {
+        $this->getResponseQueue = [];
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $responses
+     */
+    public function queueGetResponses(array $responses): void
+    {
+        $this->getResponseQueue = array_values($responses);
+    }
 
     public function get(string $path, array $query = []): array
     {
+        $this->lastGetPath = $path;
+        $this->lastGetQuery = $query;
+        $this->getCalls[] = ['path' => $path, 'query' => $query];
+
+        if ($this->getResponseQueue !== []) {
+            return array_shift($this->getResponseQueue);
+        }
+
         return $this->payload;
     }
 

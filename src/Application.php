@@ -112,6 +112,7 @@ class Application extends ConsoleApplication
             new ScheduleCommand\TriggerCommand(),
             new ScheduleCommand\UpdateCommand(),
             new ScheduleCommand\BackfillCommand(),
+            new ScheduleCommand\HistoryCommand(),
 
             // Worker management
             new WorkerCommand\RegisterCommand(),

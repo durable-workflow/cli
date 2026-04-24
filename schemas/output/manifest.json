@@ -109,6 +109,11 @@
       "schema": "schemas/output/schedule.schema.json",
       "schema_id": "https://durable-workflow.com/schemas/cli/output/schedule.schema.json"
     },
+    "schedule:history": {
+      "output": "--json",
+      "schema": "schemas/output/schedule-history.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/schedule-history.schema.json"
+    },
     "schedule:list": {
       "output": "--json",
       "schema": "schemas/output/schedule-list.schema.json",

@@ -517,6 +517,8 @@ class SystemCommandTest extends TestCase
         self::assertStringContainsString('Oldest lease expired at:  2026-04-24T11:28:25Z', $display);
         self::assertStringContainsString('Oldest ready-due age:     15000 ms', $display);
         self::assertStringContainsString('Oldest ready-due at:      2026-04-24T11:29:45Z', $display);
+        self::assertStringContainsString('Oldest dispatch-overdue age: 55000 ms', $display);
+        self::assertStringContainsString('Oldest dispatch-overdue since: 2026-04-24T11:29:05Z', $display);
 
         self::assertStringContainsString('Runnable tasks:       7', $display);
         self::assertStringContainsString('Delayed tasks:        3', $display);
@@ -634,6 +636,20 @@ class SystemCommandTest extends TestCase
         self::assertSame(['integer', 'null'], $tasks['max_ready_due_age_ms']['type']);
     }
 
+    public function test_operator_metrics_schema_pins_dispatch_overdue_age_keys(): void
+    {
+        $schema = json_decode(
+            (string) file_get_contents(__DIR__.'/../../schemas/output/operator-metrics.schema.json'),
+            true,
+            flags: JSON_THROW_ON_ERROR,
+        );
+
+        $tasks = $schema['properties']['operator_metrics']['properties']['tasks']['properties'];
+
+        self::assertSame(['string', 'null'], $tasks['oldest_dispatch_overdue_since']['type']);
+        self::assertSame(['integer', 'null'], $tasks['max_dispatch_overdue_age_ms']['type']);
+    }
+
     public function test_operator_metrics_command_tolerates_minimal_payload(): void
     {
         $command = new OperatorMetricsCommand();
@@ -677,6 +693,8 @@ class SystemCommandTest extends TestCase
                     'max_lease_expired_age_ms' => 95000,
                     'oldest_ready_due_at' => '2026-04-24T11:29:45Z',
                     'max_ready_due_age_ms' => 15000,
+                    'oldest_dispatch_overdue_since' => '2026-04-24T11:29:05Z',
+                    'max_dispatch_overdue_age_ms' => 55000,
                     'unhealthy' => 11,
                 ],
                 'backlog' => [

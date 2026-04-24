@@ -136,6 +136,15 @@ HELP)
         if (is_string($tasks['oldest_ready_due_at'] ?? null)) {
             $output->writeln(sprintf('  Oldest ready-due at:      %s', $tasks['oldest_ready_due_at']));
         }
+        if (array_key_exists('max_dispatch_overdue_age_ms', $tasks)) {
+            $output->writeln(sprintf(
+                '  Oldest dispatch-overdue age: %d ms',
+                (int) ($tasks['max_dispatch_overdue_age_ms'] ?? 0),
+            ));
+        }
+        if (is_string($tasks['oldest_dispatch_overdue_since'] ?? null)) {
+            $output->writeln(sprintf('  Oldest dispatch-overdue since: %s', $tasks['oldest_dispatch_overdue_since']));
+        }
         $output->writeln('');
     }
 

@@ -34,6 +34,8 @@
             "max_lease_expired_age_ms": { "type": ["integer", "null"] },
             "oldest_ready_due_at": { "type": ["string", "null"] },
             "max_ready_due_age_ms": { "type": ["integer", "null"] },
+            "oldest_dispatch_overdue_since": { "type": ["string", "null"] },
+            "max_dispatch_overdue_age_ms": { "type": ["integer", "null"] },
             "unhealthy": { "type": ["integer", "null"] }
           },
           "additionalProperties": true

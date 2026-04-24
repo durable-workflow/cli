@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Commands;
 
 use DurableWorkflow\Cli\Application;
+use DurableWorkflow\Cli\BuildInfo;
 use DurableWorkflow\Cli\Support\AuthCompositionContract;
 use DurableWorkflow\Cli\Support\ControlPlaneRequestContract;
 use DurableWorkflow\Cli\Support\ExternalTaskInputContract;
@@ -47,6 +48,8 @@ class ApplicationCompatibilityWarningTest extends TestCase
 
     public function test_first_server_command_warns_from_client_compatibility_metadata(): void
     {
+        $currentVersion = BuildInfo::version();
+
         $application = $this->applicationWithClient(new ApplicationCompatibilityFakeClient(
             self::clusterInfo(serverVersion: '9.8.7', supportedCliVersions: '0.2.x'),
         ));
@@ -58,7 +61,7 @@ class ApplicationCompatibilityWarningTest extends TestCase
 
         $display = $tester->getDisplay();
         self::assertStringContainsString(
-            'Compatibility warning: dw 0.1.5 is outside server-advertised cli supported_versions [0.2.x].',
+            sprintf('Compatibility warning: dw %s is outside server-advertised cli supported_versions [0.2.x].', $currentVersion),
             $display,
         );
         self::assertStringContainsString('Run `dw doctor` for details.', $display);
@@ -234,6 +237,8 @@ class ApplicationCompatibilityWarningTest extends TestCase
 
     public function test_version_output_warns_from_explicit_target_client_compatibility_metadata(): void
     {
+        $currentVersion = BuildInfo::version();
+
         putenv('DURABLE_WORKFLOW_SERVER_URL=https://server.example');
         $_ENV['DURABLE_WORKFLOW_SERVER_URL'] = 'https://server.example';
 
@@ -247,9 +252,9 @@ class ApplicationCompatibilityWarningTest extends TestCase
         ]));
 
         $display = $tester->getDisplay();
-        self::assertStringContainsString('dw 0.1.5', $display);
+        self::assertStringContainsString(sprintf('dw %s', $currentVersion), $display);
         self::assertStringContainsString(
-            'Compatibility warning: dw 0.1.5 is outside server-advertised cli supported_versions [0.2.x].',
+            sprintf('Compatibility warning: dw %s is outside server-advertised cli supported_versions [0.2.x].', $currentVersion),
             $display,
         );
         self::assertStringNotContainsString('server app version', $display);

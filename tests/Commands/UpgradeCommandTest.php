@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Commands;
 
+use DurableWorkflow\Cli\BuildInfo;
 use DurableWorkflow\Cli\Commands\UpgradeCommand;
 use DurableWorkflow\Cli\Commands\UpgradePermissionException;
 use DurableWorkflow\Cli\Support\InstallationTarget;
@@ -80,8 +81,10 @@ class UpgradeCommandTest extends TestCase
 
     public function test_noop_when_current_version_matches_latest(): void
     {
+        $currentVersion = BuildInfo::version();
+
         $command = $this->command(
-            catalog: $this->catalog(['latest-tag' => '0.1.5']),
+            catalog: $this->catalog(['latest-tag' => $currentVersion]),
             detector: fn () => new InstallationTarget(
                 kind: InstallationTarget::KIND_BINARY,
                 path: '/home/user/.local/bin/dw',
@@ -97,8 +100,8 @@ class UpgradeCommandTest extends TestCase
         self::assertSame(Command::SUCCESS, $exit);
         $decoded = $this->decode($tester->getDisplay());
         self::assertSame('noop', $decoded['status']);
-        self::assertSame('0.1.5', $decoded['current_version']);
-        self::assertSame('0.1.5', $decoded['target_version']);
+        self::assertSame($currentVersion, $decoded['current_version']);
+        self::assertSame($currentVersion, $decoded['target_version']);
     }
 
     public function test_dry_run_reports_asset_url_without_downloading(): void
@@ -143,7 +146,7 @@ class UpgradeCommandTest extends TestCase
 
         $tester = new CommandTester($command);
         $exit = $tester->execute([
-            '--version' => '0.1.3',
+            '--tag' => '0.1.3',
             '--dry-run' => true,
             '--output' => 'json',
         ]);

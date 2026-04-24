@@ -53,11 +53,11 @@ installs are refused with a pointer at the right managing tool.
 <comment>Examples:</comment>
 
   <info>dw upgrade</info>
-  <info>dw upgrade --version=0.1.5</info>
+    <info>dw upgrade --tag=0.1.5</info>
   <info>dw upgrade --dry-run</info>
   <info>dw upgrade --output=json</info>
 HELP)
-            ->addOption('version', null, InputOption::VALUE_REQUIRED, 'Tag to install (defaults to the latest release)')
+                        ->addOption('tag', null, InputOption::VALUE_REQUIRED, 'Release tag to install (defaults to the latest release)')
             ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Resolve the target release without downloading or replacing')
             ->addOption('force', null, InputOption::VALUE_NONE, 'Re-download and replace even when the current and target versions match')
             ->addOption(
@@ -102,7 +102,7 @@ HELP)
         );
 
         $currentVersion = BuildInfo::version();
-        $requestedTag = $input->getOption('version');
+        $requestedTag = $input->getOption('tag');
         if (is_string($requestedTag)) {
             $requestedTag = ltrim(trim($requestedTag), 'v');
             if ($requestedTag === '') {

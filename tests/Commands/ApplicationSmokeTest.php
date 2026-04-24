@@ -24,6 +24,7 @@ class ApplicationSmokeTest extends TestCase
             'workflow:list-runs',
             'workflow:show-run',
             'schedule:create',
+            'upgrade',
         ] as $command) {
             self::assertSame(0, $tester->run([
                 'command' => $command,

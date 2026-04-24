@@ -127,6 +127,15 @@ HELP)
         if (is_string($tasks['oldest_lease_expired_at'] ?? null)) {
             $output->writeln(sprintf('  Oldest lease expired at:  %s', $tasks['oldest_lease_expired_at']));
         }
+        if (array_key_exists('max_ready_due_age_ms', $tasks)) {
+            $output->writeln(sprintf(
+                '  Oldest ready-due age:     %d ms',
+                (int) ($tasks['max_ready_due_age_ms'] ?? 0),
+            ));
+        }
+        if (is_string($tasks['oldest_ready_due_at'] ?? null)) {
+            $output->writeln(sprintf('  Oldest ready-due at:      %s', $tasks['oldest_ready_due_at']));
+        }
         $output->writeln('');
     }
 

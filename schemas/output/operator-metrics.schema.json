@@ -32,6 +32,8 @@
             "lease_expired": { "type": ["integer", "null"] },
             "oldest_lease_expired_at": { "type": ["string", "null"] },
             "max_lease_expired_age_ms": { "type": ["integer", "null"] },
+            "oldest_ready_due_at": { "type": ["string", "null"] },
+            "max_ready_due_age_ms": { "type": ["integer", "null"] },
             "unhealthy": { "type": ["integer", "null"] }
           },
           "additionalProperties": true

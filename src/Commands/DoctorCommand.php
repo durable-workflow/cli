@@ -14,6 +14,7 @@ use DurableWorkflow\Cli\Support\OutputMode;
 use DurableWorkflow\Cli\Support\Profile;
 use DurableWorkflow\Cli\Support\ResolvedConnection;
 use DurableWorkflow\Cli\Support\ServerException;
+use DurableWorkflow\Cli\Support\WorkerCompatibility;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
@@ -447,6 +448,7 @@ HELP);
 
         if (($server['reachable'] ?? false) === true) {
             $recommendations[] = ExecutionSemantics::doctorRecommendation();
+            $recommendations[] = WorkerCompatibility::doctorRecommendation();
         }
 
         return $recommendations;

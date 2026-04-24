@@ -38,6 +38,17 @@ option controls what happens when a second start targets an existing
 returns a duplicate outcome, <comment>return_existing_active</comment>
 returns the existing active run's identity).
 
+The new run is pinned to the starter process's compatibility marker
+(<comment>DW_V2_CURRENT_COMPATIBILITY</comment>) exactly once at start. Retry
+runs, continue-as-new runs, and child workflows inherit that marker so the
+run stays inside one compatibility family for its whole lifecycle. Only
+workers whose <comment>DW_V2_SUPPORTED_COMPATIBILITIES</comment> set includes
+the run's marker (or the workers-only <comment>*</comment> wildcard) will
+claim the run's tasks; any other worker rejects the claim at claim time
+with <comment>compatibility_blocked</comment> or
+<comment>compatibility_unsupported</comment> and the task stays on the queue
+for a compatible worker to pick up.
+
 <comment>Examples:</comment>
 
   # Start with no input

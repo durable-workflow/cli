@@ -25,8 +25,15 @@ draining, and stale worker counts, rollout status, runtime and SDK-version
 mix, first-seen timestamp, and most-recent heartbeat. Unversioned workers
 are grouped under a null build_id row.
 
-Use this before draining or removing an older build to confirm which
-builds can still claim work on the queue.
+Build ids are the compatibility markers that pin workflow runs to a
+compatibility family. A run stamped at start with marker <comment>M</comment>
+is claimed only by workers whose supported set covers <comment>M</comment>
+(or the workers-only <comment>*</comment> wildcard). Retry, continue-as-new,
+and child runs inherit the parent run's marker, so a task on this queue
+stays inside one family for its whole lifecycle. Use this command before
+draining or removing an older build to confirm which builds can still
+claim work on the queue without leaving pinned runs in the explicit
+"no compatible worker is registered yet" state.
 
 <comment>Examples:</comment>
 

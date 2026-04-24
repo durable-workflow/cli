@@ -24,10 +24,20 @@ Register a worker identity for direct worker-protocol diagnostics. Real SDK
 workers register automatically; this command is useful when smoke-testing
 task routing, leases, and workflow-task completion from the CLI.
 
+The <comment>--build-id</comment> option names the compatibility marker this
+diagnostic worker advertises as part of its supported set. Markers are
+opaque strings; the engine performs exact-string equality and the
+workers-only <comment>*</comment> wildcard only, so a diagnostic worker
+registered without <comment>--build-id</comment> sees only runs that were
+stamped with no required marker. Reserve the wildcard for single-build
+fleets and test harnesses — runs themselves are never stamped with
+<comment>*</comment>.
+
 <comment>Examples:</comment>
 
   <info>dw worker:register cli-worker --task-queue=orders --workflow-type=orders.Checkout</info>
   <info>dw worker:register py-worker --runtime=python --activity-type=email.send --json</info>
+  <info>dw worker:register cli-2026-04-17 --task-queue=orders --build-id=build-2026-04-17</info>
 HELP)
             ->addArgument('worker-id', InputArgument::OPTIONAL, 'Worker ID; omitted lets the server assign one')
             ->addOption('task-queue', null, InputOption::VALUE_REQUIRED, 'Task queue to poll', 'default')

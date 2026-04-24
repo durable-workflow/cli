@@ -6,6 +6,7 @@ namespace Tests\Commands;
 
 use DurableWorkflow\Cli\Commands\SystemCommand\ActivityTimeoutPassCommand;
 use DurableWorkflow\Cli\Commands\SystemCommand\ActivityTimeoutStatusCommand;
+use DurableWorkflow\Cli\Commands\SystemCommand\OperatorMetricsCommand;
 use DurableWorkflow\Cli\Commands\SystemCommand\RepairPassCommand;
 use DurableWorkflow\Cli\Commands\SystemCommand\RepairStatusCommand;
 use DurableWorkflow\Cli\Commands\SystemCommand\RetentionPassCommand;
@@ -484,6 +485,212 @@ class SystemCommandTest extends TestCase
         self::assertIsArray($decoded);
         self::assertSame(1, $decoded['pruned']);
     }
+
+    public function test_operator_metrics_command_renders_rollout_safety_signals(): void
+    {
+        $command = new OperatorMetricsCommand();
+        $client = new SystemFakeClient(self::operatorMetricsPayload());
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+
+        $display = $tester->getDisplay();
+
+        self::assertSame('/system/operator-metrics', $client->lastGetPath);
+
+        self::assertStringContainsString('Operator metrics for namespace orders-prod', $display);
+        self::assertStringContainsString('generated 2026-04-24T11:30:00Z', $display);
+
+        self::assertStringContainsString('Runs', $display);
+        self::assertStringContainsString('Repair needed:        4', $display);
+        self::assertStringContainsString('Claim failed:         2', $display);
+        self::assertStringContainsString('Compatibility blocked: 1', $display);
+
+        self::assertStringContainsString('Queue depth:          9 ready (7 due), 3 delayed, 5 leased', $display);
+        self::assertStringContainsString(
+            'Unhealthy (duplicate-risk roll-up): 11 (dispatch failed 2, claim failed 3, dispatch overdue 4, lease expired 2)',
+            $display,
+        );
+
+        self::assertStringContainsString('Runnable tasks:       7', $display);
+        self::assertStringContainsString('Delayed tasks:        3', $display);
+        self::assertStringContainsString('Leased tasks:         5', $display);
+        self::assertStringContainsString('Unhealthy tasks:      11', $display);
+        self::assertStringContainsString('Compatibility blocked runs: 1', $display);
+
+        self::assertStringContainsString('Missing-task candidates: 3 (2 selected this pass)', $display);
+        self::assertStringContainsString('Oldest missing-task age: 125000 ms', $display);
+        self::assertStringContainsString('Oldest missing run at:   2026-04-24T11:27:55Z', $display);
+
+        self::assertStringContainsString('Required compatibility: build-2026.04.24', $display);
+        self::assertStringContainsString('Active workers:         2 (2 queue scopes, 1 supporting required)', $display);
+        self::assertStringNotContainsString(
+            'No active worker supports the required compatibility marker',
+            $display,
+        );
+        self::assertStringContainsString('worker-a', $display);
+        self::assertStringContainsString('worker-b', $display);
+        self::assertStringContainsString('build-2026.04.24', $display);
+
+        self::assertStringContainsString('Supported:            yes', $display);
+        self::assertStringContainsString('Database:              mysql/mysql', $display);
+        self::assertStringContainsString('Cache:                 redis/redis', $display);
+
+        self::assertStringContainsString('Active 4, paused 1, missed 1, oldest overdue 5000 ms', $display);
+        self::assertStringContainsString('Lifetime fires: 128 (3 failures)', $display);
+
+        self::assertStringContainsString('Redispatch after:     120s', $display);
+        self::assertStringContainsString('Loop throttle:        10s', $display);
+        self::assertStringContainsString('Scan limit:           100', $display);
+        self::assertStringContainsString('Backoff cap:          300s', $display);
+    }
+
+    public function test_operator_metrics_command_renders_json_output(): void
+    {
+        $command = new OperatorMetricsCommand();
+        $command->setServerClient(new SystemFakeClient(self::operatorMetricsPayload()));
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute(['--json' => true]));
+
+        $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+
+        self::assertIsArray($decoded);
+        self::assertSame('orders-prod', $decoded['namespace']);
+        self::assertSame('build-2026.04.24', $decoded['operator_metrics']['workers']['required_compatibility']);
+        self::assertSame(11, $decoded['operator_metrics']['tasks']['unhealthy']);
+        self::assertSame(
+            ['redispatch_after_seconds', 'loop_throttle_seconds', 'scan_limit', 'failure_backoff_max_seconds'],
+            array_keys($decoded['operator_metrics']['repair_policy']),
+        );
+    }
+
+    public function test_operator_metrics_command_warns_when_no_worker_supports_required_marker(): void
+    {
+        $payload = self::operatorMetricsPayload();
+        $payload['operator_metrics']['workers']['active_workers'] = 1;
+        $payload['operator_metrics']['workers']['active_workers_supporting_required'] = 0;
+
+        $command = new OperatorMetricsCommand();
+        $command->setServerClient(new SystemFakeClient($payload));
+
+        $tester = new CommandTester($command);
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+
+        self::assertStringContainsString(
+            'No active worker supports the required compatibility marker',
+            $tester->getDisplay(),
+        );
+    }
+
+    public function test_operator_metrics_command_tolerates_minimal_payload(): void
+    {
+        $command = new OperatorMetricsCommand();
+        $command->setServerClient(new SystemFakeClient([]));
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+
+        $display = $tester->getDisplay();
+
+        self::assertStringContainsString('Operator metrics', $display);
+        self::assertStringContainsString('Repair needed:        0', $display);
+        self::assertStringContainsString('Required compatibility: (unset)', $display);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function operatorMetricsPayload(): array
+    {
+        return [
+            'namespace' => 'orders-prod',
+            'operator_metrics' => [
+                'generated_at' => '2026-04-24T11:30:00Z',
+                'runs' => [
+                    'repair_needed' => 4,
+                    'claim_failed' => 2,
+                    'compatibility_blocked' => 1,
+                ],
+                'tasks' => [
+                    'ready' => 9,
+                    'ready_due' => 7,
+                    'delayed' => 3,
+                    'leased' => 5,
+                    'dispatch_failed' => 2,
+                    'claim_failed' => 3,
+                    'dispatch_overdue' => 4,
+                    'lease_expired' => 2,
+                    'unhealthy' => 11,
+                ],
+                'backlog' => [
+                    'runnable_tasks' => 7,
+                    'delayed_tasks' => 3,
+                    'leased_tasks' => 5,
+                    'unhealthy_tasks' => 11,
+                    'repair_needed_runs' => 4,
+                    'claim_failed_runs' => 2,
+                    'compatibility_blocked_runs' => 1,
+                ],
+                'repair' => [
+                    'missing_task_candidates' => 3,
+                    'selected_missing_task_candidates' => 2,
+                    'oldest_missing_run_started_at' => '2026-04-24T11:27:55Z',
+                    'max_missing_run_age_ms' => 125000,
+                ],
+                'workers' => [
+                    'required_compatibility' => 'build-2026.04.24',
+                    'active_workers' => 2,
+                    'active_worker_scopes' => 2,
+                    'active_workers_supporting_required' => 1,
+                    'fleet' => [
+                        [
+                            'worker_id' => 'worker-a',
+                            'connection' => 'mysql',
+                            'queue' => 'default',
+                            'supported' => ['build-2026.04.24'],
+                            'supports_required' => true,
+                            'recorded_at' => '2026-04-24T11:29:00Z',
+                        ],
+                        [
+                            'worker_id' => 'worker-b',
+                            'connection' => 'mysql',
+                            'queue' => 'priority',
+                            'supported' => ['build-2026.04.23'],
+                            'supports_required' => false,
+                            'recorded_at' => '2026-04-24T11:29:30Z',
+                        ],
+                    ],
+                ],
+                'backend' => [
+                    'supported' => true,
+                    'database' => ['connection' => 'mysql', 'driver' => 'mysql'],
+                    'queue' => ['connection' => 'redis', 'driver' => 'redis'],
+                    'cache' => ['store' => 'redis', 'driver' => 'redis'],
+                    'issues' => [],
+                ],
+                'schedules' => [
+                    'active' => 4,
+                    'paused' => 1,
+                    'missed' => 1,
+                    'oldest_overdue_at' => '2026-04-24T11:29:55Z',
+                    'max_overdue_ms' => 5000,
+                    'fires_total' => 128,
+                    'failures_total' => 3,
+                ],
+                'repair_policy' => [
+                    'redispatch_after_seconds' => 120,
+                    'loop_throttle_seconds' => 10,
+                    'scan_limit' => 100,
+                    'failure_backoff_max_seconds' => 300,
+                ],
+            ],
+        ];
+    }
 }
 
 class SystemFakeClient extends ServerClient
@@ -493,6 +700,8 @@ class SystemFakeClient extends ServerClient
 
     public string $lastPostPath = '';
 
+    public string $lastGetPath = '';
+
     /** @param array<string, mixed> $payload */
     public function __construct(
         private readonly array $payload,
@@ -500,6 +709,8 @@ class SystemFakeClient extends ServerClient
 
     public function get(string $path, array $query = []): array
     {
+        $this->lastGetPath = $path;
+
         return $this->payload;
     }
 

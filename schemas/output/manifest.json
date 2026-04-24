@@ -179,6 +179,11 @@
       "schema": "schemas/output/activity-timeout-status.schema.json",
       "schema_id": "https://durable-workflow.com/schemas/cli/output/activity-timeout-status.schema.json"
     },
+    "system:operator-metrics": {
+      "output": "--json",
+      "schema": "schemas/output/operator-metrics.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/operator-metrics.schema.json"
+    },
     "system:repair-pass": {
       "output": "--json",
       "schema": "schemas/output/repair-pass.schema.json",

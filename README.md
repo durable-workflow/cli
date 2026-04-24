@@ -481,6 +481,12 @@ and `--input-encoding=json|raw|base64` with `json` as the default.
 ### System Operations
 
 ```bash
+# Show the rollout-safety coordination-health snapshot
+dw system:operator-metrics
+
+# Pipe the raw snapshot to jq for scripted checks
+dw system:operator-metrics --json | jq '.operator_metrics.workers.active_workers_supporting_required'
+
 # Show task repair diagnostics
 dw system:repair-status
 

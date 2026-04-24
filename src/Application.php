@@ -142,6 +142,7 @@ class Application extends ConsoleApplication
             new SearchAttributeCommand\DeleteCommand(),
 
             // System operations
+            new SystemCommand\OperatorMetricsCommand(),
             new SystemCommand\RepairStatusCommand(),
             new SystemCommand\RepairPassCommand(),
             new SystemCommand\ActivityTimeoutStatusCommand(),

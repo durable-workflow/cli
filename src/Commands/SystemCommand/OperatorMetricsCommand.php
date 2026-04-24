@@ -118,6 +118,15 @@ HELP)
             (int) ($tasks['dispatch_overdue'] ?? 0),
             (int) ($tasks['lease_expired'] ?? 0),
         ));
+        if (array_key_exists('max_lease_expired_age_ms', $tasks)) {
+            $output->writeln(sprintf(
+                '  Oldest lease-expired age: %d ms',
+                (int) ($tasks['max_lease_expired_age_ms'] ?? 0),
+            ));
+        }
+        if (is_string($tasks['oldest_lease_expired_at'] ?? null)) {
+            $output->writeln(sprintf('  Oldest lease expired at:  %s', $tasks['oldest_lease_expired_at']));
+        }
         $output->writeln('');
     }
 

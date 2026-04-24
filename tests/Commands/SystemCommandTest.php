@@ -507,6 +507,9 @@ class SystemCommandTest extends TestCase
         self::assertStringContainsString('Repair needed:        4', $display);
         self::assertStringContainsString('Claim failed:         2', $display);
         self::assertStringContainsString('Compatibility blocked: 1', $display);
+        self::assertStringContainsString('Waiting (durable resume): 6', $display);
+        self::assertStringContainsString('Oldest wait age:      285000 ms', $display);
+        self::assertStringContainsString('Oldest wait started at: 2026-04-24T11:25:15Z', $display);
 
         self::assertStringContainsString('Queue depth:          9 ready (7 due), 3 delayed, 5 leased', $display);
         self::assertStringContainsString(
@@ -650,6 +653,21 @@ class SystemCommandTest extends TestCase
         self::assertSame(['integer', 'null'], $tasks['max_dispatch_overdue_age_ms']['type']);
     }
 
+    public function test_operator_metrics_schema_pins_run_wait_age_keys(): void
+    {
+        $schema = json_decode(
+            (string) file_get_contents(__DIR__.'/../../schemas/output/operator-metrics.schema.json'),
+            true,
+            flags: JSON_THROW_ON_ERROR,
+        );
+
+        $runs = $schema['properties']['operator_metrics']['properties']['runs']['properties'];
+
+        self::assertSame(['integer', 'null'], $runs['waiting']['type']);
+        self::assertSame(['string', 'null'], $runs['oldest_wait_started_at']['type']);
+        self::assertSame(['integer', 'null'], $runs['max_wait_age_ms']['type']);
+    }
+
     public function test_operator_metrics_command_tolerates_minimal_payload(): void
     {
         $command = new OperatorMetricsCommand();
@@ -679,6 +697,9 @@ class SystemCommandTest extends TestCase
                     'repair_needed' => 4,
                     'claim_failed' => 2,
                     'compatibility_blocked' => 1,
+                    'waiting' => 6,
+                    'oldest_wait_started_at' => '2026-04-24T11:25:15Z',
+                    'max_wait_age_ms' => 285000,
                 ],
                 'tasks' => [
                     'ready' => 9,

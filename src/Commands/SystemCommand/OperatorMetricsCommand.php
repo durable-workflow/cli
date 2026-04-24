@@ -94,6 +94,18 @@ HELP)
         $output->writeln(sprintf('  Repair needed:        %d', (int) ($runs['repair_needed'] ?? 0)));
         $output->writeln(sprintf('  Claim failed:         %d', (int) ($runs['claim_failed'] ?? 0)));
         $output->writeln(sprintf('  Compatibility blocked: %d', (int) ($runs['compatibility_blocked'] ?? 0)));
+        if (array_key_exists('waiting', $runs)) {
+            $output->writeln(sprintf('  Waiting (durable resume): %d', (int) ($runs['waiting'] ?? 0)));
+        }
+        if (array_key_exists('max_wait_age_ms', $runs)) {
+            $output->writeln(sprintf(
+                '  Oldest wait age:      %d ms',
+                (int) ($runs['max_wait_age_ms'] ?? 0),
+            ));
+        }
+        if (is_string($runs['oldest_wait_started_at'] ?? null)) {
+            $output->writeln(sprintf('  Oldest wait started at: %s', $runs['oldest_wait_started_at']));
+        }
         $output->writeln('');
     }
 

@@ -15,7 +15,10 @@
           "properties": {
             "repair_needed": { "type": ["integer", "null"] },
             "claim_failed": { "type": ["integer", "null"] },
-            "compatibility_blocked": { "type": ["integer", "null"] }
+            "compatibility_blocked": { "type": ["integer", "null"] },
+            "waiting": { "type": ["integer", "null"] },
+            "oldest_wait_started_at": { "type": ["string", "null"] },
+            "max_wait_age_ms": { "type": ["integer", "null"] }
           },
           "additionalProperties": true
         },

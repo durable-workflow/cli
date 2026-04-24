@@ -30,6 +30,14 @@ the workflow reaches a terminal state and exits with
 <comment>SUCCESS (0)</comment> on completion or <comment>FAILURE (1)</comment> on
 failure / cancellation / termination.
 
+Start commands are deduped by <comment>workflow_command_id</comment>. If the
+caller retries after a network error it must send the same command id so
+the engine recognises the retry. The <comment>--duplicate-policy</comment>
+option controls what happens when a second start targets an existing
+<comment>workflow_instance_id</comment> (e.g. <comment>reject_duplicate</comment>
+returns a duplicate outcome, <comment>return_existing_active</comment>
+returns the existing active run's identity).
+
 <comment>Examples:</comment>
 
   # Start with no input
@@ -48,7 +56,7 @@ HELP)
             ->addOption('workflow-id', 'w', InputOption::VALUE_OPTIONAL, 'Workflow ID (auto-generated if omitted)')
             ->addOption('business-key', null, InputOption::VALUE_OPTIONAL, 'Business key')
             ->addOption('task-queue', null, InputOption::VALUE_OPTIONAL, 'Task queue', 'default')
-            ->addOption('duplicate-policy', null, InputOption::VALUE_OPTIONAL, 'Duplicate policy (discover canonical values with server:info)', null, CompletionValues::WORKFLOW_DUPLICATE_POLICIES)
+            ->addOption('duplicate-policy', null, InputOption::VALUE_OPTIONAL, 'Duplicate-start policy keyed on workflow_command_id (e.g. reject_duplicate, return_existing_active; discover canonical values with server:info)', null, CompletionValues::WORKFLOW_DUPLICATE_POLICIES)
             ->addOption('memo', null, InputOption::VALUE_OPTIONAL, 'Memo JSON')
             ->addOption('search-attr', null, InputOption::VALUE_OPTIONAL | InputOption::VALUE_IS_ARRAY, 'Search attributes (key=value)')
             ->addOption('execution-timeout', null, InputOption::VALUE_REQUIRED, 'Execution timeout in seconds (across all runs)')

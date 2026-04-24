@@ -451,7 +451,7 @@ dw workflow-task:poll cli-worker --task-queue=orders --json
 # Complete the leased workflow task with a JSON workflow result
 dw workflow-task:complete TASK_ID ATTEMPT --lease-owner=cli-worker --complete-result='{"ok":true}'
 
-# Report workflow-task execution failure for retry or diagnosis
+# Report a worker-side failure on a leased workflow-task attempt (workflow tasks are replayed, not retried against application logic)
 dw workflow-task:fail TASK_ID ATTEMPT --lease-owner=cli-worker --message="replay mismatch"
 
 # Fetch the next history page for a leased workflow task

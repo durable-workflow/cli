@@ -6,6 +6,7 @@ namespace DurableWorkflow\Cli\Commands;
 
 use DurableWorkflow\Cli\BuildInfo;
 use DurableWorkflow\Cli\Support\CompatibilityDiagnostics;
+use DurableWorkflow\Cli\Support\ExecutionSemantics;
 use DurableWorkflow\Cli\Support\ExternalTaskInputContract;
 use DurableWorkflow\Cli\Support\ExternalTaskResultContract;
 use DurableWorkflow\Cli\Support\ExitCode;
@@ -442,6 +443,10 @@ HELP);
                 'severity' => 'info',
                 'message' => 'Connection, auth discovery, TLS settings, and advertised protocol metadata look ready for CLI operations.',
             ];
+        }
+
+        if (($server['reachable'] ?? false) === true) {
+            $recommendations[] = ExecutionSemantics::doctorRecommendation();
         }
 
         return $recommendations;

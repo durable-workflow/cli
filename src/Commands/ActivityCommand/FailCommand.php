@@ -20,9 +20,15 @@ class FailCommand extends BaseCommand
         $this->setName('activity:fail')
             ->setDescription('Fail an activity task externally')
             ->setHelp(<<<'HELP'
-Fail an activity from outside the worker process. <comment>--non-retryable</comment>
-tells the server to skip the workflow's retry policy and surface the
-failure to the workflow immediately.
+Fail an activity from outside the worker process. Activity attempts are
+at-least-once; each retry runs as a fresh attempt with a new
+<comment>activity_attempt_id</comment> while the
+<comment>activity_execution_id</comment> stays stable across the retry
+chain. <comment>--non-retryable</comment> tells the server to skip the
+retry policy and surface the failure to the workflow immediately. If the
+named <comment>activity_attempt_id</comment> has already settled, the
+server returns <comment>recorded=false</comment> with a reason — that is
+redelivery, not a failure to fail.
 
 <comment>Examples:</comment>
 

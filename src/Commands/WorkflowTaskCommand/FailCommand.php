@@ -20,9 +20,13 @@ class FailCommand extends BaseCommand
         $this->setName('workflow-task:fail')
             ->setDescription('Fail a leased workflow task')
             ->setHelp(<<<'HELP'
-Report workflow-task execution failure through the worker protocol. This
-records a task failure for retry or diagnosis; it is distinct from completing
-a task with a workflow-level fail_workflow command.
+Report a worker-side failure for the named workflow-task attempt through
+the worker protocol. Workflow tasks are replayed deterministically,
+not retried against application logic, so this records that the worker
+could not durably commit the decision — the engine replays the same
+history into a fresh task. It is distinct from completing a task with
+a workflow-level fail_workflow command, which writes WorkflowFailed
+into the run.
 
 <comment>Examples:</comment>
 

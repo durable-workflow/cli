@@ -19,8 +19,12 @@ class CompleteCommand extends BaseCommand
         $this->setName('activity:complete')
             ->setDescription('Complete an activity task externally')
             ->setHelp(<<<'HELP'
-Complete an activity from outside the worker process. You must supply
-the task's leased attempt ID so the server can validate ownership.
+Complete an activity from outside the worker process. Supply the leased
+<comment>activity_attempt_id</comment> so the server can validate ownership
+and enforce the at-most-one terminal outcome per attempt. If the attempt
+has already settled (for example, a redelivery recorded completion
+first), the server returns <comment>recorded=false</comment> with a reason
+code — that is the redelivery path, not a failure.
 
 <comment>Examples:</comment>
 

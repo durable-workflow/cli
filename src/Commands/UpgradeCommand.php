@@ -96,6 +96,11 @@ HELP)
         }
         $asJson = $outputMode === OutputMode::JSON;
 
+        // Prime exit-code constants before any self-replacement so the current
+        // process never needs to autoload ExitCode from a swapped archive.
+        $successExit = ExitCode::SUCCESS;
+        $failureExit = ExitCode::FAILURE;
+
         $target = $this->detector !== null ? ($this->detector)() : InstallationTarget::detect(
             argv0: (string) ($_SERVER['argv'][0] ?? ''),
             pharRunning: \Phar::running(false),
@@ -122,7 +127,7 @@ HELP)
                 'installation' => $target->toArray(),
                 'current_version' => $currentVersion,
                 'target_version' => null,
-            ], ExitCode::FAILURE);
+            ], $failureExit);
         }
 
         $catalog = $this->catalog ?? ReleaseCatalog::create();
@@ -136,7 +141,7 @@ HELP)
                 'installation' => $target->toArray(),
                 'current_version' => $currentVersion,
                 'target_version' => null,
-            ], ExitCode::FAILURE);
+            ], $failureExit);
         }
 
         if ($target->assetName === null) {
@@ -146,7 +151,7 @@ HELP)
                 'installation' => $target->toArray(),
                 'current_version' => $currentVersion,
                 'target_version' => $targetVersion,
-            ], ExitCode::FAILURE);
+            ], $failureExit);
         }
 
         $sameVersion = $this->versionsMatch($currentVersion, $targetVersion);
@@ -158,7 +163,7 @@ HELP)
                 'installation' => $target->toArray(),
                 'current_version' => $currentVersion,
                 'target_version' => $targetVersion,
-            ], ExitCode::SUCCESS);
+            ], $successExit);
         }
 
         $binaryUrl = $catalog->downloadUrl($targetVersion, $target->assetName);
@@ -172,7 +177,7 @@ HELP)
                 'target_version' => $targetVersion,
                 'asset_url' => $binaryUrl,
                 'checksum_url' => $sumsUrl,
-            ], ExitCode::SUCCESS);
+            ], $successExit);
         }
 
         if (! $target->upgradeable) {
@@ -182,7 +187,7 @@ HELP)
                 'installation' => $target->toArray(),
                 'current_version' => $currentVersion,
                 'target_version' => $targetVersion,
-            ], ExitCode::FAILURE);
+            ], $failureExit);
         }
 
         try {
@@ -196,7 +201,7 @@ HELP)
                 'installation' => $target->toArray(),
                 'current_version' => $currentVersion,
                 'target_version' => $targetVersion,
-            ], ExitCode::FAILURE);
+            ], $failureExit);
         }
 
         $actual = hash('sha256', $binary);
@@ -207,7 +212,7 @@ HELP)
                 'installation' => $target->toArray(),
                 'current_version' => $currentVersion,
                 'target_version' => $targetVersion,
-            ], ExitCode::FAILURE);
+            ], $failureExit);
         }
 
         $replacer = $this->replacer ?? self::defaultReplacer(...);
@@ -221,7 +226,7 @@ HELP)
                 'installation' => $target->toArray(),
                 'current_version' => $currentVersion,
                 'target_version' => $targetVersion,
-            ], ExitCode::FAILURE);
+            ], $failureExit);
         } catch (\RuntimeException $e) {
             return $this->emit($output, $asJson, [
                 'status' => 'error',
@@ -229,7 +234,7 @@ HELP)
                 'installation' => $target->toArray(),
                 'current_version' => $currentVersion,
                 'target_version' => $targetVersion,
-            ], ExitCode::FAILURE);
+            ], $failureExit);
         }
 
         return $this->emit($output, $asJson, [
@@ -237,7 +242,7 @@ HELP)
             'installation' => $target->toArray(),
             'current_version' => $currentVersion,
             'target_version' => $targetVersion,
-        ], ExitCode::SUCCESS);
+        ], $successExit);
     }
 
     private function emit(OutputInterface $output, bool $asJson, array $payload, int $exit): int

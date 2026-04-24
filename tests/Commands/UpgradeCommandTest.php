@@ -9,6 +9,7 @@ use DurableWorkflow\Cli\Commands\UpgradeCommand;
 use DurableWorkflow\Cli\Commands\UpgradePermissionException;
 use DurableWorkflow\Cli\Support\InstallationTarget;
 use DurableWorkflow\Cli\Support\ReleaseCatalog;
+use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -194,6 +195,42 @@ class UpgradeCommandTest extends TestCase
         self::assertSame('/home/user/.local/bin/dw', $replaced[0]['path']);
         self::assertSame($binary, $replaced[0]['bytes']);
         self::assertSame(0755, $replaced[0]['mode']);
+    }
+
+    #[RunInSeparateProcess]
+    public function test_exit_code_is_loaded_before_binary_replacement(): void
+    {
+        self::assertFalse(class_exists(\DurableWorkflow\Cli\Support\ExitCode::class, false));
+
+        $binary = 'new-binary-bytes';
+        $hash = hash('sha256', $binary);
+        $sums = "{$hash}  dw-linux-x86_64\n";
+
+        $exitCodeLoadedDuringReplace = null;
+        $replacer = function (string $path, string $bytes, int $mode) use (&$exitCodeLoadedDuringReplace): void {
+            $exitCodeLoadedDuringReplace = class_exists(\DurableWorkflow\Cli\Support\ExitCode::class, false);
+        };
+
+        $command = $this->command(
+            catalog: $this->catalog([
+                'latest-tag' => '0.1.9',
+                'sums' => $sums,
+                'asset' => $binary,
+            ]),
+            detector: fn () => new InstallationTarget(
+                kind: InstallationTarget::KIND_BINARY,
+                path: '/home/user/.local/bin/dw',
+                upgradeable: true,
+                assetName: 'dw-linux-x86_64',
+            ),
+            replacer: $replacer,
+        );
+
+        $tester = new CommandTester($command);
+        $exit = $tester->execute(['--output' => 'json']);
+
+        self::assertSame(Command::SUCCESS, $exit);
+        self::assertTrue($exitCodeLoadedDuringReplace, 'ExitCode should already be loaded before the replacer runs.');
     }
 
     public function test_fails_on_checksum_mismatch(): void

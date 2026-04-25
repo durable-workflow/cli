@@ -145,6 +145,20 @@
             "task_dispatch_mode": { "type": ["string", "null"] }
           },
           "additionalProperties": true
+        },
+        "projections": {
+          "type": "object",
+          "properties": {
+            "run_summaries": {
+              "type": "object",
+              "properties": {
+                "oldest_missing_run_started_at": { "type": ["string", "null"] },
+                "max_missing_run_age_ms": { "type": ["integer", "null"] }
+              },
+              "additionalProperties": true
+            }
+          },
+          "additionalProperties": true
         }
       },
       "additionalProperties": true

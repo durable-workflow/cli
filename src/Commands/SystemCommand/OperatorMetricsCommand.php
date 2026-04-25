@@ -69,6 +69,7 @@ HELP)
         $this->renderTasks($output, $this->sectionArray($metrics, 'tasks'));
         $this->renderBacklog($output, $this->sectionArray($metrics, 'backlog'));
         $this->renderRepair($output, $this->sectionArray($metrics, 'repair'));
+        $this->renderProjections($output, $this->sectionArray($metrics, 'projections'));
         $this->renderWorkers($output, $this->sectionArray($metrics, 'workers'));
         $this->renderBackend($output, $this->sectionArray($metrics, 'backend'));
         $this->renderMatchingRole($output, $this->sectionArray($metrics, 'matching_role'));
@@ -217,6 +218,34 @@ HELP)
         $output->writeln(sprintf('  Oldest missing-task age: %d ms', (int) ($repair['max_missing_run_age_ms'] ?? 0)));
         if (is_string($repair['oldest_missing_run_started_at'] ?? null)) {
             $output->writeln(sprintf('  Oldest missing run at:   %s', $repair['oldest_missing_run_started_at']));
+        }
+        $output->writeln('');
+    }
+
+    /**
+     * @param  array<string, mixed>  $projections
+     */
+    private function renderProjections(OutputInterface $output, array $projections): void
+    {
+        $runSummaries = is_array($projections['run_summaries'] ?? null) ? $projections['run_summaries'] : [];
+
+        if (! array_key_exists('max_missing_run_age_ms', $runSummaries)
+            && ! is_string($runSummaries['oldest_missing_run_started_at'] ?? null)) {
+            return;
+        }
+
+        $output->writeln('<info>Projection lag</info>');
+        if (array_key_exists('max_missing_run_age_ms', $runSummaries)) {
+            $output->writeln(sprintf(
+                '  Run-summary missing age: %d ms',
+                (int) ($runSummaries['max_missing_run_age_ms'] ?? 0),
+            ));
+        }
+        if (is_string($runSummaries['oldest_missing_run_started_at'] ?? null)) {
+            $output->writeln(sprintf(
+                '  Oldest run-summary missing run at: %s',
+                $runSummaries['oldest_missing_run_started_at'],
+            ));
         }
         $output->writeln('');
     }

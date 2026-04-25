@@ -539,6 +539,10 @@ class SystemCommandTest extends TestCase
         self::assertStringContainsString('Oldest missing-task age: 125000 ms', $display);
         self::assertStringContainsString('Oldest missing run at:   2026-04-24T11:27:55Z', $display);
 
+        self::assertStringContainsString('Projection lag', $display);
+        self::assertStringContainsString('Run-summary missing age: 330000 ms', $display);
+        self::assertStringContainsString('Oldest run-summary missing run at: 2026-04-24T11:24:30Z', $display);
+
         self::assertStringContainsString('Required compatibility: build-2026.04.24', $display);
         self::assertStringContainsString('Active workers:         2 (2 queue scopes, 1 supporting required)', $display);
         self::assertStringNotContainsString(
@@ -788,6 +792,40 @@ class SystemCommandTest extends TestCase
         self::assertStringContainsString('dispatch failed 2', $display);
     }
 
+    public function test_operator_metrics_schema_pins_run_summary_missing_age_keys(): void
+    {
+        $schema = json_decode(
+            (string) file_get_contents(__DIR__.'/../../schemas/output/operator-metrics.schema.json'),
+            true,
+            flags: JSON_THROW_ON_ERROR,
+        );
+
+        $runSummaries = $schema['properties']['operator_metrics']['properties']
+            ['projections']['properties']['run_summaries']['properties'];
+
+        self::assertSame(['string', 'null'], $runSummaries['oldest_missing_run_started_at']['type']);
+        self::assertSame(['integer', 'null'], $runSummaries['max_missing_run_age_ms']['type']);
+    }
+
+    public function test_operator_metrics_command_omits_run_summary_missing_age_when_snapshot_predates_contract(): void
+    {
+        $payload = self::operatorMetricsPayload();
+        unset($payload['operator_metrics']['projections']);
+
+        $command = new OperatorMetricsCommand();
+        $command->setServerClient(new SystemFakeClient($payload));
+
+        $tester = new CommandTester($command);
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+
+        $display = $tester->getDisplay();
+
+        self::assertStringNotContainsString('Projection lag', $display);
+        self::assertStringNotContainsString('Run-summary missing age', $display);
+        self::assertStringNotContainsString('Oldest run-summary missing run at', $display);
+        self::assertStringContainsString('Oldest missing-task age: 125000 ms', $display);
+    }
+
     public function test_operator_metrics_command_omits_activities_block_when_payload_lacks_it(): void
     {
         $payload = self::operatorMetricsPayload();
@@ -958,6 +996,12 @@ class SystemCommandTest extends TestCase
                     'queue_wake_enabled' => true,
                     'shape' => 'in_worker',
                     'task_dispatch_mode' => 'queue',
+                ],
+                'projections' => [
+                    'run_summaries' => [
+                        'oldest_missing_run_started_at' => '2026-04-24T11:24:30Z',
+                        'max_missing_run_age_ms' => 330000,
+                    ],
                 ],
             ],
         ];

@@ -435,6 +435,21 @@ HELP)
         if (is_string($activities['oldest_retrying_started_at'] ?? null)) {
             $output->writeln(sprintf('  Oldest retrying started at: %s', $activities['oldest_retrying_started_at']));
         }
+        if (array_key_exists('timeout_overdue', $activities)) {
+            $output->writeln(sprintf(
+                '  Timeout overdue:      %d',
+                (int) ($activities['timeout_overdue'] ?? 0),
+            ));
+        }
+        if (array_key_exists('max_timeout_overdue_age_ms', $activities)) {
+            $output->writeln(sprintf(
+                '  Oldest timeout-overdue age: %d ms',
+                (int) ($activities['max_timeout_overdue_age_ms'] ?? 0),
+            ));
+        }
+        if (is_string($activities['oldest_timeout_overdue_at'] ?? null)) {
+            $output->writeln(sprintf('  Oldest timeout-overdue at:  %s', $activities['oldest_timeout_overdue_at']));
+        }
         $output->writeln(sprintf(
             '  Failed attempts:      %d (max attempts on a single execution: %d)',
             (int) ($activities['failed_attempts'] ?? 0),

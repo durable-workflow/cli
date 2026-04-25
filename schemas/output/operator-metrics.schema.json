@@ -125,6 +125,9 @@
             "retrying": { "type": ["integer", "null"] },
             "oldest_retrying_started_at": { "type": ["string", "null"] },
             "max_retrying_age_ms": { "type": ["integer", "null"] },
+            "timeout_overdue": { "type": ["integer", "null"] },
+            "oldest_timeout_overdue_at": { "type": ["string", "null"] },
+            "max_timeout_overdue_age_ms": { "type": ["integer", "null"] },
             "failed_attempts": { "type": ["integer", "null"] },
             "max_attempt_count": { "type": ["integer", "null"] }
           },

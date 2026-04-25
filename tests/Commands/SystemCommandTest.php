@@ -572,6 +572,9 @@ class SystemCommandTest extends TestCase
         self::assertStringContainsString('Open 12 (pending 8, running 4), retrying 3', $display);
         self::assertStringContainsString('Oldest retrying age:  270000 ms', $display);
         self::assertStringContainsString('Oldest retrying started at: 2026-04-24T11:25:30Z', $display);
+        self::assertStringContainsString('Timeout overdue:      2', $display);
+        self::assertStringContainsString('Oldest timeout-overdue age: 345000 ms', $display);
+        self::assertStringContainsString('Oldest timeout-overdue at:  2026-04-24T11:24:15Z', $display);
         self::assertStringContainsString('Failed attempts:      7 (max attempts on a single execution: 5)', $display);
 
         self::assertStringContainsString('Redispatch after:     120s', $display);
@@ -947,6 +950,45 @@ class SystemCommandTest extends TestCase
         self::assertStringNotContainsString('Oldest retrying age', $display);
     }
 
+    public function test_operator_metrics_schema_pins_activities_timeout_overdue_keys(): void
+    {
+        $schema = json_decode(
+            (string) file_get_contents(__DIR__.'/../../schemas/output/operator-metrics.schema.json'),
+            true,
+            flags: JSON_THROW_ON_ERROR,
+        );
+
+        $activities = $schema['properties']['operator_metrics']['properties']['activities']['properties'];
+
+        self::assertSame(['integer', 'null'], $activities['timeout_overdue']['type']);
+        self::assertSame(['string', 'null'], $activities['oldest_timeout_overdue_at']['type']);
+        self::assertSame(['integer', 'null'], $activities['max_timeout_overdue_age_ms']['type']);
+    }
+
+    public function test_operator_metrics_command_omits_activities_timeout_overdue_when_snapshot_predates_contract(): void
+    {
+        $payload = self::operatorMetricsPayload();
+        unset(
+            $payload['operator_metrics']['activities']['timeout_overdue'],
+            $payload['operator_metrics']['activities']['oldest_timeout_overdue_at'],
+            $payload['operator_metrics']['activities']['max_timeout_overdue_age_ms'],
+        );
+
+        $command = new OperatorMetricsCommand();
+        $command->setServerClient(new SystemFakeClient($payload));
+
+        $tester = new CommandTester($command);
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+
+        $display = $tester->getDisplay();
+
+        self::assertStringNotContainsString('Timeout overdue:', $display);
+        self::assertStringNotContainsString('Oldest timeout-overdue age', $display);
+        self::assertStringNotContainsString('Oldest timeout-overdue at', $display);
+        self::assertStringContainsString('Open 12 (pending 8, running 4), retrying 3', $display);
+        self::assertStringContainsString('Failed attempts:      7', $display);
+    }
+
     public function test_operator_metrics_command_renders_dedicated_matching_role_shape(): void
     {
         $payload = self::operatorMetricsPayload();
@@ -1090,6 +1132,9 @@ class SystemCommandTest extends TestCase
                     'retrying' => 3,
                     'oldest_retrying_started_at' => '2026-04-24T11:25:30Z',
                     'max_retrying_age_ms' => 270000,
+                    'timeout_overdue' => 2,
+                    'oldest_timeout_overdue_at' => '2026-04-24T11:24:15Z',
+                    'max_timeout_overdue_age_ms' => 345000,
                     'failed_attempts' => 7,
                     'max_attempt_count' => 5,
                 ],

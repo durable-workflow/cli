@@ -554,6 +554,7 @@ class SystemCommandTest extends TestCase
         self::assertStringContainsString('build-2026.04.24', $display);
 
         self::assertStringContainsString('Supported:            yes', $display);
+        self::assertStringContainsString('Severity:             ok', $display);
         self::assertStringContainsString('Database:              mysql/mysql', $display);
         self::assertStringContainsString('Cache:                 redis/redis', $display);
 
@@ -792,6 +793,69 @@ class SystemCommandTest extends TestCase
         self::assertStringContainsString('dispatch failed 2', $display);
     }
 
+    public function test_operator_metrics_schema_pins_backend_severity_key(): void
+    {
+        $schema = json_decode(
+            (string) file_get_contents(__DIR__.'/../../schemas/output/operator-metrics.schema.json'),
+            true,
+            flags: JSON_THROW_ON_ERROR,
+        );
+
+        $backend = $schema['properties']['operator_metrics']['properties']['backend']['properties'];
+
+        self::assertSame(['boolean', 'null'], $backend['supported']['type']);
+        self::assertSame(['string', 'null'], $backend['severity']['type']);
+    }
+
+    public function test_operator_metrics_command_renders_backend_severity_rollup(): void
+    {
+        $payload = self::operatorMetricsPayload();
+        $payload['operator_metrics']['backend'] = [
+            'supported' => false,
+            'severity' => 'error',
+            'database' => ['connection' => 'mysql', 'driver' => 'mysql'],
+            'queue' => ['connection' => 'sync', 'driver' => 'sync'],
+            'cache' => ['store' => 'array', 'driver' => 'array'],
+            'issues' => [
+                [
+                    'component' => 'queue',
+                    'code' => 'queue_sync_unsupported',
+                    'severity' => 'error',
+                    'summary' => 'Workflow v2 cannot run on the sync queue connection.',
+                ],
+            ],
+        ];
+
+        $command = new OperatorMetricsCommand();
+        $command->setServerClient(new SystemFakeClient($payload));
+
+        $tester = new CommandTester($command);
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+
+        $display = $tester->getDisplay();
+
+        self::assertStringContainsString('Supported:            no', $display);
+        self::assertStringContainsString('Severity:             error', $display);
+        self::assertStringContainsString('[error] Workflow v2 cannot run on the sync queue connection.', $display);
+    }
+
+    public function test_operator_metrics_command_omits_backend_severity_when_snapshot_predates_contract(): void
+    {
+        $payload = self::operatorMetricsPayload();
+        unset($payload['operator_metrics']['backend']['severity']);
+
+        $command = new OperatorMetricsCommand();
+        $command->setServerClient(new SystemFakeClient($payload));
+
+        $tester = new CommandTester($command);
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+
+        $display = $tester->getDisplay();
+
+        self::assertStringNotContainsString('Severity:', $display);
+        self::assertStringContainsString('Supported:            yes', $display);
+    }
+
     public function test_operator_metrics_schema_pins_run_summary_missing_age_keys(): void
     {
         $schema = json_decode(
@@ -962,6 +1026,7 @@ class SystemCommandTest extends TestCase
                 ],
                 'backend' => [
                     'supported' => true,
+                    'severity' => 'ok',
                     'database' => ['connection' => 'mysql', 'driver' => 'mysql'],
                     'queue' => ['connection' => 'redis', 'driver' => 'redis'],
                     'cache' => ['store' => 'redis', 'driver' => 'redis'],

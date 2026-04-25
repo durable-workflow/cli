@@ -90,6 +90,7 @@
           "type": "object",
           "properties": {
             "supported": { "type": ["boolean", "null"] },
+            "severity": { "type": ["string", "null"] },
             "database": { "type": ["object", "null"], "additionalProperties": true },
             "queue": { "type": ["object", "null"], "additionalProperties": true },
             "cache": { "type": ["object", "null"], "additionalProperties": true },

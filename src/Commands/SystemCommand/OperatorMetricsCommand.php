@@ -315,6 +315,10 @@ HELP)
         $output->writeln('<info>Backend capabilities (admission roll-up)</info>');
         $output->writeln(sprintf('  Supported:            %s', $supported ? 'yes' : 'no'));
 
+        if (is_string($backend['severity'] ?? null) && $backend['severity'] !== '') {
+            $output->writeln(sprintf('  Severity:             %s', $backend['severity']));
+        }
+
         foreach (['database', 'queue', 'cache'] as $component) {
             $detail = is_array($backend[$component] ?? null) ? $backend[$component] : [];
             $label = match ($component) {

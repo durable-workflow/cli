@@ -516,6 +516,8 @@ class SystemCommandTest extends TestCase
             'Unhealthy (duplicate-risk roll-up): 11 (dispatch failed 2, claim failed 3, dispatch overdue 4, lease expired 2)',
             $display,
         );
+        self::assertStringContainsString('Oldest unhealthy age:     135000 ms', $display);
+        self::assertStringContainsString('Oldest unhealthy at:      2026-04-24T11:27:45Z', $display);
         self::assertStringContainsString('Oldest lease-expired age: 95000 ms', $display);
         self::assertStringContainsString('Oldest lease expired at:  2026-04-24T11:28:25Z', $display);
         self::assertStringContainsString('Oldest ready-due age:     15000 ms', $display);
@@ -699,6 +701,44 @@ class SystemCommandTest extends TestCase
 
         self::assertSame(['string', 'null'], $tasks['oldest_dispatch_failed_at']['type']);
         self::assertSame(['integer', 'null'], $tasks['max_dispatch_failed_age_ms']['type']);
+    }
+
+    public function test_operator_metrics_schema_pins_unhealthy_age_keys(): void
+    {
+        $schema = json_decode(
+            (string) file_get_contents(__DIR__.'/../../schemas/output/operator-metrics.schema.json'),
+            true,
+            flags: JSON_THROW_ON_ERROR,
+        );
+
+        $tasks = $schema['properties']['operator_metrics']['properties']['tasks']['properties'];
+
+        self::assertSame(['string', 'null'], $tasks['oldest_unhealthy_at']['type']);
+        self::assertSame(['integer', 'null'], $tasks['max_unhealthy_age_ms']['type']);
+    }
+
+    public function test_operator_metrics_command_omits_unhealthy_age_when_snapshot_predates_contract(): void
+    {
+        $payload = self::operatorMetricsPayload();
+        unset(
+            $payload['operator_metrics']['tasks']['oldest_unhealthy_at'],
+            $payload['operator_metrics']['tasks']['max_unhealthy_age_ms'],
+        );
+
+        $command = new OperatorMetricsCommand();
+        $command->setServerClient(new SystemFakeClient($payload));
+
+        $tester = new CommandTester($command);
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+
+        $display = $tester->getDisplay();
+
+        self::assertStringNotContainsString('Oldest unhealthy age:', $display);
+        self::assertStringNotContainsString('Oldest unhealthy at:', $display);
+        self::assertStringContainsString(
+            'Unhealthy (duplicate-risk roll-up): 11',
+            $display,
+        );
     }
 
     public function test_operator_metrics_schema_pins_run_wait_age_keys(): void
@@ -982,6 +1022,8 @@ class SystemCommandTest extends TestCase
                     'oldest_dispatch_failed_at' => '2026-04-24T11:27:45Z',
                     'max_dispatch_failed_age_ms' => 135000,
                     'unhealthy' => 11,
+                    'oldest_unhealthy_at' => '2026-04-24T11:27:45Z',
+                    'max_unhealthy_age_ms' => 135000,
                 ],
                 'backlog' => [
                     'runnable_tasks' => 7,

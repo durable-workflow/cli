@@ -43,7 +43,9 @@
             "max_claim_failed_age_ms": { "type": ["integer", "null"] },
             "oldest_dispatch_failed_at": { "type": ["string", "null"] },
             "max_dispatch_failed_age_ms": { "type": ["integer", "null"] },
-            "unhealthy": { "type": ["integer", "null"] }
+            "unhealthy": { "type": ["integer", "null"] },
+            "oldest_unhealthy_at": { "type": ["string", "null"] },
+            "max_unhealthy_age_ms": { "type": ["integer", "null"] }
           },
           "additionalProperties": true
         },

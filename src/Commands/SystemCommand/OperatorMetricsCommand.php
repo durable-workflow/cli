@@ -171,6 +171,15 @@ HELP)
         if (is_string($tasks['oldest_claim_failed_at'] ?? null)) {
             $output->writeln(sprintf('  Oldest claim failed at:   %s', $tasks['oldest_claim_failed_at']));
         }
+        if (array_key_exists('max_dispatch_failed_age_ms', $tasks)) {
+            $output->writeln(sprintf(
+                '  Oldest dispatch-failed age: %d ms',
+                (int) ($tasks['max_dispatch_failed_age_ms'] ?? 0),
+            ));
+        }
+        if (is_string($tasks['oldest_dispatch_failed_at'] ?? null)) {
+            $output->writeln(sprintf('  Oldest dispatch failed at: %s', $tasks['oldest_dispatch_failed_at']));
+        }
         $output->writeln('');
     }
 

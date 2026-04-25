@@ -524,6 +524,8 @@ class SystemCommandTest extends TestCase
         self::assertStringContainsString('Oldest dispatch-overdue since: 2026-04-24T11:29:05Z', $display);
         self::assertStringContainsString('Oldest claim-failed age:  65000 ms', $display);
         self::assertStringContainsString('Oldest claim failed at:   2026-04-24T11:28:55Z', $display);
+        self::assertStringContainsString('Oldest dispatch-failed age: 135000 ms', $display);
+        self::assertStringContainsString('Oldest dispatch failed at: 2026-04-24T11:27:45Z', $display);
 
         self::assertStringContainsString('Runnable tasks:       7', $display);
         self::assertStringContainsString('Delayed tasks:        3', $display);
@@ -680,6 +682,20 @@ class SystemCommandTest extends TestCase
         self::assertSame(['integer', 'null'], $tasks['max_claim_failed_age_ms']['type']);
     }
 
+    public function test_operator_metrics_schema_pins_dispatch_failed_age_keys(): void
+    {
+        $schema = json_decode(
+            (string) file_get_contents(__DIR__.'/../../schemas/output/operator-metrics.schema.json'),
+            true,
+            flags: JSON_THROW_ON_ERROR,
+        );
+
+        $tasks = $schema['properties']['operator_metrics']['properties']['tasks']['properties'];
+
+        self::assertSame(['string', 'null'], $tasks['oldest_dispatch_failed_at']['type']);
+        self::assertSame(['integer', 'null'], $tasks['max_dispatch_failed_age_ms']['type']);
+    }
+
     public function test_operator_metrics_schema_pins_run_wait_age_keys(): void
     {
         $schema = json_decode(
@@ -749,6 +765,27 @@ class SystemCommandTest extends TestCase
         self::assertStringNotContainsString('Oldest claim-failed age', $display);
         self::assertStringNotContainsString('Oldest claim failed at', $display);
         self::assertStringContainsString('claim failed 3', $display);
+    }
+
+    public function test_operator_metrics_command_omits_dispatch_failed_age_when_snapshot_predates_contract(): void
+    {
+        $payload = self::operatorMetricsPayload();
+        unset(
+            $payload['operator_metrics']['tasks']['oldest_dispatch_failed_at'],
+            $payload['operator_metrics']['tasks']['max_dispatch_failed_age_ms'],
+        );
+
+        $command = new OperatorMetricsCommand();
+        $command->setServerClient(new SystemFakeClient($payload));
+
+        $tester = new CommandTester($command);
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+
+        $display = $tester->getDisplay();
+
+        self::assertStringNotContainsString('Oldest dispatch-failed age', $display);
+        self::assertStringNotContainsString('Oldest dispatch failed at', $display);
+        self::assertStringContainsString('dispatch failed 2', $display);
     }
 
     public function test_operator_metrics_command_omits_activities_block_when_payload_lacks_it(): void
@@ -840,6 +877,8 @@ class SystemCommandTest extends TestCase
                     'max_dispatch_overdue_age_ms' => 55000,
                     'oldest_claim_failed_at' => '2026-04-24T11:28:55Z',
                     'max_claim_failed_age_ms' => 65000,
+                    'oldest_dispatch_failed_at' => '2026-04-24T11:27:45Z',
+                    'max_dispatch_failed_age_ms' => 135000,
                     'unhealthy' => 11,
                 ],
                 'backlog' => [

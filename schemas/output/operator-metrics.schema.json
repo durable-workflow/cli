@@ -39,6 +39,8 @@
             "max_ready_due_age_ms": { "type": ["integer", "null"] },
             "oldest_dispatch_overdue_since": { "type": ["string", "null"] },
             "max_dispatch_overdue_age_ms": { "type": ["integer", "null"] },
+            "oldest_claim_failed_at": { "type": ["string", "null"] },
+            "max_claim_failed_age_ms": { "type": ["integer", "null"] },
             "unhealthy": { "type": ["integer", "null"] }
           },
           "additionalProperties": true

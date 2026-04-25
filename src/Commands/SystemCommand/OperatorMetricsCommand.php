@@ -162,6 +162,15 @@ HELP)
         if (is_string($tasks['oldest_dispatch_overdue_since'] ?? null)) {
             $output->writeln(sprintf('  Oldest dispatch-overdue since: %s', $tasks['oldest_dispatch_overdue_since']));
         }
+        if (array_key_exists('max_claim_failed_age_ms', $tasks)) {
+            $output->writeln(sprintf(
+                '  Oldest claim-failed age:  %d ms',
+                (int) ($tasks['max_claim_failed_age_ms'] ?? 0),
+            ));
+        }
+        if (is_string($tasks['oldest_claim_failed_at'] ?? null)) {
+            $output->writeln(sprintf('  Oldest claim failed at:   %s', $tasks['oldest_claim_failed_at']));
+        }
         $output->writeln('');
     }
 

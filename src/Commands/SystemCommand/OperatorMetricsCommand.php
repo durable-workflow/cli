@@ -98,6 +98,15 @@ HELP)
     {
         $output->writeln('<info>Runs</info>');
         $output->writeln(sprintf('  Repair needed:        %d', (int) ($runs['repair_needed'] ?? 0)));
+        if (array_key_exists('max_repair_needed_age_ms', $runs)) {
+            $output->writeln(sprintf(
+                '  Oldest repair-needed age: %d ms',
+                (int) ($runs['max_repair_needed_age_ms'] ?? 0),
+            ));
+        }
+        if (is_string($runs['oldest_repair_needed_at'] ?? null)) {
+            $output->writeln(sprintf('  Oldest repair-needed at:  %s', $runs['oldest_repair_needed_at']));
+        }
         $output->writeln(sprintf('  Claim failed:         %d', (int) ($runs['claim_failed'] ?? 0)));
         $output->writeln(sprintf('  Compatibility blocked: %d', (int) ($runs['compatibility_blocked'] ?? 0)));
         if (array_key_exists('waiting', $runs)) {

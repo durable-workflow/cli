@@ -14,6 +14,8 @@
           "type": "object",
           "properties": {
             "repair_needed": { "type": ["integer", "null"] },
+            "oldest_repair_needed_at": { "type": ["string", "null"] },
+            "max_repair_needed_age_ms": { "type": ["integer", "null"] },
             "claim_failed": { "type": ["integer", "null"] },
             "compatibility_blocked": { "type": ["integer", "null"] },
             "waiting": { "type": ["integer", "null"] },

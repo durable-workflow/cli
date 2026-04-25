@@ -505,6 +505,8 @@ class SystemCommandTest extends TestCase
 
         self::assertStringContainsString('Runs', $display);
         self::assertStringContainsString('Repair needed:        4', $display);
+        self::assertStringContainsString('Oldest repair-needed age: 375000 ms', $display);
+        self::assertStringContainsString('Oldest repair-needed at:  2026-04-24T11:23:45Z', $display);
         self::assertStringContainsString('Claim failed:         2', $display);
         self::assertStringContainsString('Compatibility blocked: 1', $display);
         self::assertStringContainsString('Waiting (durable resume): 6', $display);
@@ -757,6 +759,42 @@ class SystemCommandTest extends TestCase
         self::assertSame(['integer', 'null'], $runs['waiting']['type']);
         self::assertSame(['string', 'null'], $runs['oldest_wait_started_at']['type']);
         self::assertSame(['integer', 'null'], $runs['max_wait_age_ms']['type']);
+    }
+
+    public function test_operator_metrics_schema_pins_runs_repair_needed_age_keys(): void
+    {
+        $schema = json_decode(
+            (string) file_get_contents(__DIR__.'/../../schemas/output/operator-metrics.schema.json'),
+            true,
+            flags: JSON_THROW_ON_ERROR,
+        );
+
+        $runs = $schema['properties']['operator_metrics']['properties']['runs']['properties'];
+
+        self::assertSame(['integer', 'null'], $runs['repair_needed']['type']);
+        self::assertSame(['string', 'null'], $runs['oldest_repair_needed_at']['type']);
+        self::assertSame(['integer', 'null'], $runs['max_repair_needed_age_ms']['type']);
+    }
+
+    public function test_operator_metrics_command_omits_runs_repair_needed_age_when_snapshot_predates_contract(): void
+    {
+        $payload = self::operatorMetricsPayload();
+        unset(
+            $payload['operator_metrics']['runs']['oldest_repair_needed_at'],
+            $payload['operator_metrics']['runs']['max_repair_needed_age_ms'],
+        );
+
+        $command = new OperatorMetricsCommand();
+        $command->setServerClient(new SystemFakeClient($payload));
+
+        $tester = new CommandTester($command);
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+
+        $display = $tester->getDisplay();
+
+        self::assertStringNotContainsString('Oldest repair-needed age', $display);
+        self::assertStringNotContainsString('Oldest repair-needed at', $display);
+        self::assertStringContainsString('Repair needed:        4', $display);
     }
 
     public function test_operator_metrics_schema_pins_matching_role_keys(): void
@@ -1038,6 +1076,8 @@ class SystemCommandTest extends TestCase
                 'generated_at' => '2026-04-24T11:30:00Z',
                 'runs' => [
                     'repair_needed' => 4,
+                    'oldest_repair_needed_at' => '2026-04-24T11:23:45Z',
+                    'max_repair_needed_age_ms' => 375000,
                     'claim_failed' => 2,
                     'compatibility_blocked' => 1,
                     'waiting' => 6,

@@ -557,6 +557,12 @@ class SystemCommandTest extends TestCase
         self::assertStringContainsString('Active 4, paused 1, missed 1, oldest overdue 5000 ms', $display);
         self::assertStringContainsString('Lifetime fires: 128 (3 failures)', $display);
 
+        self::assertStringContainsString('Activities', $display);
+        self::assertStringContainsString('Open 12 (pending 8, running 4), retrying 3', $display);
+        self::assertStringContainsString('Oldest retrying age:  270000 ms', $display);
+        self::assertStringContainsString('Oldest retrying started at: 2026-04-24T11:25:30Z', $display);
+        self::assertStringContainsString('Failed attempts:      7 (max attempts on a single execution: 5)', $display);
+
         self::assertStringContainsString('Redispatch after:     120s', $display);
         self::assertStringContainsString('Loop throttle:        10s', $display);
         self::assertStringContainsString('Scan limit:           100', $display);
@@ -688,6 +694,43 @@ class SystemCommandTest extends TestCase
         self::assertSame(['string', 'null'], $matchingRole['task_dispatch_mode']['type']);
     }
 
+    public function test_operator_metrics_schema_pins_activities_retrying_age_keys(): void
+    {
+        $schema = json_decode(
+            (string) file_get_contents(__DIR__.'/../../schemas/output/operator-metrics.schema.json'),
+            true,
+            flags: JSON_THROW_ON_ERROR,
+        );
+
+        $activities = $schema['properties']['operator_metrics']['properties']['activities']['properties'];
+
+        self::assertSame(['integer', 'null'], $activities['open']['type']);
+        self::assertSame(['integer', 'null'], $activities['pending']['type']);
+        self::assertSame(['integer', 'null'], $activities['running']['type']);
+        self::assertSame(['integer', 'null'], $activities['retrying']['type']);
+        self::assertSame(['string', 'null'], $activities['oldest_retrying_started_at']['type']);
+        self::assertSame(['integer', 'null'], $activities['max_retrying_age_ms']['type']);
+        self::assertSame(['integer', 'null'], $activities['failed_attempts']['type']);
+        self::assertSame(['integer', 'null'], $activities['max_attempt_count']['type']);
+    }
+
+    public function test_operator_metrics_command_omits_activities_block_when_payload_lacks_it(): void
+    {
+        $payload = self::operatorMetricsPayload();
+        unset($payload['operator_metrics']['activities']);
+
+        $command = new OperatorMetricsCommand();
+        $command->setServerClient(new SystemFakeClient($payload));
+
+        $tester = new CommandTester($command);
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+
+        $display = $tester->getDisplay();
+
+        self::assertStringNotContainsString('Activities', $display);
+        self::assertStringNotContainsString('Oldest retrying age', $display);
+    }
+
     public function test_operator_metrics_command_renders_dedicated_matching_role_shape(): void
     {
         $payload = self::operatorMetricsPayload();
@@ -816,6 +859,16 @@ class SystemCommandTest extends TestCase
                     'max_overdue_ms' => 5000,
                     'fires_total' => 128,
                     'failures_total' => 3,
+                ],
+                'activities' => [
+                    'open' => 12,
+                    'pending' => 8,
+                    'running' => 4,
+                    'retrying' => 3,
+                    'oldest_retrying_started_at' => '2026-04-24T11:25:30Z',
+                    'max_retrying_age_ms' => 270000,
+                    'failed_attempts' => 7,
+                    'max_attempt_count' => 5,
                 ],
                 'repair_policy' => [
                     'redispatch_after_seconds' => 120,

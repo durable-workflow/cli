@@ -109,6 +109,20 @@
           },
           "additionalProperties": true
         },
+        "activities": {
+          "type": "object",
+          "properties": {
+            "open": { "type": ["integer", "null"] },
+            "pending": { "type": ["integer", "null"] },
+            "running": { "type": ["integer", "null"] },
+            "retrying": { "type": ["integer", "null"] },
+            "oldest_retrying_started_at": { "type": ["string", "null"] },
+            "max_retrying_age_ms": { "type": ["integer", "null"] },
+            "failed_attempts": { "type": ["integer", "null"] },
+            "max_attempt_count": { "type": ["integer", "null"] }
+          },
+          "additionalProperties": true
+        },
         "repair_policy": {
           "type": "object",
           "properties": {

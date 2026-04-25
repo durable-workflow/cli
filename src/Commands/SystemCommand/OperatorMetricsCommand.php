@@ -38,7 +38,7 @@ advertises so mixed-build state is visible without log archaeology.
   <info>dw system:operator-metrics --json | jq '.operator_metrics.workers'</info>
 
 The contract guarantees the frozen key inventory under
-`operator_metrics.{runs,tasks,backlog,repair,workers,backend,schedules,repair_policy,matching_role}`;
+`operator_metrics.{runs,tasks,backlog,repair,workers,backend,schedules,activities,repair_policy,matching_role}`;
 consumers MAY add derived keys but MUST NOT rename these. The
 `matching_role` block is per-process and reflects only the node
 serving the request; read one snapshot per node to see the full
@@ -73,6 +73,7 @@ HELP)
         $this->renderBackend($output, $this->sectionArray($metrics, 'backend'));
         $this->renderMatchingRole($output, $this->sectionArray($metrics, 'matching_role'));
         $this->renderSchedules($output, $this->sectionArray($metrics, 'schedules'));
+        $this->renderActivities($output, $this->sectionArray($metrics, 'activities'));
         $this->renderRepairPolicy($output, $this->sectionArray($metrics, 'repair_policy'));
 
         return Command::SUCCESS;
@@ -344,6 +345,40 @@ HELP)
             '  Lifetime fires: %d (%d failures)',
             (int) ($schedules['fires_total'] ?? 0),
             (int) ($schedules['failures_total'] ?? 0),
+        ));
+        $output->writeln('');
+    }
+
+    /**
+     * @param  array<string, mixed>  $activities
+     */
+    private function renderActivities(OutputInterface $output, array $activities): void
+    {
+        if ($activities === []) {
+            return;
+        }
+
+        $output->writeln('<info>Activities</info>');
+        $output->writeln(sprintf(
+            '  Open %d (pending %d, running %d), retrying %d',
+            (int) ($activities['open'] ?? 0),
+            (int) ($activities['pending'] ?? 0),
+            (int) ($activities['running'] ?? 0),
+            (int) ($activities['retrying'] ?? 0),
+        ));
+        if (array_key_exists('max_retrying_age_ms', $activities)) {
+            $output->writeln(sprintf(
+                '  Oldest retrying age:  %d ms',
+                (int) ($activities['max_retrying_age_ms'] ?? 0),
+            ));
+        }
+        if (is_string($activities['oldest_retrying_started_at'] ?? null)) {
+            $output->writeln(sprintf('  Oldest retrying started at: %s', $activities['oldest_retrying_started_at']));
+        }
+        $output->writeln(sprintf(
+            '  Failed attempts:      %d (max attempts on a single execution: %d)',
+            (int) ($activities['failed_attempts'] ?? 0),
+            (int) ($activities['max_attempt_count'] ?? 0),
         ));
         $output->writeln('');
     }

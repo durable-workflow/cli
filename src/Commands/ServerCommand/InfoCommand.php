@@ -15,11 +15,11 @@ class InfoCommand extends BaseCommand
     {
         parent::configure();
         $this->setName('server:info')
-            ->setDescription('Display server version and capabilities')
+            ->setDescription('Display server version, capabilities, and role topology')
             ->setHelp(<<<'HELP'
-Print server version, negotiated control-plane and worker protocol
-versions, and the canonical enum values the server accepts (duplicate
-policies, wait policies, etc.).
+Print server version, role topology, negotiated control-plane and
+worker protocol versions, and the canonical enum values the server
+accepts (duplicate policies, wait policies, etc.).
 
 <comment>Examples:</comment>
 
@@ -96,6 +96,8 @@ HELP);
                 $output->writeln('  Fail Closed: '.($clientCompatibility['fail_closed'] === true ? 'yes' : 'no'));
             }
         }
+
+        $this->renderTopology($output, $result['topology'] ?? null);
 
         $controlPlane = $result['control_plane'] ?? null;
 
@@ -281,6 +283,231 @@ HELP);
         }
 
         $output->writeln(sprintf('%s%s: <info>%s</info>', $pad, $name, (string) $value));
+    }
+
+    private function renderTopology(OutputInterface $output, mixed $topology): void
+    {
+        if (! is_array($topology) || $topology === []) {
+            return;
+        }
+
+        $output->writeln('');
+        $output->writeln('Topology:');
+
+        $schema = $this->stringValue($topology['schema'] ?? null) ?? 'unknown';
+        $version = $this->stringValue($topology['version'] ?? null) ?? 'unknown';
+        $output->writeln(sprintf('  Manifest: %s v%s', $schema, $version));
+
+        $supportedShapes = $this->stringList($topology['supported_shapes'] ?? null);
+        if ($supportedShapes !== []) {
+            $output->writeln('  Supported Shapes: '.implode(', ', $supportedShapes));
+        }
+
+        $currentShape = $this->stringValue($topology['current_shape'] ?? null);
+        if ($currentShape !== null) {
+            $output->writeln('  Current Shape: '.$currentShape);
+        }
+
+        $currentProcessClass = $this->stringValue($topology['current_process_class'] ?? null);
+        if ($currentProcessClass !== null) {
+            $output->writeln('  Current Process Class: '.$currentProcessClass);
+        }
+
+        $currentRoles = $this->stringList($topology['current_roles'] ?? null);
+        if ($currentRoles !== []) {
+            $output->writeln('  Current Roles: '.implode(', ', $currentRoles));
+        }
+
+        $executionMode = $this->stringValue($topology['execution_mode'] ?? null);
+        if ($executionMode !== null) {
+            $output->writeln('  Execution Mode: '.$executionMode);
+        }
+
+        $matchingRole = $topology['matching_role'] ?? null;
+        if (is_array($matchingRole)) {
+            $shape = $this->stringValue($matchingRole['shape'] ?? null) ?? 'unknown';
+            $queueWakeEnabled = $this->formatOptionalBool($matchingRole['queue_wake_enabled'] ?? null);
+            $wakeOwner = $this->stringValue($matchingRole['wake_owner'] ?? null) ?? 'unknown';
+            $taskDispatchMode = $this->stringValue($matchingRole['task_dispatch_mode'] ?? null) ?? 'unknown';
+
+            $output->writeln(sprintf(
+                '  Matching Role: %s (queue_wake_enabled=%s, wake_owner=%s, task_dispatch_mode=%s)',
+                $shape,
+                $queueWakeEnabled,
+                $wakeOwner,
+                $taskDispatchMode,
+            ));
+
+            $partitionPrimitives = $this->stringList($matchingRole['partition_primitives'] ?? null);
+            if ($partitionPrimitives !== []) {
+                $output->writeln('  Matching Partitions: '.implode(', ', $partitionPrimitives));
+            }
+
+            $backpressureModel = $this->stringValue($matchingRole['backpressure_model'] ?? null);
+            if ($backpressureModel !== null) {
+                $output->writeln('  Matching Backpressure: '.$backpressureModel);
+            }
+        }
+
+        $roleCatalog = is_array($topology['role_catalog'] ?? null) ? $topology['role_catalog'] : [];
+        $roleCatalogLines = [];
+
+        foreach ($currentRoles as $role) {
+            $definition = $roleCatalog[$role] ?? null;
+
+            if (! is_array($definition)) {
+                continue;
+            }
+
+            $roleCatalogLines[] = sprintf(
+                '    %s: plane=%s, external_http=%s, runs_user_code=%s, interface=%s',
+                $role,
+                $this->stringValue($definition['plane'] ?? null) ?? 'unknown',
+                $this->formatOptionalBool($definition['accepts_external_http'] ?? null),
+                $this->formatOptionalBool($definition['runs_user_code'] ?? null),
+                $this->stringValue($definition['steady_state_interface'] ?? null) ?? 'unknown',
+            );
+        }
+
+        if ($roleCatalogLines !== []) {
+            $output->writeln('  Current Role Traits:');
+            foreach ($roleCatalogLines as $line) {
+                $output->writeln($line);
+            }
+        }
+
+        $authorityBoundaries = is_array($topology['authority_boundaries'] ?? null)
+            ? $topology['authority_boundaries']
+            : [];
+        $boundaryLines = [];
+
+        foreach ($currentRoles as $role) {
+            $definition = $authorityBoundaries[$role] ?? null;
+
+            if (! is_array($definition)) {
+                continue;
+            }
+
+            $writes = $this->stringList($definition['writes'] ?? null);
+
+            if ($writes === []) {
+                continue;
+            }
+
+            $boundaryLines[] = sprintf('    %s: %s', $role, implode(', ', $writes));
+        }
+
+        if ($boundaryLines !== []) {
+            $output->writeln('  Current Write Boundaries:');
+            foreach ($boundaryLines as $line) {
+                $output->writeln($line);
+            }
+        }
+
+        $scalingBoundaries = is_array($topology['scaling_boundaries'] ?? null)
+            ? $topology['scaling_boundaries']
+            : [];
+        $scalingLines = [];
+
+        foreach ($scalingBoundaries as $role => $boundary) {
+            if (! is_string($role)) {
+                continue;
+            }
+
+            $boundaryValue = $this->stringValue($boundary);
+
+            if ($boundaryValue === null) {
+                continue;
+            }
+
+            $scalingLines[] = sprintf('    %s: %s', $role, $boundaryValue);
+        }
+
+        if ($scalingLines !== []) {
+            $output->writeln('  Scaling Boundaries:');
+            foreach ($scalingLines as $line) {
+                $output->writeln($line);
+            }
+        }
+
+        $failureDomains = is_array($topology['failure_domains'] ?? null)
+            ? $topology['failure_domains']
+            : [];
+        $failureLines = [];
+
+        foreach ($failureDomains as $failure => $definition) {
+            if (! is_string($failure) || ! is_array($definition)) {
+                continue;
+            }
+
+            $signal = $this->stringValue($definition['operator_signal'] ?? null);
+            $effect = $this->stringValue($definition['effect'] ?? null);
+
+            if ($signal === null && $effect === null) {
+                continue;
+            }
+
+            $parts = [];
+
+            if ($signal !== null) {
+                $parts[] = 'signal='.$signal;
+            }
+
+            if ($effect !== null) {
+                $parts[] = 'effect='.$effect;
+            }
+
+            $failureLines[] = sprintf('    %s: %s', $failure, implode(', ', $parts));
+        }
+
+        if ($failureLines !== []) {
+            $output->writeln('  Failure Domains:');
+            foreach ($failureLines as $line) {
+                $output->writeln($line);
+            }
+        }
+    }
+
+    private function stringValue(mixed $value): ?string
+    {
+        if (is_string($value)) {
+            $value = trim($value);
+
+            return $value !== '' ? $value : null;
+        }
+
+        if (is_int($value) || is_float($value)) {
+            return (string) $value;
+        }
+
+        return null;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function stringList(mixed $value): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+
+        $list = [];
+
+        foreach ($value as $item) {
+            $string = $this->stringValue($item);
+
+            if ($string !== null) {
+                $list[] = $string;
+            }
+        }
+
+        return $list;
+    }
+
+    private function formatOptionalBool(mixed $value): string
+    {
+        return $value === true ? 'yes' : ($value === false ? 'no' : 'unknown');
     }
 
     private function formatBytes(int $bytes): string

@@ -229,6 +229,128 @@ class ServerInfoCommandTest extends TestCase
         self::assertTrue($decoded['capabilities']['workflow_tasks']);
         self::assertSame(30, $decoded['worker_protocol']['server_capabilities']['long_poll_timeout']);
     }
+
+    public function test_it_renders_role_topology_summary(): void
+    {
+        $command = new InfoCommand();
+        $command->setServerClient(new ServerInfoFakeClient([
+            'server_id' => 'server-1',
+            'version' => '0.2.16',
+            'default_namespace' => 'default',
+            'control_plane' => [
+                'version' => '2',
+                'request_contract' => [
+                    'schema' => ControlPlaneRequestContract::SCHEMA,
+                    'version' => ControlPlaneRequestContract::VERSION,
+                    'operations' => [],
+                ],
+            ],
+            'topology' => [
+                'schema' => 'durable-workflow.v2.role-topology',
+                'version' => 4,
+                'supported_shapes' => [
+                    'embedded',
+                    'standalone_server',
+                    'split_control_execution',
+                ],
+                'current_shape' => 'split_control_execution',
+                'current_process_class' => 'matching_node',
+                'current_roles' => [
+                    'matching',
+                ],
+                'execution_mode' => 'remote_worker_protocol',
+                'matching_role' => [
+                    'queue_wake_enabled' => false,
+                    'shape' => 'dedicated',
+                    'wake_owner' => 'dedicated_repair_pass',
+                    'task_dispatch_mode' => 'poll',
+                    'partition_primitives' => [
+                        'connection',
+                        'queue',
+                        'compatibility',
+                        'namespace',
+                    ],
+                    'backpressure_model' => 'lease_ownership',
+                ],
+                'role_catalog' => [
+                    'matching' => [
+                        'plane' => 'control',
+                        'hosted_by_current_node' => true,
+                        'runs_user_code' => false,
+                        'accepts_external_http' => true,
+                        'steady_state_interface' => 'worker_poll_and_repair',
+                    ],
+                ],
+                'authority_boundaries' => [
+                    'matching' => [
+                        'writes' => [
+                            'workflow_tasks.leases',
+                            'activity_tasks.leases',
+                        ],
+                    ],
+                ],
+                'scaling_boundaries' => [
+                    'matching' => 'ready_task_rate_and_poller_count',
+                    'execution_plane' => 'workflow_and_activity_task_rate',
+                ],
+                'failure_domains' => [
+                    'matching_down' => [
+                        'operator_signal' => 'ready_depth_rises_while_claim_rate_falls',
+                        'effect' => 'claim_falls_back_to_direct_ready_task_discovery',
+                    ],
+                ],
+            ],
+        ]));
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+
+        $display = $tester->getDisplay();
+
+        self::assertStringContainsString('Topology:', $display);
+        self::assertStringContainsString(
+            'Manifest: durable-workflow.v2.role-topology v4',
+            $display,
+        );
+        self::assertStringContainsString(
+            'Supported Shapes: embedded, standalone_server, split_control_execution',
+            $display,
+        );
+        self::assertStringContainsString('Current Shape: split_control_execution', $display);
+        self::assertStringContainsString('Current Process Class: matching_node', $display);
+        self::assertStringContainsString('Current Roles: matching', $display);
+        self::assertStringContainsString('Execution Mode: remote_worker_protocol', $display);
+        self::assertStringContainsString(
+            'Matching Role: dedicated (queue_wake_enabled=no, wake_owner=dedicated_repair_pass, task_dispatch_mode=poll)',
+            $display,
+        );
+        self::assertStringContainsString(
+            'Matching Partitions: connection, queue, compatibility, namespace',
+            $display,
+        );
+        self::assertStringContainsString('Matching Backpressure: lease_ownership', $display);
+        self::assertStringContainsString('Current Role Traits:', $display);
+        self::assertStringContainsString(
+            'matching: plane=control, external_http=yes, runs_user_code=no, interface=worker_poll_and_repair',
+            $display,
+        );
+        self::assertStringContainsString('Current Write Boundaries:', $display);
+        self::assertStringContainsString(
+            'matching: workflow_tasks.leases, activity_tasks.leases',
+            $display,
+        );
+        self::assertStringContainsString('Scaling Boundaries:', $display);
+        self::assertStringContainsString(
+            'matching: ready_task_rate_and_poller_count',
+            $display,
+        );
+        self::assertStringContainsString('Failure Domains:', $display);
+        self::assertStringContainsString(
+            'matching_down: signal=ready_depth_rises_while_claim_rate_falls, effect=claim_falls_back_to_direct_ready_task_discovery',
+            $display,
+        );
+    }
 }
 
 class ServerInfoFakeClient extends ServerClient

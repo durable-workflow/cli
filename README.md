@@ -246,7 +246,9 @@ sending the command. Supported servers publish schema
 `operations` map. The CLI treats missing or unknown request-contract
 schema/version metadata as a compatibility error instead of silently guessing.
 Use `dw server:info` to inspect the current canonical values,
-rejected aliases, and removed fields advertised by the target server.
+rejected aliases, removed fields, and the server-advertised role-topology
+contract for the current node, including shape, process class, matching-role
+deployment knobs, current write boundaries, and scaling/failure metadata.
 Use `dw doctor` when you need the full resolved local/remote diagnostic state:
 CLI build identity, selected server/namespace/profile, a redacted
 `connection.effective_config` block that names which source won for each
@@ -312,7 +314,7 @@ See the [Version Compatibility](https://durable-workflow.github.io/docs/2.0/comp
 # Check server health
 dw server:health
 
-# Show server version and capabilities
+# Show server version, capabilities, and role topology
 dw server:info
 
 # Diagnose the resolved connection and compatibility state

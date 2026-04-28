@@ -387,6 +387,18 @@ HELP)
             $output->writeln(sprintf('  Task dispatch mode:   %s', $matchingRole['task_dispatch_mode']));
         }
 
+        $partitionPrimitives = array_values(array_filter(
+            is_array($matchingRole['partition_primitives'] ?? null) ? $matchingRole['partition_primitives'] : [],
+            static fn (mixed $primitive): bool => is_string($primitive) && $primitive !== '',
+        ));
+        if ($partitionPrimitives !== []) {
+            $output->writeln(sprintf('  Partition primitives: %s', implode(', ', $partitionPrimitives)));
+        }
+
+        if (is_string($matchingRole['backpressure_model'] ?? null) && $matchingRole['backpressure_model'] !== '') {
+            $output->writeln(sprintf('  Backpressure model:  %s', $matchingRole['backpressure_model']));
+        }
+
         $output->writeln('');
     }
 

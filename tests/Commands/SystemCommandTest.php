@@ -566,6 +566,8 @@ class SystemCommandTest extends TestCase
         self::assertStringContainsString('Queue wake enabled:   yes', $display);
         self::assertStringContainsString('Shape:                in_worker', $display);
         self::assertStringContainsString('Task dispatch mode:   queue', $display);
+        self::assertStringContainsString('Partition primitives: connection, queue, compatibility, namespace', $display);
+        self::assertStringContainsString('Backpressure model:  lease_ownership', $display);
 
         self::assertStringContainsString('Active 4, paused 1, missed 1, oldest overdue 5000 ms', $display);
         self::assertStringContainsString('Lifetime fires: 128 (3 failures)', $display);
@@ -810,6 +812,9 @@ class SystemCommandTest extends TestCase
         self::assertSame(['boolean', 'null'], $matchingRole['queue_wake_enabled']['type']);
         self::assertSame(['string', 'null'], $matchingRole['shape']['type']);
         self::assertSame(['string', 'null'], $matchingRole['task_dispatch_mode']['type']);
+        self::assertSame(['array', 'null'], $matchingRole['partition_primitives']['type']);
+        self::assertSame('string', $matchingRole['partition_primitives']['items']['type']);
+        self::assertSame(['string', 'null'], $matchingRole['backpressure_model']['type']);
     }
 
     public function test_operator_metrics_schema_pins_activities_retrying_age_keys(): void
@@ -1034,6 +1039,8 @@ class SystemCommandTest extends TestCase
             'queue_wake_enabled' => false,
             'shape' => 'dedicated',
             'task_dispatch_mode' => 'poll',
+            'partition_primitives' => ['connection', 'queue', 'compatibility', 'namespace'],
+            'backpressure_model' => 'lease_ownership',
         ];
 
         $command = new OperatorMetricsCommand();
@@ -1047,6 +1054,8 @@ class SystemCommandTest extends TestCase
         self::assertStringContainsString('Queue wake enabled:   no', $display);
         self::assertStringContainsString('Shape:                dedicated', $display);
         self::assertStringContainsString('Task dispatch mode:   poll', $display);
+        self::assertStringContainsString('Partition primitives: connection, queue, compatibility, namespace', $display);
+        self::assertStringContainsString('Backpressure model:  lease_ownership', $display);
     }
 
     public function test_operator_metrics_command_tolerates_minimal_payload(): void
@@ -1188,6 +1197,8 @@ class SystemCommandTest extends TestCase
                     'queue_wake_enabled' => true,
                     'shape' => 'in_worker',
                     'task_dispatch_mode' => 'queue',
+                    'partition_primitives' => ['connection', 'queue', 'compatibility', 'namespace'],
+                    'backpressure_model' => 'lease_ownership',
                 ],
                 'projections' => [
                     'run_summaries' => [

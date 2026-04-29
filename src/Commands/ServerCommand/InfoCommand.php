@@ -98,6 +98,7 @@ HELP);
         }
 
         $this->renderTopology($output, $result['topology'] ?? null);
+        $this->renderCoordinationHealth($output, $result['coordination_health'] ?? null);
 
         $controlPlane = $result['control_plane'] ?? null;
 
@@ -468,6 +469,78 @@ HELP);
         }
     }
 
+    private function renderCoordinationHealth(OutputInterface $output, mixed $coordinationHealth): void
+    {
+        if (! is_array($coordinationHealth) || $coordinationHealth === []) {
+            return;
+        }
+
+        $output->writeln('');
+        $output->writeln('Coordination Health:');
+
+        $schema = $this->stringValue($coordinationHealth['schema'] ?? null) ?? 'unknown';
+        $version = $this->stringValue($coordinationHealth['version'] ?? null) ?? 'unknown';
+        $output->writeln(sprintf('  Manifest: %s v%s', $schema, $version));
+
+        $namespaceScope = $this->stringValue($coordinationHealth['namespace_scope'] ?? null);
+        if ($namespaceScope !== null) {
+            $output->writeln('  Namespace Scope: '.$namespaceScope);
+        }
+
+        $status = $this->stringValue($coordinationHealth['status'] ?? null) ?? 'unknown';
+        $httpStatus = $this->stringValue($coordinationHealth['http_status'] ?? null) ?? 'unknown';
+        $output->writeln(sprintf('  Status: %s (http %s)', $status, $httpStatus));
+
+        $generatedAt = $this->stringValue($coordinationHealth['generated_at'] ?? null);
+        if ($generatedAt !== null) {
+            $output->writeln('  Generated At: '.$generatedAt);
+        }
+
+        $categories = $this->formatScalarMap($coordinationHealth['categories'] ?? null);
+        if ($categories !== null) {
+            $output->writeln('  Categories: '.$categories);
+        }
+
+        $warningChecks = $this->stringList($coordinationHealth['warning_checks'] ?? null);
+        $errorChecks = $this->stringList($coordinationHealth['error_checks'] ?? null);
+        $output->writeln('  Warning Checks: '.($warningChecks !== [] ? implode(', ', $warningChecks) : 'none'));
+        $output->writeln('  Error Checks: '.($errorChecks !== [] ? implode(', ', $errorChecks) : 'none'));
+
+        $checks = is_array($coordinationHealth['checks'] ?? null)
+            ? $coordinationHealth['checks']
+            : [];
+        $checkLines = [];
+
+        foreach ($checks as $check) {
+            if (! is_array($check)) {
+                continue;
+            }
+
+            $name = $this->stringValue($check['name'] ?? null) ?? 'unknown';
+            $status = $this->stringValue($check['status'] ?? null) ?? 'unknown';
+            $parts = ['status='.$status];
+
+            $category = $this->stringValue($check['category'] ?? null);
+            if ($category !== null) {
+                $parts[] = 'category='.$category;
+            }
+
+            $message = $this->stringValue($check['message'] ?? null);
+            if ($message !== null) {
+                $parts[] = 'message='.$message;
+            }
+
+            $checkLines[] = sprintf('    %s: %s', $name, implode(', ', $parts));
+        }
+
+        if ($checkLines !== []) {
+            $output->writeln('  Checks:');
+            foreach ($checkLines as $line) {
+                $output->writeln($line);
+            }
+        }
+    }
+
     private function stringValue(mixed $value): ?string
     {
         if (is_string($value)) {
@@ -508,6 +581,42 @@ HELP);
     private function formatOptionalBool(mixed $value): string
     {
         return $value === true ? 'yes' : ($value === false ? 'no' : 'unknown');
+    }
+
+    private function formatScalarMap(mixed $value): ?string
+    {
+        if (! is_array($value) || $value === []) {
+            return null;
+        }
+
+        if (array_is_list($value)) {
+            $items = $this->stringList($value);
+
+            return $items !== [] ? implode(', ', $items) : null;
+        }
+
+        $items = [];
+
+        foreach ($value as $key => $entry) {
+            if (! is_string($key)) {
+                continue;
+            }
+
+            if (is_bool($entry)) {
+                $items[] = sprintf('%s=%s', $key, $entry ? 'yes' : 'no');
+                continue;
+            }
+
+            $entryValue = $this->stringValue($entry);
+
+            if ($entryValue === null) {
+                continue;
+            }
+
+            $items[] = sprintf('%s=%s', $key, $entryValue);
+        }
+
+        return $items !== [] ? implode(', ', $items) : null;
     }
 
     private function formatBytes(int $bytes): string

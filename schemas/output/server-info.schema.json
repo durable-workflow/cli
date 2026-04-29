@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://durable-workflow.com/schemas/cli/output/server-info.schema.json",
   "title": "dw server:info --output=json",
-  "description": "Server capability, compatibility, and protocol discovery output.",
+  "description": "Server capability, compatibility, topology, coordination-health, and protocol discovery output.",
   "type": "object",
   "required": ["server_id", "version"],
   "properties": {
@@ -40,6 +40,77 @@
         "request_contract": {
           "type": ["object", "null"],
           "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "topology": {
+      "type": "object",
+      "properties": {
+        "schema": { "type": ["string", "null"] },
+        "version": { "type": ["string", "integer", "null"] },
+        "supported_shapes": {
+          "type": ["array", "null"],
+          "items": { "type": "string" }
+        },
+        "current_shape": { "type": ["string", "null"] },
+        "current_process_class": { "type": ["string", "null"] },
+        "current_roles": {
+          "type": ["array", "null"],
+          "items": { "type": "string" }
+        },
+        "execution_mode": { "type": ["string", "null"] },
+        "matching_role": {
+          "type": ["object", "null"],
+          "properties": {
+            "queue_wake_enabled": { "type": ["boolean", "null"] },
+            "shape": { "type": ["string", "null"] },
+            "wake_owner": { "type": ["string", "null"] },
+            "task_dispatch_mode": { "type": ["string", "null"] },
+            "partition_primitives": {
+              "type": ["array", "null"],
+              "items": { "type": "string" }
+            },
+            "backpressure_model": { "type": ["string", "null"] }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "coordination_health": {
+      "type": "object",
+      "properties": {
+        "schema": { "type": ["string", "null"] },
+        "version": { "type": ["string", "integer", "null"] },
+        "namespace_scope": { "type": ["string", "null"] },
+        "status": { "type": ["string", "null"] },
+        "http_status": { "type": ["integer", "null"] },
+        "generated_at": { "type": ["string", "null"] },
+        "categories": {
+          "type": ["object", "array", "null"],
+          "additionalProperties": true
+        },
+        "warning_checks": {
+          "type": ["array", "null"],
+          "items": { "type": "string" }
+        },
+        "error_checks": {
+          "type": ["array", "null"],
+          "items": { "type": "string" }
+        },
+        "checks": {
+          "type": ["array", "null"],
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": ["string", "null"] },
+              "status": { "type": ["string", "null"] },
+              "category": { "type": ["string", "null"] },
+              "message": { "type": ["string", "null"] }
+            },
+            "additionalProperties": true
+          }
         }
       },
       "additionalProperties": true

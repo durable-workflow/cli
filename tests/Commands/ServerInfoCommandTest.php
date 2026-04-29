@@ -351,6 +351,137 @@ class ServerInfoCommandTest extends TestCase
             $display,
         );
     }
+
+    public function test_it_renders_coordination_health_summary(): void
+    {
+        $command = new InfoCommand();
+        $command->setServerClient(new ServerInfoFakeClient([
+            'server_id' => 'server-1',
+            'version' => '0.2.16',
+            'default_namespace' => 'default',
+            'control_plane' => [
+                'version' => '2',
+                'request_contract' => [
+                    'schema' => ControlPlaneRequestContract::SCHEMA,
+                    'version' => ControlPlaneRequestContract::VERSION,
+                    'operations' => [],
+                ],
+            ],
+            'coordination_health' => [
+                'schema' => 'durable-workflow.v2.coordination-health.contract',
+                'version' => 1,
+                'namespace_scope' => 'all_namespaces',
+                'status' => 'warning',
+                'http_status' => 200,
+                'generated_at' => '2026-04-29T18:42:00Z',
+                'categories' => [
+                    'compatibility' => 1,
+                    'notifications' => 0,
+                ],
+                'warning_checks' => [
+                    'worker_compatibility',
+                ],
+                'error_checks' => [],
+                'checks' => [
+                    [
+                        'name' => 'worker_compatibility',
+                        'status' => 'warning',
+                        'category' => 'compatibility',
+                        'message' => 'No active worker supports the required compatibility family.',
+                    ],
+                    [
+                        'name' => 'queue_wake',
+                        'status' => 'ok',
+                        'category' => 'notifications',
+                        'message' => 'Ready-task wake path is healthy.',
+                    ],
+                ],
+            ],
+        ]));
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+
+        $display = $tester->getDisplay();
+
+        self::assertStringContainsString('Coordination Health:', $display);
+        self::assertStringContainsString(
+            'Manifest: durable-workflow.v2.coordination-health.contract v1',
+            $display,
+        );
+        self::assertStringContainsString('Namespace Scope: all_namespaces', $display);
+        self::assertStringContainsString('Status: warning (http 200)', $display);
+        self::assertStringContainsString('Generated At: 2026-04-29T18:42:00Z', $display);
+        self::assertStringContainsString('Categories: compatibility=1, notifications=0', $display);
+        self::assertStringContainsString('Warning Checks: worker_compatibility', $display);
+        self::assertStringContainsString('Error Checks: none', $display);
+        self::assertStringContainsString('Checks:', $display);
+        self::assertStringContainsString(
+            'worker_compatibility: status=warning, category=compatibility, message=No active worker supports the required compatibility family.',
+            $display,
+        );
+        self::assertStringContainsString(
+            'queue_wake: status=ok, category=notifications, message=Ready-task wake path is healthy.',
+            $display,
+        );
+    }
+
+    public function test_server_info_schema_pins_topology_contract_keys(): void
+    {
+        $schema = json_decode(
+            (string) file_get_contents(__DIR__.'/../../schemas/output/server-info.schema.json'),
+            true,
+            flags: JSON_THROW_ON_ERROR,
+        );
+
+        $topology = $schema['properties']['topology']['properties'];
+        $matchingRole = $topology['matching_role']['properties'];
+
+        self::assertSame(['string', 'null'], $topology['schema']['type']);
+        self::assertSame(['string', 'integer', 'null'], $topology['version']['type']);
+        self::assertSame(['array', 'null'], $topology['supported_shapes']['type']);
+        self::assertSame('string', $topology['supported_shapes']['items']['type']);
+        self::assertSame(['string', 'null'], $topology['current_shape']['type']);
+        self::assertSame(['array', 'null'], $topology['current_roles']['type']);
+        self::assertSame('string', $topology['current_roles']['items']['type']);
+        self::assertSame(['string', 'null'], $topology['execution_mode']['type']);
+        self::assertSame(['boolean', 'null'], $matchingRole['queue_wake_enabled']['type']);
+        self::assertSame(['string', 'null'], $matchingRole['shape']['type']);
+        self::assertSame(['string', 'null'], $matchingRole['wake_owner']['type']);
+        self::assertSame(['string', 'null'], $matchingRole['task_dispatch_mode']['type']);
+        self::assertSame(['array', 'null'], $matchingRole['partition_primitives']['type']);
+        self::assertSame('string', $matchingRole['partition_primitives']['items']['type']);
+        self::assertSame(['string', 'null'], $matchingRole['backpressure_model']['type']);
+    }
+
+    public function test_server_info_schema_pins_coordination_health_contract_keys(): void
+    {
+        $schema = json_decode(
+            (string) file_get_contents(__DIR__.'/../../schemas/output/server-info.schema.json'),
+            true,
+            flags: JSON_THROW_ON_ERROR,
+        );
+
+        $coordinationHealth = $schema['properties']['coordination_health']['properties'];
+        $check = $coordinationHealth['checks']['items']['properties'];
+
+        self::assertSame(['string', 'null'], $coordinationHealth['schema']['type']);
+        self::assertSame(['string', 'integer', 'null'], $coordinationHealth['version']['type']);
+        self::assertSame(['string', 'null'], $coordinationHealth['namespace_scope']['type']);
+        self::assertSame(['string', 'null'], $coordinationHealth['status']['type']);
+        self::assertSame(['integer', 'null'], $coordinationHealth['http_status']['type']);
+        self::assertSame(['string', 'null'], $coordinationHealth['generated_at']['type']);
+        self::assertSame(['array', 'null'], $coordinationHealth['warning_checks']['type']);
+        self::assertSame('string', $coordinationHealth['warning_checks']['items']['type']);
+        self::assertSame(['array', 'null'], $coordinationHealth['error_checks']['type']);
+        self::assertSame('string', $coordinationHealth['error_checks']['items']['type']);
+        self::assertSame(['array', 'null'], $coordinationHealth['checks']['type']);
+        self::assertSame(['string', 'null'], $check['name']['type']);
+        self::assertSame(['string', 'null'], $check['status']['type']);
+        self::assertSame(['string', 'null'], $check['category']['type']);
+        self::assertSame(['string', 'null'], $check['message']['type']);
+    }
 }
 
 class ServerInfoFakeClient extends ServerClient

@@ -568,6 +568,12 @@ class SystemCommandTest extends TestCase
         self::assertStringContainsString('Task dispatch mode:   queue', $display);
         self::assertStringContainsString('Partition primitives: connection, queue, compatibility, namespace', $display);
         self::assertStringContainsString('Backpressure model:  lease_ownership', $display);
+        self::assertStringContainsString('Discovery limits:', $display);
+        self::assertStringContainsString('Poll batch cap:              100', $display);
+        self::assertStringContainsString('Availability ceiling:        1s', $display);
+        self::assertStringContainsString('Wake signal TTL:             60s', $display);
+        self::assertStringContainsString('Workflow task lease:         300s', $display);
+        self::assertStringContainsString('Activity task lease:         300s', $display);
 
         self::assertStringContainsString('Active 4, paused 1, missed 1, oldest overdue 5000 ms', $display);
         self::assertStringContainsString('Lifetime fires: 128 (3 failures)', $display);
@@ -817,6 +823,24 @@ class SystemCommandTest extends TestCase
         self::assertSame(['string', 'null'], $matchingRole['backpressure_model']['type']);
     }
 
+    public function test_operator_metrics_schema_pins_matching_role_discovery_limits_keys(): void
+    {
+        $schema = json_decode(
+            (string) file_get_contents(__DIR__.'/../../schemas/output/operator-metrics.schema.json'),
+            true,
+            flags: JSON_THROW_ON_ERROR,
+        );
+
+        $discoveryLimits = $schema['properties']['operator_metrics']['properties']
+            ['matching_role']['properties']['discovery_limits']['properties'];
+
+        self::assertSame(['integer', 'null'], $discoveryLimits['poll_batch_cap']['type']);
+        self::assertSame(['integer', 'null'], $discoveryLimits['availability_ceiling_seconds']['type']);
+        self::assertSame(['integer', 'null'], $discoveryLimits['wake_signal_ttl_seconds']['type']);
+        self::assertSame(['integer', 'null'], $discoveryLimits['workflow_task_lease_seconds']['type']);
+        self::assertSame(['integer', 'null'], $discoveryLimits['activity_task_lease_seconds']['type']);
+    }
+
     public function test_operator_metrics_schema_pins_activities_retrying_age_keys(): void
     {
         $schema = json_decode(
@@ -1058,6 +1082,28 @@ class SystemCommandTest extends TestCase
         self::assertStringContainsString('Backpressure model:  lease_ownership', $display);
     }
 
+    public function test_operator_metrics_command_omits_matching_role_discovery_limits_when_snapshot_predates_contract(): void
+    {
+        $payload = self::operatorMetricsPayload();
+        unset($payload['operator_metrics']['matching_role']['discovery_limits']);
+
+        $command = new OperatorMetricsCommand();
+        $command->setServerClient(new SystemFakeClient($payload));
+
+        $tester = new CommandTester($command);
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+
+        $display = $tester->getDisplay();
+
+        self::assertStringNotContainsString('Discovery limits:', $display);
+        self::assertStringNotContainsString('Poll batch cap:', $display);
+        self::assertStringNotContainsString('Availability ceiling:', $display);
+        self::assertStringNotContainsString('Wake signal TTL:', $display);
+        self::assertStringNotContainsString('Workflow task lease:', $display);
+        self::assertStringNotContainsString('Activity task lease:', $display);
+        self::assertStringContainsString('Backpressure model:  lease_ownership', $display);
+    }
+
     public function test_operator_metrics_command_tolerates_minimal_payload(): void
     {
         $command = new OperatorMetricsCommand();
@@ -1199,6 +1245,13 @@ class SystemCommandTest extends TestCase
                     'task_dispatch_mode' => 'queue',
                     'partition_primitives' => ['connection', 'queue', 'compatibility', 'namespace'],
                     'backpressure_model' => 'lease_ownership',
+                    'discovery_limits' => [
+                        'poll_batch_cap' => 100,
+                        'availability_ceiling_seconds' => 1,
+                        'wake_signal_ttl_seconds' => 60,
+                        'workflow_task_lease_seconds' => 300,
+                        'activity_task_lease_seconds' => 300,
+                    ],
                 ],
                 'projections' => [
                     'run_summaries' => [

@@ -155,7 +155,18 @@
               "type": ["array", "null"],
               "items": { "type": "string" }
             },
-            "backpressure_model": { "type": ["string", "null"] }
+            "backpressure_model": { "type": ["string", "null"] },
+            "discovery_limits": {
+              "type": ["object", "null"],
+              "properties": {
+                "poll_batch_cap": { "type": ["integer", "null"] },
+                "availability_ceiling_seconds": { "type": ["integer", "null"] },
+                "wake_signal_ttl_seconds": { "type": ["integer", "null"] },
+                "workflow_task_lease_seconds": { "type": ["integer", "null"] },
+                "activity_task_lease_seconds": { "type": ["integer", "null"] }
+              },
+              "additionalProperties": true
+            }
           },
           "additionalProperties": true
         },

@@ -399,6 +399,41 @@ HELP)
             $output->writeln(sprintf('  Backpressure model:  %s', $matchingRole['backpressure_model']));
         }
 
+        $discoveryLimits = is_array($matchingRole['discovery_limits'] ?? null) ? $matchingRole['discovery_limits'] : [];
+        if ($discoveryLimits !== []) {
+            $output->writeln('  Discovery limits:');
+            if (array_key_exists('poll_batch_cap', $discoveryLimits)) {
+                $output->writeln(sprintf(
+                    '    Poll batch cap:              %d',
+                    (int) ($discoveryLimits['poll_batch_cap'] ?? 0),
+                ));
+            }
+            if (array_key_exists('availability_ceiling_seconds', $discoveryLimits)) {
+                $output->writeln(sprintf(
+                    '    Availability ceiling:        %ds',
+                    (int) ($discoveryLimits['availability_ceiling_seconds'] ?? 0),
+                ));
+            }
+            if (array_key_exists('wake_signal_ttl_seconds', $discoveryLimits)) {
+                $output->writeln(sprintf(
+                    '    Wake signal TTL:             %ds',
+                    (int) ($discoveryLimits['wake_signal_ttl_seconds'] ?? 0),
+                ));
+            }
+            if (array_key_exists('workflow_task_lease_seconds', $discoveryLimits)) {
+                $output->writeln(sprintf(
+                    '    Workflow task lease:         %ds',
+                    (int) ($discoveryLimits['workflow_task_lease_seconds'] ?? 0),
+                ));
+            }
+            if (array_key_exists('activity_task_lease_seconds', $discoveryLimits)) {
+                $output->writeln(sprintf(
+                    '    Activity task lease:         %ds',
+                    (int) ($discoveryLimits['activity_task_lease_seconds'] ?? 0),
+                ));
+            }
+        }
+
         $output->writeln('');
     }
 

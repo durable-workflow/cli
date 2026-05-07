@@ -192,6 +192,259 @@ class ServerInfoCommandTest extends TestCase
         self::assertStringNotContainsString('Array', $display);
     }
 
+    public function test_it_renders_extended_worker_protocol_manifest_fields(): void
+    {
+        $command = new InfoCommand();
+        $command->setServerClient(new ServerInfoFakeClient([
+            'server_id' => 'server-1',
+            'version' => '0.2.0',
+            'worker_protocol' => [
+                'version' => '1.0',
+                'server_capabilities' => [
+                    'long_poll_timeout' => 30,
+                    'poll_status' => true,
+                    'history_page_size_default' => 200,
+                    'history_page_size_max' => 1000,
+                    'query_tasks' => true,
+                    'activity_retry_policy' => true,
+                    'activity_timeouts' => true,
+                    'child_workflow_retry_policy' => true,
+                    'child_workflow_timeouts' => true,
+                    'parent_close_policy' => true,
+                    'non_retryable_failures' => true,
+                    'response_compression' => ['gzip', 'deflate'],
+                    'history_compression' => [
+                        'supported_encodings' => ['identity', 'gzip'],
+                        'compression_threshold' => 50,
+                    ],
+                    'local_activities' => [
+                        'schema' => 'durable-workflow.v2.local-activity.contract',
+                        'version' => 1,
+                        'supported' => true,
+                        'execution' => [
+                            'mode' => 'local',
+                            'same_process' => true,
+                            'ordinary_activity_task_created' => false,
+                        ],
+                        'routing' => [
+                            'admission' => 'activity_class_must_resolve_in_the_workflow_worker_process',
+                            'queue_bypassed' => true,
+                            'rejected_options' => ['connection', 'queue', 'worker_session'],
+                        ],
+                    ],
+                    'worker_session_verbs' => ['create', 'heartbeat', 'close'],
+                    'worker_sessions' => [
+                        'feature' => 'worker_sessions',
+                        'contract_version' => '1.0',
+                        'supported' => true,
+                        'minimum_protocol_version' => '1.0',
+                        'command_field' => 'worker_session',
+                        'activity_options_field' => 'worker_session',
+                        'ownership' => 'single_worker_lease_owner',
+                        'lifecycle' => [
+                            'creation' => 'lazy_create_on_first_admitted_activity_or_explicit_worker_create',
+                            'renewal' => 'activity_heartbeat_or_explicit_session_heartbeat',
+                        ],
+                        'admission' => [
+                            'queue_routing_first' => true,
+                            'requires_registered_worker' => true,
+                        ],
+                        'limits' => [
+                            'max_concurrent_worker_sessions' => 'worker_registration',
+                            'max_concurrent_activities' => 'session',
+                        ],
+                        'default_max_concurrent_activities' => 1,
+                    ],
+                    'external_execution_surface' => [
+                        'schema' => 'durable-workflow.v2.external-execution-surface.contract',
+                        'version' => 1,
+                        'name' => 'activity_grade_external_execution',
+                    ],
+                    'external_executor_config' => [
+                        'schema' => 'durable-workflow.v2.external-executor-config.contract',
+                        'version' => 1,
+                        'config_schema' => 'durable-workflow.external-executor.config',
+                        'config_schema_version' => 1,
+                    ],
+                    'external_task_input' => [
+                        'schema' => 'durable-workflow.v2.external-task-input.contract',
+                        'version' => 1,
+                    ],
+                    'external_task_result' => [
+                        'schema' => 'durable-workflow.v2.external-task-result.contract',
+                        'version' => 1,
+                    ],
+                ],
+                'external_execution_surface_contract' => [
+                    'schema' => 'durable-workflow.v2.external-execution-surface.contract',
+                    'version' => 1,
+                    'product_boundary' => [
+                        'name' => 'activity_grade_external_execution',
+                    ],
+                    'contract_seams' => [
+                        'input_envelope' => [],
+                        'result_envelope' => [],
+                        'invocable_http_carrier' => [],
+                    ],
+                ],
+                'external_executor_config_contract' => [
+                    'schema' => 'durable-workflow.v2.external-executor-config.contract',
+                    'version' => 1,
+                    'config_schema' => [
+                        'schema' => 'durable-workflow.external-executor.config',
+                        'version' => 1,
+                    ],
+                    'steady_state_surface' => 'config_file',
+                    'runtime' => [
+                        'configured' => false,
+                        'status' => 'not_configured',
+                    ],
+                ],
+                'external_task_input_contract' => [
+                    'schema' => 'durable-workflow.v2.external-task-input.contract',
+                    'version' => 1,
+                    'unknown_field_policy' => 'ignore_additive_reject_unknown_required',
+                    'scope' => [
+                        'activity_grade_external_execution' => [
+                            'task_kinds' => ['activity_task'],
+                        ],
+                        'worker_protocol_runtime' => [
+                            'task_kinds' => ['workflow_task'],
+                        ],
+                    ],
+                    'envelopes' => [
+                        'workflow_task' => [],
+                        'activity_task' => [],
+                    ],
+                    'fixtures' => [
+                        'workflow_task' => [],
+                        'activity_task' => [],
+                    ],
+                    'payload_support' => [
+                        'inline' => 'codec-tagged payloads',
+                        'external_storage' => 'external references fail closed when unsupported',
+                    ],
+                ],
+                'external_task_result_contract' => [
+                    'schema' => 'durable-workflow.v2.external-task-result.contract',
+                    'version' => 1,
+                    'unknown_field_policy' => 'ignore_additive_reject_unknown_required',
+                    'stderr_policy' => 'logs_only_no_machine_meaning',
+                    'envelopes' => [
+                        'success' => [],
+                        'failure' => [],
+                        'malformed_output' => [],
+                    ],
+                    'fixtures' => [
+                        'success' => [],
+                        'handler_crash' => [],
+                    ],
+                    'payload_support' => [
+                        'result_payload' => 'codec-tagged results',
+                        'failure_details' => 'codec-tagged failure details',
+                    ],
+                ],
+            ],
+        ]));
+
+        $tester = new CommandTester($command);
+
+        self::assertContains('cluster:info', $command->getAliases());
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+
+        $display = $tester->getDisplay();
+
+        self::assertStringContainsString('Poll Status: yes', $display);
+        self::assertStringContainsString('Query Tasks: yes', $display);
+        self::assertStringContainsString('Activity Retry Policy: yes', $display);
+        self::assertStringContainsString('Activity Timeouts: yes', $display);
+        self::assertStringContainsString('Child Workflow Retry Policy: yes', $display);
+        self::assertStringContainsString('Parent Close Policy: yes', $display);
+        self::assertStringContainsString('Non-retryable Failures: yes', $display);
+        self::assertStringContainsString('History Page Size (default): 200', $display);
+        self::assertStringContainsString('Response Compression: gzip, deflate', $display);
+        self::assertStringContainsString('History Compression: identity, gzip', $display);
+        self::assertStringContainsString('History Compression Threshold: 50 events', $display);
+        self::assertStringContainsString(
+            'Local Activities: durable-workflow.v2.local-activity.contract v1 (supported=yes)',
+            $display,
+        );
+        self::assertStringContainsString(
+            'Local Activity Execution: mode=local, same_process=yes, ordinary_activity_task_created=no',
+            $display,
+        );
+        self::assertStringContainsString(
+            'Local Activity Routing: admission=activity_class_must_resolve_in_the_workflow_worker_process, queue_bypassed=yes, rejected_options=connection, queue, worker_session',
+            $display,
+        );
+        self::assertStringContainsString('Worker Session Verbs: create, heartbeat, close', $display);
+        self::assertStringContainsString(
+            'Worker Sessions: feature=worker_sessions, contract_version=1.0, supported=yes, minimum_protocol_version=1.0, command_field=worker_session, activity_options_field=worker_session, ownership=single_worker_lease_owner',
+            $display,
+        );
+        self::assertStringContainsString(
+            'Worker Session Lifecycle: creation=lazy_create_on_first_admitted_activity_or_explicit_worker_create, renewal=activity_heartbeat_or_explicit_session_heartbeat',
+            $display,
+        );
+        self::assertStringContainsString(
+            'Worker Session Limits: max_concurrent_worker_sessions=worker_registration, max_concurrent_activities=session',
+            $display,
+        );
+        self::assertStringContainsString(
+            'External Execution Surface: durable-workflow.v2.external-execution-surface.contract v1 (name=activity_grade_external_execution)',
+            $display,
+        );
+        self::assertStringContainsString(
+            'External Executor Config: durable-workflow.v2.external-executor-config.contract v1 (config=durable-workflow.external-executor.config v1)',
+            $display,
+        );
+        self::assertStringContainsString(
+            'External Task Input: durable-workflow.v2.external-task-input.contract v1',
+            $display,
+        );
+        self::assertStringContainsString(
+            'External Task Result: durable-workflow.v2.external-task-result.contract v1',
+            $display,
+        );
+        self::assertStringContainsString(
+            'External Execution Surface Contract: durable-workflow.v2.external-execution-surface.contract v1',
+            $display,
+        );
+        self::assertStringContainsString(
+            'External Execution Surface Boundary: activity_grade_external_execution',
+            $display,
+        );
+        self::assertStringContainsString(
+            'External Execution Surface Entries: input_envelope, result_envelope, invocable_http_carrier',
+            $display,
+        );
+        self::assertStringContainsString(
+            'External Executor Config Contract: durable-workflow.v2.external-executor-config.contract v1',
+            $display,
+        );
+        self::assertStringContainsString(
+            'External Executor Config Schema: durable-workflow.external-executor.config v1',
+            $display,
+        );
+        self::assertStringContainsString('External Executor Config Runtime: configured=no, status=not_configured', $display);
+        self::assertStringContainsString(
+            'External Task Input Contract Scope: activity_grade_external_execution=activity_task, worker_protocol_runtime=workflow_task',
+            $display,
+        );
+        self::assertStringContainsString(
+            'External Task Input Contract Envelopes: workflow_task, activity_task',
+            $display,
+        );
+        self::assertStringContainsString(
+            'External Task Result Contract Envelopes: success, failure, malformed_output',
+            $display,
+        );
+        self::assertStringContainsString(
+            'External Task Result Contract Stderr Policy: logs_only_no_machine_meaning',
+            $display,
+        );
+    }
+
     public function test_it_honors_json_output(): void
     {
         $command = new InfoCommand();

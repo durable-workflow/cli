@@ -15,6 +15,7 @@ class InfoCommand extends BaseCommand
     {
         parent::configure();
         $this->setName('server:info')
+            ->setAliases(['cluster:info'])
             ->setDescription('Display server version, capabilities, and role topology')
             ->setHelp(<<<'HELP'
 Print server version, role topology, negotiated control-plane and
@@ -25,6 +26,7 @@ accepts (duplicate policies, wait policies, etc.).
 
   <info>dw server:info</info>
   <info>dw server:info --env=prod</info>
+  <info>dw cluster:info --env=prod</info>
 HELP);
     }
 
@@ -140,90 +142,447 @@ HELP);
 
         $workerProtocol = $result['worker_protocol'] ?? null;
 
-        if (is_array($workerProtocol) && $workerProtocol !== []) {
-            $output->writeln('');
-            $output->writeln('Worker Protocol:');
-            $output->writeln('  Version: '.($workerProtocol['version'] ?? 'unknown'));
+        $this->renderWorkerProtocol($output, $workerProtocol);
 
-            $serverCapabilities = $workerProtocol['server_capabilities'] ?? null;
+        return self::SUCCESS;
+    }
 
-            if (is_array($serverCapabilities)) {
-                $output->writeln('  Long Poll Timeout: '.($serverCapabilities['long_poll_timeout'] ?? 'unknown'));
+    private function renderWorkerProtocol(OutputInterface $output, mixed $workerProtocol): void
+    {
+        if (! is_array($workerProtocol) || $workerProtocol === []) {
+            return;
+        }
 
-                $commands = $serverCapabilities['supported_workflow_task_commands'] ?? [];
-                if (is_array($commands) && $commands !== []) {
-                    $output->writeln('  Workflow Task Commands: '.implode(', ', $commands));
-                }
+        $output->writeln('');
+        $output->writeln('Worker Protocol:');
+        $output->writeln('  Version: '.($this->stringValue($workerProtocol['version'] ?? null) ?? 'unknown'));
 
-                if (array_key_exists('workflow_task_poll_request_idempotency', $serverCapabilities)) {
-                    $enabled = $serverCapabilities['workflow_task_poll_request_idempotency'] === true ? 'yes' : 'no';
-                    $output->writeln('  Workflow Task Poll Idempotency: '.$enabled);
-                }
+        $this->renderWorkerServerCapabilities($output, $workerProtocol['server_capabilities'] ?? null);
+        $this->renderExternalExecutionSurfaceContract(
+            $output,
+            $workerProtocol['external_execution_surface_contract'] ?? null,
+        );
+        $this->renderExternalExecutorConfigContract(
+            $output,
+            $workerProtocol['external_executor_config_contract'] ?? null,
+        );
+        $this->renderInvocableCarrierContract($output, $workerProtocol['invocable_carrier_contract'] ?? null);
+        $this->renderExternalTaskContract(
+            $output,
+            'External Task Input Contract',
+            $workerProtocol['external_task_input_contract'] ?? null,
+        );
+        $this->renderExternalTaskContract(
+            $output,
+            'External Task Result Contract',
+            $workerProtocol['external_task_result_contract'] ?? null,
+        );
+    }
 
-                if (array_key_exists('history_page_size_default', $serverCapabilities)) {
-                    $output->writeln('  History Page Size (default): '.($serverCapabilities['history_page_size_default'] ?? 'unknown'));
-                }
+    private function renderWorkerServerCapabilities(OutputInterface $output, mixed $serverCapabilities): void
+    {
+        if (! is_array($serverCapabilities)) {
+            return;
+        }
 
-                if (array_key_exists('history_page_size_max', $serverCapabilities)) {
-                    $output->writeln('  History Page Size (max): '.($serverCapabilities['history_page_size_max'] ?? 'unknown'));
-                }
+        $output->writeln(
+            '  Long Poll Timeout: '.($this->stringValue($serverCapabilities['long_poll_timeout'] ?? null) ?? 'unknown'),
+        );
 
-                $compression = $serverCapabilities['response_compression'] ?? null;
-                if (is_array($compression)) {
-                    $output->writeln('  Response Compression: '.($compression !== [] ? implode(', ', $compression) : 'disabled'));
-                }
+        $commands = $this->stringList($serverCapabilities['supported_workflow_task_commands'] ?? null);
+        if ($commands !== []) {
+            $output->writeln('  Workflow Task Commands: '.implode(', ', $commands));
+        }
 
-                $historyCompression = $serverCapabilities['history_compression'] ?? null;
-                if (is_array($historyCompression)) {
-                    $encodings = $historyCompression['supported_encodings'] ?? [];
-                    $threshold = $historyCompression['compression_threshold'] ?? null;
-                    $output->writeln('  History Compression: '.(is_array($encodings) && $encodings !== [] ? implode(', ', $encodings) : 'disabled'));
-                    if ($threshold !== null) {
-                        $output->writeln('  History Compression Threshold: '.$threshold.' events');
-                    }
-                }
+        if (array_key_exists('workflow_task_poll_request_idempotency', $serverCapabilities)) {
+            $output->writeln(
+                '  Workflow Task Poll Idempotency: '
+                .$this->formatOptionalBool($serverCapabilities['workflow_task_poll_request_idempotency']),
+            );
+        }
 
-                $invocable = $serverCapabilities['invocable_carrier'] ?? null;
-                if (is_array($invocable)) {
-                    $output->writeln(sprintf(
-                        '  Invocable Carrier: %s v%s (%s)',
-                        $invocable['schema'] ?? 'unknown',
-                        $invocable['version'] ?? 'unknown',
-                        $invocable['carrier_type'] ?? 'unknown',
-                    ));
-                }
-            }
+        $flagLabels = [
+            'poll_status' => 'Poll Status',
+            'query_tasks' => 'Query Tasks',
+            'activity_retry_policy' => 'Activity Retry Policy',
+            'activity_timeouts' => 'Activity Timeouts',
+            'child_workflow_retry_policy' => 'Child Workflow Retry Policy',
+            'child_workflow_timeouts' => 'Child Workflow Timeouts',
+            'parent_close_policy' => 'Parent Close Policy',
+            'non_retryable_failures' => 'Non-retryable Failures',
+        ];
 
-            $invocableContract = $workerProtocol['invocable_carrier_contract'] ?? null;
-            if (is_array($invocableContract)) {
+        foreach ($flagLabels as $field => $label) {
+            if (array_key_exists($field, $serverCapabilities)) {
                 $output->writeln(sprintf(
-                    '  Invocable Carrier Contract: %s v%s',
-                    $invocableContract['schema'] ?? 'unknown',
-                    $invocableContract['version'] ?? 'unknown',
+                    '  %s: %s',
+                    $label,
+                    $this->formatOptionalBool($serverCapabilities[$field]),
                 ));
-                $output->writeln('  Invocable Carrier Type: '.($invocableContract['carrier_type'] ?? 'unknown'));
-
-                $scope = $invocableContract['scope'] ?? null;
-                $taskKinds = is_array($scope) && is_array($scope['task_kinds'] ?? null)
-                    ? $scope['task_kinds']
-                    : [];
-                if ($taskKinds !== []) {
-                    $output->writeln('  Invocable Task Kinds: '.implode(', ', $taskKinds));
-                }
-
-                $request = $invocableContract['request'] ?? null;
-                if (is_array($request)) {
-                    $output->writeln('  Invocable Request Content-Type: '.($request['content_type'] ?? 'unknown'));
-                }
-
-                $response = $invocableContract['response'] ?? null;
-                if (is_array($response)) {
-                    $output->writeln('  Invocable Response Content-Type: '.($response['content_type'] ?? 'unknown'));
-                }
             }
         }
 
-        return self::SUCCESS;
+        if (array_key_exists('history_page_size_default', $serverCapabilities)) {
+            $output->writeln(
+                '  History Page Size (default): '
+                .($this->stringValue($serverCapabilities['history_page_size_default'] ?? null) ?? 'unknown'),
+            );
+        }
+
+        if (array_key_exists('history_page_size_max', $serverCapabilities)) {
+            $output->writeln(
+                '  History Page Size (max): '
+                .($this->stringValue($serverCapabilities['history_page_size_max'] ?? null) ?? 'unknown'),
+            );
+        }
+
+        $compression = $this->stringList($serverCapabilities['response_compression'] ?? null);
+        if (array_key_exists('response_compression', $serverCapabilities)) {
+            $output->writeln(
+                '  Response Compression: '.($compression !== [] ? implode(', ', $compression) : 'disabled'),
+            );
+        }
+
+        $this->renderHistoryCompressionCapability($output, $serverCapabilities['history_compression'] ?? null);
+        $this->renderLocalActivityCapability($output, $serverCapabilities['local_activities'] ?? null);
+        $this->renderWorkerSessionCapability(
+            $output,
+            $serverCapabilities['worker_sessions'] ?? null,
+            $this->stringList($serverCapabilities['worker_session_verbs'] ?? null),
+        );
+        $this->renderExternalExecutionSurfaceCapability(
+            $output,
+            $serverCapabilities['external_execution_surface'] ?? null,
+        );
+        $this->renderExternalExecutorConfigCapability(
+            $output,
+            $serverCapabilities['external_executor_config'] ?? null,
+        );
+        $this->renderSimpleProtocolCapability($output, 'External Task Input', $serverCapabilities['external_task_input'] ?? null);
+        $this->renderSimpleProtocolCapability($output, 'External Task Result', $serverCapabilities['external_task_result'] ?? null);
+
+        $invocable = $serverCapabilities['invocable_carrier'] ?? null;
+        if (is_array($invocable)) {
+            $output->writeln(sprintf(
+                '  Invocable Carrier: %s v%s (%s)',
+                $this->stringValue($invocable['schema'] ?? null) ?? 'unknown',
+                $this->stringValue($invocable['version'] ?? null) ?? 'unknown',
+                $this->stringValue($invocable['carrier_type'] ?? null) ?? 'unknown',
+            ));
+        }
+    }
+
+    private function renderHistoryCompressionCapability(OutputInterface $output, mixed $historyCompression): void
+    {
+        if (! is_array($historyCompression)) {
+            return;
+        }
+
+        $encodings = $this->stringList($historyCompression['supported_encodings'] ?? null);
+        $threshold = $this->stringValue($historyCompression['compression_threshold'] ?? null);
+
+        $output->writeln(
+            '  History Compression: '.($encodings !== [] ? implode(', ', $encodings) : 'disabled'),
+        );
+
+        if ($threshold !== null) {
+            $output->writeln('  History Compression Threshold: '.$threshold.' events');
+        }
+    }
+
+    private function renderLocalActivityCapability(OutputInterface $output, mixed $localActivities): void
+    {
+        if (! is_array($localActivities)) {
+            return;
+        }
+
+        $suffix = array_key_exists('supported', $localActivities)
+            ? 'supported='.$this->formatOptionalBool($localActivities['supported'])
+            : null;
+        $this->renderManifestLine($output, 'Local Activities', $localActivities, $suffix);
+
+        $execution = is_array($localActivities['execution'] ?? null) ? $localActivities['execution'] : [];
+        $executionParts = $this->fieldSummary($execution, [
+            'mode' => 'mode',
+            'same_process' => 'same_process',
+            'ordinary_activity_task_created' => 'ordinary_activity_task_created',
+        ]);
+
+        if ($executionParts !== []) {
+            $output->writeln('  Local Activity Execution: '.implode(', ', $executionParts));
+        }
+
+        $routing = is_array($localActivities['routing'] ?? null) ? $localActivities['routing'] : [];
+        $routingParts = $this->fieldSummary($routing, [
+            'admission' => 'admission',
+            'queue_bypassed' => 'queue_bypassed',
+        ]);
+        $rejectedOptions = $this->stringList($routing['rejected_options'] ?? null);
+
+        if ($rejectedOptions !== []) {
+            $routingParts[] = 'rejected_options='.implode(', ', $rejectedOptions);
+        }
+
+        if ($routingParts !== []) {
+            $output->writeln('  Local Activity Routing: '.implode(', ', $routingParts));
+        }
+    }
+
+    /**
+     * @param  list<string>  $verbs
+     */
+    private function renderWorkerSessionCapability(OutputInterface $output, mixed $workerSessions, array $verbs): void
+    {
+        if (! is_array($workerSessions) && $verbs === []) {
+            return;
+        }
+
+        if ($verbs === [] && is_array($workerSessions)) {
+            $verbs = $this->stringList($workerSessions['verbs'] ?? null);
+        }
+
+        if ($verbs !== []) {
+            $output->writeln('  Worker Session Verbs: '.implode(', ', $verbs));
+        }
+
+        if (! is_array($workerSessions)) {
+            return;
+        }
+
+        $summary = $this->fieldSummary($workerSessions, [
+            'feature' => 'feature',
+            'contract_version' => 'contract_version',
+            'supported' => 'supported',
+            'minimum_protocol_version' => 'minimum_protocol_version',
+            'command_field' => 'command_field',
+            'activity_options_field' => 'activity_options_field',
+            'ownership' => 'ownership',
+            'unavailable_reason' => 'unavailable_reason',
+        ]);
+
+        if ($summary !== []) {
+            $output->writeln('  Worker Sessions: '.implode(', ', $summary));
+        }
+
+        $lifecycle = $this->formatScalarMap($workerSessions['lifecycle'] ?? null);
+        if ($lifecycle !== null) {
+            $output->writeln('  Worker Session Lifecycle: '.$lifecycle);
+        }
+
+        $admission = $this->formatScalarMap($workerSessions['admission'] ?? null);
+        if ($admission !== null) {
+            $output->writeln('  Worker Session Admission: '.$admission);
+        }
+
+        $limits = $this->formatScalarMap($workerSessions['limits'] ?? null);
+        if ($limits !== null) {
+            $output->writeln('  Worker Session Limits: '.$limits);
+        }
+
+        $defaultConcurrency = $this->stringValue($workerSessions['default_max_concurrent_activities'] ?? null);
+        if ($defaultConcurrency !== null) {
+            $output->writeln('  Worker Session Default Max Concurrent Activities: '.$defaultConcurrency);
+        }
+    }
+
+    private function renderExternalExecutionSurfaceCapability(OutputInterface $output, mixed $capability): void
+    {
+        if (! is_array($capability)) {
+            return;
+        }
+
+        $name = $this->stringValue($capability['name'] ?? null);
+        $this->renderManifestLine(
+            $output,
+            'External Execution Surface',
+            $capability,
+            $name !== null ? 'name='.$name : null,
+        );
+    }
+
+    private function renderExternalExecutorConfigCapability(OutputInterface $output, mixed $capability): void
+    {
+        if (! is_array($capability)) {
+            return;
+        }
+
+        $configSchema = $this->stringValue($capability['config_schema'] ?? null);
+        $configVersion = $this->stringValue($capability['config_schema_version'] ?? null);
+        $suffix = $configSchema !== null
+            ? sprintf('config=%s v%s', $configSchema, $configVersion ?? 'unknown')
+            : null;
+
+        $this->renderManifestLine($output, 'External Executor Config', $capability, $suffix);
+    }
+
+    private function renderSimpleProtocolCapability(OutputInterface $output, string $label, mixed $capability): void
+    {
+        if (! is_array($capability)) {
+            return;
+        }
+
+        $this->renderManifestLine($output, $label, $capability);
+    }
+
+    private function renderExternalExecutionSurfaceContract(OutputInterface $output, mixed $contract): void
+    {
+        if (! is_array($contract)) {
+            return;
+        }
+
+        $this->renderManifestLine($output, 'External Execution Surface Contract', $contract);
+
+        $productBoundary = is_array($contract['product_boundary'] ?? null) ? $contract['product_boundary'] : [];
+        $name = $this->stringValue($productBoundary['name'] ?? null);
+        if ($name !== null) {
+            $output->writeln('  External Execution Surface Boundary: '.$name);
+        }
+
+        $entries = $this->stringKeyList($contract['contract_seams'] ?? null);
+        if ($entries !== []) {
+            $output->writeln('  External Execution Surface Entries: '.implode(', ', $entries));
+        }
+    }
+
+    private function renderExternalExecutorConfigContract(OutputInterface $output, mixed $contract): void
+    {
+        if (! is_array($contract)) {
+            return;
+        }
+
+        $this->renderManifestLine($output, 'External Executor Config Contract', $contract);
+
+        $configSchema = is_array($contract['config_schema'] ?? null) ? $contract['config_schema'] : [];
+        if ($configSchema !== []) {
+            $output->writeln(sprintf(
+                '  External Executor Config Schema: %s v%s',
+                $this->stringValue($configSchema['schema'] ?? null) ?? 'unknown',
+                $this->stringValue($configSchema['version'] ?? null) ?? 'unknown',
+            ));
+        }
+
+        $surface = $this->stringValue($contract['steady_state_surface'] ?? null);
+        if ($surface !== null) {
+            $output->writeln('  External Executor Config Surface: '.$surface);
+        }
+
+        $runtime = is_array($contract['runtime'] ?? null) ? $contract['runtime'] : [];
+        $runtimeSummary = $this->fieldSummary($runtime, [
+            'configured' => 'configured',
+            'status' => 'status',
+            'overlay' => 'overlay',
+        ]);
+
+        if ($runtimeSummary !== []) {
+            $output->writeln('  External Executor Config Runtime: '.implode(', ', $runtimeSummary));
+        }
+    }
+
+    private function renderInvocableCarrierContract(OutputInterface $output, mixed $contract): void
+    {
+        if (! is_array($contract)) {
+            return;
+        }
+
+        $this->renderManifestLine($output, 'Invocable Carrier Contract', $contract);
+        $output->writeln(
+            '  Invocable Carrier Type: '.($this->stringValue($contract['carrier_type'] ?? null) ?? 'unknown'),
+        );
+
+        $scope = $contract['scope'] ?? null;
+        $taskKinds = is_array($scope) && is_array($scope['task_kinds'] ?? null)
+            ? $this->stringList($scope['task_kinds'])
+            : [];
+        if ($taskKinds !== []) {
+            $output->writeln('  Invocable Task Kinds: '.implode(', ', $taskKinds));
+        }
+
+        $request = $contract['request'] ?? null;
+        if (is_array($request)) {
+            $output->writeln(
+                '  Invocable Request Content-Type: '
+                .($this->stringValue($request['content_type'] ?? null) ?? 'unknown'),
+            );
+        }
+
+        $response = $contract['response'] ?? null;
+        if (is_array($response)) {
+            $output->writeln(
+                '  Invocable Response Content-Type: '
+                .($this->stringValue($response['content_type'] ?? null) ?? 'unknown'),
+            );
+        }
+    }
+
+    private function renderExternalTaskContract(OutputInterface $output, string $label, mixed $contract): void
+    {
+        if (! is_array($contract)) {
+            return;
+        }
+
+        $this->renderManifestLine($output, $label, $contract);
+
+        $policy = $this->stringValue($contract['unknown_field_policy'] ?? null);
+        if ($policy !== null) {
+            $output->writeln(sprintf('  %s Unknown Field Policy: %s', $label, $policy));
+        }
+
+        $scope = is_array($contract['scope'] ?? null) ? $contract['scope'] : [];
+        $scopeParts = [];
+        foreach ($scope as $scopeName => $scopeDefinition) {
+            if (! is_string($scopeName) || ! is_array($scopeDefinition)) {
+                continue;
+            }
+
+            $taskKinds = $this->stringList($scopeDefinition['task_kinds'] ?? null);
+            if ($taskKinds !== []) {
+                $scopeParts[] = sprintf('%s=%s', $scopeName, implode('|', $taskKinds));
+            }
+        }
+
+        if ($scopeParts !== []) {
+            $output->writeln(sprintf('  %s Scope: %s', $label, implode(', ', $scopeParts)));
+        }
+
+        $envelopes = $this->stringKeyList($contract['envelopes'] ?? null);
+        if ($envelopes !== []) {
+            $output->writeln(sprintf('  %s Envelopes: %s', $label, implode(', ', $envelopes)));
+        }
+
+        $fixtures = $this->stringKeyList($contract['fixtures'] ?? null);
+        if ($fixtures !== []) {
+            $output->writeln(sprintf('  %s Fixtures: %s', $label, implode(', ', $fixtures)));
+        }
+
+        $payloadSupport = $this->stringKeyList($contract['payload_support'] ?? null);
+        if ($payloadSupport !== []) {
+            $output->writeln(sprintf('  %s Payload Support: %s', $label, implode(', ', $payloadSupport)));
+        }
+
+        $stderrPolicy = $this->stringValue($contract['stderr_policy'] ?? null);
+        if ($stderrPolicy !== null) {
+            $output->writeln(sprintf('  %s Stderr Policy: %s', $label, $stderrPolicy));
+        }
+    }
+
+    private function renderManifestLine(
+        OutputInterface $output,
+        string $label,
+        array $manifest,
+        ?string $suffix = null,
+    ): void {
+        $line = sprintf(
+            '  %s: %s v%s',
+            $label,
+            $this->stringValue($manifest['schema'] ?? null) ?? 'unknown',
+            $this->stringValue($manifest['version'] ?? null) ?? 'unknown',
+        );
+
+        if ($suffix !== null && $suffix !== '') {
+            $line .= ' ('.$suffix.')';
+        }
+
+        $output->writeln($line);
     }
 
     /**
@@ -541,6 +900,34 @@ HELP);
         }
     }
 
+    /**
+     * @param  array<string, mixed>  $source
+     * @param  array<string, string>  $fields
+     * @return list<string>
+     */
+    private function fieldSummary(array $source, array $fields): array
+    {
+        $summary = [];
+
+        foreach ($fields as $field => $label) {
+            if (! array_key_exists($field, $source)) {
+                continue;
+            }
+
+            if (is_bool($source[$field])) {
+                $summary[] = sprintf('%s=%s', $label, $source[$field] ? 'yes' : 'no');
+                continue;
+            }
+
+            $value = $this->stringValue($source[$field]);
+            if ($value !== null) {
+                $summary[] = sprintf('%s=%s', $label, $value);
+            }
+        }
+
+        return $summary;
+    }
+
     private function stringValue(mixed $value): ?string
     {
         if (is_string($value)) {
@@ -576,6 +963,26 @@ HELP);
         }
 
         return $list;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function stringKeyList(mixed $value): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+
+        $keys = [];
+
+        foreach (array_keys($value) as $key) {
+            if (is_string($key) && trim($key) !== '') {
+                $keys[] = $key;
+            }
+        }
+
+        return $keys;
     }
 
     private function formatOptionalBool(mixed $value): string

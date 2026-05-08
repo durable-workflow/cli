@@ -54,7 +54,19 @@ $version ??= $normalizeVersion($git('describe --tags --exact-match'));
 $version ??= '0.1.0-dev';
 
 $commit = $env('DW_CLI_COMMIT') ?? $env('GITHUB_SHA') ?? $git('rev-parse HEAD') ?? 'unknown';
-$buildDate = $env('DW_CLI_BUILD_DATE') ?? gmdate('Y-m-d\TH:i:s\Z');
+
+// SOURCE_DATE_EPOCH is the reproducible-builds.org standard for pinning
+// a build's notion of "now" so two builds of the same source produce
+// the same generated metadata. Honor it when DW_CLI_BUILD_DATE is unset.
+$buildDate = $env('DW_CLI_BUILD_DATE');
+if ($buildDate === null) {
+    $sourceDateEpoch = $env('SOURCE_DATE_EPOCH');
+    if ($sourceDateEpoch !== null && ctype_digit($sourceDateEpoch)) {
+        $buildDate = gmdate('Y-m-d\TH:i:s\Z', (int) $sourceDateEpoch);
+    } else {
+        $buildDate = gmdate('Y-m-d\TH:i:s\Z');
+    }
+}
 
 $contents = <<<'PHP'
 <?php

@@ -39,6 +39,8 @@ jobs:
       phar-name: dw.phar
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -48,11 +50,28 @@ jobs:
           coverage: none
           ini-values: phar.readonly=0
 
+      - name: Pin SOURCE_DATE_EPOCH for reproducible build
+        run: |
+          # Pin the build clock to the tag-pointed commit so the PHAR
+          # produced here matches the PHAR an operator rebuilds locally
+          # from the same tag. See docs/distribution.md.
+          epoch=$(git log -1 --pretty=%ct)
+          echo "SOURCE_DATE_EPOCH=$epoch" >> "$GITHUB_ENV"
+          echo "SOURCE_DATE_EPOCH pinned to $epoch ($(date -u -d "@$epoch" +%FT%TZ))"
+
       - name: Generate build metadata
         run: php scripts/generate-build-info.php
 
       - name: Install dependencies
         run: composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
+
+      - name: Normalize input mtimes for reproducible PHAR
+        run: |
+          # Box hashes archive entry mtimes. Pinning them to the build
+          # epoch (which is itself the commit time) makes the PHAR's
+          # entry table deterministic across reruns of the same tag.
+          find src schemas bin vendor -exec touch -h -d "@$SOURCE_DATE_EPOCH" {} +
+          [ -f src/GeneratedBuildInfo.php ] && touch -h -d "@$SOURCE_DATE_EPOCH" src/GeneratedBuildInfo.php
 
       - name: Build PHAR
         run: box compile --no-parallel

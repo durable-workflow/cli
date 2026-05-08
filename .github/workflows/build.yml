@@ -26,6 +26,7 @@ jobs:
           sh -n scripts/install.sh
           sh -n scripts/generate-homebrew-formula.sh
           sh -n scripts/verify-release.sh
+          bash -n scripts/verify-reproducible-build.sh
           pwsh -NoProfile -Command '$null = [scriptblock]::Create((Get-Content -Raw scripts/install.ps1))'
       - run: composer test
 
@@ -45,6 +46,22 @@ jobs:
       - run: box compile --no-parallel
       - run: box info build/dw.phar
       - run: php build/dw.phar list
+
+  reproducible-build:
+    name: Reproducible build (PHAR is bit-identical across rebuilds)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          tools: composer:v2, box:4.6.6
+          coverage: none
+          ini-values: phar.readonly=0
+      - name: Verify dw.phar reproduces bit-for-bit
+        run: scripts/verify-reproducible-build.sh
 
   sdk-python-parity:
     name: SDK-Python parity fixtures

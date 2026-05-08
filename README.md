@@ -35,9 +35,12 @@ page](https://github.com/durable-workflow/cli/releases). Available assets:
 `dw-macos-aarch64`, `dw-windows-x86_64.exe`.
 
 Tagged releases also include `dw.rb`, a generated Homebrew formula for the
-macOS arm64 binary. Until the public tap is live, tap maintainers can copy that
-formula into a tap repository and users who trust the release can install from
-the downloaded formula after verifying the release asset attestations.
+macOS arm64 binary, with the release URL and SHA256 baked in. Until a public
+tap is live, two install paths are supported: install from the bundled formula
+directly with `brew install --formula ./dw.rb` after downloading it from the
+release, or vendor the same formula into a self-hosted tap so users can run
+`brew install <org>/<tap>/dw`. See [`docs/distribution.md`](docs/distribution.md)
+for the full Homebrew install runbook.
 
 macOS x86_64 standalone binaries are not currently produced because the
 `macos-13` runner label is not available to this org; Intel Mac users can
@@ -121,13 +124,22 @@ verification when `DURABLE_WORKFLOW_INSTALL_VERIFY_ATTESTATIONS=1` is set.
 
 Native binaries and PHARs are not currently code-signed or notarized. Treat the
 GitHub release tag, artifact attestations, and `SHA256SUMS` as the current
-provenance boundary. Signing and notarization are planned distribution
-hardening work, not an active install requirement for the 0.1.x line.
+provenance boundary. Signing and notarization are explicitly out of scope for
+the 0.1.x line; see [`docs/distribution.md`](docs/distribution.md) for the
+rationale and the conditions under which that decision would be revisited.
 
-`dw` does not auto-update itself. Re-run the installer or download a newer
-release when you choose to upgrade. The CLI also does not collect telemetry;
-there is no background network traffic beyond commands that explicitly contact
-the configured Durable Workflow server.
+`dw` does not auto-update itself; the explicit `dw upgrade` command is the
+only update path, and it never runs unsolicited. The CLI also does not collect
+telemetry — there is no background network traffic beyond commands that
+explicitly contact the configured Durable Workflow server. Telemetry is
+permanently out of scope for the 0.1.x line.
+
+The PHAR is a reproducible build: given the same tag and the
+`SOURCE_DATE_EPOCH` recorded by the release workflow, locally rebuilding from
+source produces a byte-identical `dw.phar`. Run `scripts/verify-reproducible-build.sh`
+to confirm the rebuild is deterministic on your machine, and see
+[`docs/distribution.md`](docs/distribution.md) for the cross-check against a
+published release artifact.
 
 ### Live Server Smoke Test
 

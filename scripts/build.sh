@@ -64,11 +64,50 @@ install_composer_deps() {
     composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
 }
 
+ensure_source_date_epoch() {
+    # Reproducible builds (https://reproducible-builds.org/specs/source-date-epoch/):
+    # default SOURCE_DATE_EPOCH to the current commit timestamp so the same
+    # source tree always produces the same PHAR bytes. Callers can override.
+    if [[ -z "${SOURCE_DATE_EPOCH:-}" ]]; then
+        if [[ -d "$ROOT/.git" ]] && command -v git >/dev/null 2>&1; then
+            local commit_time
+            commit_time="$(git -C "$ROOT" log -1 --pretty=%ct 2>/dev/null || true)"
+            if [[ "$commit_time" =~ ^[0-9]+$ ]]; then
+                export SOURCE_DATE_EPOCH="$commit_time"
+            fi
+        fi
+    fi
+    if [[ -n "${SOURCE_DATE_EPOCH:-}" ]]; then
+        echo ">> SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"
+    fi
+}
+
+normalize_mtimes() {
+    # Pin mtimes on every input that ends up inside the PHAR so Box's
+    # archive entries hash identically across builds. Box also reads
+    # SOURCE_DATE_EPOCH directly, but normalizing the filesystem first
+    # protects us from compactor differences and ext-phar timestamps.
+    [[ -n "${SOURCE_DATE_EPOCH:-}" ]] || return 0
+    if ! command -v find >/dev/null 2>&1; then
+        return 0
+    fi
+    local epoch="$SOURCE_DATE_EPOCH"
+    local target
+    for target in src schemas bin vendor; do
+        [[ -e "$ROOT/$target" ]] || continue
+        find "$ROOT/$target" -exec touch -h -d "@$epoch" {} + 2>/dev/null || true
+    done
+    [[ -e "$ROOT/src/GeneratedBuildInfo.php" ]] && \
+        touch -h -d "@$epoch" "$ROOT/src/GeneratedBuildInfo.php" 2>/dev/null || true
+}
+
 build_phar() {
     ensure_tools
+    ensure_source_date_epoch
     php scripts/generate-build-info.php
     install_composer_deps
     mkdir -p "$BUILD_DIR"
+    normalize_mtimes
     echo ">> Building PHAR via Box"
     php -d phar.readonly=0 "$TOOLS_DIR/box" compile --no-parallel
     echo ">> PHAR built: $PHAR_OUT"

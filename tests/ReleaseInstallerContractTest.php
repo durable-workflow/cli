@@ -88,7 +88,75 @@ final class ReleaseInstallerContractTest extends TestCase
         self::assertStringContainsString('tagged release', $readme);
         self::assertStringContainsString('Release assets, including the installer scripts', $readme);
         self::assertStringContainsString('Native binaries and PHARs are not currently code-signed or notarized.', $readme);
-        self::assertStringContainsString('The CLI also does not collect telemetry', $readme);
+        self::assertStringContainsString('Telemetry is', $readme);
+        self::assertStringContainsString('docs/distribution.md', $readme);
+        self::assertStringContainsString('reproducible build', $readme);
+        self::assertStringContainsString('verify-reproducible-build.sh', $readme);
+    }
+
+    public function test_distribution_doc_records_phase3_decisions(): void
+    {
+        $doc = self::readRepoFile('docs/distribution.md');
+
+        self::assertStringContainsString('# Distribution Policy', $doc);
+
+        // Code signing / notarization is out of scope, with an explicit
+        // rationale. Phase 3 requires either implementation or a documented
+        // out-of-scope decision; this test enforces the documented form.
+        self::assertStringContainsString('Code signing and notarization', $doc);
+        self::assertStringContainsString('explicitly out of scope', $doc);
+        self::assertStringContainsString('GitHub artifact attestations', $doc);
+
+        // Telemetry is permanently out of scope, with an enumerated
+        // behavior contract operators can audit against.
+        self::assertStringContainsString('## Telemetry', $doc);
+        self::assertStringContainsString('does not collect telemetry', $doc);
+        self::assertStringContainsString('phone home', strtolower($doc));
+
+        // Reproducible-build contract is in scope and verifiable.
+        self::assertStringContainsString('Reproducible release builds', $doc);
+        self::assertStringContainsString('SOURCE_DATE_EPOCH', $doc);
+        self::assertStringContainsString('verify-reproducible-build.sh', $doc);
+        self::assertStringContainsString('bit-identical', $doc);
+
+        // Homebrew install path is documented end-to-end so the
+        // generated dw.rb formula has a published install runbook.
+        self::assertStringContainsString('Homebrew install path', $doc);
+        self::assertStringContainsString('brew install --formula ./dw.rb', $doc);
+
+        // Auto-update is documented as the explicit dw upgrade path.
+        self::assertStringContainsString('## Auto-update', $doc);
+        self::assertStringContainsString('dw upgrade', $doc);
+    }
+
+    public function test_release_pipeline_pins_source_date_epoch(): void
+    {
+        $releaseWorkflow = self::readRepoFile('.github/workflows/release.yml');
+        $buildScript = self::readRepoFile('scripts/build.sh');
+        $generator = self::readRepoFile('scripts/generate-build-info.php');
+
+        self::assertStringContainsString('SOURCE_DATE_EPOCH', $releaseWorkflow);
+        self::assertStringContainsString('Pin SOURCE_DATE_EPOCH', $releaseWorkflow);
+        self::assertStringContainsString('Normalize input mtimes', $releaseWorkflow);
+
+        self::assertStringContainsString('SOURCE_DATE_EPOCH', $buildScript);
+        self::assertStringContainsString('ensure_source_date_epoch', $buildScript);
+        self::assertStringContainsString('normalize_mtimes', $buildScript);
+
+        self::assertStringContainsString('SOURCE_DATE_EPOCH', $generator);
+    }
+
+    public function test_reproducible_build_verifier_is_present_and_wired(): void
+    {
+        $verifier = self::readRepoFile('scripts/verify-reproducible-build.sh');
+        $buildWorkflow = self::readRepoFile('.github/workflows/build.yml');
+
+        self::assertStringContainsString('SOURCE_DATE_EPOCH', $verifier);
+        self::assertStringContainsString('scripts/build.sh phar', $verifier);
+        self::assertStringContainsString('PHAR builds are not bit-identical', $verifier);
+
+        self::assertStringContainsString('reproducible-build:', $buildWorkflow);
+        self::assertStringContainsString('scripts/verify-reproducible-build.sh', $buildWorkflow);
     }
 
     private static function readRepoFile(string $path): string

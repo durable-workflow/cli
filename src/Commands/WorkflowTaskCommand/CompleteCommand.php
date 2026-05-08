@@ -57,7 +57,7 @@ HELP)
         $output->writeln('  Task ID: '.($result['task_id'] ?? $taskId));
         $output->writeln('  Attempt: '.($result['workflow_task_attempt'] ?? $attempt));
         $output->writeln('  Outcome: '.($result['outcome'] ?? '-'));
-        $output->writeln('  Run Status: '.($result['run_status'] ?? '-'));
+        $output->writeln('  Run Status: '.$this->formatStatus($result['run_status'] ?? null));
 
         return Command::SUCCESS;
     }

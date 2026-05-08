@@ -43,7 +43,7 @@ HELP)
         $output->writeln('<info>Namespace: '.$result['name'].'</info>');
         $output->writeln('  Description: '.($result['description'] ?? '-'));
         $output->writeln('  Retention: '.($result['retention_days'] ?? '-').' days');
-        $output->writeln('  Status: '.($result['status'] ?? '-'));
+        $output->writeln('  Status: '.$this->formatStatus($result['status'] ?? null));
         $output->writeln('  Created: '.($result['created_at'] ?? '-'));
         $output->writeln('  Updated: '.($result['updated_at'] ?? '-'));
 

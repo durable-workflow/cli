@@ -46,7 +46,7 @@ HELP)
         $output->writeln('  Runtime: '.($result['runtime'] ?? '-'));
         $output->writeln('  SDK Version: '.($result['sdk_version'] ?? '-'));
         $output->writeln('  Build ID: '.($result['build_id'] ?? '-'));
-        $output->writeln('  Status: '.($result['status'] ?? '-'));
+        $output->writeln('  Status: '.$this->formatStatus($result['status'] ?? null));
         $output->writeln('  Max Concurrent Workflow Tasks: '.($result['max_concurrent_workflow_tasks'] ?? '-'));
         $output->writeln('  Max Concurrent Activity Tasks: '.($result['max_concurrent_activity_tasks'] ?? '-'));
         $output->writeln('  Last Heartbeat: '.($result['last_heartbeat_at'] ?? '-'));

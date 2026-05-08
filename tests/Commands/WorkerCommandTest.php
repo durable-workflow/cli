@@ -278,6 +278,37 @@ class WorkerCommandTest extends TestCase
         self::assertStringContainsString('email.send', $display);
     }
 
+    public function test_describe_command_colors_status_only_when_output_is_decorated(): void
+    {
+        $payload = [
+            'worker_id' => 'worker-a',
+            'namespace' => 'default',
+            'task_queue' => 'queue-alpha',
+            'runtime' => 'php',
+            'sdk_version' => '1.2.3',
+            'build_id' => 'build-42',
+            'status' => 'stale',
+            'last_heartbeat_at' => '2026-04-13T12:00:00Z',
+        ];
+
+        $plainCommand = new DescribeCommand();
+        $plainCommand->setServerClient(new WorkerFakeClient($payload));
+        $plainTester = new CommandTester($plainCommand);
+
+        self::assertSame(Command::SUCCESS, $plainTester->execute(['worker-id' => 'worker-a']));
+        self::assertStringContainsString('Status: stale', $plainTester->getDisplay());
+        self::assertStringNotContainsString("\033[", $plainTester->getDisplay());
+
+        $decoratedCommand = new DescribeCommand();
+        $decoratedCommand->setServerClient(new WorkerFakeClient($payload));
+        $decoratedTester = new CommandTester($decoratedCommand);
+
+        self::assertSame(Command::SUCCESS, $decoratedTester->execute(['worker-id' => 'worker-a'], ['decorated' => true]));
+        $display = $decoratedTester->getDisplay();
+        self::assertStringContainsString('stale', $display);
+        self::assertStringContainsString("\033[", $display);
+    }
+
     public function test_describe_command_json_output(): void
     {
         $payload = [

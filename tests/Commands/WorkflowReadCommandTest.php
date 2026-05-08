@@ -455,6 +455,36 @@ class WorkflowReadCommandTest extends TestCase
         self::assertStringContainsString('order-123', $display);
     }
 
+    public function test_describe_command_colors_status_only_when_output_is_decorated(): void
+    {
+        $payload = [
+            'workflow_id' => 'wf-123',
+            'run_id' => 'run-123',
+            'workflow_type' => 'orders.process',
+            'namespace' => 'default',
+            'status' => 'running',
+            'status_bucket' => 'running',
+            'task_queue' => 'orders',
+        ];
+
+        $plainCommand = new DescribeCommand();
+        $plainCommand->setServerClient(new WorkflowReadFakeServerClient($payload));
+        $plainTester = new CommandTester($plainCommand);
+
+        self::assertSame(Command::SUCCESS, $plainTester->execute(['workflow-id' => 'wf-123']));
+        self::assertStringContainsString('Status: running', $plainTester->getDisplay());
+        self::assertStringNotContainsString("\033[", $plainTester->getDisplay());
+
+        $decoratedCommand = new DescribeCommand();
+        $decoratedCommand->setServerClient(new WorkflowReadFakeServerClient($payload));
+        $decoratedTester = new CommandTester($decoratedCommand);
+
+        self::assertSame(Command::SUCCESS, $decoratedTester->execute(['workflow-id' => 'wf-123'], ['decorated' => true]));
+        $decoratedDisplay = $decoratedTester->getDisplay();
+        self::assertStringContainsString('running', $decoratedDisplay);
+        self::assertStringContainsString("\033[", $decoratedDisplay);
+    }
+
     public function test_describe_command_renders_engine_metadata_and_available_actions(): void
     {
         $command = new DescribeCommand();

@@ -80,7 +80,11 @@ HELP)
             $workflowId,
             $runId,
         ));
-        $output->writeln(sprintf('  Status: %s (%s)', $execution['status'] ?? '-', $result['diagnostic_status'] ?? '-'));
+        $output->writeln(sprintf(
+            '  Status: %s (%s)',
+            $this->formatStatus($execution['status'] ?? null),
+            $this->formatStatus($result['diagnostic_status'] ?? null),
+        ));
         $output->writeln(sprintf('  Type: %s', $execution['workflow_type'] ?? '-'));
         $output->writeln(sprintf('  Task Queue: %s', $execution['task_queue'] ?? '-'));
         $output->writeln(sprintf('  Last Event: %s', $this->eventLabel($execution['last_event'] ?? null)));

@@ -138,6 +138,35 @@ class NamespaceCommandTest extends TestCase
         self::assertStringContainsString('active', $display);
     }
 
+    public function test_describe_command_colors_status_only_when_output_is_decorated(): void
+    {
+        $payload = [
+            'name' => 'default',
+            'description' => 'Default namespace',
+            'retention_days' => 30,
+            'status' => 'active',
+            'created_at' => '2026-04-01T00:00:00Z',
+            'updated_at' => '2026-04-10T12:00:00Z',
+        ];
+
+        $plainCommand = new DescribeCommand();
+        $plainCommand->setServerClient(new NamespaceFakeClient($payload));
+        $plainTester = new CommandTester($plainCommand);
+
+        self::assertSame(Command::SUCCESS, $plainTester->execute(['name' => 'default']));
+        self::assertStringContainsString('Status: active', $plainTester->getDisplay());
+        self::assertStringNotContainsString("\033[", $plainTester->getDisplay());
+
+        $decoratedCommand = new DescribeCommand();
+        $decoratedCommand->setServerClient(new NamespaceFakeClient($payload));
+        $decoratedTester = new CommandTester($decoratedCommand);
+
+        self::assertSame(Command::SUCCESS, $decoratedTester->execute(['name' => 'default'], ['decorated' => true]));
+        $display = $decoratedTester->getDisplay();
+        self::assertStringContainsString('active', $display);
+        self::assertStringContainsString("\033[", $display);
+    }
+
     public function test_describe_command_renders_json_output(): void
     {
         $command = new DescribeCommand();

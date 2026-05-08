@@ -173,7 +173,7 @@ HELP)
 
         $output->writeln('');
         $output->writeln('<info>Workflow reached terminal state</info>');
-        $output->writeln('  Status: '.($describe['status'] ?? '-'));
+        $output->writeln('  Status: '.$this->formatStatus($describe['status'] ?? null));
         $output->writeln('  Closed Reason: '.($describe['closed_reason'] ?? '-'));
         $output->writeln('  Closed At: '.($describe['closed_at'] ?? '-'));
 
@@ -222,7 +222,7 @@ HELP)
         if (isset($result['payload_codec'])) {
             $output->writeln('  Payload Codec: '.$result['payload_codec']);
         }
-        $output->writeln('  Outcome: '.$result['outcome']);
+        $output->writeln('  Outcome: '.$this->formatStatus($result['outcome']));
     }
 
     private function optionalString(mixed $value): ?string

@@ -66,7 +66,7 @@ HELP)
         array $result,
     ): int {
         $lastStatus = $result['status'] ?? null;
-        $output->writeln('<comment>Following run (status: '.($lastStatus ?? 'unknown').')...</comment>');
+        $output->writeln('<comment>Following run (status: '.$this->formatStatus($lastStatus ?? 'unknown').')...</comment>');
 
         while (! $this->isTerminal($result)) {
             sleep(self::FOLLOW_POLL_INTERVAL_SECONDS);
@@ -75,7 +75,11 @@ HELP)
             $currentStatus = $result['status'] ?? null;
 
             if ($currentStatus !== $lastStatus) {
-                $output->writeln('  Status changed: '.($lastStatus ?? '-').' -> '.($currentStatus ?? '-'));
+                $output->writeln(sprintf(
+                    '  Status changed: %s -> %s',
+                    $this->formatStatus($lastStatus ?? '-'),
+                    $this->formatStatus($currentStatus ?? '-'),
+                ));
                 $lastStatus = $currentStatus;
             }
         }
@@ -100,8 +104,8 @@ HELP)
         $output->writeln('  Type: '.($result['workflow_type'] ?? '-'));
         $output->writeln('  Namespace: '.($result['namespace'] ?? '-'));
         $output->writeln('  Business Key: '.($result['business_key'] ?? '-'));
-        $output->writeln('  Status: '.($result['status'] ?? '-'));
-        $output->writeln('  Status Bucket: '.($result['status_bucket'] ?? '-'));
+        $output->writeln('  Status: '.$this->formatStatus($result['status'] ?? null));
+        $output->writeln('  Status Bucket: '.$this->formatStatus($result['status_bucket'] ?? null));
         $output->writeln('  Run Number: '.($result['run_number'] ?? '-'));
         $output->writeln('  Run Count: '.($result['run_count'] ?? '-'));
         $output->writeln('  Current Run: '.(($result['is_current_run'] ?? false) ? 'yes' : 'no'));

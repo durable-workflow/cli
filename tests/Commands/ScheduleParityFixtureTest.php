@@ -8,6 +8,7 @@ use DurableWorkflow\Cli\Commands\ScheduleCommand\BackfillCommand;
 use DurableWorkflow\Cli\Commands\ScheduleCommand\CreateCommand;
 use DurableWorkflow\Cli\Commands\ScheduleCommand\DescribeCommand;
 use DurableWorkflow\Cli\Commands\ScheduleCommand\DeleteCommand;
+use DurableWorkflow\Cli\Commands\ScheduleCommand\HistoryCommand;
 use DurableWorkflow\Cli\Commands\ScheduleCommand\ListCommand;
 use DurableWorkflow\Cli\Commands\ScheduleCommand\PauseCommand;
 use DurableWorkflow\Cli\Commands\ScheduleCommand\ResumeCommand;
@@ -241,6 +242,49 @@ final class ScheduleParityFixtureTest extends TestCase
         $semantic = $fixture['semantic_body'];
         self::assertSame($semantic['schedule_id'], $decoded['schedule_id'] ?? null);
         self::assertSame($semantic['outcome'], $decoded['outcome'] ?? null);
+    }
+
+    public function test_schedule_history_matches_polyglot_request_fixture(): void
+    {
+        $fixture = self::fixture('schedule-history-parity.json', 'schedule.history');
+        $client = new ScheduleParityClient($fixture['response_body']);
+        $command = new HistoryCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute($fixture['cli']['argv']));
+
+        self::assertSame($fixture['request']['method'], $client->lastMethod);
+        self::assertSame($fixture['request']['path'], $client->lastPath);
+        self::assertSame($fixture['request']['query'], $client->lastQuery);
+
+        $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame($fixture['response_body'], $decoded);
+
+        $semantic = $fixture['semantic_body'];
+        self::assertSame($semantic['namespace'], $decoded['namespace'] ?? null);
+        self::assertSame($semantic['schedule_id'], $decoded['schedule_id'] ?? null);
+        self::assertSame($semantic['has_more'], $decoded['has_more'] ?? null);
+        self::assertSame($semantic['next_cursor'], $decoded['next_cursor'] ?? null);
+        self::assertSame(
+            $semantic['event_types'],
+            array_column($decoded['events'] ?? [], 'event_type'),
+        );
+        self::assertSame(
+            $semantic['sequences'],
+            array_column($decoded['events'] ?? [], 'sequence'),
+        );
+
+        foreach ($semantic['workflow_refs'] as $sequence => $expectedRefs) {
+            $matches = array_values(array_filter(
+                $decoded['events'] ?? [],
+                static fn (array $event): bool => (int) ($event['sequence'] ?? -1) === (int) $sequence,
+            ));
+            self::assertCount(1, $matches);
+            self::assertSame($expectedRefs['workflow_instance_id'], $matches[0]['workflow_instance_id'] ?? null);
+            self::assertSame($expectedRefs['workflow_run_id'], $matches[0]['workflow_run_id'] ?? null);
+        }
     }
 
     /**

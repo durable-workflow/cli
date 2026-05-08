@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Commands;
 
+use DurableWorkflow\Cli\Application;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\InputOption;
 
 final class WorkflowLanguageAgnosticismAuditTest extends TestCase
 {
@@ -24,6 +27,63 @@ final class WorkflowLanguageAgnosticismAuditTest extends TestCase
 
             self::assertNoPhpOnlyContractValue($fixture, basename($path));
         }
+    }
+
+    public function test_no_command_option_default_advertises_a_specific_runtime(): void
+    {
+        $languageDefaults = [
+            'php',
+            'laravel',
+            'python',
+            'go',
+            'java',
+            'typescript',
+            'javascript',
+            'node',
+            'ruby',
+            'rust',
+            'csharp',
+            '.net',
+        ];
+
+        $application = new Application();
+        $offenders = [];
+
+        foreach ($application->all() as $name => $command) {
+            if (! $command instanceof Command) {
+                continue;
+            }
+
+            foreach ($command->getDefinition()->getOptions() as $option) {
+                if (! $option instanceof InputOption) {
+                    continue;
+                }
+
+                $default = $option->getDefault();
+                if (! is_string($default) || $default === '') {
+                    continue;
+                }
+
+                $normalized = strtolower($default);
+                foreach ($languageDefaults as $token) {
+                    if ($normalized === $token) {
+                        $offenders[] = sprintf(
+                            '%s: --%s defaults to "%s"',
+                            $name,
+                            $option->getName(),
+                            $default,
+                        );
+                    }
+                }
+            }
+        }
+
+        self::assertSame(
+            [],
+            $offenders,
+            "CLI options must not default to a specific language runtime; the CLI is the language-neutral surface for the control plane:\n  - "
+                .implode("\n  - ", $offenders),
+        );
     }
 
     /**

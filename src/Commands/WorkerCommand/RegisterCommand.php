@@ -41,7 +41,7 @@ fleets and test harnesses — runs themselves are never stamped with
 HELP)
             ->addArgument('worker-id', InputArgument::OPTIONAL, 'Worker ID; omitted lets the server assign one')
             ->addOption('task-queue', null, InputOption::VALUE_REQUIRED, 'Task queue to poll', 'default')
-            ->addOption('runtime', null, InputOption::VALUE_REQUIRED, 'Runtime (php, python, typescript, go, java)', 'php')
+            ->addOption('runtime', null, InputOption::VALUE_REQUIRED, 'Runtime label the worker advertises (e.g. python, typescript, go, java, external). Omit to let the server record an unspecified runtime.')
             ->addOption('sdk-version', null, InputOption::VALUE_OPTIONAL, 'Advertised SDK version', 'dw-cli')
             ->addOption('build-id', null, InputOption::VALUE_OPTIONAL, 'Compatibility build ID')
             ->addOption('workflow-type', null, InputOption::VALUE_OPTIONAL | InputOption::VALUE_IS_ARRAY, 'Supported workflow type')

@@ -67,11 +67,43 @@ HELP)
             $worker['runtime'] ?? '-',
             $worker['build_id'] ?? '-',
             $this->formatStatus($worker['status'] ?? null),
+            $this->formatSlots($worker),
             $worker['last_heartbeat_at'] ?? '-',
         ], $workers);
 
-        $this->renderTable($output, ['Worker ID', 'Task Queue', 'Runtime', 'Build ID', 'Status', 'Last Heartbeat'], $rows);
+        $this->renderTable($output, ['Worker ID', 'Task Queue', 'Runtime', 'Build ID', 'Status', 'Slots (free/cap)', 'Last Heartbeat'], $rows);
 
         return Command::SUCCESS;
+    }
+
+    private function formatSlots(array $worker): string
+    {
+        $slots = is_array($worker['task_slots'] ?? null) ? $worker['task_slots'] : [];
+
+        $workflowAvailable = $slots['workflow_available'] ?? null;
+        $workflowCapacity = $slots['workflow_capacity'] ?? $worker['max_concurrent_workflow_tasks'] ?? null;
+        $activityAvailable = $slots['activity_available'] ?? null;
+        $activityCapacity = $slots['activity_capacity'] ?? $worker['max_concurrent_activity_tasks'] ?? null;
+
+        $workflow = $this->formatSlotPair($workflowAvailable, $workflowCapacity);
+        $activity = $this->formatSlotPair($activityAvailable, $activityCapacity);
+
+        if ($workflow === '-' && $activity === '-') {
+            return '-';
+        }
+
+        return sprintf('wf %s / act %s', $workflow, $activity);
+    }
+
+    private function formatSlotPair(mixed $available, mixed $capacity): string
+    {
+        $availableLabel = is_int($available) ? (string) $available : '-';
+        $capacityLabel = is_int($capacity) && $capacity > 0 ? (string) $capacity : '-';
+
+        if ($availableLabel === '-' && $capacityLabel === '-') {
+            return '-';
+        }
+
+        return $availableLabel.'/'.$capacityLabel;
     }
 }

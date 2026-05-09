@@ -309,6 +309,84 @@ class WorkerCommandTest extends TestCase
         self::assertStringContainsString("\033[", $display);
     }
 
+    public function test_list_command_renders_task_slot_summary(): void
+    {
+        $command = new ListCommand();
+        $command->setServerClient(new WorkerFakeClient([
+            'workers' => [
+                [
+                    'worker_id' => 'worker-slots',
+                    'task_queue' => 'queue-alpha',
+                    'runtime' => 'python',
+                    'build_id' => null,
+                    'status' => 'active',
+                    'last_heartbeat_at' => '2026-05-09T12:00:00Z',
+                    'max_concurrent_workflow_tasks' => 8,
+                    'max_concurrent_activity_tasks' => 4,
+                    'task_slots' => [
+                        'workflow_available' => 5,
+                        'activity_available' => 1,
+                        'workflow_capacity' => 8,
+                        'activity_capacity' => 4,
+                    ],
+                ],
+            ],
+        ]));
+
+        $tester = new CommandTester($command);
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+
+        $display = $tester->getDisplay();
+        self::assertStringContainsString('wf 5/8', $display);
+        self::assertStringContainsString('act 1/4', $display);
+    }
+
+    public function test_describe_command_renders_task_slots_and_process_metrics(): void
+    {
+        $command = new DescribeCommand();
+        $command->setServerClient(new WorkerFakeClient([
+            'worker_id' => 'worker-slots',
+            'namespace' => 'default',
+            'task_queue' => 'queue-alpha',
+            'runtime' => 'python',
+            'status' => 'active',
+            'max_concurrent_workflow_tasks' => 8,
+            'max_concurrent_activity_tasks' => 4,
+            'max_concurrent_worker_sessions' => 2,
+            'task_slots' => [
+                'workflow_available' => 5,
+                'activity_available' => 1,
+                'session_available' => 2,
+                'workflow_capacity' => 8,
+                'activity_capacity' => 4,
+                'session_capacity' => 2,
+            ],
+            'process_metrics' => [
+                'cpu_percent' => 7.5,
+                'memory_bytes' => 134217728,
+                'process_uptime_seconds' => 750,
+                'process_id' => 99,
+                'host' => 'py-worker-01',
+            ],
+            'heartbeat_interval_seconds' => 30,
+            'last_heartbeat_at' => '2026-05-09T12:00:00Z',
+        ]));
+
+        $tester = new CommandTester($command);
+        self::assertSame(Command::SUCCESS, $tester->execute(['worker-id' => 'worker-slots']));
+
+        $display = $tester->getDisplay();
+        self::assertStringContainsString('Task Slots', $display);
+        self::assertStringContainsString('Workflow: 5 / 8', $display);
+        self::assertStringContainsString('Activity: 1 / 4', $display);
+        self::assertStringContainsString('Sessions: 2 / 2', $display);
+        self::assertStringContainsString('Process Metrics', $display);
+        self::assertStringContainsString('CPU: 7.5%', $display);
+        self::assertStringContainsString('Memory: 128', $display);
+        self::assertStringContainsString('Host: py-worker-01', $display);
+        self::assertStringContainsString('Heartbeat Interval: 30s', $display);
+    }
+
     public function test_describe_command_json_output(): void
     {
         $payload = [

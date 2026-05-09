@@ -413,6 +413,60 @@ class WorkerCommandTest extends TestCase
         self::assertSame('worker-a', $output['worker_id']);
     }
 
+    public function test_worker_describe_schema_pins_heartbeat_surface_keys(): void
+    {
+        $schema = json_decode(
+            (string) file_get_contents(__DIR__.'/../../schemas/output/worker.schema.json'),
+            true,
+            flags: JSON_THROW_ON_ERROR,
+        );
+
+        $properties = $schema['properties'];
+
+        self::assertSame(['integer', 'null'], $properties['max_concurrent_worker_sessions']['type']);
+        self::assertSame(['integer', 'null'], $properties['heartbeat_interval_seconds']['type']);
+
+        $taskSlots = $properties['task_slots']['properties'];
+        self::assertSame(['object', 'null'], $properties['task_slots']['type']);
+        self::assertSame(['integer', 'null'], $taskSlots['workflow_available']['type']);
+        self::assertSame(['integer', 'null'], $taskSlots['workflow_capacity']['type']);
+        self::assertSame(['integer', 'null'], $taskSlots['activity_available']['type']);
+        self::assertSame(['integer', 'null'], $taskSlots['activity_capacity']['type']);
+        self::assertSame(['integer', 'null'], $taskSlots['session_available']['type']);
+        self::assertSame(['integer', 'null'], $taskSlots['session_capacity']['type']);
+
+        $processMetrics = $properties['process_metrics']['properties'];
+        self::assertSame(['object', 'null'], $properties['process_metrics']['type']);
+        self::assertSame(['number', 'null'], $processMetrics['cpu_percent']['type']);
+        self::assertSame(['integer', 'null'], $processMetrics['memory_bytes']['type']);
+        self::assertSame(['integer', 'null'], $processMetrics['process_uptime_seconds']['type']);
+        self::assertSame(['integer', 'null'], $processMetrics['process_id']['type']);
+        self::assertSame(['string', 'null'], $processMetrics['host']['type']);
+    }
+
+    public function test_worker_list_schema_pins_heartbeat_surface_keys(): void
+    {
+        $schema = json_decode(
+            (string) file_get_contents(__DIR__.'/../../schemas/output/worker-list.schema.json'),
+            true,
+            flags: JSON_THROW_ON_ERROR,
+        );
+
+        $worker = $schema['properties']['workers']['items']['properties'];
+
+        self::assertSame(['integer', 'null'], $worker['max_concurrent_workflow_tasks']['type']);
+        self::assertSame(['integer', 'null'], $worker['max_concurrent_activity_tasks']['type']);
+        self::assertSame(['object', 'null'], $worker['task_slots']['type']);
+
+        $taskSlots = $worker['task_slots']['properties'];
+        self::assertSame(['integer', 'null'], $taskSlots['workflow_available']['type']);
+        self::assertSame(['integer', 'null'], $taskSlots['workflow_capacity']['type']);
+        self::assertSame(['integer', 'null'], $taskSlots['activity_available']['type']);
+        self::assertSame(['integer', 'null'], $taskSlots['activity_capacity']['type']);
+        self::assertSame(['integer', 'null'], $taskSlots['session_available']['type']);
+        self::assertSame(['integer', 'null'], $taskSlots['session_capacity']['type']);
+    }
+
     public function test_deregister_command_sends_delete_request(): void
     {
         $client = new WorkerFakeClient([

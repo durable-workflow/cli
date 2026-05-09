@@ -72,6 +72,9 @@ HELP)
             ->addOption('search-attr', null, InputOption::VALUE_OPTIONAL | InputOption::VALUE_IS_ARRAY, 'Search attributes (key=value)')
             ->addOption('execution-timeout', null, InputOption::VALUE_REQUIRED, 'Execution timeout in seconds (across all runs)')
             ->addOption('run-timeout', null, InputOption::VALUE_REQUIRED, 'Run timeout in seconds (single run)')
+            ->addOption('priority', null, InputOption::VALUE_REQUIRED, 'Dispatch priority (0..9; lower runs first when workers on a shared queue are saturated)')
+            ->addOption('fairness-key', null, InputOption::VALUE_REQUIRED, 'Workload-class identifier (1..64 URL-safe chars) used to rebalance dispatch across classes under contention')
+            ->addOption('fairness-weight', null, InputOption::VALUE_REQUIRED, 'Relative weight (1..1000) for the fairness class — higher weights claim a proportionally larger share of dispatch slots')
             ->addOption('wait', null, InputOption::VALUE_NONE, 'Wait for the workflow to reach a terminal state')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
         $this->addInputOptions('Workflow input payload');
@@ -95,6 +98,9 @@ HELP)
 
         $executionTimeout = $input->getOption('execution-timeout');
         $runTimeout = $input->getOption('run-timeout');
+        $priority = $input->getOption('priority');
+        $fairnessKey = $this->optionalString($input->getOption('fairness-key'));
+        $fairnessWeight = $input->getOption('fairness-weight');
 
         $body = array_filter([
             'workflow_type' => $input->getOption('type'),
@@ -106,6 +112,9 @@ HELP)
             'memo' => $this->parseJsonOption($input->getOption('memo'), 'memo'),
             'execution_timeout_seconds' => $executionTimeout !== null ? (int) $executionTimeout : null,
             'run_timeout_seconds' => $runTimeout !== null ? (int) $runTimeout : null,
+            'priority' => $priority !== null ? (int) $priority : null,
+            'fairness_key' => $fairnessKey,
+            'fairness_weight' => $fairnessWeight !== null ? (int) $fairnessWeight : null,
         ], fn ($v) => $v !== null);
 
         $searchAttrs = $input->getOption('search-attr');

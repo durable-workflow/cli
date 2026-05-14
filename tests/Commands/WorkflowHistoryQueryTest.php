@@ -262,6 +262,31 @@ class WorkflowHistoryQueryTest extends TestCase
 
         self::assertSame('/workflows/wf-123/runs/run-456/query/getStatus', $client->lastPostPath);
     }
+
+    public function test_query_command_extends_http_timeout_beyond_server_query_wait_budget(): void
+    {
+        $factory = new QueryTimeoutRecordingFactory([
+            'worker_protocol' => [
+                'server_capabilities' => [
+                    'query_task_timeouts' => [
+                        'control_plane_timeout_seconds' => 32,
+                    ],
+                ],
+            ],
+        ]);
+        $command = new QueryCommand();
+        $command->setServerClientFactory($factory);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            'workflow-id' => 'wf-123',
+            'query-name' => 'getStatus',
+            '--server' => 'http://example.test',
+        ]));
+
+        self::assertSame([5.0, 42.0], $factory->timeouts);
+    }
 }
 
 class HistoryQueryFakeClient extends ServerClient
@@ -310,5 +335,47 @@ class HistoryQueryPaginatingClient extends ServerClient
         $this->getCalls++;
 
         return $page;
+    }
+}
+
+class QueryTimeoutRecordingFactory
+{
+    /** @var list<float|null> */
+    public array $timeouts = [];
+
+    /** @param array<string, mixed> $clusterInfo */
+    public function __construct(
+        private readonly array $clusterInfo,
+    ) {}
+
+    public function __invoke(
+        \DurableWorkflow\Cli\Support\ResolvedConnection $resolved,
+        ?float $timeout = null,
+    ): ServerClient {
+        $this->timeouts[] = $timeout;
+
+        return new QueryTimeoutFakeClient($this->clusterInfo);
+    }
+}
+
+class QueryTimeoutFakeClient extends ServerClient
+{
+    /** @param array<string, mixed> $clusterInfo */
+    public function __construct(
+        private readonly array $clusterInfo,
+    ) {}
+
+    public function get(string $path, array $query = []): array
+    {
+        return $path === '/cluster/info' ? $this->clusterInfo : [];
+    }
+
+    public function post(string $path, array $body = []): array
+    {
+        return [
+            'workflow_id' => 'wf-123',
+            'query_name' => 'getStatus',
+            'result' => ['status' => 'ready'],
+        ];
     }
 }

@@ -139,7 +139,7 @@ class ThrowingBaseCommand extends BaseCommand
         parent::__construct('throwing');
     }
 
-    protected function client(InputInterface $input): ServerClient
+    protected function client(InputInterface $input, ?float $timeout = null): ServerClient
     {
         throw new \LogicException('not used');
     }

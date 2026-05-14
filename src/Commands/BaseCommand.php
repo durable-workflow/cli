@@ -30,9 +30,7 @@ abstract class BaseCommand extends Command
 
     private ?ServerClient $serverClient = null;
 
-    /**
-     * @var (callable(ResolvedConnection): ServerClient)|null
-     */
+    /** @var callable|null */
     private mixed $serverClientFactory = null;
 
     private ?ProfileStore $profileStore = null;
@@ -102,7 +100,7 @@ abstract class BaseCommand extends Command
         $this->outputMode($input);
     }
 
-    protected function client(InputInterface $input): ServerClient
+    protected function client(InputInterface $input, ?float $timeout = null): ServerClient
     {
         if ($this->serverClient instanceof ServerClient) {
             return $this->serverClient;
@@ -111,7 +109,7 @@ abstract class BaseCommand extends Command
         $resolved = $this->resolvedConnection($input);
 
         if (is_callable($this->serverClientFactory)) {
-            return ($this->serverClientFactory)($resolved);
+            return $this->serverClientFromFactory($resolved, $timeout);
         }
 
         return new ServerClient(
@@ -119,6 +117,7 @@ abstract class BaseCommand extends Command
             token: $resolved->token,
             namespace: $resolved->namespace,
             tlsVerify: $resolved->tlsVerify,
+            timeout: $timeout,
         );
     }
 
@@ -127,12 +126,25 @@ abstract class BaseCommand extends Command
         $this->serverClient = $serverClient;
     }
 
-    /**
-     * @param  callable(ResolvedConnection): ServerClient  $factory
-     */
     public function setServerClientFactory(callable $factory): void
     {
         $this->serverClientFactory = $factory;
+    }
+
+    private function serverClientFromFactory(ResolvedConnection $resolved, ?float $timeout): ServerClient
+    {
+        $factory = $this->serverClientFactory;
+
+        try {
+            $reflection = new \ReflectionFunction(\Closure::fromCallable($factory));
+            if ($reflection->getNumberOfParameters() >= 2) {
+                return $factory($resolved, $timeout);
+            }
+        } catch (\Throwable) {
+            // Fall back to the original one-argument factory contract.
+        }
+
+        return $factory($resolved);
     }
 
     public function setProfileStore(ProfileStore $store): void

@@ -226,7 +226,7 @@ class ThrowingOutputCommand extends BaseCommand
         }
     }
 
-    protected function client(InputInterface $input): ServerClient
+    protected function client(InputInterface $input, ?float $timeout = null): ServerClient
     {
         throw new \LogicException('not used');
     }

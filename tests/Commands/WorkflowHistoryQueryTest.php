@@ -6,6 +6,7 @@ namespace Tests\Commands;
 
 use DurableWorkflow\Cli\Commands\WorkflowCommand\HistoryCommand;
 use DurableWorkflow\Cli\Commands\WorkflowCommand\QueryCommand;
+use DurableWorkflow\Cli\Support\ResolvedConnection;
 use DurableWorkflow\Cli\Support\ServerClient;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
@@ -265,7 +266,7 @@ class WorkflowHistoryQueryTest extends TestCase
 
     public function test_query_command_extends_http_timeout_beyond_server_query_wait_budget(): void
     {
-        $factory = new QueryTimeoutRecordingFactory([
+        $command = new CachingQueryTimeoutTrackingCommand([
             'worker_protocol' => [
                 'server_capabilities' => [
                     'query_task_timeouts' => [
@@ -274,8 +275,6 @@ class WorkflowHistoryQueryTest extends TestCase
                 ],
             ],
         ]);
-        $command = new QueryCommand();
-        $command->setServerClientFactory($factory);
 
         $tester = new CommandTester($command);
 
@@ -285,7 +284,7 @@ class WorkflowHistoryQueryTest extends TestCase
             '--server' => 'http://example.test',
         ]));
 
-        self::assertSame([5.0, 42.0], $factory->timeouts);
+        self::assertSame([5.0, 42.0], $command->timeouts);
     }
 }
 
@@ -338,7 +337,7 @@ class HistoryQueryPaginatingClient extends ServerClient
     }
 }
 
-class QueryTimeoutRecordingFactory
+class CachingQueryTimeoutTrackingCommand extends QueryCommand
 {
     /** @var list<float|null> */
     public array $timeouts = [];
@@ -346,10 +345,23 @@ class QueryTimeoutRecordingFactory
     /** @param array<string, mixed> $clusterInfo */
     public function __construct(
         private readonly array $clusterInfo,
-    ) {}
+    ) {
+        parent::__construct();
+    }
 
-    public function __invoke(
-        \DurableWorkflow\Cli\Support\ResolvedConnection $resolved,
+    protected function resolvedConnection(\Symfony\Component\Console\Input\InputInterface $input): ResolvedConnection
+    {
+        return new ResolvedConnection(
+            server: 'http://example.test',
+            namespace: 'default',
+            token: null,
+            tlsVerify: true,
+            profile: null,
+        );
+    }
+
+    protected function makeClient(
+        ResolvedConnection $resolved,
         ?float $timeout = null,
     ): ServerClient {
         $this->timeouts[] = $timeout;

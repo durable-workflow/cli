@@ -112,6 +112,20 @@ abstract class BaseCommand extends Command
             return $this->serverClientFromFactory($resolved, $timeout);
         }
 
+        return $this->serverClient = $this->makeClient($resolved, $timeout);
+    }
+
+    protected function freshClient(InputInterface $input, ?float $timeout = null): ServerClient
+    {
+        return $this->makeClient($this->resolvedConnection($input), $timeout);
+    }
+
+    protected function makeClient(ResolvedConnection $resolved, ?float $timeout = null): ServerClient
+    {
+        if (is_callable($this->serverClientFactory)) {
+            return $this->serverClientFromFactory($resolved, $timeout);
+        }
+
         return new ServerClient(
             baseUrl: $resolved->server,
             token: $resolved->token,

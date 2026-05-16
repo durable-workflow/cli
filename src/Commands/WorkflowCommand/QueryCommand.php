@@ -79,7 +79,7 @@ HELP)
 
         try {
             $serverTimeout = $this->serverQueryTimeoutSeconds(
-                $this->client($input, self::CLUSTER_INFO_TIMEOUT_SECONDS)->clusterInfoUnchecked(),
+                $this->freshClient($input, self::CLUSTER_INFO_TIMEOUT_SECONDS)->clusterInfoUnchecked(),
             );
 
             if ($serverTimeout !== null) {

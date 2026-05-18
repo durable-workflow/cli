@@ -7,9 +7,11 @@ namespace DurableWorkflow\Cli\Commands\WorkflowCommand;
 use DurableWorkflow\Cli\Commands\BaseCommand;
 use DurableWorkflow\Cli\Support\CompletionValues;
 use DurableWorkflow\Cli\Support\DetectsTerminalStatus;
+use DurableWorkflow\Cli\Support\ServerClient;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
+use Symfony\Component\Console\Output\ConsoleOutputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
 class StartCommand extends BaseCommand
@@ -17,6 +19,8 @@ class StartCommand extends BaseCommand
     use DetectsTerminalStatus;
 
     private const WAIT_POLL_INTERVAL_SECONDS = 2;
+
+    private const WAIT_DIAGNOSTIC_INTERVAL_SECONDS = 30;
 
     protected function configure(): void
     {
@@ -152,7 +156,7 @@ HELP)
      * @param  array<string, mixed>  $startResult
      */
     private function waitAndEmit(
-        \DurableWorkflow\Cli\Support\ServerClient $client,
+        ServerClient $client,
         OutputInterface $output,
         array $startResult,
         bool $wantsJson,
@@ -197,11 +201,13 @@ HELP)
      * @return array<string, mixed>
      */
     private function pollUntilTerminal(
-        \DurableWorkflow\Cli\Support\ServerClient $client,
+        ServerClient $client,
         OutputInterface $output,
         string $workflowId,
         bool $wantsJson,
     ): array {
+        $lastDiagnosticAt = null;
+
         while (true) {
             $describe = $client->get("/workflows/{$workflowId}");
 
@@ -209,12 +215,281 @@ HELP)
                 return $describe;
             }
 
-            if (! $wantsJson) {
+            if ($wantsJson) {
+                $now = time();
+
+                if (
+                    $lastDiagnosticAt === null
+                    || ($now - $lastDiagnosticAt) >= self::WAIT_DIAGNOSTIC_INTERVAL_SECONDS
+                ) {
+                    $this->emitWaitDiagnostic($client, $output, $workflowId, $describe);
+                    $lastDiagnosticAt = $now;
+                }
+            } else {
                 $output->write('.');
             }
 
-            sleep(self::WAIT_POLL_INTERVAL_SECONDS);
+            $this->sleepBetweenWaitPolls();
         }
+    }
+
+    protected function sleepBetweenWaitPolls(): void
+    {
+        sleep(self::WAIT_POLL_INTERVAL_SECONDS);
+    }
+
+    /**
+     * @param  array<string, mixed>  $describe
+     */
+    private function emitWaitDiagnostic(
+        ServerClient $client,
+        OutputInterface $output,
+        string $workflowId,
+        array $describe,
+    ): void {
+        $target = $this->diagnosticErrorOutput($output);
+
+        if ($target === null) {
+            return;
+        }
+
+        $debug = null;
+        $debugError = null;
+
+        try {
+            $debug = $client->get(sprintf('/workflows/%s/debug', rawurlencode($workflowId)));
+        } catch (\Throwable $exception) {
+            $debugError = $exception->getMessage();
+        }
+
+        $target->writeln(json_encode(
+            $this->waitDiagnostic($workflowId, $describe, $debug, $debugError),
+            JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR,
+        ));
+    }
+
+    private function diagnosticErrorOutput(OutputInterface $output): ?OutputInterface
+    {
+        if ($output instanceof ConsoleOutputInterface) {
+            return $output->getErrorOutput();
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $describe
+     * @param  array<string, mixed>|null  $debug
+     * @return array<string, mixed>
+     */
+    private function waitDiagnostic(
+        string $workflowId,
+        array $describe,
+        ?array $debug,
+        ?string $debugError,
+    ): array {
+        $execution = is_array($debug['execution'] ?? null) ? $debug['execution'] : [];
+
+        return $this->compactDiagnostic([
+            'event' => 'workflow_wait_diagnostic',
+            'workflow_id' => $workflowId,
+            'run_id' => $debug['run_id'] ?? $describe['run_id'] ?? null,
+            'status' => $execution['status'] ?? $describe['status'] ?? null,
+            'status_bucket' => $describe['status_bucket'] ?? $execution['status_bucket'] ?? null,
+            'wait_kind' => $describe['wait_kind'] ?? $execution['wait_kind'] ?? null,
+            'wait_reason' => $describe['wait_reason'] ?? $execution['wait_reason'] ?? null,
+            'diagnostic_status' => $debug['diagnostic_status'] ?? null,
+            'findings' => $this->waitDiagnosticFindings($debug),
+            'pending_workflow_tasks' => $this->waitDiagnosticWorkflowTasks($debug),
+            'pending_activities' => $this->waitDiagnosticActivities($debug),
+            'activity_task_queues' => $this->waitDiagnosticActivityTaskQueues($debug),
+            'recent_failures' => $this->waitDiagnosticRecentFailures($debug),
+            'diagnostic_error' => $debugError,
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $debug
+     * @return list<array<string, mixed>>
+     */
+    private function waitDiagnosticFindings(?array $debug): array
+    {
+        return $this->mapDiagnosticList(
+            $debug['findings'] ?? null,
+            fn (array $finding): array => $this->compactDiagnostic([
+                'severity' => $finding['severity'] ?? null,
+                'code' => $finding['code'] ?? null,
+                'message' => $finding['message'] ?? null,
+                'task_queue' => $finding['task_queue'] ?? null,
+                'activity_type' => $finding['activity_type'] ?? null,
+                'activity_execution_id' => $finding['activity_execution_id'] ?? null,
+                'active_workers' => $finding['active_workers'] ?? null,
+            ]),
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $debug
+     * @return list<array<string, mixed>>
+     */
+    private function waitDiagnosticWorkflowTasks(?array $debug): array
+    {
+        return $this->mapDiagnosticList(
+            $debug['pending_workflow_tasks'] ?? null,
+            fn (array $task): array => $this->compactDiagnostic([
+                'task_id' => $task['task_id'] ?? null,
+                'task_type' => $task['task_type'] ?? null,
+                'status' => $task['status'] ?? null,
+                'transport_state' => $task['transport_state'] ?? null,
+                'summary' => $task['summary'] ?? null,
+                'queue' => $task['queue'] ?? null,
+                'lease_owner' => $task['lease_owner'] ?? null,
+                'lease_expired' => $task['lease_expired'] ?? null,
+                'compatibility_supported' => $task['compatibility_supported'] ?? null,
+                'compatibility_reason' => $task['compatibility_reason'] ?? null,
+            ]),
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $debug
+     * @return list<array<string, mixed>>
+     */
+    private function waitDiagnosticActivities(?array $debug): array
+    {
+        return $this->mapDiagnosticList(
+            $debug['pending_activities'] ?? null,
+            fn (array $activity): array => $this->compactDiagnostic([
+                'activity_execution_id' => $activity['activity_execution_id'] ?? null,
+                'activity_type' => $activity['activity_type'] ?? null,
+                'status' => $activity['status'] ?? null,
+                'queue' => $activity['queue'] ?? null,
+                'attempt_count' => $activity['attempt_count'] ?? null,
+                'current_attempt' => $this->diagnosticAttempt($activity['current_attempt'] ?? null),
+            ]),
+        );
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function diagnosticAttempt(mixed $attempt): ?array
+    {
+        if (! is_array($attempt)) {
+            return null;
+        }
+
+        return $this->compactDiagnostic([
+            'activity_attempt_id' => $attempt['activity_attempt_id'] ?? null,
+            'attempt_number' => $attempt['attempt_number'] ?? null,
+            'status' => $attempt['status'] ?? null,
+            'lease_owner' => $attempt['lease_owner'] ?? null,
+            'lease_expires_at' => $attempt['lease_expires_at'] ?? null,
+            'lease_expired' => $attempt['lease_expired'] ?? null,
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $debug
+     * @return array<string, mixed>
+     */
+    private function waitDiagnosticActivityTaskQueues(?array $debug): array
+    {
+        $queues = $debug['activity_task_queues'] ?? null;
+
+        if (! is_array($queues)) {
+            return [];
+        }
+
+        $diagnostics = [];
+
+        foreach ($queues as $queueName => $queue) {
+            if (! is_array($queue)) {
+                continue;
+            }
+
+            $pollerStats = is_array($queue['stats']['pollers'] ?? null)
+                ? $queue['stats']['pollers']
+                : [];
+
+            $diagnostics[(string) $queueName] = $this->compactDiagnostic([
+                'active_pollers' => $pollerStats['active_count'] ?? null,
+                'stale_pollers' => $pollerStats['stale_count'] ?? null,
+                'pollers' => $this->mapDiagnosticList(
+                    $queue['pollers'] ?? null,
+                    fn (array $poller): array => $this->compactDiagnostic([
+                        'worker_id' => $poller['worker_id'] ?? null,
+                        'runtime' => $poller['runtime'] ?? null,
+                        'sdk_version' => $poller['sdk_version'] ?? null,
+                        'build_id' => $poller['build_id'] ?? null,
+                        'status' => $poller['status'] ?? null,
+                        'is_stale' => $poller['is_stale'] ?? null,
+                        'supported_activity_types' => $poller['supported_activity_types'] ?? null,
+                    ]),
+                ),
+            ]);
+        }
+
+        return $diagnostics;
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $debug
+     * @return list<array<string, mixed>>
+     */
+    private function waitDiagnosticRecentFailures(?array $debug): array
+    {
+        return $this->mapDiagnosticList(
+            $debug['recent_failures'] ?? null,
+            fn (array $failure): array => $this->compactDiagnostic([
+                'failure_id' => $failure['failure_id'] ?? null,
+                'source_kind' => $failure['source_kind'] ?? null,
+                'source_id' => $failure['source_id'] ?? null,
+                'failure_category' => $failure['failure_category'] ?? null,
+                'exception_class' => $failure['exception_class'] ?? null,
+                'message' => $failure['message'] ?? null,
+            ]),
+            3,
+        );
+    }
+
+    /**
+     * @param  callable(array<string, mixed>): array<string, mixed>  $mapper
+     * @return list<array<string, mixed>>
+     */
+    private function mapDiagnosticList(mixed $items, callable $mapper, int $limit = 5): array
+    {
+        if (! is_array($items)) {
+            return [];
+        }
+
+        $mapped = [];
+
+        foreach ($items as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+
+            $mapped[] = $mapper($item);
+
+            if (count($mapped) >= $limit) {
+                break;
+            }
+        }
+
+        return $mapped;
+    }
+
+    /**
+     * @param  array<string, mixed>  $values
+     * @return array<string, mixed>
+     */
+    private function compactDiagnostic(array $values): array
+    {
+        return array_filter(
+            $values,
+            static fn (mixed $value): bool => $value !== null && $value !== [],
+        );
     }
 
     /**

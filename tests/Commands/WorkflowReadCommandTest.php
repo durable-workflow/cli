@@ -395,6 +395,132 @@ class WorkflowReadCommandTest extends TestCase
         self::assertSame('activity_failed', $parsed['closed_reason']);
     }
 
+    public function test_start_command_with_wait_and_json_writes_diagnostics_to_stderr_while_preserving_stdout_json(): void
+    {
+        $client = new WorkflowReadFakeServerClient([
+            'workflow_id' => 'wf-wait-json-diagnostics',
+            'run_id' => 'run-wait-json-diagnostics',
+            'workflow_type' => 'orders.process',
+            'status' => 'pending',
+            'status_bucket' => 'running',
+            'is_terminal' => false,
+            'outcome' => 'started_new',
+        ], getPayloadsByPath: [
+            '/workflows/wf-wait-json-diagnostics' => [
+                [
+                    'workflow_id' => 'wf-wait-json-diagnostics',
+                    'run_id' => 'run-wait-json-diagnostics',
+                    'workflow_type' => 'orders.process',
+                    'status' => 'running',
+                    'status_bucket' => 'running',
+                    'is_terminal' => false,
+                    'wait_kind' => 'activity',
+                    'wait_reason' => 'waiting for activity task completion',
+                ],
+                [
+                    'workflow_id' => 'wf-wait-json-diagnostics',
+                    'run_id' => 'run-wait-json-diagnostics',
+                    'workflow_type' => 'orders.process',
+                    'status' => 'completed',
+                    'status_bucket' => 'completed',
+                    'is_terminal' => true,
+                    'closed_at' => '2026-04-16T00:00:00Z',
+                    'closed_reason' => 'completed',
+                    'output' => ['ok' => true],
+                ],
+            ],
+            '/workflows/wf-wait-json-diagnostics/debug' => [
+                [
+                    'workflow_id' => 'wf-wait-json-diagnostics',
+                    'run_id' => 'run-wait-json-diagnostics',
+                    'diagnostic_status' => 'pending_work',
+                    'execution' => [
+                        'status' => 'running',
+                        'wait_kind' => 'activity',
+                        'wait_reason' => 'waiting for activity task completion',
+                    ],
+                    'findings' => [
+                        [
+                            'severity' => 'warning',
+                            'code' => 'pending_activity_type_unsupported',
+                            'message' => 'Activity [polyglot.python-to-php.echo] is pending on task queue [polyglot-python-to-php], but no active poller on that queue advertises that activity type.',
+                            'task_queue' => 'polyglot-python-to-php',
+                            'activity_type' => 'polyglot.python-to-php.echo',
+                            'activity_execution_id' => 'act-1',
+                        ],
+                    ],
+                    'pending_activities' => [
+                        [
+                            'activity_execution_id' => 'act-1',
+                            'activity_type' => 'polyglot.python-to-php.echo',
+                            'status' => 'running',
+                            'queue' => 'polyglot-python-to-php',
+                            'current_attempt' => [
+                                'activity_attempt_id' => 'attempt-1',
+                                'attempt_number' => 1,
+                                'status' => 'running',
+                                'lease_owner' => 'php-worker',
+                            ],
+                        ],
+                    ],
+                    'activity_task_queues' => [
+                        'polyglot-python-to-php' => [
+                            'stats' => [
+                                'pollers' => [
+                                    'active_count' => 1,
+                                    'stale_count' => 0,
+                                ],
+                            ],
+                            'pollers' => [
+                                [
+                                    'worker_id' => 'php-worker',
+                                    'runtime' => 'php',
+                                    'status' => 'active',
+                                    'is_stale' => false,
+                                    'supported_activity_types' => ['polyglot.other.echo'],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        $command = new class extends StartCommand {
+            protected function sleepBetweenWaitPolls(): void {}
+        };
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            '--type' => 'orders.process',
+            '--wait' => true,
+            '--json' => true,
+        ], [
+            'capture_stderr_separately' => true,
+        ]));
+
+        $stdout = trim($tester->getDisplay());
+        $parsedStdout = json_decode($stdout, true, flags: JSON_THROW_ON_ERROR);
+
+        self::assertSame('completed', $parsedStdout['status']);
+        self::assertSame(['ok' => true], $parsedStdout['output']);
+        self::assertStringNotContainsString('workflow_wait_diagnostic', $stdout);
+
+        $stderr = trim($tester->getErrorOutput());
+        $parsedStderr = json_decode($stderr, true, flags: JSON_THROW_ON_ERROR);
+
+        self::assertSame('workflow_wait_diagnostic', $parsedStderr['event']);
+        self::assertSame('wf-wait-json-diagnostics', $parsedStderr['workflow_id']);
+        self::assertSame('pending_activity_type_unsupported', $parsedStderr['findings'][0]['code']);
+        self::assertSame('polyglot-python-to-php', $parsedStderr['pending_activities'][0]['queue']);
+        self::assertSame(
+            ['polyglot.other.echo'],
+            $parsedStderr['activity_task_queues']['polyglot-python-to-php']['pollers'][0]['supported_activity_types'],
+        );
+    }
+
     public function test_start_command_with_wait_without_json_renders_human_terminal_summary(): void
     {
         $client = new WorkflowReadFakeServerClient([
@@ -574,15 +700,29 @@ class WorkflowReadFakeServerClient extends ServerClient
 
     /**
      * @param  array<string, mixed>  $payload
+     * @param  array<string, list<array<string, mixed>>>  $getPayloadsByPath
      */
     public function __construct(
         private readonly array $payload,
         private readonly ?ControlPlaneRequestContract $requestContract = null,
+        private array $getPayloadsByPath = [],
     ) {
     }
 
     public function get(string $path, array $query = []): array
     {
+        if (isset($this->getPayloadsByPath[$path])) {
+            if (count($this->getPayloadsByPath[$path]) > 1) {
+                $payloads = $this->getPayloadsByPath[$path];
+                $response = array_shift($payloads);
+                $this->getPayloadsByPath[$path] = $payloads;
+
+                return $response;
+            }
+
+            return $this->getPayloadsByPath[$path][0];
+        }
+
         return $this->payload;
     }
 

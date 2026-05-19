@@ -369,9 +369,13 @@ dw watch workflow order-123 --run-id=01HXYZ --interval=5 --max-polls=60
 
 # Send a signal
 dw workflow:signal order-123 payment-received --input='{"amount":99.99}'
+dw workflow:signal counter-1 increment --input='["not-an-int"]' --output=json
+# {"error":"Server error: Signal argument validation failed.","exit_code":2,"status_code":422,"reason":"invalid_signal_arguments",...}
 
 # Query workflow state
 dw workflow:query order-123 current-status
+dw workflow:query counter-1 current-at --input='["not-an-int"]' --output=json
+# {"error":"Server error: Query argument validation failed.","exit_code":2,"status_code":422,"reason":"invalid_query_arguments",...}
 
 # Send an update
 dw workflow:update order-123 approve --input='{"approver":"admin"}'

@@ -615,6 +615,18 @@ abstract class BaseCommand extends Command
 
         if ($e instanceof ServerHttpException) {
             $envelope['status_code'] = $e->statusCode;
+
+            if ($e->reason() !== null) {
+                $envelope['reason'] = $e->reason();
+            }
+
+            if ($e->validationErrors() !== null) {
+                $envelope['validation_errors'] = $e->validationErrors();
+            }
+
+            if ($e->body !== null) {
+                $envelope['server_response'] = $e->body;
+            }
         }
 
         $recommendations = $this->errorRecommendations($e, $input);

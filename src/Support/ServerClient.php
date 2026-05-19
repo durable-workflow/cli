@@ -252,7 +252,7 @@ class ServerClient
                 ?? $this->firstValidationMessage($body)
                 ?? (isset($body['rejection_reason']) ? 'Rejected: '.$body['rejection_reason'] : null)
                 ?? "HTTP {$statusCode}";
-            throw new ServerHttpException("Server error: {$message}", $statusCode);
+            throw new ServerHttpException("Server error: {$message}", $statusCode, body: $body === [] ? null : $body);
         }
 
         return $body;

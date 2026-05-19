@@ -144,6 +144,30 @@ class OutputContractTest extends TestCase
         self::assertSame('dw throwing:test --help', $envelope['recommendations'][0]['command'] ?? null);
     }
 
+    public function test_json_error_envelope_preserves_typed_server_reason_and_body(): void
+    {
+        $body = [
+            'workflow_id' => 'counter-1',
+            'signal_name' => 'increment',
+            'reason' => 'invalid_signal_arguments',
+            'message' => 'Signal argument validation failed.',
+            'validation_errors' => [
+                'n' => ['The n argument must be an integer.'],
+            ],
+        ];
+        $command = new ThrowingOutputCommand(new ServerHttpException('bad signal', 422, body: $body));
+        $tester = new CommandTester($command);
+
+        $exit = $tester->execute(['--output' => 'json']);
+
+        self::assertSame(ExitCode::INVALID, $exit);
+
+        $envelope = json_decode(trim($tester->getDisplay()), true, 512, JSON_THROW_ON_ERROR);
+        self::assertSame('invalid_signal_arguments', $envelope['reason']);
+        self::assertSame($body['validation_errors'], $envelope['validation_errors']);
+        self::assertSame($body, $envelope['server_response']);
+    }
+
     public function test_error_envelope_on_legacy_json_flag(): void
     {
         $command = new ThrowingOutputCommand(new NetworkException('Connection refused'), enableJsonFlag: true);

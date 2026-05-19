@@ -15,17 +15,25 @@ The CLI claims one target from the suite's matrix:
   `--output=jsonl` envelopes that automation, agents, and operator
   scripts depend on. Covers the `cli_json` surface family.
 
+The authority row for `cli_json_client` requires
+`control_plane_request_response` (request side),
+`signal_query_runtime_contract`, and `cli_json_envelopes`; the CLI-owned
+fixtures below are the source for those stable categories.
+
 ## Fixture sources served by this repo
 
 | Category | Source path | Status |
 | --- | --- | --- |
 | `control_plane_request_response` | `tests/fixtures/control-plane/` | stable, parity-shared with `sdk-python` |
+| `signal_query_runtime_contract` | `tests/Commands/` signal/query command coverage and JSON-output contracts | stable |
 | `cli_json_envelopes` | `tests/fixtures/control-plane/`, `schemas/` | stable |
 | `worker_task_lifecycle` (CLI input side) | `tests/fixtures/external-task/`, `tests/fixtures/external-task-input/` | stable |
 
 The fixtures in this repo are exercised today by:
 
 - `scripts/check-sdk-python-parity.sh`
+- `tests/Commands/WorkflowSignalParityFixtureTest.php`
+- `tests/Commands/WorkflowQueryParityFixtureTest.php`
 - the `sdk-python-parity` job in `.github/workflows/build.yml`
 
 These are the per-repo gates that already enforce the contract; the
@@ -41,7 +49,7 @@ document before tag, with the conformance level at `full` or
 | Field | Value |
 | --- | --- |
 | Required claimed targets | `cli_json_client` |
-| Required suite version | `PlatformConformanceSuite::VERSION` (currently `1`) |
+| Required suite version | `PlatformConformanceSuite::VERSION` (currently `2`) |
 | CI job | `platform-conformance` (lands when the harness reference implementation publishes; until then `sdk-python-parity` covers the same ground) |
 | Block on `nonconforming` | yes |
 | Artifact attached to release | harness result document, schema `durable-workflow.v2.platform-conformance.result` |

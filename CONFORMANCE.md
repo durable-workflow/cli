@@ -2,7 +2,7 @@
 
 The `dw` CLI participates in the public platform conformance suite
 specified by [`durable-workflow.github.io/static/platform-conformance-contract.json`](https://durable-workflow.github.io/platform-conformance-contract.json),
-schema `durable-workflow.v2.platform-conformance.suite`, version `4`,
+schema `durable-workflow.v2.platform-conformance.suite`, version `5`,
 and documented at the public
 [Platform Conformance Suite](https://durable-workflow.github.io/docs/2.0/platform-conformance)
 authority page. This document is the per-repo claim: it lists the
@@ -36,7 +36,7 @@ the public scenario manifest named in the suite.
 
 | Category | Source path | Status |
 | --- | --- | --- |
-| `signal_query_runtime_contract` | `durable-workflow.github.io/static/platform-conformance/signal-query-runtime-scenarios.json` (served at `/platform-conformance/signal-query-runtime-scenarios.json`) | stable, suite version `4` |
+| `signal_query_runtime_contract` | `durable-workflow.github.io/static/platform-conformance/signal-query-runtime-scenarios.json` (served at `/platform-conformance/signal-query-runtime-scenarios.json`) | stable, suite version `5` |
 
 The fixtures in this repo are exercised today by:
 
@@ -58,7 +58,7 @@ document before tag, with the conformance level at `full` or
 | Field | Value |
 | --- | --- |
 | Required claimed targets | `cli_json_client` |
-| Required suite version | public docs-site manifest `durable-workflow.v2.platform-conformance.suite` version `4` |
+| Required suite version | public docs-site manifest `durable-workflow.v2.platform-conformance.suite` version `5` |
 | CI job | `platform-conformance` (lands when the harness reference implementation publishes; until then `sdk-python-parity` covers CLI-owned fixture parity) |
 | Block on `nonconforming` | yes |
 | Artifact attached to release | harness result document, schema `durable-workflow.v2.platform-conformance.result` |

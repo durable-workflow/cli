@@ -1,11 +1,13 @@
 # Platform Conformance — `dw` CLI Claim
 
-The `dw` CLI participates in the platform conformance suite specified
-in [`workflow/docs/architecture/platform-conformance-suite.md`](https://github.com/durable-workflow/workflow/blob/v2/docs/architecture/platform-conformance-suite.md)
-and mirrored by `Workflow\V2\Support\PlatformConformanceSuite`. This
-document is the per-repo claim: it lists the conformance targets the
-CLI claims, the fixtures it serves, and the release gate that blocks
-publication when conformance is broken.
+The `dw` CLI participates in the public platform conformance suite
+specified by [`durable-workflow.github.io/static/platform-conformance-contract.json`](https://durable-workflow.github.io/platform-conformance-contract.json),
+schema `durable-workflow.v2.platform-conformance.suite`, version `4`,
+and documented at the public
+[Platform Conformance Suite](https://durable-workflow.github.io/docs/2.0/platform-conformance)
+authority page. This document is the per-repo claim: it lists the
+conformance targets the CLI claims, the fixtures it serves, and the
+release gate that blocks publication when conformance is broken.
 
 ## Claimed targets
 
@@ -17,28 +19,35 @@ The CLI claims one target from the suite's matrix:
 
 The authority row for `cli_json_client` requires
 `control_plane_request_response` (request side),
-`signal_query_runtime_contract`, and `cli_json_envelopes`; the CLI-owned
-fixtures below are the source for those stable categories.
+`signal_query_runtime_contract`, and `cli_json_envelopes`. The CLI-owned
+fixtures below are the source for the control-plane and JSON-envelope
+categories. The stable signal/query runtime category is sourced from
+the public scenario manifest named in the suite.
 
 ## Fixture sources served by this repo
 
 | Category | Source path | Status |
 | --- | --- | --- |
 | `control_plane_request_response` | `tests/fixtures/control-plane/` | stable, parity-shared with `sdk-python` |
-| `signal_query_runtime_contract` | `tests/Commands/` signal/query command coverage and JSON-output contracts | stable |
 | `cli_json_envelopes` | `tests/fixtures/control-plane/`, `schemas/` | stable |
 | `worker_task_lifecycle` (CLI input side) | `tests/fixtures/external-task/`, `tests/fixtures/external-task-input/` | stable |
+
+## Runtime scenario sources consumed by this claim
+
+| Category | Source path | Status |
+| --- | --- | --- |
+| `signal_query_runtime_contract` | `durable-workflow.github.io/static/platform-conformance/signal-query-runtime-scenarios.json` (served at `/platform-conformance/signal-query-runtime-scenarios.json`) | stable, suite version `4` |
 
 The fixtures in this repo are exercised today by:
 
 - `scripts/check-sdk-python-parity.sh`
-- `tests/Commands/WorkflowSignalParityFixtureTest.php`
-- `tests/Commands/WorkflowQueryParityFixtureTest.php`
 - the `sdk-python-parity` job in `.github/workflows/build.yml`
 
-These are the per-repo gates that already enforce the contract; the
-public conformance harness, when it lands, will read the same fixtures
-from this repo's declared paths.
+Local command tests also exercise CLI signal/query JSON behavior, but
+implementation tests are not stable fixture sources for
+`signal_query_runtime_contract`. The public conformance harness reads
+that category from the scenario manifest above and records results
+against published artifacts.
 
 ## Release gate
 
@@ -49,8 +58,8 @@ document before tag, with the conformance level at `full` or
 | Field | Value |
 | --- | --- |
 | Required claimed targets | `cli_json_client` |
-| Required suite version | `PlatformConformanceSuite::VERSION` (currently `3`) |
-| CI job | `platform-conformance` (lands when the harness reference implementation publishes; until then `sdk-python-parity` covers the same ground) |
+| Required suite version | public docs-site manifest `durable-workflow.v2.platform-conformance.suite` version `4` |
+| CI job | `platform-conformance` (lands when the harness reference implementation publishes; until then `sdk-python-parity` covers CLI-owned fixture parity) |
 | Block on `nonconforming` | yes |
 | Artifact attached to release | harness result document, schema `durable-workflow.v2.platform-conformance.result` |
 
@@ -59,8 +68,9 @@ category emits a warning and does not block.
 
 ## Cross-references
 
-- Authority spec: `workflow/docs/architecture/platform-conformance-suite.md`
-- Authority manifest class: `Workflow\V2\Support\PlatformConformanceSuite`
+- Authority spec: <https://durable-workflow.github.io/docs/2.0/platform-conformance>
+- Authority manifest: <https://durable-workflow.github.io/platform-conformance-contract.json>
+- Signal/query runtime scenarios: <https://durable-workflow.github.io/platform-conformance/signal-query-runtime-scenarios.json>
 - Public docs page: <https://durable-workflow.github.io/docs/2.0/compatibility>
 - Polyglot parity doc:
   <https://durable-workflow.github.io/docs/polyglot/cli-python-parity>

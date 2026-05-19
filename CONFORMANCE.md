@@ -49,7 +49,7 @@ document before tag, with the conformance level at `full` or
 | Field | Value |
 | --- | --- |
 | Required claimed targets | `cli_json_client` |
-| Required suite version | `PlatformConformanceSuite::VERSION` (currently `2`) |
+| Required suite version | `PlatformConformanceSuite::VERSION` (currently `3`) |
 | CI job | `platform-conformance` (lands when the harness reference implementation publishes; until then `sdk-python-parity` covers the same ground) |
 | Block on `nonconforming` | yes |
 | Artifact attached to release | harness result document, schema `durable-workflow.v2.platform-conformance.result` |

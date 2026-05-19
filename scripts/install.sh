@@ -51,8 +51,9 @@ if [ "$VERSION" = "latest" ]; then
     url="${RELEASE_BASE_URL}/latest/download/${asset}"
     checksum_url="${RELEASE_BASE_URL}/latest/download/SHA256SUMS"
 else
-    url="${RELEASE_BASE_URL}/download/${VERSION}/${asset}"
-    checksum_url="${RELEASE_BASE_URL}/download/${VERSION}/SHA256SUMS"
+    release_version="${VERSION#v}"
+    url="${RELEASE_BASE_URL}/download/${release_version}/${asset}"
+    checksum_url="${RELEASE_BASE_URL}/download/${release_version}/SHA256SUMS"
 fi
 
 command -v curl >/dev/null 2>&1 || err "curl is required"

@@ -12,9 +12,23 @@ final class ReleaseInstallerContractTest extends TestCase
     {
         $releaseWorkflow = self::readRepoFile('.github/workflows/release.yml');
 
+        self::assertStringContainsString('Resolve release tag', $releaseWorkflow);
+        self::assertStringContainsString('DISPATCH_TAG: ${{ inputs.tag }}', $releaseWorkflow);
+        self::assertStringContainsString('0.0.1-test or v0.0.1-test', $releaseWorkflow);
+        self::assertStringContainsString('raw_tag="$tag"', $releaseWorkflow);
+        self::assertStringContainsString('tag="${tag#v}"', $releaseWorkflow);
+        self::assertStringContainsString('ref: ${{ needs.resolve-release.outputs.tag }}', $releaseWorkflow);
+        self::assertStringContainsString('DW_CLI_VERSION: ${{ needs.resolve-release.outputs.tag }}', $releaseWorkflow);
+        self::assertStringContainsString('DW_CLI_COMMIT="$(git rev-parse HEAD)"', $releaseWorkflow);
         self::assertStringContainsString('cp scripts/install.sh dist/install.sh', $releaseWorkflow);
         self::assertStringContainsString('cp scripts/install.ps1 dist/install.ps1', $releaseWorkflow);
         self::assertStringContainsString('cp scripts/verify-release.sh dist/verify-release.sh', $releaseWorkflow);
+        self::assertStringContainsString('tag_name: ${{ needs.resolve-release.outputs.tag }}', $releaseWorkflow);
+        self::assertStringContainsString('Verify public release downloads', $releaseWorkflow);
+        self::assertStringContainsString('public_asset_url()', $releaseWorkflow);
+        self::assertStringContainsString('wait_for_asset()', $releaseWorkflow);
+        self::assertStringContainsString('VERSION="$tag" DURABLE_WORKFLOW_INSTALL_DIR="$install_dir"', $releaseWorkflow);
+        self::assertStringNotContainsString('scripts/verify-public-release-assets.sh "${{ needs.resolve-release.outputs.tag }}"', $releaseWorkflow);
         self::assertStringContainsString('install.sh', $releaseWorkflow);
         self::assertStringContainsString('install.ps1', $releaseWorkflow);
         self::assertStringContainsString('verify-release.sh', $releaseWorkflow);
@@ -28,18 +42,24 @@ final class ReleaseInstallerContractTest extends TestCase
         self::assertStringContainsString('sh -n scripts/install.sh', $buildWorkflow);
         self::assertStringContainsString('sh -n scripts/generate-homebrew-formula.sh', $buildWorkflow);
         self::assertStringContainsString('sh -n scripts/verify-release.sh', $buildWorkflow);
+        self::assertStringContainsString('bash -n scripts/verify-public-release-assets.sh', $buildWorkflow);
         self::assertStringContainsString('scripts/install.ps1', $buildWorkflow);
     }
 
     public function test_release_includes_checksum_and_attestation_verifier(): void
     {
         $verifier = self::readRepoFile('scripts/verify-release.sh');
+        $publicAssetVerifier = self::readRepoFile('scripts/verify-public-release-assets.sh');
         $readme = self::readRepoFile('README.md');
 
         self::assertStringContainsString('SHA256SUMS', $verifier);
         self::assertStringContainsString('sha256sum -c SHA256SUMS --ignore-missing', $verifier);
         self::assertStringContainsString('gh attestation verify', $verifier);
         self::assertStringContainsString('DURABLE_WORKFLOW_VERIFY_ATTESTATIONS', $verifier);
+        self::assertStringContainsString('raw_tag="${1:-}"', $publicAssetVerifier);
+        self::assertStringContainsString('tag="${raw_tag#v}"', $publicAssetVerifier);
+        self::assertStringContainsString('releases/download/${tag}/${artifact}', $publicAssetVerifier);
+        self::assertStringContainsString('curl -fsSLI --retry 3 --retry-all-errors', $publicAssetVerifier);
         self::assertStringContainsString('Tagged releases include `verify-release.sh`', $readme);
         self::assertStringContainsString('verify-release.sh --attest', $readme);
     }
@@ -51,7 +71,8 @@ final class ReleaseInstallerContractTest extends TestCase
         $readme = self::readRepoFile('README.md');
 
         self::assertStringContainsString('Generate Homebrew formula', $releaseWorkflow);
-        self::assertStringContainsString('scripts/generate-homebrew-formula.sh dist "$GITHUB_REF_NAME"', $releaseWorkflow);
+        self::assertStringContainsString('scripts/generate-homebrew-formula.sh dist "${{ needs.resolve-release.outputs.tag }}"', $releaseWorkflow);
+        self::assertStringContainsString('tag="${tag#v}"', $formulaGenerator);
         self::assertStringContainsString('dw.rb', $formulaGenerator);
         self::assertStringContainsString('dw-macos-aarch64', $formulaGenerator);
         self::assertStringContainsString('class Dw < Formula', $formulaGenerator);
@@ -66,6 +87,7 @@ final class ReleaseInstallerContractTest extends TestCase
         self::assertStringContainsString('SHA256SUMS', $shellInstaller);
         self::assertStringContainsString('checksum verification failed', $shellInstaller);
         self::assertStringContainsString('DURABLE_WORKFLOW_INSTALL_VERIFY_ATTESTATIONS', $shellInstaller);
+        self::assertStringContainsString('release_version="${VERSION#v}"', $shellInstaller);
         self::assertStringContainsString('gh attestation verify "$tmp" --repo "$REPO"', $shellInstaller);
         self::assertStringContainsString('gh attestation verify "$sums" --repo "$REPO"', $shellInstaller);
         self::assertStringContainsString('mv "$tmp" "$INSTALL_DIR/$BIN_NAME"', $shellInstaller);
@@ -73,6 +95,7 @@ final class ReleaseInstallerContractTest extends TestCase
         self::assertStringContainsString('SHA256SUMS', $powershellInstaller);
         self::assertStringContainsString('Checksum verification failed', $powershellInstaller);
         self::assertStringContainsString('DURABLE_WORKFLOW_INSTALL_VERIFY_ATTESTATIONS', $powershellInstaller);
+        self::assertStringContainsString('$releaseVersion = if ($version -ne \'latest\' -and $version.StartsWith(\'v\'))', $powershellInstaller);
         self::assertStringContainsString('gh attestation verify $tmp --repo $repo', $powershellInstaller);
         self::assertStringContainsString('gh attestation verify $sums --repo $repo', $powershellInstaller);
         self::assertStringContainsString('Move-Item -Force -Path $tmp -Destination $dest', $powershellInstaller);

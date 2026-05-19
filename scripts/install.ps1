@@ -25,6 +25,11 @@ $installDir = if ($env:DURABLE_WORKFLOW_INSTALL_DIR) {
     Join-Path $env:USERPROFILE '.durable-workflow\bin'
 }
 $version = if ($env:VERSION) { $env:VERSION } else { 'latest' }
+$releaseVersion = if ($version -ne 'latest' -and $version.StartsWith('v')) {
+    $version.Substring(1)
+} else {
+    $version
+}
 $verifyAttestations = $env:DURABLE_WORKFLOW_INSTALL_VERIFY_ATTESTATIONS -eq '1'
 
 if (-not [System.Environment]::Is64BitOperatingSystem) {
@@ -37,13 +42,13 @@ $asset = "dw-windows-$arch.exe"
 $url = if ($version -eq 'latest') {
     "$releaseBaseUrl/latest/download/$asset"
 } else {
-    "$releaseBaseUrl/download/$version/$asset"
+    "$releaseBaseUrl/download/$releaseVersion/$asset"
 }
 
 $checksumUrl = if ($version -eq 'latest') {
     "$releaseBaseUrl/latest/download/SHA256SUMS"
 } else {
-    "$releaseBaseUrl/download/$version/SHA256SUMS"
+    "$releaseBaseUrl/download/$releaseVersion/SHA256SUMS"
 }
 
 New-Item -ItemType Directory -Force -Path $installDir | Out-Null

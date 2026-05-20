@@ -18,7 +18,11 @@ permissions:
 env:
   SPC_EXTENSIONS: curl,mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets
   STANDALONE_RUNTIME_EXTENSIONS: curl,mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets
-  SPC_EXTENSIONS_WINDOWS: curl,mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets
+  STANDALONE_RUNTIME_EXTENSIONS_WINDOWS: mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets
+  # Windows uses Symfony's native stream transport over OpenSSL. Avoid
+  # requesting ext-curl from phpmicro there because the Windows build can
+  # compile successfully while the generated micro runtime does not load curl.
+  SPC_EXTENSIONS_WINDOWS: mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets
   PHP_VERSION: '8.4'
   PHP_VERSION_WINDOWS: '8.4'
   BOX_VERSION: '4.6.6'

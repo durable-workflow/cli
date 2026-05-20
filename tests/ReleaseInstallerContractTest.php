@@ -165,11 +165,15 @@ final class ReleaseInstallerContractTest extends TestCase
         $runtimeCheck = self::readRepoFile('src/Commands/RuntimeCheckCommand.php');
 
         self::assertStringContainsString('STANDALONE_RUNTIME_EXTENSIONS: curl,mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets', $releaseWorkflow);
+        self::assertStringContainsString('STANDALONE_RUNTIME_EXTENSIONS_WINDOWS: mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets', $releaseWorkflow);
+        self::assertStringContainsString('SPC_EXTENSIONS_WINDOWS: mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets', $releaseWorkflow);
+        self::assertStringNotContainsString('SPC_EXTENSIONS_WINDOWS: curl', $releaseWorkflow);
         self::assertStringContainsString('Remove-Item -Recurse -Force source\php-src -ErrorAction SilentlyContinue', $releaseWorkflow);
         self::assertStringContainsString('php bin\spc extract php-src', $releaseWorkflow);
         self::assertStringContainsString('Patch PHP OpenSSL 3 compatibility', $releaseWorkflow);
         self::assertStringContainsString('php_openssl.h was not found after spc extract; continuing without local OpenSSL patch.', $releaseWorkflow);
         self::assertStringContainsString("public const REQUIRED_EXTENSIONS", $runtimeCheck);
+        self::assertStringContainsString("public const REQUIRED_EXTENSIONS_WINDOWS", $runtimeCheck);
         self::assertStringContainsString("'curl'", $runtimeCheck);
         self::assertStringContainsString("'mbstring'", $runtimeCheck);
         self::assertStringContainsString("'openssl'", $runtimeCheck);

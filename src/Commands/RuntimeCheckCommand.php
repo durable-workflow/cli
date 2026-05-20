@@ -24,19 +24,34 @@ final class RuntimeCheckCommand extends Command
         'sockets',
     ];
 
+    public const REQUIRED_EXTENSIONS_WINDOWS = [
+        'mbstring',
+        'openssl',
+        'phar',
+        'tokenizer',
+        'ctype',
+        'filter',
+        'fileinfo',
+        'iconv',
+        'sockets',
+    ];
+
     /**
      * @var callable(string): bool
      */
     private mixed $extensionLoaded;
 
+    private string $osFamily;
+
     /**
      * @param  (callable(string): bool)|null  $extensionLoaded
      */
-    public function __construct(?callable $extensionLoaded = null)
+    public function __construct(?callable $extensionLoaded = null, ?string $osFamily = null)
     {
         parent::__construct();
 
         $this->extensionLoaded = $extensionLoaded ?? extension_loaded(...);
+        $this->osFamily = $osFamily ?? PHP_OS_FAMILY;
     }
 
     protected function configure(): void
@@ -58,8 +73,9 @@ HELP);
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $missing = [];
+        $requiredExtensions = $this->requiredExtensions();
 
-        foreach (self::REQUIRED_EXTENSIONS as $extension) {
+        foreach ($requiredExtensions as $extension) {
             if (! ($this->extensionLoaded)($extension)) {
                 $missing[] = $extension;
             }
@@ -73,9 +89,21 @@ HELP);
 
         $output->writeln(sprintf(
             'Runtime extensions OK: %s',
-            implode(', ', self::REQUIRED_EXTENSIONS),
+            implode(', ', $requiredExtensions),
         ));
 
         return ExitCode::SUCCESS;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function requiredExtensions(): array
+    {
+        if ($this->osFamily === 'Windows') {
+            return self::REQUIRED_EXTENSIONS_WINDOWS;
+        }
+
+        return self::REQUIRED_EXTENSIONS;
     }
 }

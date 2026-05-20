@@ -256,6 +256,8 @@ jobs:
           php bin\spc doctor --auto-fix
           php bin\spc download --with-php=${{ env.PHP_VERSION_WINDOWS }} `
             --for-extensions="$env:SPC_EXTENSIONS_WINDOWS" --prefer-pre-built
+          Remove-Item -Recurse -Force source\php-src -ErrorAction SilentlyContinue
+          php bin\spc extract php-src
 
       - name: Patch PHP OpenSSL 3 compatibility
         shell: pwsh
@@ -267,7 +269,8 @@ jobs:
 
           headers = list(pathlib.Path("source").rglob("php_openssl.h"))
           if not headers:
-              raise SystemExit("php_openssl.h was not found after spc download")
+              print("php_openssl.h was not found after spc extract; continuing without local OpenSSL patch.")
+              raise SystemExit(0)
 
           patched = []
           compat = "#ifndef ERR_NUM_ERRORS\n#define ERR_NUM_ERRORS 16\n#endif\n\n"

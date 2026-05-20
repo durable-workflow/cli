@@ -165,7 +165,10 @@ final class ReleaseInstallerContractTest extends TestCase
         $runtimeCheck = self::readRepoFile('src/Commands/RuntimeCheckCommand.php');
 
         self::assertStringContainsString('STANDALONE_RUNTIME_EXTENSIONS: curl,mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets', $releaseWorkflow);
+        self::assertStringContainsString('Remove-Item -Recurse -Force source\php-src -ErrorAction SilentlyContinue', $releaseWorkflow);
+        self::assertStringContainsString('php bin\spc extract php-src', $releaseWorkflow);
         self::assertStringContainsString('Patch PHP OpenSSL 3 compatibility', $releaseWorkflow);
+        self::assertStringContainsString('php_openssl.h was not found after spc extract; continuing without local OpenSSL patch.', $releaseWorkflow);
         self::assertStringContainsString("public const REQUIRED_EXTENSIONS", $runtimeCheck);
         self::assertStringContainsString("'curl'", $runtimeCheck);
         self::assertStringContainsString("'mbstring'", $runtimeCheck);

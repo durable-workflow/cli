@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://durable-workflow.com/schemas/cli/output/namespace.schema.json",
-  "title": "dw namespace create/describe/update --json",
+  "title": "dw namespace create/describe/update/delete --json",
   "type": "object",
   "required": ["name"],
   "properties": {
@@ -10,7 +10,11 @@
     "retention_days": { "type": ["integer", "null"] },
     "status": { "type": ["string", "null"] },
     "created_at": { "type": ["string", "null"] },
-    "updated_at": { "type": ["string", "null"] }
+    "updated_at": { "type": ["string", "null"] },
+    "deleted": {
+      "type": ["object", "null"],
+      "additionalProperties": { "type": "integer", "minimum": 0 }
+    }
   },
   "additionalProperties": true
 }

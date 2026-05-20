@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Commands;
 
 use DurableWorkflow\Cli\Commands\NamespaceCommand\CreateCommand;
+use DurableWorkflow\Cli\Commands\NamespaceCommand\DeleteCommand;
 use DurableWorkflow\Cli\Commands\NamespaceCommand\DescribeCommand;
 use DurableWorkflow\Cli\Commands\NamespaceCommand\ListCommand;
 use DurableWorkflow\Cli\Commands\NamespaceCommand\UpdateCommand;
@@ -96,6 +97,27 @@ final class NamespaceParityFixtureTest extends TestCase
         self::assertSame($fixture['semantic_body']['retention_days'], $decoded['retention_days'] ?? null);
     }
 
+    public function test_namespace_delete_matches_polyglot_request_fixture(): void
+    {
+        $fixture = self::fixture('namespace-delete-parity.json', 'namespace.delete');
+        $client = new NamespaceParityClient($fixture['response_body']);
+        $command = new DeleteCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute($fixture['cli']['argv']));
+
+        self::assertSame($fixture['request']['method'], $client->lastMethod);
+        self::assertSame($fixture['request']['path'], $client->lastPath);
+        self::assertSame([], $client->lastBody);
+
+        $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame($fixture['response_body'], $decoded);
+        self::assertSame($fixture['semantic_body']['name'], $decoded['name'] ?? null);
+        self::assertSame($fixture['semantic_body']['status'], $decoded['status'] ?? null);
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -160,6 +182,15 @@ final class NamespaceParityClient extends ServerClient
         $this->lastMethod = 'PUT';
         $this->lastPath = $path;
         $this->lastBody = $body;
+
+        return $this->response;
+    }
+
+    public function delete(string $path): array
+    {
+        $this->lastMethod = 'DELETE';
+        $this->lastPath = $path;
+        $this->lastBody = [];
 
         return $this->response;
     }

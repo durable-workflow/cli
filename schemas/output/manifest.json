@@ -54,6 +54,11 @@
       "schema": "schemas/output/namespace.schema.json",
       "schema_id": "https://durable-workflow.com/schemas/cli/output/namespace.schema.json"
     },
+    "namespace:delete": {
+      "output": "--json",
+      "schema": "schemas/output/namespace.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/namespace.schema.json"
+    },
     "namespace:describe": {
       "output": "--json",
       "schema": "schemas/output/namespace.schema.json",

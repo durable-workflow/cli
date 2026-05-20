@@ -410,6 +410,9 @@ dw namespace:describe staging
 
 # Update a namespace
 dw namespace:update staging --retention=14
+
+# Delete a namespace and its runtime state
+dw namespace:delete staging --json
 ```
 
 Configure external payload storage for a namespace:

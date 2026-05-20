@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Commands;
 
 use DurableWorkflow\Cli\Commands\NamespaceCommand\CreateCommand;
+use DurableWorkflow\Cli\Commands\NamespaceCommand\DeleteCommand;
 use DurableWorkflow\Cli\Commands\NamespaceCommand\DescribeCommand;
 use DurableWorkflow\Cli\Commands\NamespaceCommand\ListCommand;
 use DurableWorkflow\Cli\Commands\NamespaceCommand\UpdateCommand;
@@ -212,6 +213,27 @@ class NamespaceCommandTest extends TestCase
         self::assertSame('Updated description', $client->lastPutBody['description']);
         self::assertSame(60, $client->lastPutBody['retention_days']);
     }
+
+    public function test_delete_command_sends_delete_for_namespace(): void
+    {
+        $client = new NamespaceFakeClient([
+            'name' => 'staging',
+            'status' => 'deleted',
+            'deleted' => [],
+        ]);
+
+        $command = new DeleteCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            'name' => 'staging',
+        ]));
+
+        self::assertSame('/namespaces/staging', $client->lastDeletePath);
+        self::assertStringContainsString('Namespace deleted: staging', $tester->getDisplay());
+    }
 }
 
 class NamespaceFakeClient extends ServerClient
@@ -225,6 +247,8 @@ class NamespaceFakeClient extends ServerClient
     public array $lastPutBody = [];
 
     public string $lastPutPath = '';
+
+    public string $lastDeletePath = '';
 
     /** @param array<string, mixed> $payload */
     public function __construct(
@@ -248,6 +272,13 @@ class NamespaceFakeClient extends ServerClient
     {
         $this->lastPutPath = $path;
         $this->lastPutBody = $body;
+
+        return $this->payload;
+    }
+
+    public function delete(string $path): array
+    {
+        $this->lastDeletePath = $path;
 
         return $this->payload;
     }

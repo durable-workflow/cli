@@ -90,6 +90,7 @@ class Application extends ConsoleApplication
             new NamespaceCommand\CreateCommand(),
             new NamespaceCommand\DescribeCommand(),
             new NamespaceCommand\UpdateCommand(),
+            new NamespaceCommand\DeleteCommand(),
             new NamespaceCommand\SetStorageDriverCommand(),
 
             // External payload storage diagnostics

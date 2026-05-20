@@ -80,7 +80,7 @@ HELP)
             ->addOption('fairness-key', null, InputOption::VALUE_REQUIRED, 'Workload-class identifier (1..64 URL-safe chars) used to rebalance dispatch across classes under contention')
             ->addOption('fairness-weight', null, InputOption::VALUE_REQUIRED, 'Relative weight (1..1000) for the fairness class — higher weights claim a proportionally larger share of dispatch slots')
             ->addOption('wait', null, InputOption::VALUE_NONE, 'Wait for the workflow to reach a terminal state')
-            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the command response as JSON');
         $this->addInputOptions('Workflow input payload');
     }
 
@@ -131,7 +131,7 @@ HELP)
             $body['search_attributes'] = $attrs;
         }
 
-        $result = $client->post('/workflows', $body);
+        $result = $this->addNamespaceContext($input, $client->post('/workflows', $body));
         $wait = (bool) $input->getOption('wait');
         $wantsJson = $this->wantsJson($input);
 
@@ -140,7 +140,7 @@ HELP)
         // describe (and the matching success/failure exit code) instead of
         // the transient start response.
         if ($wait) {
-            return $this->waitAndEmit($client, $output, $result, $wantsJson);
+            return $this->waitAndEmit($client, $output, $result, $wantsJson, (string) $result['namespace']);
         }
 
         if ($wantsJson) {
@@ -160,6 +160,7 @@ HELP)
         OutputInterface $output,
         array $startResult,
         bool $wantsJson,
+        string $namespace,
     ): int {
         if (! $wantsJson) {
             $this->emitStartBanner($output, $startResult);
@@ -173,6 +174,7 @@ HELP)
             (string) $startResult['workflow_id'],
             $wantsJson,
         );
+        $describe = $this->withNamespaceContext($namespace, $describe);
 
         $exit = ($describe['status_bucket'] ?? null) === 'completed'
             ? Command::SUCCESS
@@ -186,6 +188,7 @@ HELP)
 
         $output->writeln('');
         $output->writeln('<info>Workflow reached terminal state</info>');
+        $this->writeNamespaceLine($output, $describe);
         $output->writeln('  Status: '.$this->formatStatus($describe['status'] ?? null));
         $output->writeln('  Closed Reason: '.($describe['closed_reason'] ?? '-'));
         $output->writeln('  Closed At: '.($describe['closed_at'] ?? '-'));
@@ -499,6 +502,7 @@ HELP)
     {
         $output->writeln('<info>Workflow started</info>');
         $output->writeln('  Workflow ID: '.$result['workflow_id']);
+        $this->writeNamespaceLine($output, $result);
         $output->writeln('  Run ID: '.$result['run_id']);
         if (isset($result['business_key'])) {
             $output->writeln('  Business Key: '.$result['business_key']);

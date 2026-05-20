@@ -49,7 +49,7 @@ HELP)
             ->addOption('max-runs', null, InputOption::VALUE_REQUIRED, 'Maximum number of runs before auto-delete')
             ->addOption('paused', null, InputOption::VALUE_NONE, 'Create in paused state')
             ->addOption('note', null, InputOption::VALUE_OPTIONAL, 'Note')
-            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the command response as JSON');
         $this->addInputOptions('Scheduled workflow input payload');
     }
 
@@ -85,13 +85,14 @@ HELP)
             'note' => $input->getOption('note'),
         ];
 
-        $result = $this->client($input)->post('/schedules', $body);
+        $result = $this->addNamespaceContext($input, $this->client($input)->post('/schedules', $body));
 
         if ($this->wantsJson($input)) {
             return $this->renderJson($output, $result);
         }
 
         $output->writeln('<info>Schedule created: '.$result['schedule_id'].'</info>');
+        $this->writeNamespaceLine($output, $result);
 
         return Command::SUCCESS;
     }

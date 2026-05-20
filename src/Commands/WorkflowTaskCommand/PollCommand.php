@@ -34,7 +34,7 @@ HELP)
             ->addOption('poll-request-id', null, InputOption::VALUE_OPTIONAL, 'Idempotency key for retrying a poll')
             ->addOption('history-page-size', null, InputOption::VALUE_OPTIONAL, 'Maximum history events in the first page')
             ->addOption('accept-history-encoding', null, InputOption::VALUE_OPTIONAL, 'Accepted compressed history encoding')
-            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the command response as JSON');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int

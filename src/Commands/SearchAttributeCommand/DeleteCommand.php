@@ -29,20 +29,21 @@ filter on it.
   <info>dw search-attribute:delete OrderStatus --json</info>
 HELP)
             ->addArgument('name', InputArgument::REQUIRED, 'Attribute name to remove')
-            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the command response as JSON');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $name = $input->getArgument('name');
 
-        $result = $this->client($input)->delete('/search-attributes/'.$name);
+        $result = $this->addNamespaceContext($input, $this->client($input)->delete('/search-attributes/'.$name));
 
         if ($this->wantsJson($input)) {
             return $this->renderJson($output, $result);
         }
 
         $output->writeln(sprintf('<info>Search attribute deleted: %s</info>', $name));
+        $this->writeNamespaceLine($output, $result);
 
         return Command::SUCCESS;
     }

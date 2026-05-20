@@ -3,8 +3,9 @@
   "$id": "https://durable-workflow.com/schemas/cli/output/schedule.schema.json",
   "title": "dw schedule create/describe/update --json",
   "type": "object",
-  "required": ["schedule_id"],
+  "required": ["namespace", "schedule_id"],
   "properties": {
+    "namespace": { "type": "string" },
     "schedule_id": { "type": "string" },
     "workflow_type": { "type": ["string", "null"] },
     "spec": { "type": ["object", "null"], "additionalProperties": true },

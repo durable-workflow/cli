@@ -30,7 +30,7 @@ use an SDK.
 HELP)
             ->addArgument('worker-id', InputArgument::REQUIRED, 'Registered worker ID')
             ->addOption('task-queue', null, InputOption::VALUE_REQUIRED, 'Task queue to poll', 'default')
-            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the command response as JSON');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int

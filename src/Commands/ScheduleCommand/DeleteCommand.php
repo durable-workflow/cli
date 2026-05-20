@@ -28,19 +28,20 @@ Delete a schedule. In-flight runs it has already spawned keep running
   <info>dw schedule:delete daily-report --json</info>
 HELP)
             ->addArgument('schedule-id', InputArgument::REQUIRED, 'Schedule ID')
-            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the command response as JSON');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $scheduleId = $input->getArgument('schedule-id');
-        $result = $this->client($input)->delete("/schedules/{$scheduleId}");
+        $result = $this->addNamespaceContext($input, $this->client($input)->delete("/schedules/{$scheduleId}"));
 
         if ($this->wantsJson($input)) {
             return $this->renderJson($output, $result);
         }
 
         $output->writeln('<info>Schedule deleted: '.$scheduleId.'</info>');
+        $this->writeNamespaceLine($output, $result);
 
         return Command::SUCCESS;
     }

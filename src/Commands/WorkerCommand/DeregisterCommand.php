@@ -28,7 +28,7 @@ workers re-register automatically on their next heartbeat.
   <info>dw worker:deregister py-worker-abc123 --json</info>
 HELP)
             ->addArgument('worker-id', InputArgument::REQUIRED, 'Worker ID to deregister')
-            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the command response as JSON');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int

@@ -29,22 +29,23 @@ to completion.
 HELP)
             ->addArgument('schedule-id', InputArgument::REQUIRED, 'Schedule ID')
             ->addOption('note', null, InputOption::VALUE_OPTIONAL, 'Note')
-            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the command response as JSON');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $scheduleId = $input->getArgument('schedule-id');
 
-        $result = $this->client($input)->post("/schedules/{$scheduleId}/pause", array_filter([
+        $result = $this->addNamespaceContext($input, $this->client($input)->post("/schedules/{$scheduleId}/pause", array_filter([
             'note' => $input->getOption('note'),
-        ], fn ($v) => $v !== null));
+        ], fn ($v) => $v !== null)));
 
         if ($this->wantsJson($input)) {
             return $this->renderJson($output, $result);
         }
 
         $output->writeln('<info>Schedule paused: '.$scheduleId.'</info>');
+        $this->writeNamespaceLine($output, $result);
 
         return Command::SUCCESS;
     }

@@ -57,7 +57,7 @@ final class SearchAttributeParityFixtureTest extends TestCase
         self::assertSame($fixture['request']['body'], $client->lastBody);
 
         $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
-        self::assertSame($fixture['response_body'], $decoded);
+        self::assertSame($fixture['response_body'] + ['namespace' => 'default'], $decoded);
         self::assertSame($fixture['semantic_body']['name'], $decoded['name'] ?? null);
         self::assertSame($fixture['semantic_body']['type'], $decoded['type'] ?? null);
     }
@@ -78,7 +78,7 @@ final class SearchAttributeParityFixtureTest extends TestCase
         self::assertSame([], $client->lastBody);
 
         $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
-        self::assertSame($fixture['response_body'], $decoded);
+        self::assertSame($fixture['response_body'] + ['namespace' => 'default'], $decoded);
         self::assertSame($fixture['semantic_body']['name'], $decoded['name'] ?? null);
         self::assertSame($fixture['semantic_body']['outcome'], $decoded['outcome'] ?? null);
     }

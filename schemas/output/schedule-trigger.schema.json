@@ -3,8 +3,9 @@
   "$id": "https://durable-workflow.com/schemas/cli/output/schedule-trigger.schema.json",
   "title": "dw schedule:trigger --json",
   "type": "object",
-  "required": ["outcome"],
+  "required": ["namespace", "outcome"],
   "properties": {
+    "namespace": { "type": "string" },
     "schedule_id": { "type": ["string", "null"] },
     "outcome": { "type": "string" },
     "workflow_id": { "type": ["string", "null"] },

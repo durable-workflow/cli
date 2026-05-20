@@ -3,7 +3,9 @@
   "$id": "https://durable-workflow.com/schemas/cli/output/search-attribute.schema.json",
   "title": "dw search-attribute create/delete --json",
   "type": "object",
+  "required": ["namespace"],
   "properties": {
+    "namespace": { "type": "string" },
     "name": { "type": ["string", "null"] },
     "type": { "type": ["string", "null"] },
     "outcome": { "type": ["string", "null"] }

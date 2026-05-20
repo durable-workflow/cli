@@ -34,7 +34,7 @@ HELP)
             ->addArgument('update-name', InputArgument::REQUIRED, 'Update name')
             ->addOption('wait', null, InputOption::VALUE_OPTIONAL, 'Wait policy (accepted, completed)', 'accepted', CompletionValues::UPDATE_WAIT_POLICIES)
             ->addOption('run-id', null, InputOption::VALUE_OPTIONAL, 'Target a specific run ID')
-            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the command response as JSON');
         $this->addInputOptions('Update input payload');
     }
 
@@ -69,7 +69,7 @@ HELP)
             ? "/workflows/{$workflowId}/runs/{$runId}/update/{$updateName}"
             : "/workflows/{$workflowId}/update/{$updateName}";
 
-        $result = $client->post($path, $body);
+        $result = $this->addNamespaceContext($input, $client->post($path, $body));
 
         if ($this->wantsJson($input)) {
             return $this->renderJson($output, $result);
@@ -77,6 +77,7 @@ HELP)
 
         $output->writeln('<info>Update sent</info>');
         $output->writeln('  Workflow ID: '.$result['workflow_id']);
+        $this->writeNamespaceLine($output, $result);
         $output->writeln('  Update: '.$result['update_name']);
         $output->writeln('  Update ID: '.$result['update_id']);
         $output->writeln('  Outcome: '.$result['outcome']);

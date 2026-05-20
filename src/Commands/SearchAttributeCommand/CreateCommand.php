@@ -31,15 +31,15 @@ and visibility queries can filter on it. Types are fixed at creation.
 HELP)
             ->addArgument('name', InputArgument::REQUIRED, 'Attribute name (e.g. OrderStatus)')
             ->addArgument('type', InputArgument::REQUIRED, 'Attribute type (keyword, text, int, double, bool, datetime, keyword_list)', null, CompletionValues::SEARCH_ATTRIBUTE_TYPES)
-            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the command response as JSON');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $result = $this->client($input)->post('/search-attributes', [
+        $result = $this->addNamespaceContext($input, $this->client($input)->post('/search-attributes', [
             'name' => $input->getArgument('name'),
             'type' => $input->getArgument('type'),
-        ]);
+        ]));
 
         if ($this->wantsJson($input)) {
             return $this->renderJson($output, $result);
@@ -50,6 +50,7 @@ HELP)
             $result['name'],
             $result['type'],
         ));
+        $this->writeNamespaceLine($output, $result);
 
         return Command::SUCCESS;
     }

@@ -33,7 +33,7 @@ HELP)
             ->addArgument('page-token', InputArgument::REQUIRED, 'History page token from workflow-task:poll')
             ->addOption('lease-owner', null, InputOption::VALUE_REQUIRED, 'Lease owner identity', 'cli')
             ->addOption('attempt', null, InputOption::VALUE_REQUIRED, 'Workflow task attempt number')
-            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the command response as JSON');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int

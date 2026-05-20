@@ -5,13 +5,14 @@
   "type": "object",
   "oneOf": [
     {
-      "required": ["workflow_id", "outcome"]
+      "required": ["namespace", "workflow_id", "outcome"]
     },
     {
-      "required": ["matched", "cancelled", "failed", "workflow_ids", "results", "failures"]
+      "required": ["namespace", "matched", "cancelled", "failed", "workflow_ids", "results", "failures"]
     }
   ],
   "properties": {
+    "namespace": { "type": "string" },
     "workflow_id": { "type": "string" },
     "run_id": { "type": ["string", "null"] },
     "outcome": { "type": "string" },

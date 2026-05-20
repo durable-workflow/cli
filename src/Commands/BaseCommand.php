@@ -481,12 +481,22 @@ abstract class BaseCommand extends Command
     protected function addNamespaceContext(InputInterface $input, array $payload, ?string $itemsKey = null): array
     {
         $namespace = $this->namespaceContext($input, $payload);
-        $payload['namespace'] = $namespace;
+
+        return $this->withNamespaceContext($namespace, $payload, $itemsKey);
+    }
+
+    protected function withNamespaceContext(string $namespace, array $payload, ?string $itemsKey = null): array
+    {
+        if (! $this->hasNonEmptyString($payload['namespace'] ?? null)) {
+            $payload['namespace'] = $namespace;
+        }
 
         if ($itemsKey !== null && isset($payload[$itemsKey]) && is_array($payload[$itemsKey])) {
+            $itemNamespace = (string) $payload['namespace'];
+
             foreach ($payload[$itemsKey] as $index => $item) {
                 if (is_array($item) && ! $this->hasNonEmptyString($item['namespace'] ?? null)) {
-                    $payload[$itemsKey][$index]['namespace'] = $namespace;
+                    $payload[$itemsKey][$index]['namespace'] = $itemNamespace;
                 }
             }
         }
@@ -494,8 +504,21 @@ abstract class BaseCommand extends Command
         return $payload;
     }
 
-    protected function namespaceContext(InputInterface $input, array $_payload = []): string
+    protected function writeNamespaceLine(OutputInterface $output, array $payload): void
     {
+        $namespace = $this->hasNonEmptyString($payload['namespace'] ?? null)
+            ? (string) $payload['namespace']
+            : '-';
+
+        $output->writeln('  Namespace: '.$namespace);
+    }
+
+    protected function namespaceContext(InputInterface $input, array $payload = []): string
+    {
+        if ($this->hasNonEmptyString($payload['namespace'] ?? null)) {
+            return (string) $payload['namespace'];
+        }
+
         return $this->resolvedConnection($input)->namespace;
     }
 
@@ -506,12 +529,14 @@ abstract class BaseCommand extends Command
 
     /**
      * Declare --json on a mutating command. Pair with {@see wantsJson()} in
-     * execute() to return the raw server response instead of the human-readable
-     * summary. Equivalent to `--output=json`; retained as a short alias.
+     * execute() to return a machine-readable command response instead of the
+     * human-readable summary. Commands may preserve server response fields and
+     * add CLI-resolved context such as namespace. Equivalent to `--output=json`;
+     * retained as a short alias.
      */
     protected function addJsonOption(): void
     {
-        $this->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON (alias for --output=json)');
+        $this->addOption('json', null, InputOption::VALUE_NONE, 'Output the command response as JSON (alias for --output=json)');
     }
 
     protected function wantsJson(InputInterface $input): bool

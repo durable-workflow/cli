@@ -103,9 +103,11 @@ HELP)
      */
     private function fetchWorkflow(InputInterface $input, string $workflowId, ?string $runId): array
     {
-        return $runId
+        $result = $runId
             ? $this->client($input)->get("/workflows/{$workflowId}/runs/{$runId}")
             : $this->client($input)->get("/workflows/{$workflowId}");
+
+        return $this->addNamespaceContext($input, $result);
     }
 
     /**

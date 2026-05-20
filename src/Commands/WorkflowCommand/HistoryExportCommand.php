@@ -39,7 +39,7 @@ HELP)
         $workflowId = $input->getArgument('workflow-id');
         $runId = $input->getArgument('run-id');
 
-        $result = $this->client($input)->get("/workflows/{$workflowId}/runs/{$runId}/history/export");
+        $result = $this->addNamespaceContext($input, $this->client($input)->get("/workflows/{$workflowId}/runs/{$runId}/history/export"));
 
         $outputFile = $input->getOption('output-file');
 
@@ -49,7 +49,7 @@ HELP)
             $stderr = $output instanceof \Symfony\Component\Console\Output\ConsoleOutputInterface
                 ? $output->getErrorOutput()
                 : $output;
-            $stderr->writeln('<info>Exported to '.$outputFile.'</info>');
+            $stderr->writeln('<info>Exported namespace '.$result['namespace'].' to '.$outputFile.'</info>');
 
             return Command::SUCCESS;
         }

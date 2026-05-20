@@ -33,7 +33,7 @@ HELP)
             ->addArgument('attempt', InputArgument::REQUIRED, 'Query task attempt number')
             ->addOption('lease-owner', null, InputOption::VALUE_REQUIRED, 'Lease owner identity', 'cli')
             ->addOption('result', null, InputOption::VALUE_REQUIRED, 'JSON query result')
-            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the command response as JSON');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int

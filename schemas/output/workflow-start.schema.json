@@ -4,12 +4,13 @@
   "title": "dw workflow:start --json",
   "description": "Without --wait this is the start response; with --wait this is the terminal workflow describe response.",
   "type": "object",
-  "required": ["workflow_id"],
+  "required": ["namespace", "workflow_id"],
   "anyOf": [
     { "required": ["workflow_id", "run_id", "outcome"] },
     { "required": ["workflow_id", "status"] }
   ],
   "properties": {
+    "namespace": { "type": "string" },
     "workflow_id": { "type": "string" },
     "run_id": { "type": ["string", "null"] },
     "business_key": { "type": ["string", "null"] },

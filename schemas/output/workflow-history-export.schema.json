@@ -3,8 +3,9 @@
   "$id": "https://durable-workflow.com/schemas/cli/output/workflow-history-export.schema.json",
   "title": "dw workflow:history-export",
   "type": "object",
-  "required": ["schema", "workflow", "events"],
+  "required": ["namespace", "schema", "workflow", "events"],
   "properties": {
+    "namespace": { "type": "string" },
     "schema": { "const": "durable-workflow.v2.history-export" },
     "workflow": {
       "type": "object",

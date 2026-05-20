@@ -12,9 +12,9 @@ use Symfony\Component\Console\Tester\CommandTester;
 
 /**
  * Every mutating (POST / PUT / DELETE) command must honour --json so
- * pipelines can consume the raw server response instead of the
- * human-readable summary. A stub client echoes a sentinel response and
- * the command should print it verbatim when --json is set.
+ * pipelines can consume a machine-readable response instead of the
+ * human-readable summary. Commands must preserve server response fields,
+ * while namespace-scoped commands may add CLI-resolved context.
  */
 class MutatingCommandJsonTest extends TestCase
 {
@@ -47,6 +47,21 @@ class MutatingCommandJsonTest extends TestCase
         $decoded = json_decode($display, true, 512, JSON_THROW_ON_ERROR);
         self::assertIsArray($decoded, "{$commandName} JSON output must decode to an array");
         self::assertSame('stub', $decoded['sentinel'] ?? null, "{$commandName} did not return the stub sentinel");
+
+        if (self::expectsNamespaceContext($commandName)) {
+            self::assertSame(
+                'default',
+                $decoded['namespace'] ?? null,
+                "{$commandName} JSON output must include the effective namespace",
+            );
+        }
+    }
+
+    private static function expectsNamespaceContext(string $commandName): bool
+    {
+        return str_starts_with($commandName, 'workflow:')
+            || str_starts_with($commandName, 'schedule:')
+            || str_starts_with($commandName, 'search-attribute:');
     }
 
     /**

@@ -61,13 +61,19 @@ HELP)
         $allEvents = $streaming ? null : [];
         $nextPageToken = null;
         $result = [];
+        $namespace = $this->namespaceContext($input);
 
         do {
             if ($nextPageToken !== null) {
                 $query['next_page_token'] = $nextPageToken;
             }
 
-            $result = $this->client($input)->get("/workflows/{$workflowId}/runs/{$runId}/history", $query);
+            $result = $this->addNamespaceContext(
+                $input,
+                $this->client($input)->get("/workflows/{$workflowId}/runs/{$runId}/history", $query),
+                'events',
+            );
+            $namespace = (string) $result['namespace'];
 
             $events = $result['events'] ?? [];
             if ($streaming) {
@@ -90,15 +96,18 @@ HELP)
         if ($this->wantsJson($input)) {
             $result['events'] = $allEvents;
             unset($result['next_page_token']);
+            $result = $this->withNamespaceContext($namespace, $result, 'events');
 
             return $this->renderJsonList($output, $input, $result, 'events');
         }
 
         if (empty($allEvents)) {
-            $output->writeln('<comment>No history events.</comment>');
+            $output->writeln(sprintf('<comment>No history events in namespace %s.</comment>', $namespace));
 
             return Command::SUCCESS;
         }
+
+        $output->writeln('Namespace: '.$namespace);
 
         $rows = array_map(fn ($e) => [
             $e['sequence'] ?? '-',

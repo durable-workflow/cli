@@ -3,8 +3,9 @@
   "$id": "https://durable-workflow.com/schemas/cli/output/workflow-signal.schema.json",
   "title": "dw workflow:signal --json",
   "type": "object",
-  "required": ["workflow_id", "signal_name", "outcome"],
+  "required": ["namespace", "workflow_id", "signal_name", "outcome"],
   "properties": {
+    "namespace": { "type": "string" },
     "workflow_id": { "type": "string" },
     "run_id": { "type": ["string", "null"] },
     "signal_name": { "type": "string" },

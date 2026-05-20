@@ -117,6 +117,7 @@ class SearchAttributeCommandTest extends TestCase
         $tester = new CommandTester($command);
 
         self::assertSame(Command::SUCCESS, $tester->execute([
+            '--namespace' => 'tenant-a',
             'name' => 'OrderStatus',
             'type' => 'keyword',
         ]));
@@ -125,6 +126,7 @@ class SearchAttributeCommandTest extends TestCase
         self::assertSame('OrderStatus', $client->lastPostBody['name']);
         self::assertSame('keyword', $client->lastPostBody['type']);
         self::assertStringContainsString('OrderStatus', $tester->getDisplay());
+        self::assertStringContainsString('Namespace: tenant-a', $tester->getDisplay());
     }
 
     public function test_delete_command_sends_delete_request(): void

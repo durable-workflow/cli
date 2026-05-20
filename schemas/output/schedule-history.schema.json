@@ -3,18 +3,19 @@
   "$id": "https://durable-workflow.com/schemas/cli/output/schedule-history.schema.json",
   "title": "dw schedule:history --json",
   "type": "object",
-  "required": ["schedule_id", "events"],
+  "required": ["schedule_id", "namespace", "events"],
   "properties": {
     "schedule_id": { "type": "string" },
-    "namespace": { "type": ["string", "null"] },
+    "namespace": { "type": "string" },
     "events": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["sequence", "event_type"],
+        "required": ["sequence", "namespace", "event_type"],
         "properties": {
           "id": { "type": ["string", "null"] },
           "sequence": { "type": "integer", "minimum": 1 },
+          "namespace": { "type": "string" },
           "event_type": { "type": ["string", "null"] },
           "recorded_at": { "type": ["string", "null"] },
           "workflow_instance_id": { "type": ["string", "null"] },

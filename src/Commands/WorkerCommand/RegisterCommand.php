@@ -48,7 +48,7 @@ HELP)
             ->addOption('activity-type', null, InputOption::VALUE_OPTIONAL | InputOption::VALUE_IS_ARRAY, 'Supported activity type')
             ->addOption('max-workflow-tasks', null, InputOption::VALUE_OPTIONAL, 'Maximum concurrent workflow tasks')
             ->addOption('max-activity-tasks', null, InputOption::VALUE_OPTIONAL, 'Maximum concurrent activity tasks')
-            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the command response as JSON');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int

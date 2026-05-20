@@ -43,7 +43,7 @@ HELP)
             ->addOption('status', null, InputOption::VALUE_OPTIONAL, 'Batch filter by status bucket', 'running', CompletionValues::WORKFLOW_STATUSES)
             ->addOption('limit', 'l', InputOption::VALUE_OPTIONAL, 'Maximum matching workflows to cancel', '100')
             ->addOption('yes', 'y', InputOption::VALUE_NONE, 'Skip confirmation prompt for batch cancellation')
-            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the command response as JSON');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -73,7 +73,7 @@ HELP)
             ? "/workflows/{$workflowId}/runs/{$runId}/cancel"
             : "/workflows/{$workflowId}/cancel";
 
-        $result = $this->client($input)->post($path, $body);
+        $result = $this->addNamespaceContext($input, $this->client($input)->post($path, $body));
 
         if ($this->wantsJson($input)) {
             return $this->renderJson($output, $result);
@@ -81,6 +81,7 @@ HELP)
 
         $output->writeln('<info>Cancellation requested</info>');
         $output->writeln('  Workflow ID: '.$result['workflow_id']);
+        $this->writeNamespaceLine($output, $result);
         $output->writeln('  Outcome: '.$result['outcome']);
         if (isset($result['command_status'])) {
             $output->writeln('  Command Status: '.$result['command_status']);
@@ -110,6 +111,7 @@ HELP)
         }
 
         $client = $this->client($input);
+        $namespace = $this->namespaceContext($input);
         $status = $this->optionalString($input->getOption('status'));
         if (! $this->validateControlPlaneOption(
             client: $client,
@@ -124,16 +126,19 @@ HELP)
 
         $workflowType = $this->optionalString($input->getOption('type'));
         $limit = $this->parsePositiveInt($input->getOption('limit'), '--limit');
-        $matches = $this->matchingWorkflows($client, $query, $workflowType, $status, $limit);
+        $matches = array_map(
+            fn (array $workflow): array => $this->withNamespaceContext($namespace, $workflow),
+            $this->matchingWorkflows($client, $query, $workflowType, $status, $limit),
+        );
 
         if ($matches === []) {
-            $summary = $this->batchSummary($query, $workflowType, $status, [], [], []);
+            $summary = $this->withNamespaceContext($namespace, $this->batchSummary($query, $workflowType, $status, [], [], []));
 
             if ($wantsJson) {
                 return $this->renderBatchJson($output, $summary, Command::SUCCESS);
             }
 
-            $output->writeln('<comment>No workflows matched.</comment>');
+            $output->writeln(sprintf('<comment>No workflows matched in namespace %s.</comment>', $namespace));
 
             return Command::SUCCESS;
         }
@@ -155,10 +160,11 @@ HELP)
             $workflowId = $workflow['workflow_id'];
 
             try {
-                $results[] = $client->post("/workflows/{$workflowId}/cancel", $body);
+                $results[] = $this->withNamespaceContext($namespace, $client->post("/workflows/{$workflowId}/cancel", $body));
             } catch (ServerException $e) {
                 $failures[] = [
                     'workflow_id' => $workflowId,
+                    'namespace' => $namespace,
                     'message' => $e->getMessage(),
                     'exit_code' => $e->exitCode(),
                 ];
@@ -166,13 +172,14 @@ HELP)
         }
 
         $exitCode = $failures === [] ? Command::SUCCESS : Command::FAILURE;
-        $summary = $this->batchSummary($query, $workflowType, $status, $matches, $results, $failures);
+        $summary = $this->withNamespaceContext($namespace, $this->batchSummary($query, $workflowType, $status, $matches, $results, $failures));
 
         if ($wantsJson) {
             return $this->renderBatchJson($output, $summary, $exitCode);
         }
 
         $output->writeln(sprintf('<info>Cancellation requested for %d workflow%s.</info>', count($results), count($results) === 1 ? '' : 's'));
+        $this->writeNamespaceLine($output, $summary);
         $output->writeln(sprintf('  Matched: %d', count($matches)));
         $output->writeln(sprintf('  Failed: %d', count($failures)));
 

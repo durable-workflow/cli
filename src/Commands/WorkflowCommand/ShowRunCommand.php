@@ -46,7 +46,7 @@ HELP)
         $runId = $input->getArgument('run-id');
         $follow = $input->getOption('follow');
 
-        $result = $this->client($input)->get("/workflows/{$workflowId}/runs/{$runId}");
+        $result = $this->fetchRun($input, $workflowId, $runId);
 
         if ($follow && ! $this->isTerminal($result)) {
             return $this->followUntilTerminal($input, $output, $workflowId, $runId, $result);
@@ -71,7 +71,7 @@ HELP)
         while (! $this->isTerminal($result)) {
             sleep(self::FOLLOW_POLL_INTERVAL_SECONDS);
 
-            $result = $this->client($input)->get("/workflows/{$workflowId}/runs/{$runId}");
+            $result = $this->fetchRun($input, $workflowId, $runId);
             $currentStatus = $result['status'] ?? null;
 
             if ($currentStatus !== $lastStatus) {
@@ -144,6 +144,17 @@ HELP)
         }
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function fetchRun(InputInterface $input, string $workflowId, string $runId): array
+    {
+        return $this->addNamespaceContext(
+            $input,
+            $this->client($input)->get("/workflows/{$workflowId}/runs/{$runId}"),
+        );
     }
 
     private function formatTimeout(int|null $seconds): string

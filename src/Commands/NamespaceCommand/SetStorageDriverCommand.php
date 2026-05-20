@@ -39,7 +39,7 @@ HELP)
             ->addOption('endpoint', null, InputOption::VALUE_OPTIONAL, 'Custom object storage endpoint')
             ->addOption('auth-profile', null, InputOption::VALUE_OPTIONAL, 'Server-side credential profile name')
             ->addOption('disable', null, InputOption::VALUE_NONE, 'Disable external payload storage while keeping the policy record')
-            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the command response as JSON');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int

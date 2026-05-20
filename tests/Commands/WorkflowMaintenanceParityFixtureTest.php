@@ -29,7 +29,7 @@ final class WorkflowMaintenanceParityFixtureTest extends TestCase
         self::assertSame($fixture['cli']['expected_body'], $client->lastBody);
 
         $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
-        self::assertSame($fixture['response_body'], $decoded);
+        self::assertSame($fixture['response_body'] + ['namespace' => 'default'], $decoded);
         self::assertSame($fixture['semantic_body']['workflow_id'], $decoded['workflow_id'] ?? null);
     }
 
@@ -49,7 +49,7 @@ final class WorkflowMaintenanceParityFixtureTest extends TestCase
         self::assertSame($fixture['cli']['expected_body'], $client->lastBody);
 
         $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
-        self::assertSame($fixture['response_body'], $decoded);
+        self::assertSame($fixture['response_body'] + ['namespace' => 'default'], $decoded);
         self::assertSame($fixture['semantic_body']['workflow_id'], $decoded['workflow_id'] ?? null);
         self::assertSame('archived', $decoded['outcome'] ?? null);
     }

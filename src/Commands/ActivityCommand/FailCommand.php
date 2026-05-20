@@ -68,7 +68,7 @@ HELP)
             )
             ->addOption('cancelled', null, InputOption::VALUE_NONE, 'Classify the failure as cancellation-related')
             ->addOption('malformed-output', null, InputOption::VALUE_NONE, 'Classify the failure as malformed handler output')
-            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the command response as JSON');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int

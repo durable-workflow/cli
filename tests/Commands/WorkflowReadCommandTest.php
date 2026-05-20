@@ -6,6 +6,7 @@ namespace Tests\Commands;
 
 use DurableWorkflow\Cli\Commands\WorkflowCommand\DescribeCommand;
 use DurableWorkflow\Cli\Commands\WorkflowCommand\ListCommand;
+use DurableWorkflow\Cli\Commands\WorkflowCommand\SignalCommand;
 use DurableWorkflow\Cli\Commands\WorkflowCommand\StartCommand;
 use DurableWorkflow\Cli\Support\ControlPlaneRequestContract;
 use DurableWorkflow\Cli\Support\ServerClient;
@@ -60,6 +61,31 @@ class WorkflowReadCommandTest extends TestCase
         ]));
 
         self::assertSame(['Ada'], $client->lastPostBody['input'] ?? null);
+    }
+
+    public function test_start_command_adds_selected_namespace_to_json_output(): void
+    {
+        $client = new WorkflowReadFakeServerClient([
+            'workflow_id' => 'wf-tenant-a',
+            'run_id' => 'run-tenant-a',
+            'outcome' => 'started_new',
+        ]);
+
+        $command = new StartCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            '--namespace' => 'tenant-a',
+            '--type' => 'orders.process',
+            '--json' => true,
+        ]));
+
+        $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+
+        self::assertSame('tenant-a', $decoded['namespace'] ?? null);
+        self::assertSame('wf-tenant-a', $decoded['workflow_id'] ?? null);
     }
 
     public function test_start_command_reads_input_file(): void
@@ -598,6 +624,26 @@ class WorkflowReadCommandTest extends TestCase
 
         self::assertSame(Command::SUCCESS, $tester->execute([
             '--namespace' => 'tenant-a',
+        ]));
+
+        self::assertStringContainsString('Namespace: tenant-a', $tester->getDisplay());
+    }
+
+    public function test_signal_command_renders_selected_namespace_in_table_output(): void
+    {
+        $command = new SignalCommand();
+        $command->setServerClient(new WorkflowReadFakeServerClient([
+            'workflow_id' => 'wf-tenant-a',
+            'signal_name' => 'approve',
+            'outcome' => 'signal_received',
+        ]));
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            '--namespace' => 'tenant-a',
+            'workflow-id' => 'wf-tenant-a',
+            'signal-name' => 'approve',
         ]));
 
         self::assertStringContainsString('Namespace: tenant-a', $tester->getDisplay());

@@ -35,7 +35,7 @@ HELP)
     {
         $workflowId = $input->getArgument('workflow-id');
 
-        $result = $this->client($input)->get("/workflows/{$workflowId}/runs");
+        $result = $this->addNamespaceContext($input, $this->client($input)->get("/workflows/{$workflowId}/runs"), 'runs');
 
         if ($this->wantsJson($input)) {
             return $this->renderJsonList($output, $input, $result, 'runs');
@@ -45,11 +45,13 @@ HELP)
 
         if (empty($runs)) {
             $output->writeln('<comment>No runs found.</comment>');
+            $output->writeln('Namespace: '.$result['namespace']);
 
             return Command::SUCCESS;
         }
 
         $output->writeln('<info>Workflow: '.$workflowId.'</info>');
+        $output->writeln('Namespace: '.$result['namespace']);
         $output->writeln('Run Count: '.($result['run_count'] ?? count($runs)));
         $output->writeln('');
 

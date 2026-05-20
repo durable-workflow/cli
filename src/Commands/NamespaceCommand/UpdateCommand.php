@@ -30,7 +30,7 @@ HELP)
             ->addArgument('name', InputArgument::REQUIRED, 'Namespace name')
             ->addOption('description', 'd', InputOption::VALUE_OPTIONAL, 'New description')
             ->addOption('retention', 'r', InputOption::VALUE_OPTIONAL, 'New retention period in days')
-            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the command response as JSON');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int

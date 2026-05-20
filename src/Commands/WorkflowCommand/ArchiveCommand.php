@@ -29,7 +29,7 @@ active cannot be archived; cancel or terminate them first.
 HELP)
             ->addArgument('workflow-id', InputArgument::REQUIRED, 'Workflow ID')
             ->addOption('reason', null, InputOption::VALUE_OPTIONAL, 'Archive reason')
-            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the command response as JSON');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -40,7 +40,7 @@ HELP)
             'reason' => $input->getOption('reason'),
         ], fn ($v) => $v !== null);
 
-        $result = $this->client($input)->post("/workflows/{$workflowId}/archive", $body);
+        $result = $this->addNamespaceContext($input, $this->client($input)->post("/workflows/{$workflowId}/archive", $body));
 
         if ($this->wantsJson($input)) {
             return $this->renderJson($output, $result);
@@ -48,6 +48,7 @@ HELP)
 
         $output->writeln('<info>Archive requested</info>');
         $output->writeln('  Workflow ID: '.$result['workflow_id']);
+        $this->writeNamespaceLine($output, $result);
         $output->writeln('  Outcome: '.$result['outcome']);
         if (isset($result['command_status'])) {
             $output->writeln('  Command Status: '.$result['command_status']);

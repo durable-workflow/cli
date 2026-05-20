@@ -3,16 +3,18 @@
   "$id": "https://durable-workflow.com/schemas/cli/output/workflow-runs.schema.json",
   "title": "dw workflow:list-runs --json",
   "type": "object",
-  "required": ["runs"],
+  "required": ["namespace", "runs"],
   "properties": {
+    "namespace": { "type": "string" },
     "workflow_id": { "type": ["string", "null"] },
     "run_count": { "type": ["integer", "null"] },
     "runs": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["run_id"],
+        "required": ["namespace", "run_id"],
         "properties": {
+          "namespace": { "type": "string" },
           "run_id": { "type": "string" },
           "run_number": { "type": ["integer", "null"] },
           "workflow_type": { "type": ["string", "null"] },

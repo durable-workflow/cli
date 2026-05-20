@@ -35,7 +35,7 @@ HELP)
             ->addOption('idempotency-key', null, InputOption::VALUE_REQUIRED, 'Stable provider event or dedupe key')
             ->addOption('target', null, InputOption::VALUE_REQUIRED, 'Target JSON object')
             ->addOption('correlation', null, InputOption::VALUE_OPTIONAL, 'Operator-safe correlation JSON object')
-            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the command response as JSON');
         $this->addInputOptions('Bridge input payload');
     }
 

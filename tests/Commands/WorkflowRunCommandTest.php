@@ -73,7 +73,10 @@ class WorkflowRunCommandTest extends TestCase
             'workflow-id' => 'wf-empty',
         ]));
 
-        self::assertStringContainsString('No runs found.', $tester->getDisplay());
+        $display = $tester->getDisplay();
+
+        self::assertStringContainsString('No runs found.', $display);
+        self::assertStringContainsString('Namespace: default', $display);
     }
 
     public function test_list_runs_json_output(): void

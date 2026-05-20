@@ -39,7 +39,7 @@ HELP)
             ->addOption('message', 'm', InputOption::VALUE_REQUIRED, 'Failure message')
             ->addOption('type', 't', InputOption::VALUE_OPTIONAL, 'Failure type')
             ->addOption('stack-trace', null, InputOption::VALUE_OPTIONAL, 'Failure stack trace or diagnostic text')
-            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the command response as JSON');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int

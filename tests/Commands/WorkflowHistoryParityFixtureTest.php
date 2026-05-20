@@ -29,7 +29,7 @@ final class WorkflowHistoryParityFixtureTest extends TestCase
         self::assertSame($fixture['cli']['expected_query'], $client->lastQuery);
 
         $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
-        self::assertSame($fixture['response_body'], $decoded);
+        self::assertSame(self::withNamespaceContext($fixture['response_body'], 'default', 'events'), $decoded);
 
         $semantic = $fixture['semantic_body'];
         self::assertSame($semantic['workflow_id'], $decoded['workflow_id'] ?? null, 'history workflow id drifted from fixture semantics.');
@@ -52,7 +52,7 @@ final class WorkflowHistoryParityFixtureTest extends TestCase
         self::assertSame([], $client->lastQuery);
 
         $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
-        self::assertSame($fixture['response_body'], $decoded);
+        self::assertSame($fixture['response_body'] + ['namespace' => 'default'], $decoded);
 
         $semantic = $fixture['semantic_body'];
         self::assertSame($semantic['schema'], $decoded['schema'] ?? null, 'history export schema drifted from fixture semantics.');
@@ -79,6 +79,25 @@ final class WorkflowHistoryParityFixtureTest extends TestCase
         self::assertSame($operation, $fixture['operation'] ?? null);
 
         return $fixture;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private static function withNamespaceContext(array $payload, string $namespace, ?string $itemsKey = null): array
+    {
+        $payload['namespace'] ??= $namespace;
+
+        if ($itemsKey !== null && isset($payload[$itemsKey]) && is_array($payload[$itemsKey])) {
+            foreach ($payload[$itemsKey] as $index => $item) {
+                if (is_array($item)) {
+                    $payload[$itemsKey][$index]['namespace'] ??= $namespace;
+                }
+            }
+        }
+
+        return $payload;
     }
 }
 

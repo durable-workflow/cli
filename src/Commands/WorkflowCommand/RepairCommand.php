@@ -32,14 +32,14 @@ server will no-op.
   <info>dw workflow:repair chk-42 --json</info>
 HELP)
             ->addArgument('workflow-id', InputArgument::REQUIRED, 'Workflow ID')
-            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the command response as JSON');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $workflowId = $input->getArgument('workflow-id');
 
-        $result = $this->client($input)->post("/workflows/{$workflowId}/repair");
+        $result = $this->addNamespaceContext($input, $this->client($input)->post("/workflows/{$workflowId}/repair"));
 
         if ($this->wantsJson($input)) {
             return $this->renderJson($output, $result);
@@ -47,6 +47,7 @@ HELP)
 
         $output->writeln('<info>Repair requested</info>');
         $output->writeln('  Workflow ID: '.$result['workflow_id']);
+        $this->writeNamespaceLine($output, $result);
         $output->writeln('  Outcome: '.$result['outcome']);
         if (isset($result['command_status'])) {
             $output->writeln('  Command Status: '.$result['command_status']);

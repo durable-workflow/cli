@@ -3,8 +3,9 @@
   "$id": "https://durable-workflow.com/schemas/cli/output/workflow-update.schema.json",
   "title": "dw workflow:update --json",
   "type": "object",
-  "required": ["workflow_id", "update_name", "update_id", "outcome"],
+  "required": ["namespace", "workflow_id", "update_name", "update_id", "outcome"],
   "properties": {
+    "namespace": { "type": "string" },
     "workflow_id": { "type": "string" },
     "run_id": { "type": ["string", "null"] },
     "update_name": { "type": "string" },

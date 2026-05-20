@@ -117,6 +117,7 @@ class ScheduleCommandTest extends TestCase
         $tester = new CommandTester($command);
 
         self::assertSame(Command::SUCCESS, $tester->execute([
+            '--namespace' => 'tenant-a',
             '--schedule-id' => 'daily-report',
             '--workflow-type' => 'reports.daily',
             '--cron' => '0 0 * * *',
@@ -132,6 +133,7 @@ class ScheduleCommandTest extends TestCase
         self::assertSame('reports', $client->lastPostBody['action']['task_queue']);
         self::assertSame('skip', $client->lastPostBody['overlap_policy']);
         self::assertStringContainsString('daily-report', $tester->getDisplay());
+        self::assertStringContainsString('Namespace: tenant-a', $tester->getDisplay());
     }
 
     public function test_create_command_sends_interval_schedule(): void
@@ -434,7 +436,7 @@ class ScheduleCommandTest extends TestCase
             '--json' => true,
         ]));
 
-        // The raw server response is still rendered to stdout for scripting.
+        // The machine-readable response still preserves the server outcome.
         self::assertStringContainsString('trigger_failed', $tester->getDisplay());
     }
 

@@ -30,16 +30,16 @@ policy applies unless you override it with <comment>--overlap-policy</comment>.
 HELP)
             ->addArgument('schedule-id', InputArgument::REQUIRED, 'Schedule ID')
             ->addOption('overlap-policy', null, InputOption::VALUE_OPTIONAL, 'Override overlap policy', null, CompletionValues::SCHEDULE_OVERLAP_POLICIES)
-            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the command response as JSON');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $scheduleId = $input->getArgument('schedule-id');
 
-        $result = $this->client($input)->post("/schedules/{$scheduleId}/trigger", array_filter([
+        $result = $this->addNamespaceContext($input, $this->client($input)->post("/schedules/{$scheduleId}/trigger", array_filter([
             'overlap_policy' => $input->getOption('overlap-policy'),
-        ], fn ($v) => $v !== null));
+        ], fn ($v) => $v !== null)));
 
         $outcome = $result['outcome'] ?? 'unknown';
         $exitCode = self::exitCodeForOutcome($outcome);
@@ -52,33 +52,39 @@ HELP)
 
         match ($outcome) {
             'triggered' => $output->writeln(sprintf(
-                '<info>Schedule triggered:</info> %s → %s',
+                '<info>Schedule triggered:</info> %s (namespace %s) -> %s',
                 $scheduleId,
+                $result['namespace'],
                 $result['workflow_id'] ?? '(unknown)',
             )),
             'buffered' => $output->writeln(sprintf(
-                '<comment>Schedule buffered:</comment> %s (buffer depth: %d)',
+                '<comment>Schedule buffered:</comment> %s (namespace %s, buffer depth: %d)',
                 $scheduleId,
+                $result['namespace'],
                 $result['buffer_depth'] ?? 0,
             )),
             'buffer_full' => $output->writeln(sprintf(
-                '<comment>Buffer full:</comment> %s — %s',
+                '<comment>Buffer full:</comment> %s (namespace %s) - %s',
                 $scheduleId,
+                $result['namespace'],
                 $result['reason'] ?? 'previous workflow still running',
             )),
             'skipped' => $output->writeln(sprintf(
-                '<comment>Skipped:</comment> %s — %s',
+                '<comment>Skipped:</comment> %s (namespace %s) - %s',
                 $scheduleId,
+                $result['namespace'],
                 $result['reason'] ?? 'schedule exhausted',
             )),
             'trigger_failed' => $output->writeln(sprintf(
-                '<error>Trigger failed:</error> %s — %s',
+                '<error>Trigger failed:</error> %s (namespace %s) - %s',
                 $scheduleId,
+                $result['namespace'],
                 $result['reason'] ?? 'unknown error',
             )),
             default => $output->writeln(sprintf(
-                '<info>Schedule trigger outcome:</info> %s (%s)',
+                '<info>Schedule trigger outcome:</info> %s (namespace %s, %s)',
                 $scheduleId,
+                $result['namespace'],
                 $outcome,
             )),
         };

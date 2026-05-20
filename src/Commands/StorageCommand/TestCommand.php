@@ -30,7 +30,7 @@ HELP)
             ->addOption('driver', null, InputOption::VALUE_OPTIONAL, 'Driver override for this diagnostic', null, CompletionValues::EXTERNAL_STORAGE_DRIVERS)
             ->addOption('small-bytes', null, InputOption::VALUE_OPTIONAL, 'Small inline payload size for the round trip', '128')
             ->addOption('large-bytes', null, InputOption::VALUE_OPTIONAL, 'Large offloaded payload size for the round trip', '2097152')
-            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the command response as JSON');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int

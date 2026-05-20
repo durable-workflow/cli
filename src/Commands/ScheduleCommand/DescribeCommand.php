@@ -34,13 +34,14 @@ HELP)
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $scheduleId = $input->getArgument('schedule-id');
-        $result = $this->client($input)->get("/schedules/{$scheduleId}");
+        $result = $this->addNamespaceContext($input, $this->client($input)->get("/schedules/{$scheduleId}"));
 
         if ($this->wantsJson($input)) {
             return $this->renderJson($output, $result);
         }
 
         $output->writeln('<info>Schedule: '.$scheduleId.'</info>');
+        $this->writeNamespaceLine($output, $result);
         $output->writeln('  Spec: '.json_encode($result['spec'] ?? null, JSON_UNESCAPED_SLASHES));
         $output->writeln('  Action: '.json_encode($result['action'] ?? null, JSON_UNESCAPED_SLASHES));
         $output->writeln('  State: '.json_encode($result['state'] ?? null, JSON_UNESCAPED_SLASHES));

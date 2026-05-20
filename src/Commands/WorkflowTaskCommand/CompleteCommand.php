@@ -34,7 +34,7 @@ HELP)
             ->addOption('lease-owner', null, InputOption::VALUE_REQUIRED, 'Lease owner identity', 'cli')
             ->addOption('complete-result', null, InputOption::VALUE_OPTIONAL, 'JSON result for a complete_workflow command')
             ->addOption('command', null, InputOption::VALUE_OPTIONAL | InputOption::VALUE_IS_ARRAY, 'Raw workflow task command JSON')
-            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the command response as JSON');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int

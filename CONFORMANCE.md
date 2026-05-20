@@ -58,12 +58,13 @@ public suite keeps that runtime category required in version `8`, and
 the namespace scenario manifest is the stable source for evaluating
 namespace parity against published artifacts.
 
-The CLI's namespace-scoped list outputs include the effective namespace in
-human and JSON modes. `workflow:list` and `schedule:list` also attach the same
-namespace to each JSON/JSONL item so line-oriented automation keeps scope after
-the top-level envelope is dropped. Omitting `--namespace` resolves to the
-configured/default namespace and still sends a single `X-Namespace` header; it
-does not request a cross-namespace aggregate.
+The CLI's namespace-scoped workflow, schedule, and search-attribute outputs
+include the effective namespace in human and JSON modes. List and history
+commands also attach the same namespace to each JSON/JSONL item so
+line-oriented automation keeps scope after the top-level envelope is dropped.
+Omitting `--namespace` resolves to the configured/default namespace and still
+sends a single `X-Namespace` header; it does not request a cross-namespace
+aggregate.
 
 Child workflow commands and JSON output are covered through
 `child_workflow_runtime_contract` when the CLI starts, observes,

@@ -38,7 +38,7 @@ HELP)
             ->addArgument('workflow-id', InputArgument::REQUIRED, 'Workflow ID')
             ->addArgument('query-name', InputArgument::REQUIRED, 'Query name')
             ->addOption('run-id', null, InputOption::VALUE_OPTIONAL, 'Target a specific run ID')
-            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the server response as JSON');
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Output the command response as JSON');
         $this->addInputOptions('Query input payload');
     }
 
@@ -58,13 +58,14 @@ HELP)
             ? "/workflows/{$workflowId}/runs/{$runId}/query/{$queryName}"
             : "/workflows/{$workflowId}/query/{$queryName}";
 
-        $result = $this->client($input, $this->queryHttpTimeoutSeconds($input))->post($path, $body);
+        $result = $this->addNamespaceContext($input, $this->client($input, $this->queryHttpTimeoutSeconds($input))->post($path, $body));
 
         if ($this->wantsJson($input)) {
             return $this->renderJson($output, $result);
         }
 
         $output->writeln('<info>Query result</info>');
+        $this->writeNamespaceLine($output, $result);
         if (isset($result['query_name'])) {
             $output->writeln('  Query: '.$result['query_name']);
         }

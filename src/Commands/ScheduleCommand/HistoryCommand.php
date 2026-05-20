@@ -71,7 +71,7 @@ HELP)
         $cursor = $afterSequence;
         $nextCursor = null;
         $hasMore = false;
-        $namespace = null;
+        $namespace = $this->namespaceContext($input);
 
         do {
             $query = [];
@@ -82,7 +82,7 @@ HELP)
                 $query['after_sequence'] = (string) $cursor;
             }
 
-            $response = $client->get($path, $query);
+            $response = $this->addNamespaceContext($input, $client->get($path, $query), 'events');
 
             $pageEvents = $response['events'] ?? [];
             if (is_array($pageEvents)) {
@@ -111,10 +111,12 @@ HELP)
         }
 
         if ($events === []) {
-            $output->writeln('<comment>No audit events recorded for schedule '.$scheduleId.'.</comment>');
+            $output->writeln(sprintf('<comment>No audit events recorded for schedule %s in namespace %s.</comment>', $scheduleId, $namespace));
 
             return Command::SUCCESS;
         }
+
+        $output->writeln('Namespace: '.$namespace);
 
         $rows = array_map(static function (array $event): array {
             $refs = [];

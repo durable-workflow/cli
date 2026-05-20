@@ -266,7 +266,10 @@ final class ScheduleParityFixtureTest extends TestCase
         self::assertSame($fixture['request']['query'], $client->lastQuery);
 
         $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
-        self::assertSame($fixture['response_body'], $decoded);
+        self::assertSame(
+            self::withScheduleHistoryNamespaceContext($fixture['response_body'], $fixture['semantic_body']['namespace']),
+            $decoded,
+        );
 
         $semantic = $fixture['semantic_body'];
         self::assertSame($semantic['namespace'], $decoded['namespace'] ?? null);
@@ -321,6 +324,23 @@ final class ScheduleParityFixtureTest extends TestCase
         foreach ($payload['schedules'] ?? [] as $index => $schedule) {
             if (is_array($schedule)) {
                 $payload['schedules'][$index]['namespace'] ??= $namespace;
+            }
+        }
+
+        return $payload;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private static function withScheduleHistoryNamespaceContext(array $payload, string $namespace): array
+    {
+        $payload['namespace'] ??= $namespace;
+
+        foreach ($payload['events'] ?? [] as $index => $event) {
+            if (is_array($event)) {
+                $payload['events'][$index]['namespace'] ??= $namespace;
             }
         }
 

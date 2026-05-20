@@ -3,16 +3,18 @@
   "$id": "https://durable-workflow.com/schemas/cli/output/workflow-history.schema.json",
   "title": "dw workflow:history --json",
   "type": "object",
-  "required": ["events"],
+  "required": ["namespace", "events"],
   "properties": {
+    "namespace": { "type": "string" },
     "workflow_id": { "type": ["string", "null"] },
     "run_id": { "type": ["string", "null"] },
     "events": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["event_type"],
+        "required": ["namespace", "event_type"],
         "properties": {
+          "namespace": { "type": "string" },
           "sequence": { "type": ["integer", "null"] },
           "event_type": { "type": "string" },
           "timestamp": { "type": ["string", "null"] },

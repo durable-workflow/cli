@@ -3,8 +3,9 @@
   "$id": "https://durable-workflow.com/schemas/cli/output/workflow-query.schema.json",
   "title": "dw workflow:query --json",
   "type": "object",
-  "required": ["result"],
+  "required": ["namespace", "result"],
   "properties": {
+    "namespace": { "type": "string" },
     "workflow_id": { "type": ["string", "null"] },
     "run_id": { "type": ["string", "null"] },
     "query_name": { "type": ["string", "null"] },

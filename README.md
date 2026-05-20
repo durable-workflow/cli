@@ -234,8 +234,9 @@ Namespace-scoped commands always send exactly one namespace to the server. When
 `--namespace` is omitted, `dw` resolves the namespace from
 `DURABLE_WORKFLOW_NAMESPACE`, the selected profile, or the built-in `default`
 namespace; workflow, schedule, and search-attribute list commands do not fan
-out across all tenant namespaces. Their human and JSON outputs include the
-effective namespace so operators can tell which scope was queried.
+out across all tenant namespaces. Namespace-scoped workflow, schedule, and
+search-attribute commands include the effective namespace in human and JSON
+outputs so operators can tell which scope was queried or mutated.
 
 Invocable activity handlers use the `invocable_http` carrier type in the same
 external executor config file. The CLI validates that these targets stay
@@ -580,15 +581,16 @@ and are covered by [`tests/Commands/ExitCodePolicyTest.php`](tests/Commands/Exit
 ## JSON Output
 
 Every list, describe, read, and mutating command supports `--json` for
-machine-readable output. Mutating commands (POST/PUT/DELETE) return the
-server's raw response body when `--json` is set, making them safe to pipe
-into `jq` or feed into downstream tooling.
+machine-readable output. JSON responses preserve server response fields and
+may add CLI-resolved context, such as the effective `namespace` for
+namespace-scoped commands, making them safe to pipe into `jq` or feed into
+downstream tooling.
 
 ```bash
 # Read surface — stable even when no --json flag is passed for list views.
 dw workflow:list --json | jq '.workflows[].workflow_id'
 
-# Mutating surface — capture server response for idempotent automation.
+# Mutating surface — capture command response for idempotent automation.
 wf_id=$(dw workflow:start --type=orders.Checkout --json | jq -r '.workflow_id')
 dw workflow:signal "$wf_id" approve --json | jq '.command_status'
 ```

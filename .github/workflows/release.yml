@@ -17,12 +17,8 @@ permissions:
 
 env:
   SPC_EXTENSIONS: curl,mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets
-  # Windows: no ext-openssl. PHP's Windows openssl extension fails to
-  # compile against OpenSSL 3 on both 8.3 and 8.4 (php_openssl.h uses
-  # the removed ERR_NUM_ERRORS). We patch spc's config/ext.json to
-  # stop it from being pulled in as a transitive dep of ext-curl;
-  # curl still links libopenssl at the transport layer for TLS.
-  SPC_EXTENSIONS_WINDOWS: curl,mbstring,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets
+  STANDALONE_RUNTIME_EXTENSIONS: curl,mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets
+  SPC_EXTENSIONS_WINDOWS: curl,mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets
   PHP_VERSION: '8.4'
   PHP_VERSION_WINDOWS: '8.4'
   BOX_VERSION: '4.6.6'
@@ -196,11 +192,11 @@ jobs:
           ./spc micro:combine ../../build/dw.phar \
             --output=../../build/dw-${{ matrix.name }}
 
-      - name: Smoke test binary (native arch only)
-        if: matrix.name == 'linux-x86_64' || matrix.name == 'macos-aarch64'
+      - name: Smoke test binary
         run: |
           chmod +x build/dw-${{ matrix.name }}
           ./build/dw-${{ matrix.name }} --version
+          ./build/dw-${{ matrix.name }} runtime:check
           ./build/dw-${{ matrix.name }} list
 
       - uses: actions/upload-artifact@v4
@@ -213,7 +209,6 @@ jobs:
     name: Build windows-x86_64
     needs: [resolve-release, build-phar]
     runs-on: windows-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
         with:
@@ -232,27 +227,10 @@ jobs:
           tools: composer:v2
           coverage: none
 
-      - name: Clone spc and patch ext.json
+      - name: Clone spc
         shell: pwsh
         run: |
-          # Strip 'openssl' from curl's Windows ext-depends. Upstream spc
-          # forces PHP's ext-openssl in whenever ext-curl is built on
-          # Windows, but PHP's Windows ext-openssl fails to compile
-          # against OpenSSL 3 (php_openssl.h references the removed
-          # ERR_NUM_ERRORS). libcurl itself still links libopenssl for
-          # transport-layer TLS, so HTTPS continues to work.
           git clone --depth=1 https://github.com/crazywhalecc/static-php-cli.git build\spc-src
-          @'
-          import json, pathlib
-          p = pathlib.Path("build/spc-src/config/ext.json")
-          d = json.loads(p.read_text())
-          d["curl"]["ext-depends-windows"] = [
-              x for x in d["curl"]["ext-depends-windows"] if x != "openssl"
-          ]
-          p.write_text(json.dumps(d, indent=4))
-          '@ | Set-Content -Path patch-ext.py -Encoding utf8
-          python patch-ext.py
-          Get-Content build\spc-src\config\ext.json | Select-String -Pattern '"curl"' -Context 0,8
 
       - name: Install spc Composer dependencies
         shell: pwsh
@@ -267,7 +245,6 @@ jobs:
           path: |
             build/spc-src/downloads
             build/spc-src/source
-            build/spc-src/buildroot
           key: spc-src-windows-x86_64-php${{ env.PHP_VERSION_WINDOWS }}-${{ hashFiles('.github/workflows/release.yml') }}
           restore-keys: |
             spc-src-windows-x86_64-php${{ env.PHP_VERSION_WINDOWS }}-
@@ -279,6 +256,44 @@ jobs:
           php bin\spc doctor --auto-fix
           php bin\spc download --with-php=${{ env.PHP_VERSION_WINDOWS }} `
             --for-extensions="$env:SPC_EXTENSIONS_WINDOWS" --prefer-pre-built
+
+      - name: Patch PHP OpenSSL 3 compatibility
+        shell: pwsh
+        working-directory: build\spc-src
+        run: |
+          @'
+          import pathlib
+          import re
+
+          headers = list(pathlib.Path("source").rglob("php_openssl.h"))
+          if not headers:
+              raise SystemExit("php_openssl.h was not found after spc download")
+
+          patched = []
+          compat = "#ifndef ERR_NUM_ERRORS\n#define ERR_NUM_ERRORS 16\n#endif\n\n"
+          for header in headers:
+              text = header.read_text()
+              if "ERR_NUM_ERRORS" not in text or "#define ERR_NUM_ERRORS 16" in text:
+                  continue
+
+              patched_text, count = re.subn(r"(#include\s+<openssl/err\.h>\r?\n)", r"\1" + compat, text, count=1)
+              if count == 1:
+                  text = patched_text
+              else:
+                  text = compat + text
+
+              header.write_text(text)
+              patched.append(str(header))
+
+          if patched:
+              print("Patched OpenSSL ERR_NUM_ERRORS compatibility in:")
+              for path in patched:
+                  print(f"  {path}")
+          else:
+              print("No ERR_NUM_ERRORS compatibility patch was needed.")
+          '@ | Set-Content -Path patch-php-openssl.py -Encoding utf8
+          python patch-php-openssl.py
+          Remove-Item -Recurse -Force buildroot -ErrorAction SilentlyContinue
 
       - name: Build phpmicro SAPI with extensions
         shell: pwsh
@@ -304,6 +319,7 @@ jobs:
         shell: pwsh
         run: |
           .\build\dw-windows-x86_64.exe --version
+          .\build\dw-windows-x86_64.exe runtime:check
           .\build\dw-windows-x86_64.exe list
 
       - uses: actions/upload-artifact@v4
@@ -314,11 +330,12 @@ jobs:
 
   release:
     name: Publish Release
-    # Wait for the optional Windows build before publishing so a successful
-    # Windows artifact is included in the release and SHA256SUMS.
+    # Every supported standalone platform must publish before the release
+    # asset list, SHA256SUMS, installers, and public download endpoints are
+    # considered complete.
     needs: [resolve-release, build-phar, build-binary, build-binary-windows]
     runs-on: ubuntu-latest
-    if: ${{ always() && needs.resolve-release.result == 'success' && needs.build-phar.result == 'success' && needs.build-binary.result == 'success' }}
+    if: ${{ always() && needs.resolve-release.result == 'success' && needs.build-phar.result == 'success' && needs.build-binary.result == 'success' && needs.build-binary-windows.result == 'success' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -345,6 +362,7 @@ jobs:
             dw-linux-x86_64
             dw-linux-aarch64
             dw-macos-aarch64
+            dw-windows-x86_64.exe
             install.sh
             install.ps1
             verify-release.sh
@@ -355,10 +373,6 @@ jobs:
               exit 1
             fi
           done
-
-          if [ ! -s dist/dw-windows-x86_64.exe ]; then
-            echo "::warning::Optional Windows release artifact is not present"
-          fi
 
           sh -n dist/install.sh
           sh -n dist/verify-release.sh
@@ -444,6 +458,7 @@ jobs:
             dw-linux-x86_64
             dw-linux-aarch64
             dw-macos-aarch64
+            dw-windows-x86_64.exe
             dw.rb
             install.sh
             install.ps1
@@ -451,13 +466,33 @@ jobs:
             SHA256SUMS
           )
 
-          if [ -s dist/dw-windows-x86_64.exe ]; then
-            public_assets+=(dw-windows-x86_64.exe)
-          fi
-
           for asset in "${public_assets[@]}"; do
             wait_for_asset "$asset"
           done
+
+          evidence="release-public-download-evidence.json"
+          release_commit="$(git rev-parse HEAD)"
+          verified_at="$(date -u +%FT%TZ)"
+          {
+            printf '{\n'
+            printf '  "tag": "%s",\n' "$tag"
+            printf '  "commit": "%s",\n' "$release_commit"
+            printf '  "artifact_versions": {"cli": "%s"},\n' "$tag"
+            printf '  "verified_at": "%s",\n' "$verified_at"
+            printf '  "outcome": "pass",\n'
+            printf '  "assets": [\n'
+            last_index=$((${#public_assets[@]} - 1))
+            for i in "${!public_assets[@]}"; do
+              asset="${public_assets[$i]}"
+              comma=","
+              if [ "$i" -eq "$last_index" ]; then
+                comma=""
+              fi
+              printf '    {"name": "%s", "url": "%s"}%s\n' "$asset" "$(public_asset_url "$asset")" "$comma"
+            done
+            printf '  ]\n'
+            printf '}\n'
+          } > "$evidence"
 
           installer="$(mktemp)"
           install_dir="$(mktemp -d)"
@@ -468,3 +503,10 @@ jobs:
             DURABLE_WORKFLOW_RELEASE_BASE_URL="https://github.com/${release_repo}/releases" \
             DURABLE_WORKFLOW_BIN_NAME=dw-release-check sh "$installer"
           "$install_dir/dw-release-check" --version
+
+      - name: Upload public download evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-public-download-evidence
+          path: release-public-download-evidence.json
+          if-no-files-found: error

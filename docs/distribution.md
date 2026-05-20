@@ -33,8 +33,8 @@ The provenance boundary for the 0.1.x line is:
    `durable-workflow/cli`. The release workflow runs only on
    `refs/tags/<MAJOR>.<MINOR>.<PATCH>*`.
 2. **`SHA256SUMS`** — generated inside the release workflow over every
-   asset that is actually published for the tag (PHAR, every native
-   binary that built successfully, the installer scripts, the
+   supported release asset for the tag (PHAR, Linux x86_64, Linux
+   aarch64, macOS aarch64, Windows x86_64, the installer scripts, the
    `verify-release.sh` helper, and the generated Homebrew formula).
 3. **GitHub artifact attestations** — the release workflow signs every
    asset (including `SHA256SUMS`) with the GitHub Actions OIDC identity

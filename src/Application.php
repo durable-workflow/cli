@@ -13,6 +13,7 @@ use DurableWorkflow\Cli\Commands\UpgradeCommand;
 use DurableWorkflow\Cli\Commands\EnvCommand;
 use DurableWorkflow\Cli\Commands\NamespaceCommand;
 use DurableWorkflow\Cli\Commands\QueryTaskCommand;
+use DurableWorkflow\Cli\Commands\RuntimeCheckCommand;
 use DurableWorkflow\Cli\Commands\ScheduleCommand;
 use DurableWorkflow\Cli\Commands\SchemaCommand;
 use DurableWorkflow\Cli\Commands\SearchAttributeCommand;
@@ -61,6 +62,7 @@ class Application extends ConsoleApplication
             new DoctorCommand(),
             new DebugCommand(),
             new UpgradeCommand(),
+            new RuntimeCheckCommand(),
 
             // Workflow operations
             new WorkflowCommand\StartCommand(),

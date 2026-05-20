@@ -29,6 +29,12 @@ final class ReleaseInstallerContractTest extends TestCase
         self::assertStringContainsString('wait_for_asset()', $releaseWorkflow);
         self::assertStringContainsString('VERSION="$tag" DURABLE_WORKFLOW_INSTALL_DIR="$install_dir"', $releaseWorkflow);
         self::assertStringNotContainsString('scripts/verify-public-release-assets.sh "${{ needs.resolve-release.outputs.tag }}"', $releaseWorkflow);
+        self::assertStringNotContainsString('continue-on-error: true', $releaseWorkflow);
+        self::assertStringContainsString("needs.build-binary-windows.result == 'success'", $releaseWorkflow);
+        self::assertStringContainsString('dw-windows-x86_64.exe', $releaseWorkflow);
+        self::assertStringContainsString('.\\build\\dw-windows-x86_64.exe runtime:check', $releaseWorkflow);
+        self::assertStringContainsString('release-public-download-evidence.json', $releaseWorkflow);
+        self::assertStringContainsString('"artifact_versions": {"cli": "%s"}', $releaseWorkflow);
         self::assertStringContainsString('install.sh', $releaseWorkflow);
         self::assertStringContainsString('install.ps1', $releaseWorkflow);
         self::assertStringContainsString('verify-release.sh', $releaseWorkflow);
@@ -60,6 +66,7 @@ final class ReleaseInstallerContractTest extends TestCase
         self::assertStringContainsString('tag="${raw_tag#v}"', $publicAssetVerifier);
         self::assertStringContainsString('releases/download/${tag}/${artifact}', $publicAssetVerifier);
         self::assertStringContainsString('curl -fsSLI --retry 3 --retry-all-errors', $publicAssetVerifier);
+        self::assertStringContainsString('dw-windows-x86_64.exe', $publicAssetVerifier);
         self::assertStringContainsString('Tagged releases include `verify-release.sh`', $readme);
         self::assertStringContainsString('verify-release.sh --attest', $readme);
     }
@@ -150,6 +157,21 @@ final class ReleaseInstallerContractTest extends TestCase
         // Auto-update is documented as the explicit dw upgrade path.
         self::assertStringContainsString('## Auto-update', $doc);
         self::assertStringContainsString('dw upgrade', $doc);
+    }
+
+    public function test_release_runtime_check_pins_required_standalone_extensions(): void
+    {
+        $releaseWorkflow = self::readRepoFile('.github/workflows/release.yml');
+        $runtimeCheck = self::readRepoFile('src/Commands/RuntimeCheckCommand.php');
+
+        self::assertStringContainsString('STANDALONE_RUNTIME_EXTENSIONS: curl,mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets', $releaseWorkflow);
+        self::assertStringContainsString('Patch PHP OpenSSL 3 compatibility', $releaseWorkflow);
+        self::assertStringContainsString("public const REQUIRED_EXTENSIONS", $runtimeCheck);
+        self::assertStringContainsString("'curl'", $runtimeCheck);
+        self::assertStringContainsString("'mbstring'", $runtimeCheck);
+        self::assertStringContainsString("'openssl'", $runtimeCheck);
+        self::assertStringContainsString("'sockets'", $runtimeCheck);
+        self::assertStringContainsString("setHidden(true)", $runtimeCheck);
     }
 
     public function test_release_pipeline_pins_source_date_epoch(): void

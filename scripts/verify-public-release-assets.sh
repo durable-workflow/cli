@@ -22,7 +22,7 @@ Verifies that every named asset is downloadable from:
 
 Tags may include one optional leading "v"; public release URLs use the
 repository's bare tag name.
-If no assets are provided, the required Unix installer surface is checked.
+If no assets are provided, every supported public release asset is checked.
 Override the repository with DURABLE_WORKFLOW_REPO=owner/name.
 USAGE
 }
@@ -45,6 +45,7 @@ if [ "$#" -eq 0 ]; then
         dw-linux-x86_64 \
         dw-linux-aarch64 \
         dw-macos-aarch64 \
+        dw-windows-x86_64.exe \
         dw.rb \
         install.sh \
         install.ps1 \

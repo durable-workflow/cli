@@ -108,10 +108,11 @@ for the underlying steps; tools are cached under `build/.tools/`.
 ### Release Policy
 
 Release assets are published from the tagged source by GitHub Actions. Each
-release includes `SHA256SUMS` for `dw.phar` and every native binary that was
-built for that tag. The release workflow waits for Linux, macOS, and Windows
-builders before publishing the manifest; Windows remains optional when that
-runner fails, and the manifest reflects the assets that are actually present.
+release includes `SHA256SUMS` for `dw.phar` and every supported native binary
+for that tag: Linux x86_64, Linux aarch64, macOS aarch64, and Windows x86_64.
+The release workflow waits for all supported platform builders before
+publishing the manifest; a failed platform build blocks the release instead of
+publishing a partial standalone surface.
 
 The release workflow also publishes artifact attestations for every release
 asset, including `SHA256SUMS`, the installer scripts, and the generated

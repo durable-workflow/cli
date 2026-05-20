@@ -2,7 +2,7 @@
 
 The `dw` CLI participates in the public platform conformance suite
 specified by [`durable-workflow.github.io/static/platform-conformance-contract.json`](https://durable-workflow.github.io/platform-conformance-contract.json),
-schema `durable-workflow.v2.platform-conformance.suite`, version `6`,
+schema `durable-workflow.v2.platform-conformance.suite`, version `7`,
 and documented at the public
 [Platform Conformance Suite](https://durable-workflow.github.io/docs/2.0/platform-conformance)
 authority page. This document is the per-repo claim: it lists the
@@ -19,11 +19,11 @@ The CLI claims one target from the suite's matrix:
 
 The authority row for `cli_json_client` requires
 `control_plane_request_response` (request side),
-`signal_query_runtime_contract`, `namespace_runtime_contract`, and
-`cli_json_envelopes`. The CLI-owned fixtures below are the source for
-the control-plane and JSON-envelope categories. The stable runtime
-categories are sourced from the public scenario manifests named in the
-suite.
+`signal_query_runtime_contract`, `namespace_runtime_contract`,
+`child_workflow_runtime_contract`, and `cli_json_envelopes`. The
+CLI-owned fixtures below are the source for the control-plane and
+JSON-envelope categories. The stable runtime categories are sourced
+from the public scenario manifests named in the suite.
 
 ## Fixture sources served by this repo
 
@@ -37,8 +37,9 @@ suite.
 
 | Category | Source path | Status |
 | --- | --- | --- |
-| `signal_query_runtime_contract` | `durable-workflow.github.io/static/platform-conformance/signal-query-runtime-scenarios.json` (served at `/platform-conformance/signal-query-runtime-scenarios.json`) | stable, suite version `6` |
-| `namespace_runtime_contract` | `durable-workflow.github.io/static/platform-conformance/namespace-runtime-scenarios.json` (served at `/platform-conformance/namespace-runtime-scenarios.json`) | stable, suite version `6` |
+| `signal_query_runtime_contract` | `durable-workflow.github.io/static/platform-conformance/signal-query-runtime-scenarios.json` (served at `/platform-conformance/signal-query-runtime-scenarios.json`) | stable, suite version `7` |
+| `namespace_runtime_contract` | `durable-workflow.github.io/static/platform-conformance/namespace-runtime-scenarios.json` (served at `/platform-conformance/namespace-runtime-scenarios.json`) | stable, suite version `7` |
+| `child_workflow_runtime_contract` | `durable-workflow.github.io/static/platform-conformance/child-workflow-runtime-scenarios.json` (served at `/platform-conformance/child-workflow-runtime-scenarios.json`) | stable, suite version `7` |
 
 The fixtures in this repo are exercised today by:
 
@@ -53,9 +54,17 @@ against published artifacts.
 
 Namespace commands, `--namespace` scoping, JSON namespace context, and
 default-scope behavior are covered by `namespace_runtime_contract`. The
-public suite defines that runtime category in version `6`, and the
-namespace scenario manifest is the stable source for evaluating namespace
-parity against published artifacts.
+public suite keeps that runtime category required in version `7`, and
+the namespace scenario manifest is the stable source for evaluating
+namespace parity against published artifacts.
+
+Child workflow commands and JSON output are covered through
+`child_workflow_runtime_contract` when the CLI starts, observes,
+cancels, or queries parent workflows that orchestrate child workflow
+runs. The public suite defines that runtime category in version `7`, and
+the child-workflow scenario manifest is the stable source for evaluating
+same-language, cross-language, cancellation, replay, fan-out, and
+namespace behavior against published artifacts.
 
 ## Release gate
 
@@ -66,7 +75,7 @@ document before tag, with the conformance level at `full` or
 | Field | Value |
 | --- | --- |
 | Required claimed targets | `cli_json_client` |
-| Required suite version | public docs-site manifest `durable-workflow.v2.platform-conformance.suite` version `6` |
+| Required suite version | public docs-site manifest `durable-workflow.v2.platform-conformance.suite` version `7` |
 | CI job | `platform-conformance` (lands when the harness reference implementation publishes; until then `sdk-python-parity` covers CLI-owned fixture parity) |
 | Block on `nonconforming` | yes |
 | Artifact attached to release | harness result document, schema `durable-workflow.v2.platform-conformance.result` |
@@ -80,6 +89,7 @@ category emits a warning and does not block.
 - Authority manifest: <https://durable-workflow.github.io/platform-conformance-contract.json>
 - Signal/query runtime scenarios: <https://durable-workflow.github.io/platform-conformance/signal-query-runtime-scenarios.json>
 - Namespace runtime scenarios: <https://durable-workflow.github.io/platform-conformance/namespace-runtime-scenarios.json>
+- Child-workflow runtime scenarios: <https://durable-workflow.github.io/platform-conformance/child-workflow-runtime-scenarios.json>
 - Public docs page: <https://durable-workflow.github.io/docs/2.0/compatibility>
 - Polyglot parity doc:
   <https://durable-workflow.github.io/docs/polyglot/cli-python-parity>

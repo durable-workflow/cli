@@ -24,11 +24,14 @@ status bucket, and free-form visibility query can all be applied at
 once. <comment>--output=json</comment> (or <comment>--json</comment>)
 emits a single JSON document; <comment>--output=jsonl</comment> streams
 one JSON object per line for scripting over large result sets.
+When <comment>--namespace</comment> is omitted, the command queries the
+resolved default namespace only; it never enumerates all namespaces.
 
 <comment>Examples:</comment>
 
   # Last 20 workflows in the namespace
   <info>dw workflow:list</info>
+  <info>dw workflow:list --namespace=orders</info>
 
   # Just the running ones, up to 100
   <info>dw workflow:list --status=running --limit=100</info>
@@ -63,24 +66,27 @@ HELP)
             return Command::INVALID;
         }
 
-        $result = $this->client($input)->get('/workflows', array_filter([
+        $result = $this->addNamespaceContext($input, $this->client($input)->get('/workflows', array_filter([
             'workflow_type' => $input->getOption('type'),
             'status' => $input->getOption('status'),
             'query' => $input->getOption('query'),
             'page_size' => (int) $input->getOption('limit'),
-        ], fn ($v) => $v !== null));
+        ], fn ($v) => $v !== null)), 'workflows');
 
         if ($this->wantsJson($input)) {
             return $this->renderJsonList($output, $input, $result, 'workflows');
         }
 
         $workflows = $result['workflows'] ?? [];
+        $namespace = $this->namespaceContext($input, $result);
 
         if (empty($workflows)) {
-            $output->writeln('<comment>No workflows found.</comment>');
+            $output->writeln(sprintf('<comment>No workflows found in namespace %s.</comment>', $namespace));
 
             return Command::SUCCESS;
         }
+
+        $output->writeln('Namespace: '.$namespace);
 
         $rows = array_map(fn ($w) => [
             $w['workflow_id'] ?? '-',

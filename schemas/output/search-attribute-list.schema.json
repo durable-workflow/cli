@@ -3,8 +3,9 @@
   "$id": "https://durable-workflow.com/schemas/cli/output/search-attribute-list.schema.json",
   "title": "dw search-attribute:list --json",
   "type": "object",
-  "required": ["system_attributes", "custom_attributes"],
+  "required": ["namespace", "system_attributes", "custom_attributes"],
   "properties": {
+    "namespace": { "type": "string" },
     "system_attributes": {
       "type": "object",
       "additionalProperties": { "type": "string" }

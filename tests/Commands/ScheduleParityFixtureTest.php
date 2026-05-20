@@ -52,15 +52,21 @@ final class ScheduleParityFixtureTest extends TestCase
         $command->setServerClient($client);
 
         $tester = new CommandTester($command);
+        $namespace = $fixture['semantic_body']['namespace'];
 
-        self::assertSame(Command::SUCCESS, $tester->execute($fixture['cli']['argv']));
+        self::assertSame(Command::SUCCESS, $tester->execute($fixture['cli']['argv'] + [
+            '--namespace' => $namespace,
+        ]));
 
         self::assertSame($fixture['request']['method'], $client->lastMethod);
         self::assertSame($fixture['request']['path'], $client->lastPath);
         self::assertSame([], $client->lastQuery);
 
         $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
-        self::assertSame($fixture['response_body'], $decoded);
+        self::assertSame(
+            self::withScheduleListNamespaceContext($fixture['response_body'], $namespace),
+            $decoded,
+        );
 
         $semantic = $fixture['semantic_body'];
         self::assertSame($semantic['schedule_ids'], array_column($decoded['schedules'] ?? [], 'schedule_id'));
@@ -302,6 +308,23 @@ final class ScheduleParityFixtureTest extends TestCase
         self::assertSame($operation, $fixture['operation'] ?? null);
 
         return $fixture;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private static function withScheduleListNamespaceContext(array $payload, string $namespace): array
+    {
+        $payload['namespace'] = $namespace;
+
+        foreach ($payload['schedules'] ?? [] as $index => $schedule) {
+            if (is_array($schedule)) {
+                $payload['schedules'][$index]['namespace'] ??= $namespace;
+            }
+        }
+
+        return $payload;
     }
 }
 

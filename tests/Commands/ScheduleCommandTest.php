@@ -55,6 +55,28 @@ class ScheduleCommandTest extends TestCase
         self::assertStringContainsString('paused', $display);
     }
 
+    public function test_list_command_renders_selected_namespace_in_table_output(): void
+    {
+        $command = new ListCommand();
+        $command->setServerClient(new ScheduleFakeClient([
+            'schedules' => [
+                [
+                    'schedule_id' => 'daily-report',
+                    'workflow_type' => 'reports.daily',
+                    'paused' => false,
+                ],
+            ],
+        ]));
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            '--namespace' => 'tenant-a',
+        ]));
+
+        self::assertStringContainsString('Namespace: tenant-a', $tester->getDisplay());
+    }
+
     public function test_list_command_renders_json_output(): void
     {
         $command = new ListCommand();
@@ -71,12 +93,15 @@ class ScheduleCommandTest extends TestCase
         $tester = new CommandTester($command);
 
         self::assertSame(Command::SUCCESS, $tester->execute([
+            '--namespace' => 'tenant-a',
             '--json' => true,
         ]));
 
         $decoded = json_decode($tester->getDisplay(), true);
 
         self::assertIsArray($decoded);
+        self::assertSame('tenant-a', $decoded['namespace'] ?? null);
+        self::assertSame('tenant-a', $decoded['schedules'][0]['namespace'] ?? null);
         self::assertSame('daily-report', $decoded['schedules'][0]['schedule_id']);
     }
 

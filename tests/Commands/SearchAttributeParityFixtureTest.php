@@ -22,15 +22,21 @@ final class SearchAttributeParityFixtureTest extends TestCase
         $command->setServerClient($client);
 
         $tester = new CommandTester($command);
+        $namespace = 'orders-prod';
 
-        self::assertSame(Command::SUCCESS, $tester->execute($fixture['cli']['argv']));
+        self::assertSame(Command::SUCCESS, $tester->execute($fixture['cli']['argv'] + [
+            '--namespace' => $namespace,
+        ]));
 
         self::assertSame($fixture['request']['method'], $client->lastMethod);
         self::assertSame($fixture['request']['path'], $client->lastPath);
         self::assertSame([], $client->lastQuery);
 
         $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
-        self::assertSame($fixture['response_body'], $decoded);
+        self::assertSame(
+            $fixture['response_body'] + ['namespace' => $namespace],
+            $decoded,
+        );
         self::assertSame($fixture['semantic_body']['system_attributes'], $decoded['system_attributes'] ?? null);
         self::assertSame($fixture['semantic_body']['custom_attributes'], $decoded['custom_attributes'] ?? null);
     }

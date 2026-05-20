@@ -478,6 +478,32 @@ abstract class BaseCommand extends Command
         return $this->renderJson($output, $envelope);
     }
 
+    protected function addNamespaceContext(InputInterface $input, array $payload, ?string $itemsKey = null): array
+    {
+        $namespace = $this->namespaceContext($input, $payload);
+        $payload['namespace'] = $namespace;
+
+        if ($itemsKey !== null && isset($payload[$itemsKey]) && is_array($payload[$itemsKey])) {
+            foreach ($payload[$itemsKey] as $index => $item) {
+                if (is_array($item) && ! $this->hasNonEmptyString($item['namespace'] ?? null)) {
+                    $payload[$itemsKey][$index]['namespace'] = $namespace;
+                }
+            }
+        }
+
+        return $payload;
+    }
+
+    protected function namespaceContext(InputInterface $input, array $_payload = []): string
+    {
+        return $this->resolvedConnection($input)->namespace;
+    }
+
+    private function hasNonEmptyString(mixed $value): bool
+    {
+        return is_scalar($value) && trim((string) $value) !== '';
+    }
+
     /**
      * Declare --json on a mutating command. Pair with {@see wantsJson()} in
      * execute() to return the raw server response instead of the human-readable

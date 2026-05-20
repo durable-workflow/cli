@@ -581,6 +581,80 @@ class WorkflowReadCommandTest extends TestCase
         self::assertStringContainsString('order-123', $display);
     }
 
+    public function test_list_command_renders_selected_namespace_in_table_output(): void
+    {
+        $command = new ListCommand();
+        $command->setServerClient(new WorkflowReadFakeServerClient([
+            'workflows' => [
+                [
+                    'workflow_id' => 'wf-tenant-a',
+                    'workflow_type' => 'orders.process',
+                    'status' => 'running',
+                ],
+            ],
+        ]));
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            '--namespace' => 'tenant-a',
+        ]));
+
+        self::assertStringContainsString('Namespace: tenant-a', $tester->getDisplay());
+    }
+
+    public function test_list_command_adds_selected_namespace_to_json_output(): void
+    {
+        $command = new ListCommand();
+        $command->setServerClient(new WorkflowReadFakeServerClient([
+            'workflows' => [
+                [
+                    'workflow_id' => 'wf-tenant-a',
+                    'workflow_type' => 'orders.process',
+                    'status' => 'running',
+                ],
+            ],
+        ]));
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            '--namespace' => 'tenant-a',
+            '--output' => 'json',
+        ]));
+
+        $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+
+        self::assertSame('tenant-a', $decoded['namespace'] ?? null);
+        self::assertSame('tenant-a', $decoded['workflows'][0]['namespace'] ?? null);
+    }
+
+    public function test_list_command_adds_selected_namespace_to_jsonl_items(): void
+    {
+        $command = new ListCommand();
+        $command->setServerClient(new WorkflowReadFakeServerClient([
+            'workflows' => [
+                [
+                    'workflow_id' => 'wf-tenant-a',
+                    'workflow_type' => 'orders.process',
+                    'status' => 'running',
+                ],
+            ],
+        ]));
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            '--namespace' => 'tenant-a',
+            '--output' => 'jsonl',
+        ]));
+
+        $decoded = json_decode(trim($tester->getDisplay()), true, flags: JSON_THROW_ON_ERROR);
+
+        self::assertSame('tenant-a', $decoded['namespace'] ?? null);
+        self::assertSame('wf-tenant-a', $decoded['workflow_id'] ?? null);
+    }
+
     public function test_describe_command_colors_status_only_when_output_is_decorated(): void
     {
         $payload = [

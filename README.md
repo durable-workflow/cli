@@ -230,6 +230,13 @@ path, mTLS certificate path plus key reference, or signed-header key reference
 plus header allowlist. They must not persist bearer tokens, private keys, or
 signing secrets inline.
 
+Namespace-scoped commands always send exactly one namespace to the server. When
+`--namespace` is omitted, `dw` resolves the namespace from
+`DURABLE_WORKFLOW_NAMESPACE`, the selected profile, or the built-in `default`
+namespace; workflow, schedule, and search-attribute list commands do not fan
+out across all tenant namespaces. Their human and JSON outputs include the
+effective namespace so operators can tell which scope was queried.
+
 Invocable activity handlers use the `invocable_http` carrier type in the same
 external executor config file. The CLI validates that these targets stay
 activity-only, use `POST`, declare an absolute HTTPS URL, avoid embedded URL
@@ -353,6 +360,7 @@ dw workflow:start --type=order.process --execution-timeout=3600 --run-timeout=60
 
 # List workflows
 dw workflow:list
+dw workflow:list --namespace=orders
 dw workflow:list --status=running
 dw workflow:list --type=order.process
 
@@ -435,6 +443,7 @@ dw schedule:create --schedule-id=daily-report --workflow-type=reports.daily --cr
 
 # List schedules
 dw schedule:list
+dw schedule:list --namespace=orders
 
 # Describe a schedule
 dw schedule:describe daily-report

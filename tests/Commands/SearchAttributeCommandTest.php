@@ -41,6 +41,27 @@ class SearchAttributeCommandTest extends TestCase
         self::assertStringContainsString('Priority', $display);
     }
 
+    public function test_list_command_renders_selected_namespace_in_table_output(): void
+    {
+        $command = new ListCommand();
+        $command->setServerClient(new SearchAttributeFakeClient([
+            'system_attributes' => [
+                'WorkflowType' => 'keyword',
+            ],
+            'custom_attributes' => [
+                'OrderStatus' => 'keyword',
+            ],
+        ]));
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            '--namespace' => 'tenant-a',
+        ]));
+
+        self::assertStringContainsString('Namespace: tenant-a', $tester->getDisplay());
+    }
+
     public function test_list_command_shows_message_when_no_attributes_exist(): void
     {
         $command = new ListCommand();
@@ -71,12 +92,14 @@ class SearchAttributeCommandTest extends TestCase
         $tester = new CommandTester($command);
 
         self::assertSame(Command::SUCCESS, $tester->execute([
+            '--namespace' => 'tenant-a',
             '--json' => true,
         ]));
 
         $decoded = json_decode($tester->getDisplay(), true);
 
         self::assertIsArray($decoded);
+        self::assertSame('tenant-a', $decoded['namespace'] ?? null);
         self::assertSame('keyword', $decoded['system_attributes']['WorkflowType']);
         self::assertSame('keyword', $decoded['custom_attributes']['OrderStatus']);
     }

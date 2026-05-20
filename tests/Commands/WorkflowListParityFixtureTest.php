@@ -20,8 +20,11 @@ final class WorkflowListParityFixtureTest extends TestCase
         $command->setServerClient($client);
 
         $tester = new CommandTester($command);
+        $namespace = 'orders-prod';
 
-        self::assertSame(Command::SUCCESS, $tester->execute($fixture['cli']['argv']));
+        self::assertSame(Command::SUCCESS, $tester->execute($fixture['cli']['argv'] + [
+            '--namespace' => $namespace,
+        ]));
 
         self::assertSame($fixture['request']['method'], $client->lastMethod);
         self::assertSame($fixture['request']['path'], $client->lastPath);
@@ -36,7 +39,10 @@ final class WorkflowListParityFixtureTest extends TestCase
         ], $client->validatedOptions);
 
         $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
-        self::assertSame($fixture['response_body'], $decoded);
+        self::assertSame(
+            self::withNamespaceContext($fixture['response_body'], $namespace),
+            $decoded,
+        );
 
         $semantic = $fixture['semantic_body'];
         self::assertSame(
@@ -66,6 +72,23 @@ final class WorkflowListParityFixtureTest extends TestCase
         self::assertSame('workflow.list', $fixture['operation'] ?? null);
 
         return $fixture;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private static function withNamespaceContext(array $payload, string $namespace): array
+    {
+        $payload['namespace'] = $namespace;
+
+        foreach ($payload['workflows'] ?? [] as $index => $workflow) {
+            if (is_array($workflow)) {
+                $payload['workflows'][$index]['namespace'] ??= $namespace;
+            }
+        }
+
+        return $payload;
     }
 }
 

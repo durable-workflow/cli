@@ -19,11 +19,14 @@ class ListCommand extends BaseCommand
             ->setDescription('List all schedules')
             ->setHelp(<<<'HELP'
 List every schedule in the current namespace with next/last fire
-times.
+times. When <comment>--namespace</comment> is omitted, the command
+queries the resolved default namespace only; it never enumerates all
+namespaces.
 
 <comment>Examples:</comment>
 
   <info>dw schedule:list</info>
+  <info>dw schedule:list --namespace=orders</info>
   <info>dw schedule:list --output=json | jq '.schedules[] | select(.paused)'</info>
   <info>dw schedule:list --output=jsonl | jq 'select(.paused)'</info>
 HELP)
@@ -32,19 +35,22 @@ HELP)
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $result = $this->client($input)->get('/schedules');
+        $result = $this->addNamespaceContext($input, $this->client($input)->get('/schedules'), 'schedules');
 
         if ($this->wantsJson($input)) {
             return $this->renderJsonList($output, $input, $result, 'schedules');
         }
 
         $schedules = $result['schedules'] ?? [];
+        $namespace = $this->namespaceContext($input, $result);
 
         if (empty($schedules)) {
-            $output->writeln('<comment>No schedules found.</comment>');
+            $output->writeln(sprintf('<comment>No schedules found in namespace %s.</comment>', $namespace));
 
             return Command::SUCCESS;
         }
+
+        $output->writeln('Namespace: '.$namespace);
 
         $rows = array_map(fn ($s) => [
             $s['schedule_id'] ?? '-',

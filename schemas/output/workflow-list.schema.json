@@ -3,14 +3,16 @@
   "$id": "https://durable-workflow.com/schemas/cli/output/workflow-list.schema.json",
   "title": "dw workflow:list --json",
   "type": "object",
-  "required": ["workflows"],
+  "required": ["namespace", "workflows"],
   "properties": {
+    "namespace": { "type": "string" },
     "workflows": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["workflow_id"],
+        "required": ["namespace", "workflow_id"],
         "properties": {
+          "namespace": { "type": "string" },
           "workflow_id": { "type": "string" },
           "run_id": { "type": ["string", "null"] },
           "workflow_type": { "type": ["string", "null"] },

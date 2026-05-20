@@ -19,11 +19,14 @@ class ListCommand extends BaseCommand
             ->setDescription('List search attribute definitions')
             ->setHelp(<<<'HELP'
 List every search attribute — system-defined attributes shipped by the
-server and any custom attributes registered for this namespace.
+server and any custom attributes registered for this namespace. When
+<comment>--namespace</comment> is omitted, the command queries the
+resolved default namespace only; it never enumerates all namespaces.
 
 <comment>Examples:</comment>
 
   <info>dw search-attribute:list</info>
+  <info>dw search-attribute:list --namespace=orders</info>
   <info>dw search-attribute:list --output=json | jq '.custom_attributes'</info>
 HELP)
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output as JSON (alias for --output=json)');
@@ -31,7 +34,7 @@ HELP)
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $result = $this->client($input)->get('/search-attributes');
+        $result = $this->addNamespaceContext($input, $this->client($input)->get('/search-attributes'));
 
         if ($this->wantsJson($input)) {
             // system_attributes / custom_attributes are name→type maps, not
@@ -49,12 +52,15 @@ HELP)
             $rows[] = [$name, $type, 'custom'];
         }
 
+        $namespace = $this->namespaceContext($input, $result);
+
         if (empty($rows)) {
-            $output->writeln('<comment>No search attributes found.</comment>');
+            $output->writeln(sprintf('<comment>No search attributes found in namespace %s.</comment>', $namespace));
 
             return Command::SUCCESS;
         }
 
+        $output->writeln('Namespace: '.$namespace);
         $this->renderTable($output, ['Name', 'Type', 'Source'], $rows);
 
         return Command::SUCCESS;

@@ -26,6 +26,7 @@ env:
   PHP_VERSION: '8.4'
   PHP_VERSION_WINDOWS: '8.4'
   BOX_VERSION: '4.6.6'
+  SPC_DOWNLOAD_RETRY: '5'
   # Passed to every spc step so it can use authenticated GitHub API calls
   # when fetching source tarballs / pre-built libs (avoids 403 rate limits).
   GITHUB_TOKEN: ${{ github.token }}
@@ -184,11 +185,20 @@ jobs:
         run: |
           ./spc doctor --auto-fix || true
           ./spc download --with-php=${{ env.PHP_VERSION }} \
-            --for-extensions="$SPC_EXTENSIONS" --prefer-pre-built
+            --for-extensions="$SPC_EXTENSIONS" --prefer-pre-built \
+            --without-suggestions --retry="${SPC_DOWNLOAD_RETRY}"
 
       - name: Build phpmicro SAPI with extensions
         working-directory: build/.tools
         run: ./spc build "$SPC_EXTENSIONS" --build-micro
+
+      - name: Upload spc build logs (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}-spc-logs
+          path: build/.tools/log/
+          if-no-files-found: warn
 
       - name: Combine PHAR into standalone binary
         working-directory: build/.tools
@@ -259,7 +269,8 @@ jobs:
         run: |
           php bin\spc doctor --auto-fix
           php bin\spc download --with-php=${{ env.PHP_VERSION_WINDOWS }} `
-            --for-extensions="$env:SPC_EXTENSIONS_WINDOWS" --prefer-pre-built
+            --for-extensions="$env:SPC_EXTENSIONS_WINDOWS" --prefer-pre-built `
+            --without-suggestions --retry="$env:SPC_DOWNLOAD_RETRY"
           Remove-Item -Recurse -Force source\php-src -ErrorAction SilentlyContinue
           php bin\spc extract php-src
 

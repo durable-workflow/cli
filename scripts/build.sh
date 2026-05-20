@@ -20,6 +20,7 @@ PHAR_OUT="$BUILD_DIR/dw.phar"
 # Extensions required by the CLI at runtime. Keep this list in sync with the
 # CI matrix in .github/workflows/release.yml.
 SPC_EXTENSIONS="curl,mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets"
+SPC_DOWNLOAD_RETRY="${SPC_DOWNLOAD_RETRY:-5}"
 
 BOX_VERSION="${BOX_VERSION:-4.6.6}"
 BOX_URL="https://github.com/box-project/box/releases/download/${BOX_VERSION}/box.phar"
@@ -123,7 +124,8 @@ build_binary() {
 
     pushd "$TOOLS_DIR" >/dev/null
     echo ">> Downloading PHP ${php_version} source + extension deps"
-    ./spc download --with-php="$php_version" --for-extensions="$SPC_EXTENSIONS" --prefer-pre-built
+    ./spc download --with-php="$php_version" --for-extensions="$SPC_EXTENSIONS" \
+        --prefer-pre-built --without-suggestions --retry="$SPC_DOWNLOAD_RETRY"
     echo ">> Compiling phpmicro with required extensions"
     ./spc build "$SPC_EXTENSIONS" --build-micro
     echo ">> Embedding PHAR into micro SAPI"

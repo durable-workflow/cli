@@ -39,6 +39,10 @@ final class ReleaseInstallerContractTest extends TestCase
         self::assertStringContainsString('install.ps1', $releaseWorkflow);
         self::assertStringContainsString('verify-release.sh', $releaseWorkflow);
         self::assertStringContainsString('subject-path: dist/*', $releaseWorkflow);
+        self::assertStringContainsString('SPC_DOWNLOAD_RETRY: \'5\'', $releaseWorkflow);
+        self::assertStringContainsString('--without-suggestions --retry="${SPC_DOWNLOAD_RETRY}"', $releaseWorkflow);
+        self::assertStringContainsString('--without-suggestions --retry="$env:SPC_DOWNLOAD_RETRY"', $releaseWorkflow);
+        self::assertStringContainsString('name: ${{ matrix.name }}-spc-logs', $releaseWorkflow);
     }
 
     public function test_build_validates_installer_scripts(): void
@@ -194,6 +198,8 @@ final class ReleaseInstallerContractTest extends TestCase
         self::assertStringContainsString('SOURCE_DATE_EPOCH', $buildScript);
         self::assertStringContainsString('ensure_source_date_epoch', $buildScript);
         self::assertStringContainsString('normalize_mtimes', $buildScript);
+        self::assertStringContainsString('SPC_DOWNLOAD_RETRY="${SPC_DOWNLOAD_RETRY:-5}"', $buildScript);
+        self::assertStringContainsString('--prefer-pre-built --without-suggestions --retry="$SPC_DOWNLOAD_RETRY"', $buildScript);
 
         self::assertStringContainsString('SOURCE_DATE_EPOCH', $generator);
     }

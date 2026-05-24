@@ -33,12 +33,15 @@ class TaskQueueDescribeCommandTest extends TestCase
         $tester = new CommandTester($command);
 
         self::assertSame(Command::SUCCESS, $tester->execute([
+            '--namespace' => 'tenant-a',
             '--json' => true,
         ]));
 
         $decoded = json_decode($tester->getDisplay(), true);
 
         self::assertIsArray($decoded);
+        self::assertSame('tenant-a', $decoded['namespace'] ?? null);
+        self::assertSame('tenant-a', $decoded['task_queues'][0]['namespace'] ?? null);
         self::assertSame('external-workflows', $decoded['task_queues'][0]['name']);
         self::assertSame('accepting', $decoded['task_queues'][0]['admission']['workflow_tasks']['status']);
     }
@@ -80,10 +83,13 @@ class TaskQueueDescribeCommandTest extends TestCase
 
         $tester = new CommandTester($command);
 
-        self::assertSame(Command::SUCCESS, $tester->execute([]));
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            '--namespace' => 'tenant-a',
+        ]));
 
         $display = $tester->getDisplay();
 
+        self::assertStringContainsString('Namespace: tenant-a', $display);
         self::assertStringContainsString('Workflow Admission', $display);
         self::assertStringContainsString('Activity Admission', $display);
         self::assertStringContainsString('Query Admission', $display);
@@ -202,11 +208,13 @@ class TaskQueueDescribeCommandTest extends TestCase
 
         self::assertSame(Command::SUCCESS, $tester->execute([
             'task-queue' => 'external-workflows',
+            '--namespace' => 'tenant-a',
         ]));
 
         $display = $tester->getDisplay();
 
         self::assertStringContainsString('Task Queue: external-workflows', $display);
+        self::assertStringContainsString('Namespace: tenant-a', $display);
         self::assertStringContainsString('Workflow Ready: 1', $display);
         self::assertStringContainsString('Workflow Expired Leases: 1', $display);
         self::assertStringContainsString('Pollers: active=1 stale=1', $display);

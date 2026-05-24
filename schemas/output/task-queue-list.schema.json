@@ -3,14 +3,16 @@
   "$id": "https://durable-workflow.com/schemas/cli/output/task-queue-list.schema.json",
   "title": "dw task-queue:list --json",
   "type": "object",
-  "required": ["task_queues"],
+  "required": ["namespace", "task_queues"],
   "properties": {
+    "namespace": { "type": "string" },
     "task_queues": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["name"],
+        "required": ["namespace", "name"],
         "properties": {
+          "namespace": { "type": "string" },
           "name": { "type": "string" },
           "admission": { "type": ["object", "null"], "additionalProperties": true }
         },

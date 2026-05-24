@@ -21,7 +21,9 @@ class ListCommand extends BaseCommand
             ->setHelp(<<<'HELP'
 List workers registered in the current namespace. Filter by task queue
 or by fleet status (<comment>active</comment>, <comment>stale</comment>,
-<comment>draining</comment>).
+<comment>draining</comment>). When <comment>--namespace</comment> is
+omitted, the command queries the resolved default namespace only; it
+never enumerates all namespaces.
 
 <comment>Examples:</comment>
 
@@ -47,19 +49,22 @@ HELP)
             $query['status'] = $input->getOption('status');
         }
 
-        $result = $this->client($input)->get('/workers', $query);
+        $result = $this->addNamespaceContext($input, $this->client($input)->get('/workers', $query), 'workers');
 
         $workers = $result['workers'] ?? [];
+        $namespace = $this->namespaceContext($input, $result);
 
         if ($this->wantsJson($input)) {
             return $this->renderJsonList($output, $input, $result, 'workers');
         }
 
         if (empty($workers)) {
-            $output->writeln('<comment>No workers found.</comment>');
+            $output->writeln(sprintf('<comment>No workers found in namespace %s.</comment>', $namespace));
 
             return Command::SUCCESS;
         }
+
+        $output->writeln('Namespace: '.$namespace);
 
         $rows = array_map(fn (array $worker) => [
             $worker['worker_id'],

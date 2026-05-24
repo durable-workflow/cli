@@ -55,6 +55,7 @@ final class TaskQueueBuildIdsCommandTest extends TestCase
 
         $display = $tester->getDisplay();
         self::assertStringContainsString('Task Queue: ingest', $display);
+        self::assertStringContainsString('Namespace: default', $display);
         self::assertStringContainsString('Stale threshold: 60s', $display);
         self::assertStringContainsString('build-2026.04.22-a1', $display);
         self::assertStringContainsString('(unversioned)', $display);

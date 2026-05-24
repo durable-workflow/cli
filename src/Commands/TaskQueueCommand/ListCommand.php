@@ -18,7 +18,9 @@ class ListCommand extends BaseCommand
         $this->setName('task-queue:list')
             ->setDescription('List task queues with active pollers')
             ->setHelp(<<<'HELP'
-List every task queue known to the namespace.
+List every task queue known to the namespace. When
+<comment>--namespace</comment> is omitted, the command queries the
+resolved default namespace only; it never enumerates all namespaces.
 
 <comment>Examples:</comment>
 
@@ -31,19 +33,26 @@ HELP)
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $result = $this->client($input)->get('/task-queues');
+        $result = $this->addNamespaceContext(
+            $input,
+            $this->client($input)->get('/task-queues'),
+            'task_queues',
+        );
 
         if ($this->wantsJson($input)) {
             return $this->renderJsonList($output, $input, $result, 'task_queues');
         }
 
         $queues = $result['task_queues'] ?? [];
+        $namespace = $this->namespaceContext($input, $result);
 
         if (empty($queues)) {
-            $output->writeln('<comment>No task queues found.</comment>');
+            $output->writeln(sprintf('<comment>No task queues found in namespace %s.</comment>', $namespace));
 
             return Command::SUCCESS;
         }
+
+        $output->writeln('Namespace: '.$namespace);
 
         $rows = array_map(fn ($q) => [
             $q['name'],

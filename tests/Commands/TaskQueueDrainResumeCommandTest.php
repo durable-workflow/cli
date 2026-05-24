@@ -40,6 +40,7 @@ final class TaskQueueDrainResumeCommandTest extends TestCase
 
         $display = $tester->getDisplay();
         self::assertStringContainsString('Drained build_id build-2026.04.21-z9 on task queue orders.', $display);
+        self::assertStringContainsString('Namespace: default', $display);
         self::assertStringContainsString('Drained at: 2026-04-22T09:45:00Z', $display);
     }
 
@@ -147,6 +148,7 @@ final class TaskQueueDrainResumeCommandTest extends TestCase
 
         $display = $tester->getDisplay();
         self::assertStringContainsString('Resumed build_id build-2026.04.21-z9 on task queue orders.', $display);
+        self::assertStringContainsString('Namespace: default', $display);
     }
 
     public function test_resume_targets_unversioned_cohort_with_null_build_id(): void

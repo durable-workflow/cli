@@ -35,13 +35,17 @@ HELP)
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $taskQueue = $input->getArgument('task-queue');
-        $result = $this->client($input)->get("/task-queues/{$taskQueue}");
+        $result = $this->addNamespaceContext(
+            $input,
+            $this->client($input)->get("/task-queues/{$taskQueue}"),
+        );
 
         if ($this->wantsJson($input)) {
             return $this->renderJson($output, $result);
         }
 
         $output->writeln('<info>Task Queue: '.$result['name'].'</info>');
+        $output->writeln('Namespace: '.$this->namespaceContext($input, $result));
         $output->writeln('');
 
         $stats = $result['stats'] ?? [];

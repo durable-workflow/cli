@@ -98,7 +98,9 @@ class WorkerCommandTest extends TestCase
 
         $tester = new CommandTester($command);
 
-        self::assertSame(Command::SUCCESS, $tester->execute([]));
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            '--namespace' => 'tenant-a',
+        ]));
 
         $display = $tester->getDisplay();
 
@@ -110,6 +112,7 @@ class WorkerCommandTest extends TestCase
         self::assertStringContainsString('worker-b', $display);
         self::assertStringContainsString('python', $display);
         self::assertStringContainsString('stale', $display);
+        self::assertStringContainsString('Namespace: tenant-a', $display);
     }
 
     public function test_list_command_colors_statuses_only_when_output_is_decorated(): void
@@ -162,9 +165,11 @@ class WorkerCommandTest extends TestCase
 
         $tester = new CommandTester($command);
 
-        self::assertSame(Command::SUCCESS, $tester->execute([]));
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            '--namespace' => 'tenant-a',
+        ]));
 
-        self::assertStringContainsString('No workers found', $tester->getDisplay());
+        self::assertStringContainsString('No workers found in namespace tenant-a', $tester->getDisplay());
     }
 
     public function test_list_command_sends_task_queue_filter(): void
@@ -230,12 +235,17 @@ class WorkerCommandTest extends TestCase
 
         $tester = new CommandTester($command);
 
-        self::assertSame(Command::SUCCESS, $tester->execute(['--json' => true]));
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            '--namespace' => 'tenant-a',
+            '--json' => true,
+        ]));
 
         $output = json_decode($tester->getDisplay(), true);
 
         self::assertIsArray($output);
+        self::assertSame('tenant-a', $output['namespace'] ?? null);
         self::assertArrayHasKey('workers', $output);
+        self::assertSame('tenant-a', $output['workers'][0]['namespace'] ?? null);
         self::assertSame('worker-a', $output['workers'][0]['worker_id']);
     }
 
@@ -391,7 +401,6 @@ class WorkerCommandTest extends TestCase
     {
         $payload = [
             'worker_id' => 'worker-a',
-            'namespace' => 'default',
             'task_queue' => 'queue-alpha',
             'runtime' => 'php',
             'status' => 'active',
@@ -404,6 +413,7 @@ class WorkerCommandTest extends TestCase
 
         self::assertSame(Command::SUCCESS, $tester->execute([
             'worker-id' => 'worker-a',
+            '--namespace' => 'tenant-a',
             '--json' => true,
         ]));
 
@@ -411,6 +421,7 @@ class WorkerCommandTest extends TestCase
 
         self::assertIsArray($output);
         self::assertSame('worker-a', $output['worker_id']);
+        self::assertSame('tenant-a', $output['namespace'] ?? null);
     }
 
     public function test_worker_describe_schema_pins_heartbeat_surface_keys(): void
@@ -423,6 +434,7 @@ class WorkerCommandTest extends TestCase
 
         $properties = $schema['properties'];
 
+        self::assertContains('namespace', $schema['required']);
         self::assertSame(['integer', 'null'], $properties['max_concurrent_worker_sessions']['type']);
         self::assertSame(['integer', 'null'], $properties['heartbeat_interval_seconds']['type']);
 
@@ -454,6 +466,8 @@ class WorkerCommandTest extends TestCase
 
         $worker = $schema['properties']['workers']['items']['properties'];
 
+        self::assertContains('namespace', $schema['required']);
+        self::assertContains('namespace', $schema['properties']['workers']['items']['required']);
         self::assertSame(['integer', 'null'], $worker['max_concurrent_workflow_tasks']['type']);
         self::assertSame(['integer', 'null'], $worker['max_concurrent_activity_tasks']['type']);
         self::assertSame(['object', 'null'], $worker['task_slots']['type']);

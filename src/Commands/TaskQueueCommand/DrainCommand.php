@@ -49,9 +49,12 @@ HELP)
         $taskQueue = (string) $input->getArgument('task-queue');
         $buildId = $this->resolveTargetBuildId($input);
 
-        $result = $this->client($input)->post(
-            "/task-queues/{$taskQueue}/build-ids/drain",
-            ['build_id' => $buildId],
+        $result = $this->addNamespaceContext(
+            $input,
+            $this->client($input)->post(
+                "/task-queues/{$taskQueue}/build-ids/drain",
+                ['build_id' => $buildId],
+            ),
         );
 
         if ($this->wantsJson($input)) {
@@ -66,6 +69,7 @@ HELP)
             $renderedBuildId,
             $result['task_queue'] ?? $taskQueue,
         ));
+        $this->writeNamespaceLine($output, $result);
 
         if (is_string($drainedAt) && $drainedAt !== '') {
             $output->writeln('Drained at: '.$drainedAt);

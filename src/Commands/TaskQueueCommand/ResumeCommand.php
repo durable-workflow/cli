@@ -46,9 +46,12 @@ HELP)
         $taskQueue = (string) $input->getArgument('task-queue');
         $buildId = $this->resolveTargetBuildId($input);
 
-        $result = $this->client($input)->post(
-            "/task-queues/{$taskQueue}/build-ids/resume",
-            ['build_id' => $buildId],
+        $result = $this->addNamespaceContext(
+            $input,
+            $this->client($input)->post(
+                "/task-queues/{$taskQueue}/build-ids/resume",
+                ['build_id' => $buildId],
+            ),
         );
 
         if ($this->wantsJson($input)) {
@@ -62,6 +65,7 @@ HELP)
             $rendered,
             $result['task_queue'] ?? $taskQueue,
         ));
+        $this->writeNamespaceLine($output, $result);
         $output->writeln('');
         $output->writeln('The cohort is marked active again. Workers that were flagged as draining have been flipped back to active and will resume claiming new tasks.');
 

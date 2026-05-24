@@ -47,13 +47,17 @@ HELP)
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $taskQueue = $input->getArgument('task-queue');
-        $result = $this->client($input)->get("/task-queues/{$taskQueue}/build-ids");
+        $result = $this->addNamespaceContext(
+            $input,
+            $this->client($input)->get("/task-queues/{$taskQueue}/build-ids"),
+        );
 
         if ($this->wantsJson($input)) {
             return $this->renderJson($output, $result);
         }
 
         $output->writeln('<info>Task Queue: '.($result['task_queue'] ?? $taskQueue).'</info>');
+        $output->writeln('Namespace: '.$this->namespaceContext($input, $result));
         $staleAfter = $result['stale_after_seconds'] ?? null;
         if ($staleAfter !== null) {
             $output->writeln('Stale threshold: '.$staleAfter.'s');

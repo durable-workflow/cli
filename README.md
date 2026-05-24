@@ -233,10 +233,11 @@ signing secrets inline.
 Namespace-scoped commands always send exactly one namespace to the server. When
 `--namespace` is omitted, `dw` resolves the namespace from
 `DURABLE_WORKFLOW_NAMESPACE`, the selected profile, or the built-in `default`
-namespace; workflow, schedule, and search-attribute list commands do not fan
-out across all tenant namespaces. Namespace-scoped workflow, schedule, and
-search-attribute commands include the effective namespace in human and JSON
-outputs so operators can tell which scope was queried or mutated.
+namespace; workflow, schedule, search-attribute, task-queue, and worker list
+commands do not fan out across all tenant namespaces. Namespace-scoped
+workflow, schedule, search-attribute, task-queue, and worker visibility
+commands include the effective namespace in human and JSON outputs so
+operators can tell which scope was queried or mutated.
 
 Invocable activity handlers use the `invocable_http` carrier type in the same
 external executor config file. The CLI validates that these targets stay

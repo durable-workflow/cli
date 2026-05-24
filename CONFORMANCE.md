@@ -2,7 +2,7 @@
 
 The `dw` CLI participates in the public platform conformance suite
 specified by [`durable-workflow.github.io/static/platform-conformance-contract.json`](https://durable-workflow.github.io/platform-conformance-contract.json),
-schema `durable-workflow.v2.platform-conformance.suite`, version `8`,
+schema `durable-workflow.v2.platform-conformance.suite`, version `9`,
 and documented at the public
 [Platform Conformance Suite](https://durable-workflow.github.io/docs/2.0/platform-conformance)
 authority page. This document is the per-repo claim: it lists the
@@ -37,9 +37,9 @@ from the public scenario manifests named in the suite.
 
 | Category | Source path | Status |
 | --- | --- | --- |
-| `signal_query_runtime_contract` | `durable-workflow.github.io/static/platform-conformance/signal-query-runtime-scenarios.json` (served at `/platform-conformance/signal-query-runtime-scenarios.json`) | stable, suite version `8` |
-| `namespace_runtime_contract` | `durable-workflow.github.io/static/platform-conformance/namespace-runtime-scenarios.json` (served at `/platform-conformance/namespace-runtime-scenarios.json`) | stable, suite version `8` |
-| `child_workflow_runtime_contract` | `durable-workflow.github.io/static/platform-conformance/child-workflow-runtime-scenarios.json` (served at `/platform-conformance/child-workflow-runtime-scenarios.json`) | stable, suite version `8` |
+| `signal_query_runtime_contract` | `durable-workflow.github.io/static/platform-conformance/signal-query-runtime-scenarios.json` (served at `/platform-conformance/signal-query-runtime-scenarios.json`) | stable, suite version `9` |
+| `namespace_runtime_contract` | `durable-workflow.github.io/static/platform-conformance/namespace-runtime-scenarios.json` (served at `/platform-conformance/namespace-runtime-scenarios.json`) | stable, suite version `9` |
+| `child_workflow_runtime_contract` | `durable-workflow.github.io/static/platform-conformance/child-workflow-runtime-scenarios.json` (served at `/platform-conformance/child-workflow-runtime-scenarios.json`) | stable, suite version `9` |
 
 The fixtures in this repo are exercised today by:
 
@@ -54,14 +54,16 @@ against published artifacts.
 
 Namespace commands, `--namespace` scoping, JSON namespace context, and
 default-scope behavior are covered by `namespace_runtime_contract`. The
-public suite keeps that runtime category required in version `8`, and
+public suite keeps that runtime category required in version `9`, and
 the namespace scenario manifest is the stable source for evaluating
 namespace parity against published artifacts.
 
-The CLI's namespace-scoped workflow, schedule, and search-attribute outputs
-include the effective namespace in human and JSON modes. List and history
-commands also attach the same namespace to each JSON/JSONL item so
-line-oriented automation keeps scope after the top-level envelope is dropped.
+The CLI's namespace-scoped workflow, schedule, search-attribute, task-queue,
+and worker visibility outputs include the effective namespace in human and JSON
+modes.
+List and history commands also attach the same namespace to each JSON/JSONL
+item so line-oriented automation keeps scope after the top-level envelope is
+dropped.
 Omitting `--namespace` resolves to the configured/default namespace and still
 sends a single `X-Namespace` header; it does not request a cross-namespace
 aggregate.
@@ -69,7 +71,7 @@ aggregate.
 Child workflow commands and JSON output are covered through
 `child_workflow_runtime_contract` when the CLI starts, observes,
 cancels, or queries parent workflows that orchestrate child workflow
-runs. The public suite defines that runtime category in version `8`, and
+runs. The public suite defines that runtime category in version `9`, and
 the child-workflow scenario manifest is the stable source for evaluating
 same-language, cross-language, cancellation, replay, fan-out, and
 namespace behavior against published artifacts.
@@ -83,7 +85,7 @@ document before tag, with the conformance level at `full` or
 | Field | Value |
 | --- | --- |
 | Required claimed targets | `cli_json_client` |
-| Required suite version | public docs-site manifest `durable-workflow.v2.platform-conformance.suite` version `8` |
+| Required suite version | public docs-site manifest `durable-workflow.v2.platform-conformance.suite` version `9` |
 | CI job | `platform-conformance` (lands when the harness reference implementation publishes; until then `sdk-python-parity` covers CLI-owned fixture parity) |
 | Block on `nonconforming` | yes |
 | Artifact attached to release | harness result document, schema `durable-workflow.v2.platform-conformance.result` |

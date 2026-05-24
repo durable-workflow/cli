@@ -20,7 +20,8 @@ class DescribeCommand extends BaseCommand
             ->setDescription('Show details of a registered worker')
             ->setHelp(<<<'HELP'
 Show the worker's runtime, SDK version, build ID, heartbeat cadence,
-and which workflow/activity types it is currently handling.
+and which workflow/activity types it is currently handling in the
+current namespace.
 
 <comment>Examples:</comment>
 
@@ -34,7 +35,7 @@ HELP)
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $workerId = $input->getArgument('worker-id');
-        $result = $this->client($input)->get("/workers/{$workerId}");
+        $result = $this->addNamespaceContext($input, $this->client($input)->get("/workers/{$workerId}"));
 
         if ($this->wantsJson($input)) {
             return $this->renderJson($output, $result);

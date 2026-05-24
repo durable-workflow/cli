@@ -3,8 +3,9 @@
   "$id": "https://durable-workflow.com/schemas/cli/output/task-queue.schema.json",
   "title": "dw task-queue:describe --json",
   "type": "object",
-  "required": ["name"],
+  "required": ["namespace", "name"],
   "properties": {
+    "namespace": { "type": "string" },
     "name": { "type": "string" },
     "stats": { "type": ["object", "null"], "additionalProperties": true },
     "admission": { "type": ["object", "null"], "additionalProperties": true },

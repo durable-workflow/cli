@@ -84,7 +84,7 @@ final class InstallationTarget
                     path: $pharResolved,
                     upgradeable: false,
                     assetName: $asset,
-                    reason: 'dw is installed as a Composer dependency. Use `composer update durable-workflow/cli` instead.',
+                    reason: 'dw is installed as a Composer dependency. Update it with the package manager that owns this vendor tree, or reinstall a pinned public release with install.sh.',
                 );
             }
 
@@ -113,7 +113,7 @@ final class InstallationTarget
                 path: $resolved,
                 upgradeable: false,
                 assetName: $asset,
-                reason: 'dw is installed as a Composer dependency. Use `composer update durable-workflow/cli` instead.',
+                reason: 'dw is installed as a Composer dependency. Update it with the package manager that owns this vendor tree, or reinstall a pinned public release with install.sh.',
             );
         }
 

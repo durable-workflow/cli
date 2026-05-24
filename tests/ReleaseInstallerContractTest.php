@@ -126,6 +126,8 @@ final class ReleaseInstallerContractTest extends TestCase
         self::assertStringContainsString('docs/distribution.md', $readme);
         self::assertStringContainsString('reproducible build', $readme);
         self::assertStringContainsString('verify-reproducible-build.sh', $readme);
+        self::assertStringContainsString('VERSION=0.1.63', $readme);
+        self::assertStringNotContainsString('durable-workflow.com/composer', $readme);
     }
 
     public function test_distribution_doc_records_phase3_decisions(): void
@@ -161,6 +163,8 @@ final class ReleaseInstallerContractTest extends TestCase
         // Auto-update is documented as the explicit dw upgrade path.
         self::assertStringContainsString('## Auto-update', $doc);
         self::assertStringContainsString('dw upgrade', $doc);
+        self::assertStringContainsString('VERSION=0.1.63', $doc);
+        self::assertStringNotContainsString('durable-workflow.com/composer', $doc);
     }
 
     public function test_release_runtime_check_pins_required_standalone_extensions(): void

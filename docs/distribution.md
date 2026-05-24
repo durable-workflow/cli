@@ -15,15 +15,21 @@ CLI talks to the configured server and nothing else.
 | Path | Audience | Verification baseline |
 |------|----------|-----------------------|
 | One-line installer (`install.sh` / `install.ps1`) | Most users | SHA256 against the release `SHA256SUMS` manifest, optional GitHub artifact attestation when `gh` is installed and `DURABLE_WORKFLOW_INSTALL_VERIFY_ATTESTATIONS=1` is set. |
+| Exact-version installer (`VERSION=<tag>`) | CI, conformance, and reproducible automation | Same checksum and optional attestation path as the one-line installer, pinned to a named release tag. |
 | Direct download from the GitHub release | Operators bringing their own automation | `verify-release.sh` (bundled with each tagged release) plus `gh attestation verify` for end-to-end provenance. |
 | Homebrew formula (`dw.rb`) | macOS arm64 users on Homebrew | The release-bundled formula pins the exact release URL and SHA256; `brew install` verifies the checksum before linking. |
-| `composer global require durable-workflow/cli` | PHP-shop users | Composer pins by version in your `composer.lock`; verify the release tag before bumping. |
 | PHAR (`dw.phar`) plus a system PHP | PHP-aware operators | Same `SHA256SUMS` plus attestation surface as the native binaries. |
 
 The one-line installer is the recommended path on every supported platform.
 Both `install.sh` and `install.ps1` download the matching `SHA256SUMS` manifest,
 verify the binary's checksum before writing it into the install directory,
 and refuse to proceed when the checksum does not match.
+
+For exact-version automation, set `VERSION` to the release tag:
+
+```bash
+curl -fsSL https://durable-workflow.com/install.sh | VERSION=0.1.63 sh
+```
 
 ## Provenance boundary
 
@@ -167,7 +173,10 @@ binary. Behavior:
 - Defaults: `dw upgrade` upgrades to the newest release tag, refuses to
   proceed if checksum verification fails, and refuses to overwrite
   Composer-managed PHAR installs and Homebrew-managed binaries because
-  the package manager owns those install paths.
+  the package manager owns those install paths. Composer package metadata
+  is not a supported public CLI distribution channel for the 0.1.x line;
+  use the exact-version installer or direct release assets for public,
+  source-free automation.
 - Flags: `--version=<tag>` for a specific release, `--dry-run` to print
   the action without performing it, `--force` to override stale-binary
   guards, and `--output=json` for scripted use.

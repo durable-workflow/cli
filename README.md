@@ -4,7 +4,7 @@ Command-line interface for running and interacting with the [Durable Workflow Se
 
 ## Installation
 
-Three options depending on what you have installed:
+Two supported public install paths depending on what you have installed:
 
 **1. Standalone binary (no PHP required).** The easiest path — a one-liner
 installer that detects your OS and arch:
@@ -14,8 +14,21 @@ installer that detects your OS and arch:
 curl -fsSL https://durable-workflow.com/install.sh | sh
 ```
 
+Pin an exact release for CI, conformance, or reproducible automation:
+
+```bash
+# Linux and macOS
+curl -fsSL https://durable-workflow.com/install.sh | VERSION=0.1.63 sh
+```
+
 ```powershell
 # Windows
+irm https://durable-workflow.com/install.ps1 | iex
+```
+
+```powershell
+# Windows, exact release
+$env:VERSION = '0.1.63'
 irm https://durable-workflow.com/install.ps1 | iex
 ```
 
@@ -87,12 +100,6 @@ if (-not $expected.Line.StartsWith($actual)) { throw 'Checksum mismatch' }
 with `php dw.phar` (or `chmod +x` and call directly — the PHAR
 has a `#!/usr/bin/env php` shebang).
 
-**3. Composer.**
-
-```bash
-composer global require durable-workflow/cli
-```
-
 ### Building from source
 
 ```bash
@@ -130,10 +137,14 @@ the 0.1.x line; see [`docs/distribution.md`](docs/distribution.md) for the
 rationale and the conditions under which that decision would be revisited.
 
 `dw` does not auto-update itself; the explicit `dw upgrade` command is the
-only update path, and it never runs unsolicited. The CLI also does not collect
-telemetry — there is no background network traffic beyond commands that
-explicitly contact the configured Durable Workflow server. Telemetry is
-permanently out of scope for the 0.1.x line.
+only update path for standalone binary installs, and it never runs
+unsolicited. The standalone installer and direct GitHub release assets are the
+public release channels for CI and conformance jobs that only need the `dw`
+binary. Composer package metadata is not a supported public CLI distribution
+channel for the 0.1.x line. The CLI also does not collect telemetry — there is
+no background network traffic beyond commands that explicitly contact the
+configured Durable Workflow server. Telemetry is permanently out of scope for
+the 0.1.x line.
 
 The PHAR is a reproducible build: given the same tag and the
 `SOURCE_DATE_EPOCH` recorded by the release workflow, locally rebuilding from

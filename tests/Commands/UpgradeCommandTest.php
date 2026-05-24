@@ -44,7 +44,7 @@ class UpgradeCommandTest extends TestCase
                 path: '/opt/app/vendor/durable-workflow/cli/bin/dw',
                 upgradeable: false,
                 assetName: 'dw-linux-x86_64',
-                reason: 'dw is installed as a Composer dependency. Use `composer update durable-workflow/cli` instead.',
+                reason: 'dw is installed as a Composer dependency. Update it with the package manager that owns this vendor tree, or reinstall a pinned public release with install.sh.',
             ),
             replacer: $this->rejectingReplacer(),
         );

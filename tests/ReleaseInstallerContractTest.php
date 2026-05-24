@@ -40,6 +40,9 @@ final class ReleaseInstallerContractTest extends TestCase
         self::assertStringContainsString('verify-release.sh', $releaseWorkflow);
         self::assertStringContainsString('subject-path: dist/*', $releaseWorkflow);
         self::assertStringContainsString('SPC_DOWNLOAD_RETRY: \'5\'', $releaseWorkflow);
+        self::assertStringContainsString('SPC_DOWNLOAD_OUTER_ATTEMPTS: \'4\'', $releaseWorkflow);
+        self::assertStringContainsString('spc dependency download failed after ${SPC_DOWNLOAD_OUTER_ATTEMPTS} attempts', $releaseWorkflow);
+        self::assertStringContainsString('spc dependency download failed after $outerAttempts attempts', $releaseWorkflow);
         self::assertStringContainsString('--without-suggestions --retry="${SPC_DOWNLOAD_RETRY}"', $releaseWorkflow);
         self::assertStringContainsString('--without-suggestions --retry="$env:SPC_DOWNLOAD_RETRY"', $releaseWorkflow);
         self::assertStringContainsString('name: ${{ matrix.name }}-spc-logs', $releaseWorkflow);
@@ -203,6 +206,8 @@ final class ReleaseInstallerContractTest extends TestCase
         self::assertStringContainsString('ensure_source_date_epoch', $buildScript);
         self::assertStringContainsString('normalize_mtimes', $buildScript);
         self::assertStringContainsString('SPC_DOWNLOAD_RETRY="${SPC_DOWNLOAD_RETRY:-5}"', $buildScript);
+        self::assertStringContainsString('SPC_DOWNLOAD_OUTER_ATTEMPTS="${SPC_DOWNLOAD_OUTER_ATTEMPTS:-4}"', $buildScript);
+        self::assertStringContainsString('spc_download_with_retry', $buildScript);
         self::assertStringContainsString('--prefer-pre-built --without-suggestions --retry="$SPC_DOWNLOAD_RETRY"', $buildScript);
 
         self::assertStringContainsString('SOURCE_DATE_EPOCH', $generator);

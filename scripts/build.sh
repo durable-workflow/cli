@@ -21,6 +21,7 @@ PHAR_OUT="$BUILD_DIR/dw.phar"
 # CI matrix in .github/workflows/release.yml.
 SPC_EXTENSIONS="curl,mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets"
 SPC_DOWNLOAD_RETRY="${SPC_DOWNLOAD_RETRY:-5}"
+SPC_DOWNLOAD_OUTER_ATTEMPTS="${SPC_DOWNLOAD_OUTER_ATTEMPTS:-4}"
 
 BOX_VERSION="${BOX_VERSION:-4.6.6}"
 BOX_URL="https://github.com/box-project/box/releases/download/${BOX_VERSION}/box.phar"
@@ -102,6 +103,29 @@ normalize_mtimes() {
         touch -h -d "@$epoch" "$ROOT/src/GeneratedBuildInfo.php" 2>/dev/null || true
 }
 
+spc_download_with_retry() {
+    if [[ ! "$SPC_DOWNLOAD_OUTER_ATTEMPTS" =~ ^[0-9]+$ ]] || [[ "$SPC_DOWNLOAD_OUTER_ATTEMPTS" -lt 1 ]]; then
+        echo "SPC_DOWNLOAD_OUTER_ATTEMPTS must be a positive integer" >&2
+        exit 1
+    fi
+
+    local attempt delay
+    for ((attempt = 1; attempt <= SPC_DOWNLOAD_OUTER_ATTEMPTS; attempt++)); do
+        if ./spc download "$@"; then
+            return 0
+        fi
+
+        if [[ "$attempt" -lt "$SPC_DOWNLOAD_OUTER_ATTEMPTS" ]]; then
+            delay=$((attempt * 30))
+            echo ">> spc dependency download attempt ${attempt}/${SPC_DOWNLOAD_OUTER_ATTEMPTS} failed; retrying in ${delay}s" >&2
+            sleep "$delay"
+        fi
+    done
+
+    echo "spc dependency download failed after ${SPC_DOWNLOAD_OUTER_ATTEMPTS} attempts" >&2
+    return 1
+}
+
 build_phar() {
     ensure_tools
     ensure_source_date_epoch
@@ -124,7 +148,7 @@ build_binary() {
 
     pushd "$TOOLS_DIR" >/dev/null
     echo ">> Downloading PHP ${php_version} source + extension deps"
-    ./spc download --with-php="$php_version" --for-extensions="$SPC_EXTENSIONS" \
+    spc_download_with_retry --with-php="$php_version" --for-extensions="$SPC_EXTENSIONS" \
         --prefer-pre-built --without-suggestions --retry="$SPC_DOWNLOAD_RETRY"
     echo ">> Compiling phpmicro with required extensions"
     ./spc build "$SPC_EXTENSIONS" --build-micro

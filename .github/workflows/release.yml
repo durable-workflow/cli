@@ -27,6 +27,7 @@ env:
   PHP_VERSION_WINDOWS: '8.4'
   BOX_VERSION: '4.6.6'
   SPC_DOWNLOAD_RETRY: '5'
+  SPC_DOWNLOAD_OUTER_ATTEMPTS: '4'
   # Passed to every spc step so it can use authenticated GitHub API calls
   # when fetching source tarballs / pre-built libs (avoids 403 rate limits).
   GITHUB_TOKEN: ${{ github.token }}
@@ -183,10 +184,36 @@ jobs:
       - name: Fetch PHP sources & extension deps
         working-directory: build/.tools
         run: |
-          ./spc doctor --auto-fix || true
-          ./spc download --with-php=${{ env.PHP_VERSION }} \
-            --for-extensions="$SPC_EXTENSIONS" --prefer-pre-built \
-            --without-suggestions --retry="${SPC_DOWNLOAD_RETRY}"
+          case "$SPC_DOWNLOAD_OUTER_ATTEMPTS" in
+            ''|*[!0-9]*)
+              echo "::error::SPC_DOWNLOAD_OUTER_ATTEMPTS must be a positive integer"
+              exit 1
+              ;;
+          esac
+          if [ "$SPC_DOWNLOAD_OUTER_ATTEMPTS" -lt 1 ]; then
+            echo "::error::SPC_DOWNLOAD_OUTER_ATTEMPTS must be at least 1"
+            exit 1
+          fi
+
+          attempt=1
+          while [ "$attempt" -le "$SPC_DOWNLOAD_OUTER_ATTEMPTS" ]; do
+            ./spc doctor --auto-fix || true
+            if ./spc download --with-php=${{ env.PHP_VERSION }} \
+                --for-extensions="$SPC_EXTENSIONS" --prefer-pre-built \
+                --without-suggestions --retry="${SPC_DOWNLOAD_RETRY}"; then
+              exit 0
+            fi
+
+            if [ "$attempt" -lt "$SPC_DOWNLOAD_OUTER_ATTEMPTS" ]; then
+              delay=$((attempt * 30))
+              echo "::warning::spc dependency download attempt ${attempt}/${SPC_DOWNLOAD_OUTER_ATTEMPTS} failed; retrying in ${delay}s"
+              sleep "$delay"
+            fi
+            attempt=$((attempt + 1))
+          done
+
+          echo "::error::spc dependency download failed after ${SPC_DOWNLOAD_OUTER_ATTEMPTS} attempts"
+          exit 1
 
       - name: Build phpmicro SAPI with extensions
         working-directory: build/.tools
@@ -267,10 +294,31 @@ jobs:
         shell: pwsh
         working-directory: build\spc-src
         run: |
-          php bin\spc doctor --auto-fix
-          php bin\spc download --with-php=${{ env.PHP_VERSION_WINDOWS }} `
-            --for-extensions="$env:SPC_EXTENSIONS_WINDOWS" --prefer-pre-built `
-            --without-suggestions --retry="$env:SPC_DOWNLOAD_RETRY"
+          $outerAttempts = [int]$env:SPC_DOWNLOAD_OUTER_ATTEMPTS
+          if ($outerAttempts -lt 1) {
+            Write-Error "SPC_DOWNLOAD_OUTER_ATTEMPTS must be at least 1"
+            exit 1
+          }
+
+          for ($attempt = 1; $attempt -le $outerAttempts; $attempt++) {
+            php bin\spc doctor --auto-fix
+            php bin\spc download --with-php=${{ env.PHP_VERSION_WINDOWS }} `
+              --for-extensions="$env:SPC_EXTENSIONS_WINDOWS" --prefer-pre-built `
+              --without-suggestions --retry="$env:SPC_DOWNLOAD_RETRY"
+            if ($LASTEXITCODE -eq 0) {
+              break
+            }
+
+            if ($attempt -lt $outerAttempts) {
+              $delay = $attempt * 30
+              Write-Warning "spc dependency download attempt $attempt/$outerAttempts failed; retrying in ${delay}s"
+              Start-Sleep -Seconds $delay
+            } else {
+              Write-Error "spc dependency download failed after $outerAttempts attempts"
+              exit $LASTEXITCODE
+            }
+          }
+
           Remove-Item -Recurse -Force source\php-src -ErrorAction SilentlyContinue
           php bin\spc extract php-src
 

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://durable-workflow.com/schemas/cli/output/task-queue-build-id-rollout.schema.json",
-  "title": "dw task-queue:drain|resume --json",
+  "title": "dw task-queue:drain|promote|resume --json",
   "type": "object",
   "required": ["namespace", "task_queue", "build_id", "drain_intent", "drained_at"],
   "properties": {
@@ -12,7 +12,14 @@
       "type": "string",
       "enum": ["active", "draining"]
     },
-    "drained_at": { "type": ["string", "null"] }
+    "drained_at": { "type": ["string", "null"] },
+    "promoted_at": { "type": ["string", "null"] },
+    "rolled_back_at": { "type": ["string", "null"] },
+    "new_start_selected": { "type": "boolean" },
+    "deployment": {
+      "type": ["object", "null"],
+      "additionalProperties": true
+    }
   },
   "additionalProperties": true
 }

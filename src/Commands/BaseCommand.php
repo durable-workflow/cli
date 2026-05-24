@@ -61,6 +61,7 @@ abstract class BaseCommand extends Command
         'task-queue:describe',
         'task-queue:drain',
         'task-queue:list',
+        'task-queue:promote',
         'task-queue:resume',
         'watch',
         'worker:deregister',

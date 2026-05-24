@@ -136,6 +136,7 @@ class Application extends ConsoleApplication
             new TaskQueueCommand\ListCommand(),
             new TaskQueueCommand\DescribeCommand(),
             new TaskQueueCommand\BuildIdsCommand(),
+            new TaskQueueCommand\PromoteCommand(),
             new TaskQueueCommand\DrainCommand(),
             new TaskQueueCommand\ResumeCommand(),
 

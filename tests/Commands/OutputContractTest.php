@@ -382,6 +382,7 @@ class OutputContractTest extends TestCase
         yield 'task queue describe' => ['task-queue:describe'];
         yield 'task queue drain' => ['task-queue:drain'];
         yield 'task queue list' => ['task-queue:list'];
+        yield 'task queue promote' => ['task-queue:promote'];
         yield 'task queue resume' => ['task-queue:resume'];
         yield 'watch workflow' => ['watch'];
         yield 'worker deregister' => ['worker:deregister'];

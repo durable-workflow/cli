@@ -475,6 +475,12 @@ dw task-queue:list
 
 # Describe a task queue (pollers, backlog, queue, namespace, and downstream admission budgets)
 dw task-queue:describe default
+
+# Inspect and operate worker build-id rollout cohorts
+dw task-queue:build-ids orders
+dw task-queue:promote orders --build-id build-2026.04.21-z9
+dw task-queue:drain orders --build-id build-2026.04.20-a3f
+dw task-queue:resume orders --build-id build-2026.04.20-a3f
 ```
 
 ### Worker Protocol Diagnostics

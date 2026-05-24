@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Commands;
 
 use DurableWorkflow\Cli\Commands\TaskQueueCommand\DrainCommand;
+use DurableWorkflow\Cli\Commands\TaskQueueCommand\PromoteCommand;
 use DurableWorkflow\Cli\Commands\TaskQueueCommand\ResumeCommand;
 use DurableWorkflow\Cli\Support\ServerClient;
 use PHPUnit\Framework\TestCase;
@@ -108,6 +109,105 @@ final class TaskQueueDrainResumeCommandTest extends TestCase
         $client = new FakeDrainResumeClient($payload);
 
         $command = new DrainCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            'task-queue' => 'orders',
+            '--build-id' => 'build-2026.04.21-z9',
+            '--json' => true,
+        ]));
+
+        $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame($payload, $decoded);
+    }
+
+    public function test_promote_posts_build_id_to_server_and_renders_confirmation(): void
+    {
+        $client = new FakeDrainResumeClient([
+            'namespace' => 'default',
+            'task_queue' => 'orders',
+            'build_id' => 'build-2026.04.21-z9',
+            'drain_intent' => 'active',
+            'drained_at' => null,
+            'promoted_at' => '2026-04-22T10:00:00Z',
+            'new_start_selected' => true,
+        ]);
+
+        $command = new PromoteCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            'task-queue' => 'orders',
+            '--build-id' => 'build-2026.04.21-z9',
+        ]));
+
+        self::assertSame('POST', $client->lastMethod);
+        self::assertSame('/task-queues/orders/build-ids/promote', $client->lastPath);
+        self::assertSame(['build_id' => 'build-2026.04.21-z9'], $client->lastBody);
+
+        $display = $tester->getDisplay();
+        self::assertStringContainsString('Promoted build_id build-2026.04.21-z9 on task queue orders.', $display);
+        self::assertStringContainsString('Namespace: default', $display);
+        self::assertStringContainsString('Promoted at: 2026-04-22T10:00:00Z', $display);
+        self::assertStringContainsString('Fresh workflow starts now pin to this build_id.', $display);
+    }
+
+    public function test_promote_targets_unversioned_cohort_with_null_build_id(): void
+    {
+        $client = new FakeDrainResumeClient([
+            'namespace' => 'default',
+            'task_queue' => 'orders',
+            'build_id' => null,
+            'drain_intent' => 'active',
+            'drained_at' => null,
+            'promoted_at' => '2026-04-22T10:00:00Z',
+            'new_start_selected' => true,
+        ]);
+
+        $command = new PromoteCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            'task-queue' => 'orders',
+            '--unversioned' => true,
+        ]));
+
+        self::assertSame(['build_id' => null], $client->lastBody);
+        self::assertStringContainsString('(unversioned)', $tester->getDisplay());
+    }
+
+    public function test_promote_requires_build_id_or_unversioned(): void
+    {
+        $command = new PromoteCommand();
+        $command->setServerClient(new FakeDrainResumeClient([]));
+        $tester = new CommandTester($command);
+
+        $this->expectException(InvalidOptionException::class);
+        $this->expectExceptionMessage('--build-id <value> or --unversioned');
+
+        $tester->execute(['task-queue' => 'orders']);
+    }
+
+    public function test_promote_json_output_returns_full_server_payload(): void
+    {
+        $payload = [
+            'namespace' => 'default',
+            'task_queue' => 'orders',
+            'build_id' => 'build-2026.04.21-z9',
+            'drain_intent' => 'active',
+            'drained_at' => null,
+            'promoted_at' => '2026-04-22T10:00:00Z',
+            'new_start_selected' => true,
+        ];
+        $client = new FakeDrainResumeClient($payload);
+
+        $command = new PromoteCommand();
         $command->setServerClient($client);
 
         $tester = new CommandTester($command);

@@ -29,6 +29,14 @@ final class TaskQueueBuildIdsCommandTest extends TestCase
                     'total_worker_count' => 2,
                     'runtimes' => ['worker-runtime'],
                     'sdk_versions' => ['polyglot-sdk/2.0.0'],
+                    'new_start_selected' => true,
+                    'promoted_at' => '2026-04-22T10:00:00Z',
+                    'workflow_definition_fingerprint_conflicts' => [
+                        [
+                            'workflow_type' => 'orders.Checkout',
+                            'fingerprint_count' => 2,
+                        ],
+                    ],
                     'last_heartbeat_at' => '2026-04-22T09:30:00Z',
                     'first_seen_at' => '2026-04-22T08:00:00Z',
                 ],
@@ -61,6 +69,9 @@ final class TaskQueueBuildIdsCommandTest extends TestCase
         self::assertStringContainsString('(unversioned)', $display);
         self::assertStringContainsString('active', $display);
         self::assertStringContainsString('stale_only', $display);
+        self::assertStringContainsString('New Starts', $display);
+        self::assertStringContainsString('2026-04-22T10:00:00Z', $display);
+        self::assertStringContainsString('orders.Checkout:2', $display);
     }
 
     public function test_renders_empty_message_when_no_workers_have_registered(): void

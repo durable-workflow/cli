@@ -8,6 +8,7 @@ use DurableWorkflow\Cli\Commands\TaskQueueCommand\BuildIdsCommand;
 use DurableWorkflow\Cli\Commands\TaskQueueCommand\DescribeCommand;
 use DurableWorkflow\Cli\Commands\TaskQueueCommand\DrainCommand;
 use DurableWorkflow\Cli\Commands\TaskQueueCommand\ListCommand;
+use DurableWorkflow\Cli\Commands\TaskQueueCommand\PromoteCommand;
 use DurableWorkflow\Cli\Commands\TaskQueueCommand\ResumeCommand;
 use DurableWorkflow\Cli\Support\ServerClient;
 use PHPUnit\Framework\TestCase;
@@ -137,6 +138,37 @@ final class TaskQueueParityFixtureTest extends TestCase
         self::assertSame($semantic['build_id'], $decoded['build_id'] ?? null);
         self::assertSame($semantic['drain_intent'], $decoded['drain_intent'] ?? null);
         self::assertSame($semantic['drained_at'], $decoded['drained_at'] ?? null);
+    }
+
+    public function test_task_queue_promote_matches_polyglot_request_fixture(): void
+    {
+        $fixture = self::fixture(
+            'task-queue-build-id-promote-parity.json',
+            'task_queue.build_id.promote',
+        );
+        $client = new TaskQueueParityClient($fixture['response_body']);
+        $command = new PromoteCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute($fixture['cli']['argv']));
+
+        self::assertSame($fixture['request']['method'], $client->lastMethod);
+        self::assertSame($fixture['request']['path'], $client->lastPath);
+        self::assertSame($fixture['request']['body'], $client->lastBody);
+
+        $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame($fixture['response_body'], $decoded);
+
+        $semantic = $fixture['semantic_body'];
+        self::assertSame($semantic['namespace'], $decoded['namespace'] ?? null);
+        self::assertSame($semantic['task_queue'], $decoded['task_queue'] ?? null);
+        self::assertSame($semantic['build_id'], $decoded['build_id'] ?? null);
+        self::assertSame($semantic['drain_intent'], $decoded['drain_intent'] ?? null);
+        self::assertSame($semantic['drained_at'], $decoded['drained_at'] ?? null);
+        self::assertSame($semantic['promoted_at'], $decoded['promoted_at'] ?? null);
+        self::assertSame($semantic['new_start_selected'], $decoded['new_start_selected'] ?? null);
     }
 
     public function test_task_queue_resume_matches_polyglot_request_fixture(): void

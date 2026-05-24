@@ -83,6 +83,9 @@ HELP)
                 (string) ($entry['draining_worker_count'] ?? 0),
                 (string) ($entry['stale_worker_count'] ?? 0),
                 (string) ($entry['total_worker_count'] ?? 0),
+                (($entry['new_start_selected'] ?? false) === true) ? 'yes' : '-',
+                (string) ($entry['promoted_at'] ?? '-'),
+                $this->formatFingerprintConflicts($entry['workflow_definition_fingerprint_conflicts'] ?? []),
                 $this->joinList($runtimes),
                 $this->joinList($sdkVersions),
                 (string) ($entry['last_heartbeat_at'] ?? '-'),
@@ -92,7 +95,21 @@ HELP)
 
         $this->renderTable(
             $output,
-            ['Build ID', 'Rollout', 'Active', 'Draining', 'Stale', 'Total', 'Runtimes', 'SDK Versions', 'Last Heartbeat', 'First Seen'],
+            [
+                'Build ID',
+                'Rollout',
+                'Active',
+                'Draining',
+                'Stale',
+                'Total',
+                'New Starts',
+                'Promoted At',
+                'Definition Conflicts',
+                'Runtimes',
+                'SDK Versions',
+                'Last Heartbeat',
+                'First Seen',
+            ],
             $rows,
         );
 
@@ -106,6 +123,31 @@ HELP)
         }
 
         return $buildId;
+    }
+
+    private function formatFingerprintConflicts(mixed $conflicts): string
+    {
+        if (! is_array($conflicts) || $conflicts === []) {
+            return '-';
+        }
+
+        $rendered = [];
+        foreach ($conflicts as $conflict) {
+            if (! is_array($conflict)) {
+                continue;
+            }
+
+            $workflowType = $conflict['workflow_type'] ?? null;
+            $fingerprintCount = $conflict['fingerprint_count'] ?? null;
+
+            if (! is_string($workflowType) || ! is_numeric($fingerprintCount)) {
+                continue;
+            }
+
+            $rendered[] = sprintf('%s:%d', $workflowType, (int) $fingerprintCount);
+        }
+
+        return $rendered === [] ? '-' : implode(', ', $rendered);
     }
 
     /**

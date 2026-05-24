@@ -28,6 +28,31 @@ abstract class BaseCommand extends Command
 {
     private const INPUT_ENCODINGS = ['json', 'raw', 'base64'];
 
+    private const NAMESPACE_SCOPED_COMMAND_PREFIXES = [
+        'activity:',
+        'query-task:',
+        'schedule:',
+        'search-attribute:',
+        'storage:',
+        'task-queue:',
+        'worker:',
+        'workflow:',
+        'workflow-task:',
+    ];
+
+    private const NAMESPACE_SCOPED_COMMAND_NAMES = [
+        'bridge:webhook',
+        'debug',
+        'watch',
+        'system:activity-timeout-pass',
+        'system:activity-timeout-status',
+        'system:operator-metrics',
+        'system:repair-pass',
+        'system:repair-status',
+        'system:retention-pass',
+        'system:retention-status',
+    ];
+
     private ?ServerClient $serverClient = null;
 
     /** @var callable|null */
@@ -648,6 +673,7 @@ abstract class BaseCommand extends Command
         }
 
         $this->writeHumanError($output, $e->getMessage());
+        $this->writeHumanErrorNamespaceContext($output, $input);
 
         $recommendations = $this->errorRecommendations($e, $input);
         if ($recommendations !== []) {
@@ -662,7 +688,13 @@ abstract class BaseCommand extends Command
         $envelope = [
             'error' => $e->getMessage(),
             'exit_code' => $exitCode,
+            'command' => (string) $this->getName(),
         ];
+
+        $namespace = $this->errorNamespaceContext($input);
+        if ($namespace !== null) {
+            $envelope['namespace'] = $namespace;
+        }
 
         if ($e instanceof ServerHttpException) {
             $envelope['status_code'] = $e->statusCode;
@@ -692,6 +724,47 @@ abstract class BaseCommand extends Command
     {
         $target = $output instanceof ConsoleOutputInterface ? $output->getErrorOutput() : $output;
         $target->writeln('<error>'.$message.'</error>');
+    }
+
+    private function writeHumanErrorNamespaceContext(OutputInterface $output, InputInterface $input): void
+    {
+        $namespace = $this->errorNamespaceContext($input);
+        if ($namespace === null) {
+            return;
+        }
+
+        $target = $output instanceof ConsoleOutputInterface ? $output->getErrorOutput() : $output;
+        $target->writeln('Namespace: '.$namespace);
+    }
+
+    private function errorNamespaceContext(InputInterface $input): ?string
+    {
+        if (! $this->isNamespaceScopedCommand()) {
+            return null;
+        }
+
+        try {
+            return $this->namespaceContext($input);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function isNamespaceScopedCommand(): bool
+    {
+        $name = (string) $this->getName();
+
+        if (in_array($name, self::NAMESPACE_SCOPED_COMMAND_NAMES, true)) {
+            return true;
+        }
+
+        foreach (self::NAMESPACE_SCOPED_COMMAND_PREFIXES as $prefix) {
+            if (str_starts_with($name, $prefix)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

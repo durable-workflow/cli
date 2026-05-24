@@ -139,9 +139,33 @@ class OutputContractTest extends TestCase
         $envelope = json_decode($display, true, 512, JSON_THROW_ON_ERROR);
         self::assertSame('Not found', $envelope['error']);
         self::assertSame(ExitCode::NOT_FOUND, $envelope['exit_code']);
+        self::assertSame('throwing:test', $envelope['command']);
         self::assertSame(404, $envelope['status_code']);
         self::assertSame('resource.not_found', $envelope['recommendations'][0]['id'] ?? null);
         self::assertSame('dw throwing:test --help', $envelope['recommendations'][0]['command'] ?? null);
+    }
+
+    /**
+     * @dataProvider namespaceScopedCommandNames
+     */
+    public function test_json_error_envelope_names_selected_namespace_for_scoped_commands(string $commandName): void
+    {
+        $command = new ThrowingOutputCommand(
+            new ServerHttpException('Workflow not found', 404),
+            commandName: $commandName,
+        );
+        $tester = new CommandTester($command);
+
+        $exit = $tester->execute([
+            '--namespace' => 'tenant-b',
+            '--output' => 'json',
+        ]);
+
+        self::assertSame(ExitCode::NOT_FOUND, $exit);
+
+        $envelope = json_decode(trim($tester->getDisplay()), true, 512, JSON_THROW_ON_ERROR);
+        self::assertSame($commandName, $envelope['command']);
+        self::assertSame('tenant-b', $envelope['namespace']);
     }
 
     public function test_json_error_envelope_preserves_typed_server_reason_and_body(): void
@@ -204,6 +228,67 @@ class OutputContractTest extends TestCase
         self::assertStringContainsString('boom', $tester->getErrorOutput(), 'human error must land on stderr');
     }
 
+    /**
+     * @dataProvider namespaceScopedCommandNames
+     */
+    public function test_human_error_names_selected_namespace_for_scoped_commands(string $commandName): void
+    {
+        $command = new ThrowingOutputCommand(
+            new ServerHttpException('Workflow not found', 404),
+            commandName: $commandName,
+        );
+        $tester = new CommandTester($command);
+
+        $exit = $tester->execute([
+            '--namespace' => 'tenant-b',
+        ], ['capture_stderr_separately' => true]);
+
+        self::assertSame(ExitCode::NOT_FOUND, $exit);
+        self::assertSame('', trim($tester->getDisplay()), 'stdout must be empty on error in table mode');
+        self::assertStringContainsString('Workflow not found', $tester->getErrorOutput());
+        self::assertStringContainsString('Namespace: tenant-b', $tester->getErrorOutput());
+    }
+
+    /**
+     * @dataProvider defaultScopeCommandNames
+     */
+    public function test_json_error_envelope_omits_namespace_for_default_scope_commands(string $commandName): void
+    {
+        $command = new ThrowingOutputCommand(
+            new ServerHttpException('Not found', 404),
+            commandName: $commandName,
+        );
+        $tester = new CommandTester($command);
+
+        $tester->execute([
+            '--namespace' => 'tenant-b',
+            '--output' => 'json',
+        ]);
+
+        $envelope = json_decode(trim($tester->getDisplay()), true, 512, JSON_THROW_ON_ERROR);
+        self::assertSame($commandName, $envelope['command']);
+        self::assertArrayNotHasKey('namespace', $envelope);
+    }
+
+    /**
+     * @dataProvider defaultScopeCommandNames
+     */
+    public function test_human_error_omits_namespace_for_default_scope_commands(string $commandName): void
+    {
+        $command = new ThrowingOutputCommand(
+            new ServerHttpException('Not found', 404),
+            commandName: $commandName,
+        );
+        $tester = new CommandTester($command);
+
+        $tester->execute([
+            '--namespace' => 'tenant-b',
+        ], ['capture_stderr_separately' => true]);
+
+        self::assertStringContainsString('Not found', $tester->getErrorOutput());
+        self::assertStringNotContainsString('Namespace: tenant-b', $tester->getErrorOutput());
+    }
+
     public function test_json_mode_keeps_stderr_silent_on_error(): void
     {
         $command = new ThrowingOutputCommand(new ServerHttpException('denied', 403));
@@ -216,6 +301,97 @@ class OutputContractTest extends TestCase
         $envelope = json_decode(trim($tester->getDisplay()), true, 512, JSON_THROW_ON_ERROR);
         self::assertSame(ExitCode::AUTH, $envelope['exit_code']);
         self::assertSame(403, $envelope['status_code']);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function namespaceScopedCommandNames(): iterable
+    {
+        yield 'activity complete' => ['activity:complete'];
+        yield 'activity fail' => ['activity:fail'];
+        yield 'bridge adapter webhook' => ['bridge:webhook'];
+        yield 'debug workflow diagnostics' => ['debug'];
+        yield 'query task complete' => ['query-task:complete'];
+        yield 'query task fail' => ['query-task:fail'];
+        yield 'query task poll' => ['query-task:poll'];
+        yield 'schedule backfill' => ['schedule:backfill'];
+        yield 'schedule create' => ['schedule:create'];
+        yield 'schedule delete' => ['schedule:delete'];
+        yield 'schedule describe' => ['schedule:describe'];
+        yield 'schedule history' => ['schedule:history'];
+        yield 'schedule list' => ['schedule:list'];
+        yield 'schedule pause' => ['schedule:pause'];
+        yield 'schedule resume' => ['schedule:resume'];
+        yield 'schedule trigger' => ['schedule:trigger'];
+        yield 'schedule update' => ['schedule:update'];
+        yield 'search attribute create' => ['search-attribute:create'];
+        yield 'search attribute delete' => ['search-attribute:delete'];
+        yield 'search attribute list' => ['search-attribute:list'];
+        yield 'storage diagnostics' => ['storage:test'];
+        yield 'system activity timeout pass' => ['system:activity-timeout-pass'];
+        yield 'system activity timeout status' => ['system:activity-timeout-status'];
+        yield 'system operator metrics' => ['system:operator-metrics'];
+        yield 'system repair pass' => ['system:repair-pass'];
+        yield 'system repair status' => ['system:repair-status'];
+        yield 'system retention pass' => ['system:retention-pass'];
+        yield 'system retention status' => ['system:retention-status'];
+        yield 'task queue build ids' => ['task-queue:build-ids'];
+        yield 'task queue describe' => ['task-queue:describe'];
+        yield 'task queue drain' => ['task-queue:drain'];
+        yield 'task queue list' => ['task-queue:list'];
+        yield 'task queue resume' => ['task-queue:resume'];
+        yield 'watch workflow' => ['watch'];
+        yield 'worker deregister' => ['worker:deregister'];
+        yield 'worker describe' => ['worker:describe'];
+        yield 'worker list' => ['worker:list'];
+        yield 'worker register' => ['worker:register'];
+        yield 'workflow archive' => ['workflow:archive'];
+        yield 'workflow cancel' => ['workflow:cancel'];
+        yield 'workflow describe' => ['workflow:describe'];
+        yield 'workflow history' => ['workflow:history'];
+        yield 'workflow history export' => ['workflow:history-export'];
+        yield 'workflow list' => ['workflow:list'];
+        yield 'workflow list runs' => ['workflow:list-runs'];
+        yield 'workflow query' => ['workflow:query'];
+        yield 'workflow repair' => ['workflow:repair'];
+        yield 'workflow show run' => ['workflow:show-run'];
+        yield 'workflow signal' => ['workflow:signal'];
+        yield 'workflow start' => ['workflow:start'];
+        yield 'workflow terminate' => ['workflow:terminate'];
+        yield 'workflow update' => ['workflow:update'];
+        yield 'workflow task complete' => ['workflow-task:complete'];
+        yield 'workflow task fail' => ['workflow-task:fail'];
+        yield 'workflow task history' => ['workflow-task:history'];
+        yield 'workflow task poll' => ['workflow-task:poll'];
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function defaultScopeCommandNames(): iterable
+    {
+        yield 'doctor' => ['doctor'];
+        yield 'environment profile delete' => ['env:delete'];
+        yield 'environment profile list' => ['env:list'];
+        yield 'environment profile set' => ['env:set'];
+        yield 'environment profile show' => ['env:show'];
+        yield 'environment profile use' => ['env:use'];
+        yield 'namespace create' => ['namespace:create'];
+        yield 'namespace delete' => ['namespace:delete'];
+        yield 'namespace describe' => ['namespace:describe'];
+        yield 'namespace list' => ['namespace:list'];
+        yield 'namespace set storage driver' => ['namespace:set-storage-driver'];
+        yield 'namespace update' => ['namespace:update'];
+        yield 'runtime check' => ['runtime:check'];
+        yield 'schema list' => ['schema:list'];
+        yield 'schema manifest' => ['schema:manifest'];
+        yield 'schema show' => ['schema:show'];
+        yield 'server health' => ['server:health'];
+        yield 'server info' => ['server:info'];
+        yield 'server start dev' => ['server:start-dev'];
+        yield 'upgrade' => ['upgrade'];
+        yield 'unknown local command family' => ['throwing:test'];
     }
 }
 
@@ -237,8 +413,9 @@ class ThrowingOutputCommand extends BaseCommand
     public function __construct(
         private readonly \Throwable $toThrow,
         private readonly bool $enableJsonFlag = false,
+        string $commandName = 'throwing:test',
     ) {
-        parent::__construct('throwing:test');
+        parent::__construct($commandName);
     }
 
     protected function configure(): void

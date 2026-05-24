@@ -61,6 +61,10 @@ namespace parity against published artifacts.
 The CLI's namespace-scoped workflow, schedule, search-attribute, task-queue,
 and worker visibility outputs include the effective namespace in human and JSON
 modes.
+Namespace resource commands expose both the server resource `name` and the
+operator-facing `namespace` field in JSON output, so CRUD responses carry the
+same namespace context as scoped workflow, schedule, and search-attribute
+commands.
 List and history commands also attach the same namespace to each JSON/JSONL
 item so line-oriented automation keeps scope after the top-level envelope is
 dropped.

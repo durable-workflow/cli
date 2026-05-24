@@ -42,13 +42,16 @@ HELP)
             'retention_days' => $input->getOption('retention') ? (int) $input->getOption('retention') : null,
         ], fn ($v) => $v !== null);
 
-        $result = $this->client($input)->put("/namespaces/{$name}", $body);
+        $result = $this->addNamespaceResourceContext(
+            $this->client($input)->put("/namespaces/{$name}", $body),
+            (string) $name,
+        );
 
         if ($this->wantsJson($input)) {
             return $this->renderJson($output, $result);
         }
 
-        $output->writeln('<info>Namespace updated: '.$result['name'].'</info>');
+        $output->writeln('<info>Namespace updated: '.$result['namespace'].'</info>');
 
         return Command::SUCCESS;
     }

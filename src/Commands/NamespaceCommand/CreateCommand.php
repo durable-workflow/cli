@@ -36,17 +36,18 @@ HELP)
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $result = $this->client($input)->post('/namespaces', [
+        $name = (string) $input->getArgument('name');
+        $result = $this->addNamespaceResourceContext($this->client($input)->post('/namespaces', [
             'name' => $input->getArgument('name'),
             'description' => $input->getOption('description'),
             'retention_days' => (int) $input->getOption('retention'),
-        ]);
+        ]), $name);
 
         if ($this->wantsJson($input)) {
             return $this->renderJson($output, $result);
         }
 
-        $output->writeln('<info>Namespace created: '.$result['name'].'</info>');
+        $output->writeln('<info>Namespace created: '.$result['namespace'].'</info>');
 
         return Command::SUCCESS;
     }

@@ -34,13 +34,16 @@ HELP)
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $name = $input->getArgument('name');
-        $result = $this->client($input)->get("/namespaces/{$name}");
+        $result = $this->addNamespaceResourceContext(
+            $this->client($input)->get("/namespaces/{$name}"),
+            (string) $name,
+        );
 
         if ($this->wantsJson($input)) {
             return $this->renderJson($output, $result);
         }
 
-        $output->writeln('<info>Namespace: '.$result['name'].'</info>');
+        $output->writeln('<info>Namespace: '.$result['namespace'].'</info>');
         $output->writeln('  Description: '.($result['description'] ?? '-'));
         $output->writeln('  Retention: '.($result['retention_days'] ?? '-').' days');
         $output->writeln('  Status: '.$this->formatStatus($result['status'] ?? null));

@@ -9,9 +9,10 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["name"],
+        "required": ["name", "namespace"],
         "properties": {
           "name": { "type": "string" },
+          "namespace": { "type": "string" },
           "description": { "type": ["string", "null"] },
           "retention_days": { "type": ["integer", "null"] },
           "status": { "type": ["string", "null"] },

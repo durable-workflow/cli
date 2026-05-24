@@ -32,7 +32,7 @@ final class NamespaceParityFixtureTest extends TestCase
         self::assertSame([], $client->lastQuery);
 
         $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
-        self::assertSame($fixture['response_body'], $decoded);
+        self::assertSame(self::withNamespaceListItemContext($fixture['response_body']), $decoded);
         self::assertSame($fixture['semantic_body']['namespace_names'], array_column($decoded['namespaces'], 'name'));
     }
 
@@ -51,7 +51,7 @@ final class NamespaceParityFixtureTest extends TestCase
         self::assertSame($fixture['request']['path'], $client->lastPath);
 
         $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
-        self::assertSame($fixture['response_body'], $decoded);
+        self::assertSame(self::withNamespaceResourceContext($fixture['response_body']), $decoded);
         self::assertSame($fixture['semantic_body']['name'], $decoded['name'] ?? null);
         self::assertSame($fixture['semantic_body']['retention_days'], $decoded['retention_days'] ?? null);
     }
@@ -72,7 +72,7 @@ final class NamespaceParityFixtureTest extends TestCase
         self::assertSame($fixture['request']['body'], $client->lastBody);
 
         $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
-        self::assertSame($fixture['response_body'], $decoded);
+        self::assertSame(self::withNamespaceResourceContext($fixture['response_body']), $decoded);
         self::assertSame($fixture['semantic_body']['name'], $decoded['name'] ?? null);
     }
 
@@ -92,7 +92,7 @@ final class NamespaceParityFixtureTest extends TestCase
         self::assertSame($fixture['request']['body'], $client->lastBody);
 
         $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
-        self::assertSame($fixture['response_body'], $decoded);
+        self::assertSame(self::withNamespaceResourceContext($fixture['response_body']), $decoded);
         self::assertSame($fixture['semantic_body']['description'], $decoded['description'] ?? null);
         self::assertSame($fixture['semantic_body']['retention_days'], $decoded['retention_days'] ?? null);
     }
@@ -113,7 +113,7 @@ final class NamespaceParityFixtureTest extends TestCase
         self::assertSame([], $client->lastBody);
 
         $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
-        self::assertSame($fixture['response_body'], $decoded);
+        self::assertSame(self::withNamespaceResourceContext($fixture['response_body']), $decoded);
         self::assertSame($fixture['semantic_body']['name'], $decoded['name'] ?? null);
         self::assertSame($fixture['semantic_body']['status'], $decoded['status'] ?? null);
     }
@@ -132,6 +132,34 @@ final class NamespaceParityFixtureTest extends TestCase
         self::assertSame($operation, $fixture['operation'] ?? null);
 
         return $fixture;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private static function withNamespaceResourceContext(array $payload): array
+    {
+        if (is_scalar($payload['name'] ?? null) && (string) $payload['name'] !== '') {
+            $payload['namespace'] ??= (string) $payload['name'];
+        }
+
+        return $payload;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private static function withNamespaceListItemContext(array $payload): array
+    {
+        foreach ($payload['namespaces'] ?? [] as $index => $namespace) {
+            if (is_array($namespace)) {
+                $payload['namespaces'][$index] = self::withNamespaceResourceContext($namespace);
+            }
+        }
+
+        return $payload;
     }
 }
 

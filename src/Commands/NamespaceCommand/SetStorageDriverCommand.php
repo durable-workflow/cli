@@ -69,7 +69,10 @@ HELP)
             $body['config'] = $config;
         }
 
-        $result = $this->client($input)->put("/namespaces/{$name}/external-storage", $body);
+        $result = $this->addNamespaceResourceContext(
+            $this->client($input)->put("/namespaces/{$name}/external-storage", $body),
+            $name,
+        );
 
         if ($this->wantsJson($input)) {
             return $this->renderJson($output, $result);

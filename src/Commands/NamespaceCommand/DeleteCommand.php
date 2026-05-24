@@ -36,13 +36,16 @@ HELP)
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $name = $input->getArgument('name');
-        $result = $this->client($input)->delete("/namespaces/{$name}");
+        $result = $this->addNamespaceResourceContext(
+            $this->client($input)->delete("/namespaces/{$name}"),
+            (string) $name,
+        );
 
         if ($this->wantsJson($input)) {
             return $this->renderJson($output, $result);
         }
 
-        $output->writeln('<info>Namespace deleted: '.($result['name'] ?? $name).'</info>');
+        $output->writeln('<info>Namespace deleted: '.$result['namespace'].'</info>');
 
         return Command::SUCCESS;
     }

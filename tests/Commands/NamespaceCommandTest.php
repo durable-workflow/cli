@@ -87,6 +87,7 @@ class NamespaceCommandTest extends TestCase
 
         self::assertIsArray($decoded);
         self::assertSame('default', $decoded['namespaces'][0]['name']);
+        self::assertSame('default', $decoded['namespaces'][0]['namespace']);
     }
 
     public function test_create_command_sends_name_description_and_retention(): void
@@ -111,6 +112,25 @@ class NamespaceCommandTest extends TestCase
         self::assertSame('Production namespace', $client->lastPostBody['description']);
         self::assertSame(90, $client->lastPostBody['retention_days']);
         self::assertStringContainsString('Namespace created: production', $tester->getDisplay());
+    }
+
+    public function test_create_command_renders_json_namespace_context(): void
+    {
+        $command = new CreateCommand();
+        $command->setServerClient(new NamespaceFakeClient([]));
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            'name' => 'production',
+            '--json' => true,
+        ]));
+
+        $decoded = json_decode($tester->getDisplay(), true);
+
+        self::assertIsArray($decoded);
+        self::assertSame('production', $decoded['name']);
+        self::assertSame('production', $decoded['namespace']);
     }
 
     public function test_describe_command_renders_namespace_details(): void
@@ -189,6 +209,7 @@ class NamespaceCommandTest extends TestCase
 
         self::assertIsArray($decoded);
         self::assertSame('default', $decoded['name']);
+        self::assertSame('default', $decoded['namespace']);
         self::assertSame(30, $decoded['retention_days']);
     }
 
@@ -214,6 +235,28 @@ class NamespaceCommandTest extends TestCase
         self::assertSame(60, $client->lastPutBody['retention_days']);
     }
 
+    public function test_update_command_renders_json_namespace_context(): void
+    {
+        $command = new UpdateCommand();
+        $command->setServerClient(new NamespaceFakeClient([
+            'name' => 'default',
+        ]));
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            'name' => 'default',
+            '--description' => 'Updated description',
+            '--json' => true,
+        ]));
+
+        $decoded = json_decode($tester->getDisplay(), true);
+
+        self::assertIsArray($decoded);
+        self::assertSame('default', $decoded['name']);
+        self::assertSame('default', $decoded['namespace']);
+    }
+
     public function test_delete_command_sends_delete_for_namespace(): void
     {
         $client = new NamespaceFakeClient([
@@ -233,6 +276,27 @@ class NamespaceCommandTest extends TestCase
 
         self::assertSame('/namespaces/staging', $client->lastDeletePath);
         self::assertStringContainsString('Namespace deleted: staging', $tester->getDisplay());
+    }
+
+    public function test_delete_command_renders_json_namespace_context(): void
+    {
+        $command = new DeleteCommand();
+        $command->setServerClient(new NamespaceFakeClient([
+            'deleted' => [],
+        ]));
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            'name' => 'staging',
+            '--json' => true,
+        ]));
+
+        $decoded = json_decode($tester->getDisplay(), true);
+
+        self::assertIsArray($decoded);
+        self::assertSame('staging', $decoded['name']);
+        self::assertSame('staging', $decoded['namespace']);
     }
 }
 

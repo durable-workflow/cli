@@ -3,9 +3,10 @@
   "$id": "https://durable-workflow.com/schemas/cli/output/external-storage-policy.schema.json",
   "title": "dw namespace:set-storage-driver --json",
   "type": "object",
-  "required": ["name"],
+  "required": ["name", "namespace"],
   "properties": {
     "name": { "type": "string" },
+    "namespace": { "type": "string" },
     "external_payload_storage": {
       "type": "object",
       "required": ["driver", "enabled"],

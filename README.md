@@ -237,7 +237,9 @@ namespace; workflow, schedule, search-attribute, task-queue, and worker list
 commands do not fan out across all tenant namespaces. Namespace-scoped
 workflow, schedule, search-attribute, task-queue, and worker visibility
 commands include the effective namespace in human and JSON outputs so
-operators can tell which scope was queried or mutated.
+operators can tell which scope was queried or mutated. Namespace CRUD JSON
+outputs also expose `namespace` alongside the resource `name` for the same
+operator-facing context.
 
 Invocable activity handlers use the `invocable_http` carrier type in the same
 external executor config file. The CLI validates that these targets stay

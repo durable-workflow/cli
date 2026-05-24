@@ -29,10 +29,11 @@ final class ExternalStorageParityFixtureTest extends TestCase
         self::assertSame($fixture['request']['body'], $client->lastBody);
 
         $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
-        self::assertSame($fixture['response_body'], $decoded);
+        self::assertSame(self::withNamespaceResourceContext($fixture['response_body']), $decoded);
 
         $semantic = $fixture['semantic_body'];
         self::assertSame($semantic['namespace'], $decoded['name'] ?? null);
+        self::assertSame($semantic['namespace'], $decoded['namespace'] ?? null);
         self::assertSame($semantic['driver'], $decoded['external_payload_storage']['driver'] ?? null);
         self::assertSame($semantic['enabled'], $decoded['external_payload_storage']['enabled'] ?? null);
         self::assertSame($semantic['threshold_bytes'], $decoded['external_payload_storage']['threshold_bytes'] ?? null);
@@ -79,6 +80,19 @@ final class ExternalStorageParityFixtureTest extends TestCase
         self::assertSame($operation, $fixture['operation'] ?? null);
 
         return $fixture;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private static function withNamespaceResourceContext(array $payload): array
+    {
+        if (is_scalar($payload['name'] ?? null) && (string) $payload['name'] !== '') {
+            $payload['namespace'] ??= (string) $payload['name'];
+        }
+
+        return $payload;
     }
 }
 

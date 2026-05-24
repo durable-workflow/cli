@@ -32,6 +32,7 @@ HELP)
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $result = $this->client($input)->get('/namespaces');
+        $result = $this->addNamespaceListItemContext($result);
 
         if ($this->wantsJson($input)) {
             return $this->renderJsonList($output, $input, $result, 'namespaces');
@@ -55,5 +56,27 @@ HELP)
         $this->renderTable($output, ['Name', 'Description', 'Retention (days)', 'Status'], $rows);
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * @param  array<string, mixed>  $result
+     * @return array<string, mixed>
+     */
+    private function addNamespaceListItemContext(array $result): array
+    {
+        if (! isset($result['namespaces']) || ! is_array($result['namespaces'])) {
+            return $result;
+        }
+
+        foreach ($result['namespaces'] as $index => $namespace) {
+            if (is_array($namespace)) {
+                $result['namespaces'][$index] = $this->addNamespaceResourceContext(
+                    $namespace,
+                    is_scalar($namespace['name'] ?? null) ? (string) $namespace['name'] : '',
+                );
+            }
+        }
+
+        return $result;
     }
 }

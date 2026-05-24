@@ -578,6 +578,27 @@ abstract class BaseCommand extends Command
         return $this->withNamespaceContext($namespace, $payload, $itemsKey);
     }
 
+    protected function addNamespaceResourceContext(array $payload, string $fallbackName): array
+    {
+        $name = $this->hasNonEmptyString($payload['name'] ?? null)
+            ? (string) $payload['name']
+            : $fallbackName;
+
+        if (! $this->hasNonEmptyString($name)) {
+            return $payload;
+        }
+
+        if (! $this->hasNonEmptyString($payload['name'] ?? null)) {
+            $payload['name'] = $name;
+        }
+
+        if (! $this->hasNonEmptyString($payload['namespace'] ?? null)) {
+            $payload['namespace'] = $name;
+        }
+
+        return $payload;
+    }
+
     protected function withNamespaceContext(string $namespace, array $payload, ?string $itemsKey = null): array
     {
         if (! $this->hasNonEmptyString($payload['namespace'] ?? null)) {

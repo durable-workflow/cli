@@ -50,6 +50,54 @@ class WorkerCommandTest extends TestCase
         self::assertSame(5, $client->lastPostBody['max_concurrent_workflow_tasks']);
         self::assertSame(7, $client->lastPostBody['max_concurrent_activity_tasks']);
         self::assertStringContainsString('worker-a', $tester->getDisplay());
+        self::assertStringContainsString('build-42', $tester->getDisplay());
+    }
+
+    public function test_register_command_defaults_to_external_runtime_for_cli_diagnostics(): void
+    {
+        $client = new WorkerFakeClient([
+            'worker_id' => 'worker-a',
+            'registered' => true,
+        ]);
+
+        $command = new RegisterCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            'worker-id' => 'worker-a',
+            '--task-queue' => 'queue-alpha',
+            '--build-id' => 'build-v2',
+        ]));
+
+        self::assertSame('/worker/register', $client->lastPostPath);
+        self::assertSame('worker-a', $client->lastPostBody['worker_id']);
+        self::assertSame('queue-alpha', $client->lastPostBody['task_queue']);
+        self::assertSame('external', $client->lastPostBody['runtime']);
+        self::assertSame('build-v2', $client->lastPostBody['build_id']);
+    }
+
+    public function test_register_command_fails_when_server_does_not_confirm_registration(): void
+    {
+        $client = new WorkerFakeClient([
+            'worker_id' => 'worker-a',
+            'registered' => false,
+        ]);
+
+        $command = new RegisterCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::FAILURE, $tester->execute([
+            'worker-id' => 'worker-a',
+            '--task-queue' => 'queue-alpha',
+            '--build-id' => 'build-v2',
+        ]));
+
+        self::assertSame('/worker/register', $client->lastPostPath);
+        self::assertStringContainsString('Worker registration was not confirmed', $tester->getDisplay());
     }
 
     public function test_register_command_json_output(): void

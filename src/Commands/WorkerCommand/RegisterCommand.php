@@ -14,6 +14,8 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 class RegisterCommand extends BaseCommand
 {
+    private const DEFAULT_DIAGNOSTIC_RUNTIME = 'external';
+
     protected function configure(): void
     {
         parent::configure();
@@ -41,7 +43,12 @@ fleets and test harnesses — runs themselves are never stamped with
 HELP)
             ->addArgument('worker-id', InputArgument::OPTIONAL, 'Worker ID; omitted lets the server assign one')
             ->addOption('task-queue', null, InputOption::VALUE_REQUIRED, 'Task queue to poll', 'default')
-            ->addOption('runtime', null, InputOption::VALUE_REQUIRED, 'Runtime label the worker advertises (e.g. python, typescript, go, java, external). Omit to let the server record an unspecified runtime.')
+            ->addOption(
+                'runtime',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Runtime label the worker advertises (php, python, rust, typescript, go, java, external). Omit to use external for CLI diagnostics.',
+            )
             ->addOption('sdk-version', null, InputOption::VALUE_OPTIONAL, 'Advertised SDK version', 'dw-cli')
             ->addOption('build-id', null, InputOption::VALUE_OPTIONAL, 'Compatibility build ID')
             ->addOption('workflow-type', null, InputOption::VALUE_OPTIONAL | InputOption::VALUE_IS_ARRAY, 'Supported workflow type')
@@ -56,7 +63,7 @@ HELP)
         $body = array_filter([
             'worker_id' => $input->getArgument('worker-id') ?: null,
             'task_queue' => $input->getOption('task-queue'),
-            'runtime' => $input->getOption('runtime'),
+            'runtime' => $this->runtimeOption($input),
             'sdk_version' => $input->getOption('sdk-version'),
             'build_id' => $input->getOption('build-id'),
             'supported_workflow_types' => $this->stringList($input->getOption('workflow-type')),
@@ -66,6 +73,7 @@ HELP)
         ], static fn (mixed $value): bool => $value !== null && $value !== []);
 
         $result = $this->client($input)->post('/worker/register', $body);
+        $this->assertRegistered($result);
 
         if ($this->wantsJson($input)) {
             return $this->renderJson($output, $result);
@@ -75,6 +83,7 @@ HELP)
         $output->writeln('  Worker ID: '.($result['worker_id'] ?? '-'));
         $output->writeln('  Task Queue: '.($body['task_queue'] ?? '-'));
         $output->writeln('  Runtime: '.($body['runtime'] ?? '-'));
+        $output->writeln('  Build ID: '.($body['build_id'] ?? '(unversioned)'));
 
         return Command::SUCCESS;
     }
@@ -107,5 +116,30 @@ HELP)
         }
 
         return (int) $value;
+    }
+
+    private function runtimeOption(InputInterface $input): string
+    {
+        $runtime = $input->getOption('runtime');
+
+        if (! is_scalar($runtime) || trim((string) $runtime) === '') {
+            return self::DEFAULT_DIAGNOSTIC_RUNTIME;
+        }
+
+        return trim((string) $runtime);
+    }
+
+    /**
+     * @param  array<string, mixed>  $result
+     */
+    private function assertRegistered(array $result): void
+    {
+        if (($result['registered'] ?? null) === true) {
+            return;
+        }
+
+        throw new \RuntimeException(
+            'Worker registration was not confirmed by the server; expected registered=true in the /worker/register response.',
+        );
     }
 }

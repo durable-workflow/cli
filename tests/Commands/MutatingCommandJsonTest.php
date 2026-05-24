@@ -206,6 +206,7 @@ class StubServerClient extends ServerClient
             'name' => 'stub-name',
             'type' => 'keyword',
             'worker_id' => 'w-1',
+            'registered' => true,
             'result' => ['stub' => true],
         ];
     }

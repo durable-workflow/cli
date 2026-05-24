@@ -283,7 +283,7 @@ abstract class BaseCommand extends Command
 
         try {
             $warnings = CompatibilityDiagnostics::warnings(
-                $this->client($input)->clusterInfoUnchecked(),
+                $this->freshClient($input)->clusterInfoUnchecked(),
                 BuildInfo::version(),
                 $this->includeWorkerProtocolCompatibilityWarning(),
             );

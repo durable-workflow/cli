@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Commands;
 
+use DurableWorkflow\Cli\Application;
 use DurableWorkflow\Cli\Commands\BaseCommand;
 use DurableWorkflow\Cli\Commands\NamespaceCommand\ListCommand as NamespaceListCommand;
 use DurableWorkflow\Cli\Commands\WorkflowCommand\ListCommand as WorkflowListCommand;
@@ -289,6 +290,47 @@ class OutputContractTest extends TestCase
         self::assertStringNotContainsString('Namespace: tenant-b', $tester->getErrorOutput());
     }
 
+    public function test_namespace_error_scope_metadata_covers_registered_base_commands(): void
+    {
+        $scoped = BaseCommand::namespaceScopedCommandNamesForErrors();
+        $default = BaseCommand::defaultScopeCommandNamesForErrors();
+
+        self::assertSame([], array_values(array_intersect($scoped, $default)), 'commands must have one namespace error scope');
+
+        $application = new Application();
+        $registered = [];
+
+        foreach ($application->all() as $command) {
+            if (! $command instanceof BaseCommand) {
+                continue;
+            }
+
+            $name = $command->getName();
+            if ($name !== null && $name !== '') {
+                $registered[$name] = true;
+            }
+        }
+
+        $declared = array_fill_keys(array_merge($scoped, $default), true);
+        ksort($registered);
+        ksort($declared);
+
+        self::assertSame(
+            array_keys($registered),
+            array_keys($declared),
+            'every BaseCommand must explicitly declare whether errors include namespace context',
+        );
+    }
+
+    public function test_namespace_error_scope_metadata_matches_scoped_expectations(): void
+    {
+        $expected = self::commandNamesFromCases(self::namespaceScopedCommandNames());
+        $actual = BaseCommand::namespaceScopedCommandNamesForErrors();
+        sort($actual);
+
+        self::assertSame($expected, $actual);
+    }
+
     public function test_json_mode_keeps_stderr_silent_on_error(): void
     {
         $command = new ThrowingOutputCommand(new ServerHttpException('denied', 403));
@@ -392,6 +434,23 @@ class OutputContractTest extends TestCase
         yield 'server start dev' => ['server:start-dev'];
         yield 'upgrade' => ['upgrade'];
         yield 'unknown local command family' => ['throwing:test'];
+    }
+
+    /**
+     * @param  iterable<string, array{string}>  $cases
+     * @return list<string>
+     */
+    private static function commandNamesFromCases(iterable $cases): array
+    {
+        $names = [];
+
+        foreach ($cases as $case) {
+            $names[] = $case[0];
+        }
+
+        sort($names);
+
+        return $names;
     }
 }
 

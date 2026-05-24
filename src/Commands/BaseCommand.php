@@ -28,22 +28,28 @@ abstract class BaseCommand extends Command
 {
     private const INPUT_ENCODINGS = ['json', 'raw', 'base64'];
 
-    private const NAMESPACE_SCOPED_COMMAND_PREFIXES = [
-        'activity:',
-        'query-task:',
-        'schedule:',
-        'search-attribute:',
-        'storage:',
-        'task-queue:',
-        'worker:',
-        'workflow:',
-        'workflow-task:',
-    ];
-
     private const NAMESPACE_SCOPED_COMMAND_NAMES = [
+        'activity:complete',
+        'activity:fail',
         'bridge:webhook',
         'debug',
-        'watch',
+        'query-task:complete',
+        'query-task:fail',
+        'query-task:poll',
+        'schedule:backfill',
+        'schedule:create',
+        'schedule:delete',
+        'schedule:describe',
+        'schedule:history',
+        'schedule:list',
+        'schedule:pause',
+        'schedule:resume',
+        'schedule:trigger',
+        'schedule:update',
+        'search-attribute:create',
+        'search-attribute:delete',
+        'search-attribute:list',
+        'storage:test',
         'system:activity-timeout-pass',
         'system:activity-timeout-status',
         'system:operator-metrics',
@@ -51,6 +57,51 @@ abstract class BaseCommand extends Command
         'system:repair-status',
         'system:retention-pass',
         'system:retention-status',
+        'task-queue:build-ids',
+        'task-queue:describe',
+        'task-queue:drain',
+        'task-queue:list',
+        'task-queue:resume',
+        'watch',
+        'worker:deregister',
+        'worker:describe',
+        'worker:list',
+        'worker:register',
+        'workflow:archive',
+        'workflow:cancel',
+        'workflow:describe',
+        'workflow:history',
+        'workflow:history-export',
+        'workflow:list',
+        'workflow:list-runs',
+        'workflow:query',
+        'workflow:repair',
+        'workflow:show-run',
+        'workflow:signal',
+        'workflow:start',
+        'workflow:terminate',
+        'workflow:update',
+        'workflow-task:complete',
+        'workflow-task:fail',
+        'workflow-task:history',
+        'workflow-task:poll',
+    ];
+
+    private const DEFAULT_SCOPE_COMMAND_NAMES = [
+        'doctor',
+        'env:delete',
+        'env:list',
+        'env:set',
+        'env:show',
+        'env:use',
+        'namespace:create',
+        'namespace:delete',
+        'namespace:describe',
+        'namespace:list',
+        'namespace:set-storage-driver',
+        'namespace:update',
+        'server:health',
+        'server:info',
     ];
 
     private ?ServerClient $serverClient = null;
@@ -205,6 +256,22 @@ abstract class BaseCommand extends Command
     public function emitsSessionCompatibilityWarning(): bool
     {
         return true;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function namespaceScopedCommandNamesForErrors(): array
+    {
+        return self::NAMESPACE_SCOPED_COMMAND_NAMES;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function defaultScopeCommandNamesForErrors(): array
+    {
+        return self::DEFAULT_SCOPE_COMMAND_NAMES;
     }
 
     public function emitSessionCompatibilityWarning(InputInterface $input, OutputInterface $output): void
@@ -752,19 +819,7 @@ abstract class BaseCommand extends Command
 
     private function isNamespaceScopedCommand(): bool
     {
-        $name = (string) $this->getName();
-
-        if (in_array($name, self::NAMESPACE_SCOPED_COMMAND_NAMES, true)) {
-            return true;
-        }
-
-        foreach (self::NAMESPACE_SCOPED_COMMAND_PREFIXES as $prefix) {
-            if (str_starts_with($name, $prefix)) {
-                return true;
-            }
-        }
-
-        return false;
+        return in_array((string) $this->getName(), self::NAMESPACE_SCOPED_COMMAND_NAMES, true);
     }
 
     /**

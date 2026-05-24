@@ -235,6 +235,39 @@ class ApplicationCompatibilityWarningTest extends TestCase
         );
     }
 
+    public function test_worker_command_does_not_warn_when_server_advertises_compatible_newer_worker_protocol(): void
+    {
+        $clusterInfo = self::clusterInfo(serverVersion: '9.8.7', supportedCliVersions: '0.1.x');
+        $clusterInfo['worker_protocol']['version'] = '1.8';
+
+        $application = $this->applicationWithClient(new ApplicationCompatibilityFakeClient($clusterInfo));
+        $tester = new ApplicationTester($application);
+
+        self::assertSame(0, $tester->run([
+            'command' => 'worker:list',
+        ]));
+
+        self::assertStringNotContainsString('worker_protocol.version', $tester->getDisplay());
+    }
+
+    public function test_worker_command_warns_when_server_advertises_incompatible_worker_protocol(): void
+    {
+        $clusterInfo = self::clusterInfo(serverVersion: '9.8.7', supportedCliVersions: '0.1.x');
+        $clusterInfo['worker_protocol']['version'] = '2.0';
+
+        $application = $this->applicationWithClient(new ApplicationCompatibilityFakeClient($clusterInfo));
+        $tester = new ApplicationTester($application);
+
+        self::assertSame(0, $tester->run([
+            'command' => 'worker:list',
+        ]));
+
+        self::assertStringContainsString(
+            'Compatibility warning: server advertises worker_protocol.version [2.0]; worker commands support protocol 1.0 on compatible same-major server minors.',
+            $tester->getDisplay(),
+        );
+    }
+
     public function test_version_output_warns_from_explicit_target_client_compatibility_metadata(): void
     {
         $currentVersion = BuildInfo::version();

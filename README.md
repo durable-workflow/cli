@@ -312,6 +312,9 @@ CLI version 0.1.x is compatible with servers that advertise
 `control_plane.version: "2"` and
 `control_plane.request_contract.schema: durable-workflow.v2.control-plane-request.contract`
 version `1` from `GET /api/cluster/info`.
+Worker diagnostic commands speak worker protocol `1.0` and accept server
+responses from compatible `1.x` worker-protocol minors; breaking major
+versions are refused with an explicit compatibility error.
 
 The top-level server `version` is build identity only. The CLI validates the
 protocol manifests on first invocation and raises a clear error if incompatible:

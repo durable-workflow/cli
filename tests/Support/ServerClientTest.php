@@ -591,6 +591,92 @@ class ServerClientTest extends TestCase
         self::assertSame(ServerClient::WORKER_PROTOCOL_VERSION, $payload['protocol_version']);
     }
 
+    public function test_it_accepts_newer_compatible_worker_protocol_responses(): void
+    {
+        $response = new MockResponse(json_encode([
+            'worker_id' => 'worker-1',
+            'registered' => true,
+            'protocol_version' => '1.8',
+            'server_capabilities' => [
+                'workflow_task_poll_request_idempotency' => true,
+            ],
+        ], JSON_THROW_ON_ERROR), [
+            'http_code' => 201,
+            'response_headers' => [
+                'X-Durable-Workflow-Protocol-Version: 1.8',
+            ],
+        ]);
+
+        $client = new ServerClient(
+            baseUrl: 'http://example.test',
+            namespace: 'default',
+            http: new MockHttpClient($response, 'http://example.test'),
+        );
+
+        $payload = $client->post('/worker/register', [
+            'worker_id' => 'worker-1',
+            'task_queue' => 'default',
+            'runtime' => 'php',
+        ]);
+
+        self::assertSame('worker-1', $payload['worker_id']);
+        self::assertSame('1.8', $payload['protocol_version']);
+    }
+
+    public function test_it_rejects_breaking_worker_protocol_response_versions(): void
+    {
+        $response = new MockResponse(json_encode([
+            'worker_id' => 'worker-1',
+            'registered' => true,
+            'protocol_version' => '2.0',
+        ], JSON_THROW_ON_ERROR), [
+            'http_code' => 201,
+            'response_headers' => [
+                'X-Durable-Workflow-Protocol-Version: 2.0',
+            ],
+        ]);
+
+        $client = new ServerClient(
+            baseUrl: 'http://example.test',
+            namespace: 'default',
+            http: new MockHttpClient($response, 'http://example.test'),
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('invalid worker-protocol response version');
+
+        $client->post('/worker/register');
+    }
+
+    public function test_it_does_not_apply_worker_protocol_response_validation_to_worker_management_routes(): void
+    {
+        $response = new MockResponse(json_encode([
+            'workers' => [
+                [
+                    'worker_id' => 'worker-1',
+                    'task_queue' => 'default',
+                    'build_id' => 'build-v2',
+                ],
+            ],
+        ], JSON_THROW_ON_ERROR), [
+            'http_code' => 200,
+            'response_headers' => [
+                'X-Durable-Workflow-Control-Plane-Version: 2',
+            ],
+        ]);
+
+        $client = new ServerClient(
+            baseUrl: 'http://example.test',
+            namespace: 'default',
+            http: new MockHttpClient($response, 'http://example.test'),
+        );
+
+        $payload = $client->get('/workers');
+
+        self::assertSame('worker-1', $payload['workers'][0]['worker_id']);
+        self::assertSame('build-v2', $payload['workers'][0]['build_id']);
+    }
+
     public function test_it_rejects_worker_responses_without_the_worker_protocol_header(): void
     {
         $response = new MockResponse(json_encode([

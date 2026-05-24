@@ -20,6 +20,18 @@ class ServerClient
 
     public const CONTROL_PLANE_HEADER = 'X-Durable-Workflow-Control-Plane-Version';
 
+    public static function isCompatibleWorkerProtocolVersion(string $clientVersion, string $serverVersion): bool
+    {
+        $client = self::splitWorkerProtocolVersion($clientVersion);
+        $server = self::splitWorkerProtocolVersion($serverVersion);
+
+        if ($client === null || $server === null) {
+            return $clientVersion === $serverVersion;
+        }
+
+        return $client[0] === $server[0] && $client[1] <= $server[1];
+    }
+
     private HttpClientInterface $http;
 
     private string $baseUrl;
@@ -266,12 +278,12 @@ class ServerClient
         int $statusCode,
     ): array
     {
-        if (str_starts_with($path, '/worker')) {
+        if (self::isWorkerProtocolPath($path)) {
             $version = $this->responseHeader($response, self::WORKER_PROTOCOL_HEADER);
 
-            if ($version !== self::WORKER_PROTOCOL_VERSION) {
+            if ($version === null || ! self::isCompatibleWorkerProtocolVersion(self::WORKER_PROTOCOL_VERSION, $version)) {
                 throw new \RuntimeException(sprintf(
-                    'Server error: invalid worker-protocol response version for [%s]; expected [%s], got [%s].',
+                    'Server error: invalid worker-protocol response version for [%s]; expected same-major server minor compatible with [%s], got [%s].',
                     $path,
                     self::WORKER_PROTOCOL_VERSION,
                     $version ?? 'missing',
@@ -279,9 +291,13 @@ class ServerClient
             }
 
             $bodyVersion = $body['protocol_version'] ?? null;
-            if (! is_scalar($bodyVersion) || trim((string) $bodyVersion) !== self::WORKER_PROTOCOL_VERSION) {
+            if (
+                ! is_scalar($bodyVersion)
+                || trim((string) $bodyVersion) !== $version
+                || ! self::isCompatibleWorkerProtocolVersion(self::WORKER_PROTOCOL_VERSION, trim((string) $bodyVersion))
+            ) {
                 throw new \RuntimeException(sprintf(
-                    'Server error: invalid worker-protocol response body for [%s]; expected protocol_version [%s].',
+                    'Server error: invalid worker-protocol response body for [%s]; expected protocol_version same-major compatible with [%s].',
                     $path,
                     self::WORKER_PROTOCOL_VERSION,
                 ));
@@ -312,6 +328,11 @@ class ServerClient
         return $body;
     }
 
+    private static function isWorkerProtocolPath(string $path): bool
+    {
+        return $path === '/worker' || str_starts_with($path, '/worker/');
+    }
+
     private function responseHeader(ResponseInterface $response, string $header): ?string
     {
         $headers = $response->getHeaders(false);
@@ -324,6 +345,20 @@ class ServerClient
         $value = trim((string) $values[0]);
 
         return $value === '' ? null : $value;
+    }
+
+    /**
+     * @return array{0: int, 1: int}|null
+     */
+    private static function splitWorkerProtocolVersion(string $value): ?array
+    {
+        if (preg_match('/^\d+\.\d+$/', trim($value)) !== 1) {
+            return null;
+        }
+
+        [$major, $minor] = explode('.', trim($value), 2);
+
+        return [(int) $major, (int) $minor];
     }
 
     private function firstValidationMessage(array $body): ?string

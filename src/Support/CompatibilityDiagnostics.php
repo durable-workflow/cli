@@ -192,9 +192,15 @@ final class CompatibilityDiagnostics
         }
 
         $version = $workerProtocol['version'] ?? null;
-        if (! is_scalar($version) || trim((string) $version) !== ServerClient::WORKER_PROTOCOL_VERSION) {
+        if (
+            ! is_scalar($version)
+            || ! ServerClient::isCompatibleWorkerProtocolVersion(
+                ServerClient::WORKER_PROTOCOL_VERSION,
+                trim((string) $version),
+            )
+        ) {
             return sprintf(
-                'Compatibility warning: server advertises worker_protocol.version [%s]; worker commands expect %s.',
+                'Compatibility warning: server advertises worker_protocol.version [%s]; worker commands support protocol %s on compatible same-major server minors.',
                 is_scalar($version) ? (string) $version : 'missing',
                 ServerClient::WORKER_PROTOCOL_VERSION,
             );

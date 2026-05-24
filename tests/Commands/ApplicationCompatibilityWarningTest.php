@@ -25,6 +25,7 @@ class ApplicationCompatibilityWarningTest extends TestCase
         'DURABLE_WORKFLOW_NAMESPACE',
         'DURABLE_WORKFLOW_AUTH_TOKEN',
         'DURABLE_WORKFLOW_TLS_VERIFY',
+        'DW_CONFIG_HOME',
         'DW_ENV',
     ];
 
@@ -33,6 +34,8 @@ class ApplicationCompatibilityWarningTest extends TestCase
 
     /** @var array<string, array{process: string|false, env_exists: bool, env_value: mixed}> */
     private array $originalEnv = [];
+
+    private string $configHome = '';
 
     protected function setUp(): void
     {
@@ -45,6 +48,12 @@ class ApplicationCompatibilityWarningTest extends TestCase
         foreach (self::CONNECTION_ENV_VARS as $name) {
             $this->clearEnv($name);
         }
+
+        $this->configHome = sys_get_temp_dir().'/dw-cli-config-'.bin2hex(random_bytes(8));
+        if (! mkdir($this->configHome, 0777, true) && ! is_dir($this->configHome)) {
+            self::fail('Unable to create isolated dw config directory.');
+        }
+        $this->setEnv('DW_CONFIG_HOME', $this->configHome);
     }
 
     protected function tearDown(): void
@@ -61,6 +70,14 @@ class ApplicationCompatibilityWarningTest extends TestCase
         }
 
         $this->fakeServers = [];
+
+        if ($this->configHome !== '') {
+            foreach (glob($this->configHome.'/*') ?: [] as $path) {
+                @unlink($path);
+            }
+            @rmdir($this->configHome);
+            $this->configHome = '';
+        }
 
         foreach ($this->originalEnv as $name => $state) {
             $this->restoreEnv($name, $state);

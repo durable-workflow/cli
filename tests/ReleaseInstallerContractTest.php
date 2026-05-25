@@ -39,6 +39,10 @@ final class ReleaseInstallerContractTest extends TestCase
         self::assertStringContainsString('install.ps1', $releaseWorkflow);
         self::assertStringContainsString('verify-release.sh', $releaseWorkflow);
         self::assertStringContainsString('subject-path: dist/*', $releaseWorkflow);
+        self::assertStringContainsString('Write release notes', $releaseWorkflow);
+        self::assertStringContainsString('Durable Workflow CLI ${tag}', $releaseWorkflow);
+        self::assertStringContainsString('SHA256SUMS for artifact verification', $releaseWorkflow);
+        self::assertStringContainsString('body_path: release-notes.md', $releaseWorkflow);
         self::assertStringContainsString('SPC_DOWNLOAD_RETRY: \'5\'', $releaseWorkflow);
         self::assertStringContainsString('SPC_DOWNLOAD_OUTER_ATTEMPTS: \'4\'', $releaseWorkflow);
         self::assertStringContainsString('spc dependency download failed after ${SPC_DOWNLOAD_OUTER_ATTEMPTS} attempts', $releaseWorkflow);

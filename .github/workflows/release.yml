@@ -456,11 +456,29 @@ jobs:
         with:
           subject-path: dist/*
 
+      - name: Write release notes
+        run: |
+          set -euo pipefail
+          tag="${{ needs.resolve-release.outputs.tag }}"
+          cat > release-notes.md <<EOF
+          Durable Workflow CLI ${tag}
+
+          This release publishes the \`dw\` command-line client and its supported public distribution assets:
+
+          - installer scripts for POSIX shells and PowerShell
+          - the portable PHAR package
+          - standalone binaries for Linux x86_64, Linux aarch64, macOS aarch64, and Windows x86_64
+          - SHA256SUMS for artifact verification
+
+          Download the assets below and verify them with the bundled \`verify-release.sh\` helper or your platform checksum tooling.
+          EOF
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.resolve-release.outputs.tag }}
           name: ${{ needs.resolve-release.outputs.tag }}
+          body_path: release-notes.md
           files: |
             dist/*
           generate_release_notes: true

@@ -113,11 +113,42 @@ HELP)
             $e['sequence'] ?? '-',
             $e['event_type'] ?? '-',
             $e['timestamp'] ?? '-',
+            $this->principalLabel($e['principal'] ?? null),
             json_encode($e['payload'] ?? null, JSON_UNESCAPED_SLASHES),
         ], $allEvents);
 
-        $this->renderTable($output, ['#', 'Event Type', 'Time', 'Details'], $rows);
+        $this->renderTable($output, ['#', 'Event Type', 'Time', 'Principal', 'Details'], $rows);
 
         return Command::SUCCESS;
+    }
+
+    private function principalLabel(mixed $principal): string
+    {
+        if (! is_array($principal)) {
+            return '-';
+        }
+
+        $id = $this->stringValue($principal['id'] ?? null);
+        $type = $this->stringValue($principal['type'] ?? null);
+        $label = $this->stringValue($principal['label'] ?? null);
+
+        if ($id === null && $type === null && $label === null) {
+            return '-';
+        }
+
+        $identity = $label ?? $id ?? '-';
+
+        return $type === null ? $identity : $identity.' ('.$type.')';
+    }
+
+    private function stringValue(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        return $value === '' ? null : $value;
     }
 }

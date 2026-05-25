@@ -25,6 +25,11 @@ class WorkflowHistoryQueryTest extends TestCase
                     'sequence' => 1,
                     'event_type' => 'workflow_started',
                     'timestamp' => '2026-04-13T00:00:00Z',
+                    'principal' => [
+                        'type' => 'auth:token',
+                        'id' => 'alice',
+                        'label' => 'Alice Operator',
+                    ],
                     'payload' => ['type' => 'orders.process'],
                 ],
                 [
@@ -48,6 +53,8 @@ class WorkflowHistoryQueryTest extends TestCase
 
         self::assertStringContainsString('workflow_started', $display);
         self::assertStringContainsString('activity_scheduled', $display);
+        self::assertStringContainsString('Principal', $display);
+        self::assertStringContainsString('Alice Operator (auth:token)', $display);
         self::assertStringContainsString('send_email', $display);
     }
 

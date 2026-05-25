@@ -98,6 +98,11 @@ Worker build-ID and rollout commands are covered through
 task-queue build IDs, drains or resumes worker cohorts, and describes
 workflow runs pinned to compatible workers.
 
+Migration runtime scenarios are not part of this CLI claim until the
+public docs-site manifest and corresponding scenario artifact are
+published. Until then, release gating remains pinned to suite version
+`12`.
+
 ## Release gate
 
 A release of the `dw` CLI must produce a passing harness result

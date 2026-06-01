@@ -12,6 +12,104 @@ use Symfony\Component\HttpClient\Response\MockResponse;
 
 class ServerClientTest extends TestCase
 {
+    public function test_it_allows_conformance_protocol_overrides_for_request_and_response_validation(): void
+    {
+        $previousControlPlaneVersion = getenv('DURABLE_WORKFLOW_CONTROL_PLANE_VERSION');
+        $previousWorkerProtocolVersion = getenv('DURABLE_WORKFLOW_WORKER_PROTOCOL_VERSION');
+
+        putenv('DURABLE_WORKFLOW_CONTROL_PLANE_VERSION=3');
+        putenv('DURABLE_WORKFLOW_WORKER_PROTOCOL_VERSION=2.0');
+
+        try {
+            $calls = 0;
+            $client = new ServerClient(
+                baseUrl: 'http://example.test',
+                namespace: 'default',
+                http: new MockHttpClient(static function (string $method, string $url, array $options) use (&$calls): MockResponse {
+                    $calls++;
+                    self::assertSame('3', self::headerValue($options, ServerClient::CONTROL_PLANE_HEADER));
+                    self::assertSame('2.0', self::headerValue($options, ServerClient::WORKER_PROTOCOL_HEADER));
+
+                    if (str_ends_with($url, '/api/cluster/info')) {
+                        return new MockResponse(json_encode([
+                            'version' => '0.2.210',
+                            'control_plane' => [
+                                'version' => '3',
+                                'request_contract' => [
+                                    'schema' => ControlPlaneRequestContract::SCHEMA,
+                                    'version' => ControlPlaneRequestContract::VERSION,
+                                    'operations' => [],
+                                ],
+                            ],
+                        ], JSON_THROW_ON_ERROR), [
+                            'http_code' => 200,
+                        ]);
+                    }
+
+                    if (str_ends_with($url, '/api/worker/register')) {
+                        return new MockResponse(json_encode([
+                            'worker_id' => 'worker-1',
+                            'registered' => true,
+                            'protocol_version' => '2.0',
+                        ], JSON_THROW_ON_ERROR), [
+                            'http_code' => 201,
+                            'response_headers' => [
+                                'X-Durable-Workflow-Protocol-Version: 2.0',
+                            ],
+                        ]);
+                    }
+
+                    return new MockResponse(json_encode([
+                        'control_plane' => [
+                            'schema' => 'durable-workflow.v2.control-plane-response',
+                            'version' => 1,
+                            'operation' => 'signal',
+                            'operation_name' => 'advance',
+                            'operation_name_field' => 'signal_name',
+                            'workflow_id' => 'wf-123',
+                            'outcome' => 'signal_received',
+                            'contract' => [
+                                'schema' => 'durable-workflow.v2.control-plane-response.contract',
+                                'version' => 1,
+                                'legacy_field_policy' => 'reject_non_canonical',
+                                'legacy_fields' => [
+                                    'query' => 'query_name',
+                                    'signal' => 'signal_name',
+                                    'update' => 'update_name',
+                                    'wait_policy' => 'wait_for',
+                                ],
+                                'required_fields' => ['workflow_id', 'operation_name', 'operation_name_field'],
+                                'success_fields' => ['outcome'],
+                            ],
+                        ],
+                    ], JSON_THROW_ON_ERROR), [
+                        'http_code' => 202,
+                        'response_headers' => [
+                            'X-Durable-Workflow-Control-Plane-Version: 3',
+                        ],
+                    ]);
+                }, 'http://example.test'),
+            );
+
+            self::assertSame('0.2.210', $client->clusterInfo()['version']);
+
+            $workerPayload = $client->post('/worker/register', [
+                'worker_id' => 'worker-1',
+                'task_queue' => 'default',
+                'runtime' => 'php',
+            ]);
+            self::assertSame('2.0', $workerPayload['protocol_version']);
+
+            $workflowPayload = $client->post('/workflows/wf-123/signal/advance');
+            self::assertSame('3', $workflowPayload['control_plane_version']);
+            self::assertSame('signal_received', $workflowPayload['outcome']);
+            self::assertSame(3, $calls);
+        } finally {
+            self::restoreEnv('DURABLE_WORKFLOW_CONTROL_PLANE_VERSION', $previousControlPlaneVersion);
+            self::restoreEnv('DURABLE_WORKFLOW_WORKER_PROTOCOL_VERSION', $previousWorkerProtocolVersion);
+        }
+    }
+
     public function test_it_rejects_non_canonical_control_plane_aliases(): void
     {
         $response = new MockResponse(json_encode([
@@ -56,6 +154,65 @@ class ServerClientTest extends TestCase
         $this->expectExceptionMessage('non-canonical control-plane field [signal]');
 
         $client->post('/workflows/wf-123/signal/advance');
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
+    private static function headerValue(array $options, string $wantedHeader): ?string
+    {
+        foreach (['headers', 'normalized_headers'] as $optionKey) {
+            foreach (($options[$optionKey] ?? []) as $name => $value) {
+                $nameMatches = is_string($name) && strcasecmp($name, $wantedHeader) === 0;
+
+                if ($nameMatches) {
+                    return self::headerScalarValue($value, $wantedHeader, true);
+                }
+
+                $parsed = self::headerScalarValue($value, $wantedHeader, false);
+                if ($parsed !== null) {
+                    return $parsed;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static function headerScalarValue(mixed $value, string $wantedHeader, bool $nameMatches): ?string
+    {
+        if (is_array($value)) {
+            foreach ($value as $item) {
+                $parsed = self::headerScalarValue($item, $wantedHeader, $nameMatches);
+                if ($parsed !== null) {
+                    return $parsed;
+                }
+            }
+
+            return null;
+        }
+
+        if (! is_scalar($value)) {
+            return null;
+        }
+
+        $header = (string) $value;
+        if (stripos($header, $wantedHeader.':') === 0) {
+            return trim(substr($header, strlen($wantedHeader) + 1));
+        }
+
+        return $nameMatches ? trim($header) : null;
+    }
+
+    private static function restoreEnv(string $name, string|false $previousValue): void
+    {
+        if (is_string($previousValue)) {
+            putenv($name.'='.$previousValue);
+
+            return;
+        }
+
+        putenv($name);
     }
 
     public function test_it_reads_the_server_published_request_contract_from_cluster_info(): void

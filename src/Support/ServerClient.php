@@ -40,6 +40,15 @@ class ServerClient
 
     private bool $tlsVerify;
 
+    private string $workerProtocolVersion;
+
+    private string $controlPlaneVersion;
+
+    /**
+     * @var array<string, string>
+     */
+    private array $defaultHeaders = [];
+
     /**
      * @var array<string, mixed>|null
      */
@@ -66,12 +75,21 @@ class ServerClient
         $this->namespace = $namespace ?? $this->resolveNamespace();
         $this->tlsVerify = $tlsVerify ?? true;
 
+        $this->workerProtocolVersion = self::protocolVersionFromEnv(
+            'DURABLE_WORKFLOW_WORKER_PROTOCOL_VERSION',
+            self::WORKER_PROTOCOL_VERSION,
+        );
+        $this->controlPlaneVersion = self::protocolVersionFromEnv(
+            'DURABLE_WORKFLOW_CONTROL_PLANE_VERSION',
+            self::CONTROL_PLANE_VERSION,
+        );
+
         $headers = [
             'Accept' => 'application/json',
             'Content-Type' => 'application/json',
             'X-Namespace' => $this->namespace,
-            self::WORKER_PROTOCOL_HEADER => self::WORKER_PROTOCOL_VERSION,
-            self::CONTROL_PLANE_HEADER => self::CONTROL_PLANE_VERSION,
+            self::WORKER_PROTOCOL_HEADER => $this->workerProtocolVersion,
+            self::CONTROL_PLANE_HEADER => $this->controlPlaneVersion,
         ];
 
         $token = $token ?? $this->resolveToken();
@@ -79,9 +97,10 @@ class ServerClient
             $headers['Authorization'] = 'Bearer '.$token;
         }
 
+        $this->defaultHeaders = $headers;
+
         $options = [
             'base_uri' => $this->baseUrl,
-            'headers' => $headers,
             'verify_peer' => $this->tlsVerify,
             'verify_host' => $this->tlsVerify,
         ];
@@ -91,6 +110,13 @@ class ServerClient
         }
 
         $this->http = $http ?? HttpClient::create($options);
+    }
+
+    private static function protocolVersionFromEnv(string $name, string $default): string
+    {
+        $value = getenv($name);
+
+        return is_string($value) && trim($value) !== '' ? trim($value) : $default;
     }
 
     public function get(string $path, array $query = []): array
@@ -160,16 +186,16 @@ class ServerClient
         if (! is_array($controlPlane)) {
             throw new \RuntimeException(
                 'Server compatibility error: missing control_plane manifest; expected control_plane.version '
-                .self::CONTROL_PLANE_VERSION.'.',
+                .$this->controlPlaneVersion.'.',
             );
         }
 
         $controlPlaneVersion = $controlPlane['version'] ?? null;
-        if (! is_scalar($controlPlaneVersion) || trim((string) $controlPlaneVersion) !== self::CONTROL_PLANE_VERSION) {
+        if (! is_scalar($controlPlaneVersion) || trim((string) $controlPlaneVersion) !== $this->controlPlaneVersion) {
             throw new \RuntimeException(sprintf(
                 'Server compatibility error: unsupported control_plane.version [%s]; dw CLI 0.1.x requires control_plane.version %s.',
                 is_scalar($controlPlaneVersion) ? (string) $controlPlaneVersion : 'missing',
-                self::CONTROL_PLANE_VERSION,
+                $this->controlPlaneVersion,
             ));
         }
 
@@ -228,6 +254,8 @@ class ServerClient
 
     private function request(string $method, string $path, array $options = []): array
     {
+        $options['headers'] = array_merge($this->defaultHeaders, $options['headers'] ?? []);
+
         try {
             $response = $this->http->request($method, '/api'.$path, $options);
 
@@ -281,11 +309,11 @@ class ServerClient
         if (self::isWorkerProtocolPath($path)) {
             $version = $this->responseHeader($response, self::WORKER_PROTOCOL_HEADER);
 
-            if ($version === null || ! self::isCompatibleWorkerProtocolVersion(self::WORKER_PROTOCOL_VERSION, $version)) {
+            if ($version === null || ! self::isCompatibleWorkerProtocolVersion($this->workerProtocolVersion, $version)) {
                 throw new \RuntimeException(sprintf(
                     'Server error: invalid worker-protocol response version for [%s]; expected same-major server minor compatible with [%s], got [%s].',
                     $path,
-                    self::WORKER_PROTOCOL_VERSION,
+                    $this->workerProtocolVersion,
                     $version ?? 'missing',
                 ));
             }
@@ -294,12 +322,12 @@ class ServerClient
             if (
                 ! is_scalar($bodyVersion)
                 || trim((string) $bodyVersion) !== $version
-                || ! self::isCompatibleWorkerProtocolVersion(self::WORKER_PROTOCOL_VERSION, trim((string) $bodyVersion))
+                || ! self::isCompatibleWorkerProtocolVersion($this->workerProtocolVersion, trim((string) $bodyVersion))
             ) {
                 throw new \RuntimeException(sprintf(
                     'Server error: invalid worker-protocol response body for [%s]; expected protocol_version same-major compatible with [%s].',
                     $path,
-                    self::WORKER_PROTOCOL_VERSION,
+                    $this->workerProtocolVersion,
                 ));
             }
 
@@ -312,11 +340,11 @@ class ServerClient
 
         $version = $this->responseHeader($response, self::CONTROL_PLANE_HEADER);
 
-        if ($version !== self::CONTROL_PLANE_VERSION) {
+        if ($version !== $this->controlPlaneVersion) {
             throw new \RuntimeException(sprintf(
                 'Server error: invalid control-plane response version for [%s]; expected [%s], got [%s].',
                 $path,
-                self::CONTROL_PLANE_VERSION,
+                $this->controlPlaneVersion,
                 $version ?? 'missing',
             ));
         }

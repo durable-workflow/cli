@@ -117,7 +117,7 @@ class ApplicationCompatibilityWarningTest extends TestCase
 
         $display = $tester->getDisplay();
         self::assertStringContainsString(
-            sprintf('Compatibility warning: dw %s is outside server-advertised cli supported_versions [0.2.x].', $currentVersion),
+            sprintf('Compatibility warning: dw %s is outside server-advertised cli supported_versions [0.2.x] for server 9.8.7. Compatibility window: 0.2.x. Next step: upgrade dw, pin dw to a supported release, or connect to a compatible server.', $currentVersion),
             $display,
         );
         self::assertStringContainsString('Run `dw doctor` for details.', $display);
@@ -412,7 +412,7 @@ class ApplicationCompatibilityWarningTest extends TestCase
         $display = $tester->getDisplay();
         self::assertStringContainsString(sprintf('dw %s', $currentVersion), $display);
         self::assertStringContainsString(
-            sprintf('Compatibility warning: dw %s is outside server-advertised cli supported_versions [0.2.x].', $currentVersion),
+            sprintf('Compatibility warning: dw %s is outside server-advertised cli supported_versions [0.2.x] for server 9.8.7. Compatibility window: 0.2.x. Next step: upgrade dw, pin dw to a supported release, or connect to a compatible server.', $currentVersion),
             $display,
         );
         self::assertStringNotContainsString('server app version', $display);

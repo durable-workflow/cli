@@ -260,10 +260,30 @@ final class CompatibilityDiagnostics
         }
 
         return sprintf(
-            'Compatibility warning: dw %s is outside server-advertised cli supported_versions [%s].',
+            'Compatibility warning: dw %s is outside server-advertised cli supported_versions [%s] for server %s. Compatibility window: %s. Next step: upgrade dw, pin dw to a supported release, or connect to a compatible server.',
             $cliVersion,
             $supportedVersions,
+            self::serverVersion($clusterInfo),
+            $supportedVersions,
         );
+    }
+
+    /**
+     * @param  array<string, mixed>  $clusterInfo
+     */
+    private static function serverVersion(array $clusterInfo): string
+    {
+        foreach ([
+            $clusterInfo['version'] ?? null,
+            $clusterInfo['server_version'] ?? null,
+            is_array($clusterInfo['server'] ?? null) ? ($clusterInfo['server']['version'] ?? null) : null,
+        ] as $value) {
+            if (is_scalar($value) && trim((string) $value) !== '') {
+                return trim((string) $value);
+            }
+        }
+
+        return 'unknown';
     }
 
     private static function matchesVersionConstraint(string $version, string $constraint): bool

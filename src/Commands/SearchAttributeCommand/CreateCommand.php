@@ -18,6 +18,7 @@ class CreateCommand extends BaseCommand
     {
         parent::configure();
         $this->setName('search-attribute:create')
+            ->setAliases(['search-attributes:create'])
             ->setDescription('Register a custom search attribute')
             ->setHelp(<<<'HELP'
 Register a custom search attribute so workflows can attach it in memo
@@ -25,8 +26,10 @@ and visibility queries can filter on it. Types are fixed at creation.
 
 <comment>Examples:</comment>
 
+  <info>dw search-attributes create OrderStatus keyword</info>
   <info>dw search-attribute:create OrderStatus keyword</info>
   <info>dw search-attribute:create OrderAmount double</info>
+  <info>dw search-attributes create Tags keyword_list</info>
   <info>dw search-attribute:create Tags keyword_list</info>
 HELP)
             ->addArgument('name', InputArgument::REQUIRED, 'Attribute name (e.g. OrderStatus)')

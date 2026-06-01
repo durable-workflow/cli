@@ -17,6 +17,7 @@ class DeleteCommand extends BaseCommand
     {
         parent::configure();
         $this->setName('search-attribute:delete')
+            ->setAliases(['search-attributes:delete'])
             ->setDescription('Remove a custom search attribute')
             ->setHelp(<<<'HELP'
 Remove a custom search attribute. Existing workflows that indexed the
@@ -25,7 +26,9 @@ filter on it.
 
 <comment>Examples:</comment>
 
+  <info>dw search-attributes delete OrderStatus</info>
   <info>dw search-attribute:delete OrderStatus</info>
+  <info>dw search-attributes delete OrderStatus --output=json</info>
   <info>dw search-attribute:delete OrderStatus --json</info>
 HELP)
             ->addArgument('name', InputArgument::REQUIRED, 'Attribute name to remove')

@@ -7,6 +7,8 @@ namespace Tests\Commands;
 use DurableWorkflow\Cli\Application;
 use DurableWorkflow\Cli\Support\OutputSchemaRegistry;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Console\Input\ArgvInput;
+use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Console\Tester\ApplicationTester;
 
 class ApplicationSmokeTest extends TestCase
@@ -48,6 +50,42 @@ class ApplicationSmokeTest extends TestCase
             '/^dw \S+ \(commit [^)]+, built [^)]+\)/',
             trim($tester->getDisplay()),
         );
+    }
+
+    public function test_plural_grouped_workflow_list_command_maps_to_visibility_list_command(): void
+    {
+        $application = new Application();
+        $application->setAutoExit(false);
+        $output = new BufferedOutput();
+
+        $exit = $application->run(new ArgvInput([
+            'dw',
+            'workflows',
+            'list',
+            '--help',
+        ]), $output);
+
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('workflow:list', $output->fetch());
+    }
+
+    public function test_plural_grouped_search_attribute_commands_map_to_definition_commands(): void
+    {
+        foreach (['list', 'create', 'delete'] as $verb) {
+            $application = new Application();
+            $application->setAutoExit(false);
+            $output = new BufferedOutput();
+
+            $exit = $application->run(new ArgvInput([
+                'dw',
+                'search-attributes',
+                $verb,
+                '--help',
+            ]), $output);
+
+            self::assertSame(0, $exit);
+            self::assertStringContainsString('search-attribute:'.$verb, $output->fetch());
+        }
     }
 
     public function test_every_command_has_description_and_help_with_operator_examples(): void

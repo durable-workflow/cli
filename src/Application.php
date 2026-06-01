@@ -32,12 +32,42 @@ use DurableWorkflow\Cli\Support\ResolvedConnection;
 use DurableWorkflow\Cli\Support\ServerClient;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Application as ConsoleApplication;
+use Symfony\Component\Console\Input\ArgvInput;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\ConsoleOutputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
 class Application extends ConsoleApplication
 {
+    private const GROUPED_COMMAND_ALIASES = [
+        'workflow' => [
+            'list' => 'workflow:list',
+        ],
+        'workflows' => [
+            'list' => 'workflow:list',
+        ],
+        'search-attribute' => [
+            'create' => 'search-attribute:create',
+            'delete' => 'search-attribute:delete',
+            'list' => 'search-attribute:list',
+        ],
+        'search-attributes' => [
+            'create' => 'search-attribute:create',
+            'delete' => 'search-attribute:delete',
+            'list' => 'search-attribute:list',
+        ],
+    ];
+
+    private const OPTIONS_WITH_SEPARATE_VALUES = [
+        '--env',
+        '--namespace',
+        '--output',
+        '--server',
+        '--tls-verify',
+        '--token',
+        '-s',
+    ];
+
     private bool $sessionCompatibilityWarningChecked = false;
 
     /**
@@ -176,6 +206,8 @@ class Application extends ConsoleApplication
 
     public function doRun(InputInterface $input, OutputInterface $output): int
     {
+        $input = $this->normalizeGroupedCommandInput($input);
+
         if (true === $input->hasParameterOption(['--version', '-V'], true)) {
             $output->writeln($this->getLongVersion());
             $this->emitVersionCompatibilityWarning($output);
@@ -184,6 +216,74 @@ class Application extends ConsoleApplication
         }
 
         return parent::doRun($input, $output);
+    }
+
+    private function normalizeGroupedCommandInput(InputInterface $input): InputInterface
+    {
+        if (! $input instanceof ArgvInput) {
+            return $input;
+        }
+
+        $tokens = method_exists($input, 'getRawTokens')
+            ? $input->getRawTokens()
+            : array_slice($_SERVER['argv'] ?? [], 1);
+
+        if (! is_array($tokens) || count($tokens) < 2) {
+            return $input;
+        }
+
+        $rewritten = $this->rewriteGroupedCommandTokens($tokens);
+        if ($rewritten === null) {
+            return $input;
+        }
+
+        return new ArgvInput(array_merge([$_SERVER['argv'][0] ?? 'dw'], $rewritten));
+    }
+
+    /**
+     * @param  list<string>  $tokens
+     * @return list<string>|null
+     */
+    private function rewriteGroupedCommandTokens(array $tokens): ?array
+    {
+        $count = count($tokens);
+
+        for ($i = 0; $i < $count; $i++) {
+            $token = (string) $tokens[$i];
+
+            if ($token === '--') {
+                return null;
+            }
+
+            if (str_starts_with($token, '-')) {
+                if ($this->optionConsumesNextToken($token) && isset($tokens[$i + 1])) {
+                    $i++;
+                }
+
+                continue;
+            }
+
+            $verb = isset($tokens[$i + 1]) ? (string) $tokens[$i + 1] : null;
+            if ($verb !== null && isset(self::GROUPED_COMMAND_ALIASES[$token][$verb])) {
+                $tokens[$i] = self::GROUPED_COMMAND_ALIASES[$token][$verb];
+                array_splice($tokens, $i + 1, 1);
+
+                return array_values($tokens);
+            }
+
+            return null;
+        }
+
+        return null;
+    }
+
+    private function optionConsumesNextToken(string $token): bool
+    {
+        if (str_contains($token, '=')) {
+            return false;
+        }
+
+        return in_array($token, self::OPTIONS_WITH_SEPARATE_VALUES, true);
     }
 
     protected function doRunCommand(Command $command, InputInterface $input, OutputInterface $output): int

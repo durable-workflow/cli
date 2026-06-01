@@ -17,6 +17,7 @@ class ListCommand extends BaseCommand
     {
         parent::configure();
         $this->setName('workflow:list')
+            ->setAliases(['workflows:list'])
             ->setDescription('List workflow executions')
             ->setHelp(<<<'HELP'
 List workflows in the current namespace. Filters combine: type,
@@ -30,6 +31,7 @@ resolved default namespace only; it never enumerates all namespaces.
 <comment>Examples:</comment>
 
   # Last 20 workflows in the namespace
+  <info>dw workflows list</info>
   <info>dw workflow:list</info>
   <info>dw workflow:list --namespace=orders</info>
 
@@ -43,6 +45,7 @@ resolved default namespace only; it never enumerates all namespaces.
   <info>dw workflow:list --output=jsonl | while read -r wf; do echo "$wf"; done</info>
 
   # Visibility query (depends on search attributes in use)
+  <info>dw workflows list --query='CustomerId="42" and Status="running"'</info>
   <info>dw workflow:list --query='CustomerId="42" and Status="running"'</info>
 HELP)
             ->addOption('type', 't', InputOption::VALUE_OPTIONAL, 'Filter by workflow type')

@@ -796,6 +796,7 @@ abstract class BaseCommand extends Command
 
         $this->writeHumanError($output, $e->getMessage());
         $this->writeHumanErrorNamespaceContext($output, $input);
+        $this->writeHumanHttpErrorDetails($output, $e);
 
         $recommendations = $this->errorRecommendations($e, $input);
         if ($recommendations !== []) {
@@ -823,6 +824,15 @@ abstract class BaseCommand extends Command
 
             if ($e->reason() !== null) {
                 $envelope['reason'] = $e->reason();
+            }
+
+            if ($e->body !== null) {
+                foreach (['code', 'error_code', 'type', 'rejection_reason'] as $key) {
+                    $value = $e->body[$key] ?? null;
+                    if (is_string($value) && $value !== '') {
+                        $envelope[$key] = $value;
+                    }
+                }
             }
 
             if ($e->validationErrors() !== null) {
@@ -861,6 +871,64 @@ abstract class BaseCommand extends Command
 
         $target = $output instanceof ConsoleOutputInterface ? $output->getErrorOutput() : $output;
         $target->writeln('Namespace: '.$namespace);
+    }
+
+    private function writeHumanHttpErrorDetails(OutputInterface $output, \Throwable $e): void
+    {
+        if (! $e instanceof ServerHttpException) {
+            return;
+        }
+
+        $target = $output instanceof ConsoleOutputInterface ? $output->getErrorOutput() : $output;
+
+        if ($e->reason() !== null) {
+            $target->writeln('Reason: '.$e->reason());
+        }
+
+        if ($e->body !== null) {
+            foreach (['code', 'error_code', 'type', 'rejection_reason'] as $key) {
+                $value = $e->body[$key] ?? null;
+                if (is_string($value) && $value !== '') {
+                    $target->writeln(str_replace('_', ' ', ucfirst($key)).': '.$value);
+                }
+            }
+        }
+
+        $validationErrors = $e->validationErrors();
+        if ($validationErrors === null) {
+            return;
+        }
+
+        foreach ($this->flattenValidationErrors($validationErrors) as $message) {
+            $target->writeln('Validation: '.$message);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $errors
+     * @return list<string>
+     */
+    private function flattenValidationErrors(array $errors): array
+    {
+        $messages = [];
+
+        foreach ($errors as $field => $fieldMessages) {
+            if (is_array($fieldMessages)) {
+                foreach ($fieldMessages as $message) {
+                    if (is_string($message) && $message !== '') {
+                        $messages[] = sprintf('%s: %s', (string) $field, $message);
+                    }
+                }
+
+                continue;
+            }
+
+            if (is_string($fieldMessages) && $fieldMessages !== '') {
+                $messages[] = sprintf('%s: %s', (string) $field, $fieldMessages);
+            }
+        }
+
+        return $messages;
     }
 
     private function errorNamespaceContext(InputInterface $input): ?string

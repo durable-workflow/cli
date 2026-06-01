@@ -149,12 +149,27 @@
       "schema": "schemas/output/search-attribute.schema.json",
       "schema_id": "https://durable-workflow.com/schemas/cli/output/search-attribute.schema.json"
     },
+    "search-attributes:create": {
+      "output": "--json",
+      "schema": "schemas/output/search-attribute.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/search-attribute.schema.json"
+    },
     "search-attribute:delete": {
       "output": "--json",
       "schema": "schemas/output/search-attribute.schema.json",
       "schema_id": "https://durable-workflow.com/schemas/cli/output/search-attribute.schema.json"
     },
+    "search-attributes:delete": {
+      "output": "--json",
+      "schema": "schemas/output/search-attribute.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/search-attribute.schema.json"
+    },
     "search-attribute:list": {
+      "output": "--json",
+      "schema": "schemas/output/search-attribute-list.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/search-attribute-list.schema.json"
+    },
+    "search-attributes:list": {
       "output": "--json",
       "schema": "schemas/output/search-attribute-list.schema.json",
       "schema_id": "https://durable-workflow.com/schemas/cli/output/search-attribute-list.schema.json"
@@ -310,6 +325,11 @@
       "schema_id": "https://durable-workflow.com/schemas/cli/output/workflow-history-export.schema.json"
     },
     "workflow:list": {
+      "output": "--json",
+      "schema": "schemas/output/workflow-list.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/workflow-list.schema.json"
+    },
+    "workflows:list": {
       "output": "--json",
       "schema": "schemas/output/workflow-list.schema.json",
       "schema_id": "https://durable-workflow.com/schemas/cli/output/workflow-list.schema.json"

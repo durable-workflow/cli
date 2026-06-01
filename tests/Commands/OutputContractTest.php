@@ -175,6 +175,8 @@ class OutputContractTest extends TestCase
             'workflow_id' => 'counter-1',
             'signal_name' => 'increment',
             'reason' => 'invalid_signal_arguments',
+            'code' => 'search_attribute_type_mismatch',
+            'type' => 'validation_error',
             'message' => 'Signal argument validation failed.',
             'validation_errors' => [
                 'n' => ['The n argument must be an integer.'],
@@ -189,8 +191,41 @@ class OutputContractTest extends TestCase
 
         $envelope = json_decode(trim($tester->getDisplay()), true, 512, JSON_THROW_ON_ERROR);
         self::assertSame('invalid_signal_arguments', $envelope['reason']);
+        self::assertSame('search_attribute_type_mismatch', $envelope['code']);
+        self::assertSame('validation_error', $envelope['type']);
         self::assertSame($body['validation_errors'], $envelope['validation_errors']);
         self::assertSame($body, $envelope['server_response']);
+    }
+
+    public function test_human_error_preserves_typed_server_reason_and_validation_details(): void
+    {
+        $body = [
+            'reason' => 'invalid_visibility_query',
+            'rejection_reason' => 'unexpected_token',
+            'message' => 'Visibility query rejected.',
+            'validation_errors' => [
+                'query' => ['order_total_cents expects int literal, got string.'],
+            ],
+        ];
+        $command = new ThrowingOutputCommand(
+            new ServerHttpException('bad query', 422, body: $body),
+            commandName: 'workflow:list',
+        );
+        $tester = new CommandTester($command);
+
+        $exit = $tester->execute([
+            '--namespace' => 'sa-test',
+        ], ['capture_stderr_separately' => true]);
+
+        self::assertSame(ExitCode::INVALID, $exit);
+        self::assertSame('', trim($tester->getDisplay()), 'stdout must be empty on human error');
+
+        $error = $tester->getErrorOutput();
+        self::assertStringContainsString('bad query', $error);
+        self::assertStringContainsString('Namespace: sa-test', $error);
+        self::assertStringContainsString('Reason: invalid_visibility_query', $error);
+        self::assertStringContainsString('Rejection reason: unexpected_token', $error);
+        self::assertStringContainsString('Validation: query: order_total_cents expects int literal, got string.', $error);
     }
 
     public function test_error_envelope_on_legacy_json_flag(): void

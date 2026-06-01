@@ -16,6 +16,7 @@ class ListCommand extends BaseCommand
     {
         parent::configure();
         $this->setName('search-attribute:list')
+            ->setAliases(['search-attributes:list'])
             ->setDescription('List search attribute definitions')
             ->setHelp(<<<'HELP'
 List every search attribute — system-defined attributes shipped by the
@@ -25,8 +26,10 @@ resolved default namespace only; it never enumerates all namespaces.
 
 <comment>Examples:</comment>
 
+  <info>dw search-attributes list</info>
   <info>dw search-attribute:list</info>
   <info>dw search-attribute:list --namespace=orders</info>
+  <info>dw search-attributes list --output=json | jq '.custom_attributes'</info>
   <info>dw search-attribute:list --output=json | jq '.custom_attributes'</info>
 HELP)
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output as JSON (alias for --output=json)');

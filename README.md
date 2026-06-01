@@ -322,20 +322,42 @@ policy, worker status, search attribute type, and local dev database driver.
 ## Compatibility
 
 CLI version 0.1.x is compatible with servers that advertise
-`control_plane.version: "2"` and
+`control_plane.version: "2"`,
 `control_plane.request_contract.schema: durable-workflow.v2.control-plane-request.contract`
-version `1` from `GET /api/cluster/info`.
+version `1`, and a `client_compatibility.clients.cli.supported_versions`
+range that includes the local CLI version from `GET /api/cluster/info`.
 Worker diagnostic commands speak worker protocol `1.0` and accept server
 responses from compatible `1.x` worker-protocol minors; breaking major
 versions are refused with an explicit compatibility error.
 
 The top-level server `version` is build identity only. The CLI validates the
-protocol manifests on first invocation and raises a clear error if incompatible:
+protocol manifests before the first server operation in each command. If the
+server cannot safely interoperate, the CLI refuses before mutation,
+registration, polling, or dropped work, exits with `COMPATIBILITY` (`8`), and
+names the CLI version, server version, compatibility window, and next step:
 
 ```bash
 $ dw workflow:list
-Server compatibility error: unsupported control_plane.version [3]; dw CLI 0.1.x requires control_plane.version 2.
-Upgrade the server or use a compatible CLI version.
+Server compatibility error: refusing before the requested operation because dw 0.1.73 cannot safely interoperate with server 0.2.221. Compatibility window: cli >=0.1,<1.0; control-plane version 2; worker protocol same-major <= 1.0. Next step: Upgrade dw, pin dw to a supported release, or connect to a compatible server. Detail: Server compatibility error: missing control_plane.request_contract; expected durable-workflow.v2.control-plane-request.contract v1.
+Next steps:
+  - Upgrade dw, pin dw to a supported release, or connect to a compatible server.
+    Try: dw doctor --output=json
+```
+
+With `--output=json`, the same failure includes a structured compatibility
+object for automation:
+
+```json
+{
+  "exit_code": 8,
+  "compatibility": {
+    "cli_version": "0.1.73",
+    "server_version": "0.2.221",
+    "compatibility_window": "cli >=0.1,<1.0; control-plane version 2; worker protocol same-major <= 1.0",
+    "next_step": "Upgrade dw, pin dw to a supported release, or connect to a compatible server.",
+    "detail": "Server compatibility error: missing control_plane.request_contract; expected durable-workflow.v2.control-plane-request.contract v1."
+  }
+}
 ```
 
 `dw --version` prints local build identity. When `DURABLE_WORKFLOW_SERVER_URL`
@@ -587,6 +609,7 @@ from there:
 | 5 | `NOT_FOUND` | Resource not found. Returned for HTTP `404`. |
 | 6 | `SERVER` | Server error. Returned for HTTP `5xx`. |
 | 7 | `TIMEOUT` | Request timed out before the server responded. Also returned for HTTP `408`. |
+| 8 | `COMPATIBILITY` | Compatibility failure. The CLI/server protocol window cannot be used safely, so the command refused before the requested operation. |
 
 Example:
 

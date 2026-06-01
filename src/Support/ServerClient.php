@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DurableWorkflow\Cli\Support;
 
+use DurableWorkflow\Cli\BuildInfo;
 use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Contracts\HttpClient\Exception\TimeoutExceptionInterface;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
@@ -61,6 +62,8 @@ class ServerClient
     private bool $controlPlaneRequestContractResolved = false;
 
     private bool $serverCompatibilityChecked = false;
+
+    private bool $workerProtocolCompatibilityChecked = false;
 
     public function __construct(
         ?string $baseUrl = null,
@@ -150,8 +153,7 @@ class ServerClient
      */
     public function clusterInfo(): array
     {
-        $this->clusterInfoUnchecked();
-        $this->checkServerCompatibility();
+        $this->assertServerCompatibility();
 
         return $this->clusterInfoCache;
     }
@@ -173,6 +175,16 @@ class ServerClient
         return $this->clusterInfoCache;
     }
 
+    public function assertServerCompatibility(bool $includeWorkerProtocol = false): void
+    {
+        $this->clusterInfoUnchecked();
+        $this->checkServerCompatibility();
+
+        if ($includeWorkerProtocol) {
+            $this->checkWorkerProtocolCompatibility();
+        }
+    }
+
     private function checkServerCompatibility(): void
     {
         if ($this->serverCompatibilityChecked || ! is_array($this->clusterInfoCache)) {
@@ -184,24 +196,80 @@ class ServerClient
         $controlPlane = $this->clusterInfoCache['control_plane'] ?? null;
 
         if (! is_array($controlPlane)) {
-            throw new \RuntimeException(
-                'Server compatibility error: missing control_plane manifest; expected control_plane.version '
-                .$this->controlPlaneVersion.'.',
+            throw $this->compatibilityException(
+                'missing control_plane manifest; expected control_plane.version '.$this->controlPlaneVersion.'.',
             );
         }
 
         $controlPlaneVersion = $controlPlane['version'] ?? null;
         if (! is_scalar($controlPlaneVersion) || trim((string) $controlPlaneVersion) !== $this->controlPlaneVersion) {
-            throw new \RuntimeException(sprintf(
-                'Server compatibility error: unsupported control_plane.version [%s]; dw CLI 0.1.x requires control_plane.version %s.',
+            throw $this->compatibilityException(sprintf(
+                'unsupported control_plane.version [%s]; dw %s sends control_plane.version %s.',
                 is_scalar($controlPlaneVersion) ? (string) $controlPlaneVersion : 'missing',
+                BuildInfo::version(),
                 $this->controlPlaneVersion,
             ));
         }
 
-        if (! ControlPlaneRequestContract::fromClusterInfo($this->clusterInfoCache) instanceof ControlPlaneRequestContract) {
-            throw new \RuntimeException(ControlPlaneRequestContract::compatibilityErrorFromClusterInfo($this->clusterInfoCache));
+        if (! CompatibilityDiagnostics::cliVersionIsSupported($this->clusterInfoCache, BuildInfo::version())) {
+            $supportedVersions = CompatibilityDiagnostics::cliSupportedVersions($this->clusterInfoCache) ?? 'unknown';
+            throw $this->compatibilityException(sprintf(
+                'dw %s is outside server-advertised cli supported_versions [%s].',
+                BuildInfo::version(),
+                $supportedVersions,
+            ));
         }
+
+        if (! ControlPlaneRequestContract::fromClusterInfo($this->clusterInfoCache) instanceof ControlPlaneRequestContract) {
+            throw $this->compatibilityException(
+                ControlPlaneRequestContract::compatibilityErrorFromClusterInfo($this->clusterInfoCache),
+            );
+        }
+    }
+
+    private function checkWorkerProtocolCompatibility(): void
+    {
+        if ($this->workerProtocolCompatibilityChecked || ! is_array($this->clusterInfoCache)) {
+            return;
+        }
+
+        $this->workerProtocolCompatibilityChecked = true;
+
+        $workerProtocol = $this->clusterInfoCache['worker_protocol'] ?? null;
+        if (! is_array($workerProtocol)) {
+            throw $this->compatibilityException(sprintf(
+                'server did not advertise worker_protocol.version; worker commands send worker_protocol.version %s.',
+                $this->workerProtocolVersion,
+            ));
+        }
+
+        $version = $workerProtocol['version'] ?? null;
+        if (
+            ! is_scalar($version)
+            || ! self::isCompatibleWorkerProtocolVersion($this->workerProtocolVersion, trim((string) $version))
+        ) {
+            throw $this->compatibilityException(sprintf(
+                'unsupported worker_protocol.version [%s]; worker commands send worker_protocol.version %s.',
+                is_scalar($version) ? (string) $version : 'missing',
+                $this->workerProtocolVersion,
+            ));
+        }
+    }
+
+    private function compatibilityException(string $detail): CompatibilityException
+    {
+        $diagnostic = CompatibilityDiagnostics::failureDiagnostic(
+            $this->clusterInfoCache ?? [],
+            BuildInfo::version(),
+            $detail,
+            $this->controlPlaneVersion,
+            $this->workerProtocolVersion,
+        );
+
+        return new CompatibilityException(
+            CompatibilityDiagnostics::failureMessage($diagnostic),
+            $diagnostic,
+        );
     }
 
     public function controlPlaneRequestContract(): ?ControlPlaneRequestContract

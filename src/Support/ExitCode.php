@@ -39,6 +39,9 @@ final class ExitCode
     /** Request timed out — the server did not respond within the deadline. */
     public const TIMEOUT = 7;
 
+    /** Compatibility failure — the CLI/server protocol window cannot be used safely. */
+    public const COMPATIBILITY = 8;
+
     private function __construct() {}
 
     /**

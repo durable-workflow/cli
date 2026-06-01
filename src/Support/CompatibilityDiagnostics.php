@@ -6,6 +6,8 @@ namespace DurableWorkflow\Cli\Support;
 
 final class CompatibilityDiagnostics
 {
+    public const NEXT_STEP = 'Upgrade dw, pin dw to a supported release, or connect to a compatible server.';
+
     /**
      * @param  array<string, mixed>  $clusterInfo
      * @return list<string>
@@ -271,7 +273,7 @@ final class CompatibilityDiagnostics
     /**
      * @param  array<string, mixed>  $clusterInfo
      */
-    private static function serverVersion(array $clusterInfo): string
+    public static function serverVersion(array $clusterInfo): string
     {
         foreach ([
             $clusterInfo['version'] ?? null,
@@ -284,6 +286,129 @@ final class CompatibilityDiagnostics
         }
 
         return 'unknown';
+    }
+
+    /**
+     * @param  array<string, mixed>  $clusterInfo
+     */
+    public static function cliSupportedVersions(array $clusterInfo): ?string
+    {
+        $compatibility = $clusterInfo['client_compatibility'] ?? null;
+        if (! is_array($compatibility)) {
+            return null;
+        }
+
+        $clients = $compatibility['clients'] ?? null;
+        if (! is_array($clients)) {
+            return null;
+        }
+
+        $cli = $clients['cli'] ?? null;
+        if (! is_array($cli)) {
+            return null;
+        }
+
+        $supportedVersions = $cli['supported_versions'] ?? null;
+
+        return is_string($supportedVersions) && trim($supportedVersions) !== ''
+            ? trim($supportedVersions)
+            : null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $clusterInfo
+     */
+    public static function cliVersionIsSupported(array $clusterInfo, string $cliVersion): bool
+    {
+        $supportedVersions = self::cliSupportedVersions($clusterInfo);
+
+        return $supportedVersions === null
+            || self::matchesVersionConstraint($cliVersion, $supportedVersions);
+    }
+
+    /**
+     * @param  array<string, mixed>  $clusterInfo
+     * @return array<string, mixed>
+     */
+    public static function failureDiagnostic(
+        array $clusterInfo,
+        string $cliVersion,
+        string $detail,
+        ?string $clientControlPlaneVersion = null,
+        ?string $clientWorkerProtocolVersion = null,
+    ): array {
+        $controlPlane = is_array($clusterInfo['control_plane'] ?? null) ? $clusterInfo['control_plane'] : [];
+        $workerProtocol = is_array($clusterInfo['worker_protocol'] ?? null) ? $clusterInfo['worker_protocol'] : [];
+        $supportedVersions = self::cliSupportedVersions($clusterInfo);
+
+        return [
+            'cli_version' => $cliVersion,
+            'server_version' => self::serverVersion($clusterInfo),
+            'compatibility_window' => self::compatibilityWindow($clusterInfo, $supportedVersions),
+            'server_supported_cli_versions' => $supportedVersions,
+            'control_plane' => [
+                'client_version' => $clientControlPlaneVersion,
+                'server_version' => self::scalarString($controlPlane['version'] ?? null),
+            ],
+            'worker_protocol' => [
+                'client_version' => $clientWorkerProtocolVersion,
+                'server_version' => self::scalarString($workerProtocol['version'] ?? null),
+            ],
+            'next_step' => self::NEXT_STEP,
+            'detail' => $detail,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $diagnostic
+     */
+    public static function failureMessage(array $diagnostic): string
+    {
+        return sprintf(
+            'Server compatibility error: refusing before the requested operation because dw %s cannot safely interoperate with server %s. Compatibility window: %s. Next step: %s Detail: %s',
+            self::scalarString($diagnostic['cli_version'] ?? null) ?? 'unknown',
+            self::scalarString($diagnostic['server_version'] ?? null) ?? 'unknown',
+            self::scalarString($diagnostic['compatibility_window'] ?? null) ?? 'unknown',
+            self::scalarString($diagnostic['next_step'] ?? null) ?? self::NEXT_STEP,
+            self::scalarString($diagnostic['detail'] ?? null) ?? 'compatibility metadata is incomplete',
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $clusterInfo
+     */
+    private static function compatibilityWindow(array $clusterInfo, ?string $supportedVersions): string
+    {
+        $controlPlane = is_array($clusterInfo['control_plane'] ?? null) ? $clusterInfo['control_plane'] : [];
+        $workerProtocol = is_array($clusterInfo['worker_protocol'] ?? null) ? $clusterInfo['worker_protocol'] : [];
+        $window = [
+            $supportedVersions === null
+                ? 'server did not advertise cli supported_versions'
+                : 'cli '.$supportedVersions,
+        ];
+
+        $controlPlaneVersion = self::scalarString($controlPlane['version'] ?? null);
+        if ($controlPlaneVersion !== null) {
+            $window[] = 'control-plane version '.$controlPlaneVersion;
+        }
+
+        $workerProtocolVersion = self::scalarString($workerProtocol['version'] ?? null);
+        if ($workerProtocolVersion !== null) {
+            $window[] = 'worker protocol same-major <= '.$workerProtocolVersion;
+        }
+
+        return implode('; ', $window);
+    }
+
+    private static function scalarString(mixed $value): ?string
+    {
+        if (! is_scalar($value)) {
+            return null;
+        }
+
+        $value = trim((string) $value);
+
+        return $value === '' ? null : $value;
     }
 
     private static function matchesVersionConstraint(string $version, string $constraint): bool

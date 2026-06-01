@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DurableWorkflow\Cli\Commands;
 
 use DurableWorkflow\Cli\BuildInfo;
+use DurableWorkflow\Cli\Support\CompatibilityException;
 use DurableWorkflow\Cli\Support\CompatibilityDiagnostics;
 use DurableWorkflow\Cli\Support\ExitCode;
 use DurableWorkflow\Cli\Support\InvalidOptionException;
@@ -107,6 +108,10 @@ abstract class BaseCommand extends Command
 
     private ?ServerClient $serverClient = null;
 
+    private bool $serverClientInjected = false;
+
+    private bool $serverCompatibilityAsserted = false;
+
     /** @var callable|null */
     private mixed $serverClientFactory = null;
 
@@ -189,7 +194,10 @@ abstract class BaseCommand extends Command
             return $this->serverClientFromFactory($resolved, $timeout);
         }
 
-        return $this->serverClient = $this->makeClient($resolved, $timeout);
+        $client = $this->makeClient($resolved, $timeout);
+        $this->assertServerCompatibilityBeforeUse($client);
+
+        return $this->serverClient = $client;
     }
 
     protected function freshClient(InputInterface $input, ?float $timeout = null): ServerClient
@@ -215,6 +223,7 @@ abstract class BaseCommand extends Command
     public function setServerClient(ServerClient $serverClient): void
     {
         $this->serverClient = $serverClient;
+        $this->serverClientInjected = true;
     }
 
     public function setServerClientFactory(callable $factory): void
@@ -304,7 +313,31 @@ abstract class BaseCommand extends Command
 
         return str_starts_with($name, 'worker:')
             || str_starts_with($name, 'workflow-task:')
+            || str_starts_with($name, 'query-task:')
             || str_starts_with($name, 'activity:');
+    }
+
+    private function assertServerCompatibilityBeforeUse(ServerClient $client): void
+    {
+        if ($this->serverCompatibilityAsserted || ! $this->enforcesServerCompatibilityBeforeUse()) {
+            return;
+        }
+
+        $this->serverCompatibilityAsserted = true;
+        $client->assertServerCompatibility($this->includeWorkerProtocolCompatibilityWarning());
+    }
+
+    private function enforcesServerCompatibilityBeforeUse(): bool
+    {
+        if ($this->serverClientInjected || is_callable($this->serverClientFactory)) {
+            return false;
+        }
+
+        return ! in_array((string) $this->getName(), [
+            'doctor',
+            'server:health',
+            'server:start-dev',
+        ], true);
     }
 
     protected function resolvedConnection(InputInterface $input): ResolvedConnection
@@ -801,6 +834,10 @@ abstract class BaseCommand extends Command
             }
         }
 
+        if ($e instanceof CompatibilityException) {
+            $envelope['compatibility'] = $e->diagnostic();
+        }
+
         $recommendations = $this->errorRecommendations($e, $input);
         if ($recommendations !== []) {
             $envelope['recommendations'] = $recommendations;
@@ -892,6 +929,15 @@ abstract class BaseCommand extends Command
 
         if ($e instanceof ServerHttpException) {
             return $this->httpErrorRecommendations($e, $input);
+        }
+
+        if ($e instanceof CompatibilityException) {
+            return [[
+                'id' => 'compatibility.unsupported',
+                'severity' => 'error',
+                'message' => $e->nextStep(),
+                'command' => $this->doctorCommand($input),
+            ]];
         }
 
         if ($e instanceof InvalidOptionException) {

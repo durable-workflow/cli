@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Support;
 
 use DurableWorkflow\Cli\Support\ControlPlaneRequestContract;
+use DurableWorkflow\Cli\Support\CompatibilityException;
 use DurableWorkflow\Cli\Support\ServerClient;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpClient\MockHttpClient;
@@ -215,6 +216,41 @@ class ServerClientTest extends TestCase
         putenv($name);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    private static function clusterInfo(
+        string $serverVersion,
+        string $supportedCliVersions,
+        string $controlPlaneVersion = ServerClient::CONTROL_PLANE_VERSION,
+        string $workerProtocolVersion = ServerClient::WORKER_PROTOCOL_VERSION,
+    ): array {
+        return [
+            'server_id' => 'server-1',
+            'version' => $serverVersion,
+            'control_plane' => [
+                'version' => $controlPlaneVersion,
+                'request_contract' => [
+                    'schema' => ControlPlaneRequestContract::SCHEMA,
+                    'version' => ControlPlaneRequestContract::VERSION,
+                    'operations' => [],
+                ],
+            ],
+            'worker_protocol' => [
+                'version' => $workerProtocolVersion,
+            ],
+            'client_compatibility' => [
+                'authority' => 'protocol_manifests',
+                'top_level_version_role' => 'informational',
+                'clients' => [
+                    'cli' => [
+                        'supported_versions' => $supportedCliVersions,
+                    ],
+                ],
+            ],
+        ];
+    }
+
     public function test_it_reads_the_server_published_request_contract_from_cluster_info(): void
     {
         $response = new MockResponse(json_encode([
@@ -282,6 +318,63 @@ class ServerClientTest extends TestCase
         );
 
         self::assertSame('not-semver', $client->clusterInfo()['version']);
+    }
+
+    public function test_it_rejects_cli_versions_outside_the_server_advertised_window(): void
+    {
+        $previousCliVersion = getenv('DW_CLI_VERSION');
+        putenv('DW_CLI_VERSION=0.1.5');
+
+        try {
+            $response = new MockResponse(json_encode(self::clusterInfo(
+                serverVersion: '0.2.221',
+                supportedCliVersions: '>=0.2,<1.0',
+            ), JSON_THROW_ON_ERROR), [
+                'http_code' => 200,
+            ]);
+
+            $client = new ServerClient(
+                baseUrl: 'http://example.test',
+                namespace: 'default',
+                http: new MockHttpClient($response, 'http://example.test'),
+            );
+
+            $this->expectException(CompatibilityException::class);
+            $this->expectExceptionMessage('dw 0.1.5 cannot safely interoperate with server 0.2.221');
+            $this->expectExceptionMessage(
+                'Compatibility window: cli >=0.2,<1.0; control-plane version 2; worker protocol same-major <= 1.0.',
+            );
+            $this->expectExceptionMessage('Next step:');
+
+            $client->assertServerCompatibility();
+        } finally {
+            self::restoreEnv('DW_CLI_VERSION', $previousCliVersion);
+        }
+    }
+
+    public function test_it_rejects_worker_commands_when_server_worker_protocol_is_outside_the_window(): void
+    {
+        $response = new MockResponse(json_encode(self::clusterInfo(
+            serverVersion: '0.2.221',
+            supportedCliVersions: '>=0.1,<1.0',
+            workerProtocolVersion: '2.0',
+        ), JSON_THROW_ON_ERROR), [
+            'http_code' => 200,
+        ]);
+
+        $client = new ServerClient(
+            baseUrl: 'http://example.test',
+            namespace: 'default',
+            http: new MockHttpClient($response, 'http://example.test'),
+        );
+
+        $this->expectException(CompatibilityException::class);
+        $this->expectExceptionMessage('worker_protocol.version [2.0]');
+        $this->expectExceptionMessage(
+            'Compatibility window: cli >=0.1,<1.0; control-plane version 2; worker protocol same-major <= 2.0.',
+        );
+
+        $client->assertServerCompatibility(includeWorkerProtocol: true);
     }
 
     public function test_it_rejects_cluster_info_without_control_plane_manifest(): void

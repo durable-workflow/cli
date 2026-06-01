@@ -53,7 +53,7 @@ HELP)
             $this->formatStatus($ns['status'] ?? null),
         ], $namespaces);
 
-        $this->renderTable($output, ['Name', 'Description', 'Retention (days)', 'Status'], $rows);
+        $this->renderTable($output, ['Namespace', 'Description', 'Retention (days)', 'Status'], $rows);
 
         return Command::SUCCESS;
     }

@@ -42,6 +42,7 @@ class NamespaceCommandTest extends TestCase
 
         $display = $tester->getDisplay();
 
+        self::assertStringContainsString('Namespace', $display);
         self::assertStringContainsString('default', $display);
         self::assertStringContainsString('Default namespace', $display);
         self::assertStringContainsString('30', $display);

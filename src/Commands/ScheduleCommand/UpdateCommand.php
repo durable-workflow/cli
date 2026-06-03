@@ -26,9 +26,9 @@ everything else is left alone. At least one field is required.
 
 <comment>Examples:</comment>
 
-  <info>dw schedule:update daily-report --cron="0 5 * * *"</info>
-  <info>dw schedule:update daily-report --overlap-policy=skip --jitter=60</info>
-  <info>dw schedule:update daily-report --max-runs=100</info>
+  <info>dw schedules update daily-report --cron="0 5 * * *"</info>
+  <info>dw schedules update daily-report --overlap-policy=skip --jitter=60</info>
+  <info>dw schedules update daily-report --max-runs=100</info>
 HELP)
             ->addArgument('schedule-id', InputArgument::REQUIRED, 'Schedule ID')
             ->addOption('cron', 'c', InputOption::VALUE_OPTIONAL, 'Cron expression')

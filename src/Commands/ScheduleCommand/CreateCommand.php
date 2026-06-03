@@ -28,13 +28,13 @@ the next fire time arrives while the previous run is still executing.
 <comment>Examples:</comment>
 
   # Cron-based daily schedule
-  <info>dw schedule:create --schedule-id=daily-report --workflow-type=reports.Daily --cron="0 6 * * *"</info>
+  <info>dw schedules create --schedule-id=daily-report --workflow-type=reports.Daily --cron="0 6 * * *"</info>
 
   # Interval every 15 minutes
-  <info>dw schedule:create --schedule-id=poller --workflow-type=sync.Poll --interval=PT15M</info>
+  <info>dw schedules create --schedule-id=poller --workflow-type=sync.Poll --interval=PT15M</info>
 
   # Create paused with a one-time cap
-  <info>dw schedule:create --schedule-id=one-shot --workflow-type=migrate.Once --cron="0 0 1 * *" --max-runs=1 --paused</info>
+  <info>dw schedules create --schedule-id=one-shot --workflow-type=migrate.Once --cron="0 0 1 * *" --max-runs=1 --paused</info>
 HELP)
             ->addOption('schedule-id', null, InputOption::VALUE_OPTIONAL, 'Schedule ID')
             ->addOption('workflow-type', 't', InputOption::VALUE_REQUIRED, 'Workflow type to execute')

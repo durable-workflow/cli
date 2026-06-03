@@ -24,8 +24,8 @@ actions, and skip history.
 
 <comment>Examples:</comment>
 
-  <info>dw schedule:describe daily-report</info>
-  <info>dw schedule:describe daily-report --json | jq '.state'</info>
+  <info>dw schedules describe daily-report</info>
+  <info>dw schedules describe daily-report --json | jq '.state'</info>
 HELP)
             ->addArgument('schedule-id', InputArgument::REQUIRED, 'Schedule ID')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output as JSON');

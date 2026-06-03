@@ -29,11 +29,11 @@ trigger posture, and works for deleted schedules as well.
 
 <comment>Examples:</comment>
 
-  <info>dw schedule:history daily-report</info>
-  <info>dw schedule:history daily-report --limit 200</info>
-  <info>dw schedule:history daily-report --output=jsonl | jq 'select(.event_type=="ScheduleTriggered")'</info>
-  <info>dw schedule:history daily-report --after-sequence 42</info>
-  <info>dw schedule:history daily-report --all --output=json</info>
+  <info>dw schedules history daily-report</info>
+  <info>dw schedules history daily-report --limit 200</info>
+  <info>dw schedules history daily-report --output=jsonl | jq 'select(.event_type=="ScheduleTriggered")'</info>
+  <info>dw schedules history daily-report --after-sequence 42</info>
+  <info>dw schedules history daily-report --all --output=json</info>
 HELP)
             ->addArgument('schedule-id', InputArgument::REQUIRED, 'Schedule ID')
             ->addOption(

@@ -2,7 +2,7 @@
 
 The `dw` CLI participates in the public platform conformance suite
 specified by [`durable-workflow.github.io/static/platform-conformance-contract.json`](https://durable-workflow.github.io/platform-conformance-contract.json),
-schema `durable-workflow.v2.platform-conformance.suite`, version `12`,
+schema `durable-workflow.v2.platform-conformance.suite`, version `20`,
 and documented at the public
 [Platform Conformance Suite](https://durable-workflow.github.io/docs/2.0/platform-conformance)
 authority page. This document is the per-repo claim: it lists the
@@ -20,9 +20,11 @@ The CLI claims one target from the suite's matrix:
 The authority row for `cli_json_client` requires
 `control_plane_request_response` (request side),
 `signal_query_runtime_contract`, `search_attribute_runtime_contract`,
-`namespace_runtime_contract`, `child_workflow_runtime_contract`,
-`saga_runtime_contract`, `worker_versioning_runtime_contract`, and
-`cli_json_envelopes`. The CLI-owned fixtures below are the source for
+`schedules_runtime_contract`, `namespace_runtime_contract`,
+`child_workflow_runtime_contract`, `saga_runtime_contract`,
+`worker_versioning_runtime_contract`, `migration_runtime_contract`,
+`skew_refusal_matrix_contract`, and `cli_json_envelopes`.
+The CLI-owned fixtures below are the source for
 the control-plane and JSON-envelope categories. The stable runtime
 categories are sourced from the public scenario manifests named in the
 suite.
@@ -39,12 +41,15 @@ suite.
 
 | Category | Source path | Status |
 | --- | --- | --- |
-| `signal_query_runtime_contract` | `durable-workflow.github.io/static/platform-conformance/signal-query-runtime-scenarios.json` (served at `/platform-conformance/signal-query-runtime-scenarios.json`) | stable, suite version `12` |
-| `search_attribute_runtime_contract` | `durable-workflow.github.io/static/platform-conformance/search-attribute-runtime-scenarios.json` (served at `/platform-conformance/search-attribute-runtime-scenarios.json`) | stable, suite version `12` |
-| `namespace_runtime_contract` | `durable-workflow.github.io/static/platform-conformance/namespace-runtime-scenarios.json` (served at `/platform-conformance/namespace-runtime-scenarios.json`) | stable, suite version `12` |
-| `child_workflow_runtime_contract` | `durable-workflow.github.io/static/platform-conformance/child-workflow-runtime-scenarios.json` (served at `/platform-conformance/child-workflow-runtime-scenarios.json`) | stable, suite version `12` |
-| `saga_runtime_contract` | `durable-workflow.github.io/static/platform-conformance/saga-runtime-scenarios.json` (served at `/platform-conformance/saga-runtime-scenarios.json`) | stable, suite version `12` |
-| `worker_versioning_runtime_contract` | `durable-workflow.github.io/static/platform-conformance/worker-versioning-runtime-scenarios.json` (served at `/platform-conformance/worker-versioning-runtime-scenarios.json`) | stable, suite version `12` |
+| `signal_query_runtime_contract` | `durable-workflow.github.io/static/platform-conformance/signal-query-runtime-scenarios.json` (served at `/platform-conformance/signal-query-runtime-scenarios.json`) | stable, suite version `20`, manifest version `3` |
+| `search_attribute_runtime_contract` | `durable-workflow.github.io/static/platform-conformance/search-attribute-runtime-scenarios.json` (served at `/platform-conformance/search-attribute-runtime-scenarios.json`) | stable, suite version `20`, manifest version `1` |
+| `schedules_runtime_contract` | `durable-workflow.github.io/static/platform-conformance/schedules-runtime-scenarios.json` (served at `/platform-conformance/schedules-runtime-scenarios.json`) | stable, suite version `20`, manifest version `3` |
+| `namespace_runtime_contract` | `durable-workflow.github.io/static/platform-conformance/namespace-runtime-scenarios.json` (served at `/platform-conformance/namespace-runtime-scenarios.json`) | stable, suite version `20`, manifest version `1` |
+| `child_workflow_runtime_contract` | `durable-workflow.github.io/static/platform-conformance/child-workflow-runtime-scenarios.json` (served at `/platform-conformance/child-workflow-runtime-scenarios.json`) | stable, suite version `20`, manifest version `1` |
+| `saga_runtime_contract` | `durable-workflow.github.io/static/platform-conformance/saga-runtime-scenarios.json` (served at `/platform-conformance/saga-runtime-scenarios.json`) | stable, suite version `20`, manifest version `1` |
+| `worker_versioning_runtime_contract` | `durable-workflow.github.io/static/platform-conformance/worker-versioning-runtime-scenarios.json` (served at `/platform-conformance/worker-versioning-runtime-scenarios.json`) | stable, suite version `20`, manifest version `1` |
+| `migration_runtime_contract` | `durable-workflow.github.io/static/platform-conformance/migration-runtime-scenarios.json` (served at `/platform-conformance/migration-runtime-scenarios.json`) | stable, suite version `20`, manifest version `1` |
+| `skew_refusal_matrix_contract` | `durable-workflow.github.io/static/platform-conformance/skew-refusal-matrix-scenarios.json` (served at `/platform-conformance/skew-refusal-matrix-scenarios.json`) | stable, suite version `20`, manifest version `1` |
 
 The fixtures in this repo are exercised today by:
 
@@ -59,9 +64,14 @@ against published artifacts.
 
 Namespace commands, `--namespace` scoping, JSON namespace context, and
 default-scope behavior are covered by `namespace_runtime_contract`. The
-public suite keeps that runtime category required in version `12`, and
+public suite keeps that runtime category required in version `20`, and
 the namespace scenario manifest is the stable source for evaluating
 namespace parity against published artifacts.
+
+Schedule commands and JSON output are covered through
+`schedules_runtime_contract` when the CLI creates or observes
+schedules, lists and describes them, and exercises pause, resume,
+trigger, and delete through `dw schedules` lifecycle commands.
 
 The CLI's namespace-scoped workflow, schedule, search-attribute, task-queue,
 and worker visibility outputs include the effective namespace in human and JSON
@@ -80,7 +90,7 @@ aggregate.
 Child workflow commands and JSON output are covered through
 `child_workflow_runtime_contract` when the CLI starts, observes,
 cancels, or queries parent workflows that orchestrate child workflow
-runs. The public suite defines that runtime category in version `12`, and
+runs. The public suite defines that runtime category in version `20`, and
 the child-workflow scenario manifest is the stable source for evaluating
 same-language, cross-language, cancellation, replay, fan-out, and
 namespace behavior against published artifacts.
@@ -98,10 +108,10 @@ Worker build-ID and rollout commands are covered through
 task-queue build IDs, drains or resumes worker cohorts, and describes
 workflow runs pinned to compatible workers.
 
-Migration runtime scenarios are not part of this CLI claim until the
-public docs-site manifest and corresponding scenario artifact are
-published. Until then, release gating remains pinned to suite version
-`12`.
+Migration runtime and version-skew refusal scenarios are covered through
+`migration_runtime_contract` and `skew_refusal_matrix_contract` when the
+CLI observes migrated resources, emits compatible JSON during migration,
+and refuses unsupported artifact skew with machine-readable diagnostics.
 
 ## Release gate
 
@@ -112,7 +122,7 @@ document before tag, with the conformance level at `full` or
 | Field | Value |
 | --- | --- |
 | Required claimed targets | `cli_json_client` |
-| Required suite version | public docs-site manifest `durable-workflow.v2.platform-conformance.suite` version `12` |
+| Required suite version | public docs-site manifest `durable-workflow.v2.platform-conformance.suite` version `20` |
 | CI job | `platform-conformance` (lands when the harness reference implementation publishes; until then `sdk-python-parity` covers CLI-owned fixture parity) |
 | Block on `nonconforming` | yes |
 | Artifact attached to release | harness result document, schema `durable-workflow.v2.platform-conformance.result` |
@@ -126,10 +136,13 @@ category emits a warning and does not block.
 - Authority manifest: <https://durable-workflow.github.io/platform-conformance-contract.json>
 - Signal/query runtime scenarios: <https://durable-workflow.github.io/platform-conformance/signal-query-runtime-scenarios.json>
 - Search-attribute runtime scenarios: <https://durable-workflow.github.io/platform-conformance/search-attribute-runtime-scenarios.json>
+- Schedules runtime scenarios: <https://durable-workflow.github.io/platform-conformance/schedules-runtime-scenarios.json>
 - Namespace runtime scenarios: <https://durable-workflow.github.io/platform-conformance/namespace-runtime-scenarios.json>
 - Child-workflow runtime scenarios: <https://durable-workflow.github.io/platform-conformance/child-workflow-runtime-scenarios.json>
 - Saga runtime scenarios: <https://durable-workflow.github.io/platform-conformance/saga-runtime-scenarios.json>
 - Worker-versioning runtime scenarios: <https://durable-workflow.github.io/platform-conformance/worker-versioning-runtime-scenarios.json>
+- Migration runtime scenarios: <https://durable-workflow.github.io/platform-conformance/migration-runtime-scenarios.json>
+- Skew-refusal matrix scenarios: <https://durable-workflow.github.io/platform-conformance/skew-refusal-matrix-scenarios.json>
 - Public docs page: <https://durable-workflow.github.io/docs/2.0/compatibility>
 - Polyglot parity doc:
   <https://durable-workflow.github.io/docs/polyglot/cli-python-parity>

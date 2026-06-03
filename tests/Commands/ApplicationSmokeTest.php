@@ -88,6 +88,50 @@ class ApplicationSmokeTest extends TestCase
         }
     }
 
+    public function test_grouped_schedule_commands_map_to_schedule_lifecycle_commands(): void
+    {
+        foreach (['schedule', 'schedules'] as $group) {
+            foreach (['create', 'list', 'describe', 'pause', 'resume', 'trigger', 'delete', 'update', 'backfill', 'history'] as $verb) {
+                $application = new Application();
+                $application->setAutoExit(false);
+                $output = new BufferedOutput();
+
+                $exit = $application->run(new ArgvInput([
+                    'dw',
+                    $group,
+                    $verb,
+                    '--help',
+                ]), $output);
+
+                self::assertSame(0, $exit, "{$group} {$verb} should resolve to schedule:{$verb}");
+                self::assertStringContainsString('schedule:'.$verb, $output->fetch());
+            }
+        }
+    }
+
+    public function test_grouped_schedule_commands_preserve_connection_options_before_group(): void
+    {
+        $application = new Application();
+        $application->setAutoExit(false);
+        $output = new BufferedOutput();
+
+        $exit = $application->run(new ArgvInput([
+            'dw',
+            '--server',
+            'http://127.0.0.1:8080',
+            '--namespace',
+            'orders',
+            '--token',
+            'secret-token',
+            'schedules',
+            'list',
+            '--help',
+        ]), $output);
+
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('schedule:list', $output->fetch());
+    }
+
     public function test_every_command_has_description_and_help_with_operator_examples(): void
     {
         $application = new Application();

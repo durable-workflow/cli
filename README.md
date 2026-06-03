@@ -477,29 +477,29 @@ dw storage:test --driver=s3 --json
 
 ```bash
 # Create a schedule
-dw schedule:create --workflow-type=reports.daily --cron="0 9 * * *"
-dw schedule:create --workflow-type=reports.daily --cron="0 9 * * *" --input-file=payload.json
-dw schedule:create --schedule-id=daily-report --workflow-type=reports.daily --cron="0 9 * * *" --timezone=America/New_York
+dw schedules create --workflow-type=reports.daily --cron="0 9 * * *"
+dw schedules create --workflow-type=reports.daily --cron="0 9 * * *" --input-file=payload.json
+dw schedules create --schedule-id=daily-report --workflow-type=reports.daily --cron="0 9 * * *" --timezone=America/New_York
 
 # List schedules
-dw schedule:list
-dw schedule:list --namespace=orders
+dw schedules list
+dw schedules list --namespace=orders
 
 # Describe a schedule
-dw schedule:describe daily-report
+dw schedules describe daily-report
 
 # Pause/resume
-dw schedule:pause daily-report --note="Holiday freeze"
-dw schedule:resume daily-report
+dw schedules pause daily-report --note="Holiday freeze"
+dw schedules resume daily-report
 
 # Trigger immediately
-dw schedule:trigger daily-report
+dw schedules trigger daily-report
 
 # Backfill missed runs
-dw schedule:backfill daily-report --start-time=2024-01-01T00:00:00Z --end-time=2024-01-07T00:00:00Z
+dw schedules backfill daily-report --start-time=2024-01-01T00:00:00Z --end-time=2024-01-07T00:00:00Z
 
 # Delete a schedule
-dw schedule:delete daily-report
+dw schedules delete daily-report
 ```
 
 ### Task Queues

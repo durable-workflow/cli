@@ -24,8 +24,8 @@ to completion.
 
 <comment>Examples:</comment>
 
-  <info>dw schedule:pause daily-report</info>
-  <info>dw schedule:pause daily-report --note="paused during maintenance"</info>
+  <info>dw schedules pause daily-report</info>
+  <info>dw schedules pause daily-report --note="paused during maintenance"</info>
 HELP)
             ->addArgument('schedule-id', InputArgument::REQUIRED, 'Schedule ID')
             ->addOption('note', null, InputOption::VALUE_OPTIONAL, 'Note')

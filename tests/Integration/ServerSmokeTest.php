@@ -157,7 +157,8 @@ final class ServerSmokeTest extends TestCase
         self::assertSame('completed-by-cli-smoke', $completedWorkflow['output']['status'] ?? null);
 
         $createdSchedule = $this->runJsonDw([
-            'schedule:create',
+            'schedules',
+            'create',
             '--schedule-id='.$scheduleId,
             '--workflow-type=cli.smoke.scheduled',
             '--interval=PT1H',
@@ -168,17 +169,39 @@ final class ServerSmokeTest extends TestCase
 
         self::assertSame($scheduleId, $createdSchedule['schedule_id'] ?? null);
 
-        $describedSchedule = $this->runJsonDw(['schedule:describe', $scheduleId, '--json'], $namespace, $this->operatorToken);
+        $describedSchedule = $this->runJsonDw(['schedules', 'describe', $scheduleId, '--json'], $namespace, $this->operatorToken);
         self::assertSame($scheduleId, $describedSchedule['schedule_id'] ?? null);
         self::assertTrue((bool) ($describedSchedule['state']['paused'] ?? false));
 
-        $listedSchedules = $this->runJsonDw(['schedule:list', '--json'], $namespace, $this->operatorToken);
+        $listedSchedules = $this->runJsonDw(['schedules', 'list', '--json'], $namespace, $this->operatorToken);
         self::assertContains(
             $scheduleId,
             array_column($listedSchedules['schedules'] ?? [], 'schedule_id'),
         );
 
-        $deletedSchedule = $this->runJsonDw(['schedule:delete', $scheduleId, '--json'], $namespace, $this->operatorToken);
+        $resumedSchedule = $this->runJsonDw([
+            'schedules',
+            'resume',
+            $scheduleId,
+            '--note=CLI smoke lifecycle resume',
+            '--json',
+        ], $namespace, $this->operatorToken);
+        self::assertSame($scheduleId, $resumedSchedule['schedule_id'] ?? null);
+
+        $triggeredSchedule = $this->runJsonDw(['schedules', 'trigger', $scheduleId, '--json'], $namespace, $this->operatorToken);
+        self::assertSame($scheduleId, $triggeredSchedule['schedule_id'] ?? null);
+        self::assertArrayHasKey('outcome', $triggeredSchedule);
+
+        $pausedSchedule = $this->runJsonDw([
+            'schedules',
+            'pause',
+            $scheduleId,
+            '--note=CLI smoke lifecycle pause',
+            '--json',
+        ], $namespace, $this->operatorToken);
+        self::assertSame($scheduleId, $pausedSchedule['schedule_id'] ?? null);
+
+        $deletedSchedule = $this->runJsonDw(['schedules', 'delete', $scheduleId, '--json'], $namespace, $this->operatorToken);
         self::assertSame($scheduleId, $deletedSchedule['schedule_id'] ?? null);
 
         $terminable = $this->runJsonDw([

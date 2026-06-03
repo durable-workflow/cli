@@ -20,12 +20,12 @@ class ResumeCommand extends BaseCommand
             ->setDescription('Resume a paused schedule')
             ->setHelp(<<<'HELP'
 Restart a paused schedule. Missed fires during the pause are not
-replayed unless you follow up with <comment>schedule:backfill</comment>.
+replayed unless you follow up with <comment>schedules backfill</comment>.
 
 <comment>Examples:</comment>
 
-  <info>dw schedule:resume daily-report --note="maintenance done"</info>
-  <info>dw schedule:resume daily-report --json</info>
+  <info>dw schedules resume daily-report --note="maintenance done"</info>
+  <info>dw schedules resume daily-report --json</info>
 HELP)
             ->addArgument('schedule-id', InputArgument::REQUIRED, 'Schedule ID')
             ->addOption('note', null, InputOption::VALUE_OPTIONAL, 'Note')

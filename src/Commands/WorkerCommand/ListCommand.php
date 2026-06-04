@@ -19,11 +19,13 @@ class ListCommand extends BaseCommand
         $this->setName('worker:list')
             ->setDescription('List registered workers')
             ->setHelp(<<<'HELP'
-List workers registered in the current namespace. Filter by task queue
-or by fleet status (<comment>active</comment>, <comment>stale</comment>,
-<comment>draining</comment>). When <comment>--namespace</comment> is
-omitted, the command queries the resolved default namespace only; it
-never enumerates all namespaces.
+List fresh workers registered in the current namespace. Workers that
+miss the server's stale-after window fall out of the default roster;
+use <comment>--status=stale</comment> for the expired diagnostic set.
+Filter by task queue or by fleet status (<comment>active</comment>,
+<comment>stale</comment>, <comment>draining</comment>). When
+<comment>--namespace</comment> is omitted, the command queries the
+resolved default namespace only; it never enumerates all namespaces.
 
 <comment>Examples:</comment>
 

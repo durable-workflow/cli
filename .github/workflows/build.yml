@@ -26,6 +26,7 @@ jobs:
           sh -n scripts/install.sh
           sh -n scripts/generate-homebrew-formula.sh
           sh -n scripts/verify-release.sh
+          sh -n scripts/ci/check-docs-release-audit.sh
           bash -n scripts/verify-public-release-assets.sh
           bash -n scripts/verify-reproducible-build.sh
           pwsh -NoProfile -Command '$null = [scriptblock]::Create((Get-Content -Raw scripts/install.ps1))'

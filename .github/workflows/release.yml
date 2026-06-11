@@ -67,10 +67,115 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "Resolved release tag: $tag"
 
-  build-phar:
-    name: Build PHAR
+  release-preflight:
+    name: Release preflight
     needs: resolve-release
     runs-on: ubuntu-latest
+    outputs:
+      public_assets_present: ${{ steps.public_assets.outputs.present }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve-release.outputs.tag }}
+
+      - name: Inspect existing public release assets
+        id: public_assets
+        env:
+          RELEASE_TAG: ${{ needs.resolve-release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          tag="${RELEASE_TAG#v}"
+          release_repo="${DURABLE_WORKFLOW_REPO:-durable-workflow/cli}"
+          evidence="release-preflight-public-assets-evidence.json"
+          present="false"
+          status="missing_or_incomplete"
+          message="No complete public CLI asset set was found for ${tag}."
+
+          if DURABLE_WORKFLOW_RELEASE_ASSET_ATTEMPTS=1 DURABLE_WORKFLOW_RELEASE_ASSET_RETRY_SLEEP=0 \
+              scripts/verify-public-release-assets.sh "$tag"; then
+            present="true"
+            status="present"
+            message="A complete public CLI asset set is already downloadable for ${tag}."
+          fi
+
+          echo "present=${present}" >> "$GITHUB_OUTPUT"
+
+          checked_at="$(date -u +%FT%TZ)"
+          node - "$evidence" "$tag" "$release_repo" "$status" "$message" "$checked_at" "$present" <<'NODE'
+          const fs = require('fs');
+
+          const [path, tag, repo, status, message, checkedAt, present] = process.argv.slice(2);
+          const assets = [
+            'dw.phar',
+            'dw-linux-x86_64',
+            'dw-linux-aarch64',
+            'dw-macos-aarch64',
+            'dw-windows-x86_64.exe',
+            'dw.rb',
+            'install.sh',
+            'install.ps1',
+            'verify-release.sh',
+            'SHA256SUMS',
+          ];
+
+          const urls = assets.map((asset) => ({
+            name: asset,
+            url: `https://github.com/${repo}/releases/download/${tag}/${asset}`,
+          }));
+
+          fs.writeFileSync(path, `${JSON.stringify({
+            schema: 'durable-workflow.cli.public-release-assets-preflight',
+            tag,
+            repository: repo,
+            checked_at: checkedAt,
+            outcome: status,
+            message,
+            purpose: present === 'true'
+              ? 'existing-public-assets-rerun-gate'
+              : 'pre-upload-public-asset-presence-check',
+            installable_artifacts: {
+              complete_public_asset_set: present === 'true',
+              version: tag,
+            },
+            assets: urls,
+          }, null, 2)}\n`);
+          NODE
+
+          if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+            {
+              printf '## Public CLI asset preflight\n\n'
+              printf '%s\n\n' "$message"
+              if [ "$present" = "true" ]; then
+                printf 'Because the complete public asset set already exists, the live docs release-audit gate runs before any rebuild or upload.\n'
+              else
+                printf 'The live docs release-audit gate will run after this release publishes and verifies the public download surface.\n'
+              fi
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Require live docs release audit for existing public assets
+        if: steps.public_assets.outputs.present == 'true'
+        env:
+          DOCS_RELEASE_AUDIT_ARTIFACT: cli
+          DOCS_RELEASE_AUDIT_VERSION: ${{ needs.resolve-release.outputs.tag }}
+          DOCS_RELEASE_AUDIT_EVIDENCE: docs-release-audit-evidence.json
+        run: scripts/ci/check-docs-release-audit.sh
+
+      - name: Upload release preflight evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-preflight-evidence
+          path: |
+            release-preflight-public-assets-evidence.json
+            docs-release-audit-evidence.json
+          if-no-files-found: warn
+
+  build-phar:
+    name: Build PHAR
+    needs: [resolve-release, release-preflight]
+    runs-on: ubuntu-latest
+    if: ${{ always() && needs.resolve-release.result == 'success' && needs.release-preflight.result == 'success' && needs.release-preflight.outputs.public_assets_present != 'true' }}
     outputs:
       phar-name: dw.phar
     steps:
@@ -130,7 +235,8 @@ jobs:
 
   build-binary:
     name: Build ${{ matrix.name }}
-    needs: [resolve-release, build-phar]
+    needs: [resolve-release, release-preflight, build-phar]
+    if: ${{ always() && needs.resolve-release.result == 'success' && needs.release-preflight.result == 'success' && needs.release-preflight.outputs.public_assets_present != 'true' && needs.build-phar.result == 'success' }}
     strategy:
       fail-fast: false
       matrix:
@@ -248,7 +354,8 @@ jobs:
 
   build-binary-windows:
     name: Build windows-x86_64
-    needs: [resolve-release, build-phar]
+    needs: [resolve-release, release-preflight, build-phar]
+    if: ${{ always() && needs.resolve-release.result == 'success' && needs.release-preflight.result == 'success' && needs.release-preflight.outputs.public_assets_present != 'true' && needs.build-phar.result == 'success' }}
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -399,9 +506,9 @@ jobs:
     # Every supported standalone platform must publish before the release
     # asset list, SHA256SUMS, installers, and public download endpoints are
     # considered complete.
-    needs: [resolve-release, build-phar, build-binary, build-binary-windows]
+    needs: [resolve-release, release-preflight, build-phar, build-binary, build-binary-windows]
     runs-on: ubuntu-latest
-    if: ${{ always() && needs.resolve-release.result == 'success' && needs.build-phar.result == 'success' && needs.build-binary.result == 'success' && needs.build-binary-windows.result == 'success' }}
+    if: ${{ always() && needs.resolve-release.result == 'success' && needs.release-preflight.result == 'success' && needs.release-preflight.outputs.public_assets_present != 'true' && needs.build-phar.result == 'success' && needs.build-binary.result == 'success' && needs.build-binary-windows.result == 'success' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -562,6 +669,7 @@ jobs:
             printf '  "tag": "%s",\n' "$tag"
             printf '  "commit": "%s",\n' "$release_commit"
             printf '  "artifact_versions": {"cli": "%s"},\n' "$tag"
+            printf '  "installable_artifacts": {"verified_public_downloads": true, "version": "%s"},\n' "$tag"
             printf '  "verified_at": "%s",\n' "$verified_at"
             printf '  "outcome": "pass",\n'
             printf '  "assets": [\n'
@@ -588,15 +696,19 @@ jobs:
             DURABLE_WORKFLOW_BIN_NAME=dw-release-check sh "$installer"
           "$install_dir/dw-release-check" --version
 
-      - name: Upload public download evidence
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-public-download-evidence
-          path: release-public-download-evidence.json
-          if-no-files-found: error
-
-      - name: Require live docs release audit refresh
+      - name: Verify live docs release audit after public downloads
         env:
           DOCS_RELEASE_AUDIT_ARTIFACT: cli
           DOCS_RELEASE_AUDIT_VERSION: ${{ needs.resolve-release.outputs.tag }}
+          DOCS_RELEASE_AUDIT_EVIDENCE: docs-release-audit-evidence.json
         run: scripts/ci/check-docs-release-audit.sh
+
+      - name: Upload release evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-evidence
+          path: |
+            release-public-download-evidence.json
+            docs-release-audit-evidence.json
+          if-no-files-found: warn

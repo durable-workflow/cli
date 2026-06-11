@@ -594,3 +594,9 @@ jobs:
           name: release-public-download-evidence
           path: release-public-download-evidence.json
           if-no-files-found: error
+
+      - name: Require live docs release audit refresh
+        env:
+          DOCS_RELEASE_AUDIT_ARTIFACT: cli
+          DOCS_RELEASE_AUDIT_VERSION: ${{ needs.resolve-release.outputs.tag }}
+        run: scripts/ci/check-docs-release-audit.sh

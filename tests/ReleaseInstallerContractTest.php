@@ -120,7 +120,7 @@ final class ReleaseInstallerContractTest extends TestCase
         $auditor = self::readRepoFile('scripts/ci/check-docs-release-audit.sh');
 
         self::assertStringContainsString('DOCS_RELEASE_AUDIT_EVIDENCE', $auditor);
-        self::assertStringContainsString('durable-workflow.cli.docs-release-audit-evidence', $auditor);
+        self::assertStringContainsString('durable-workflow.release.docs-release-audit-evidence', $auditor);
         self::assertStringContainsString('docs-page-release-audit-${artifact}-${expected}-$$.json', $auditor);
         self::assertStringContainsString('trap \'rm -f "$audit_path"\' EXIT HUP INT TERM', $auditor);
         self::assertStringContainsString("surface: 'public_docs_release_audit'", $auditor);
@@ -128,6 +128,11 @@ final class ReleaseInstallerContractTest extends TestCase
         self::assertStringContainsString("writeEvidence('stale'", $auditor);
         self::assertStringContainsString("writeEvidence('pass'", $auditor);
         self::assertStringContainsString('actual_version: actualVersion', $auditor);
+        self::assertStringContainsString("schema: 'durable-workflow.docs.refresh-request'", $auditor);
+        self::assertStringContainsString("repository: 'durable-workflow.github.io'", $auditor);
+        self::assertStringContainsString("refresh_command: 'npm run refresh:public-artifact-versions'", $auditor);
+        self::assertStringContainsString('observed_artifact_versions: versions', $auditor);
+        self::assertStringContainsString('docs_refresh_request: docsRefreshRequest', $auditor);
     }
 
     public function test_release_publishes_generated_homebrew_formula(): void

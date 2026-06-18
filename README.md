@@ -18,7 +18,7 @@ Pin an exact release for CI, conformance, or reproducible automation:
 
 ```bash
 # Linux and macOS
-curl -fsSL https://durable-workflow.com/install.sh | VERSION=0.1.63 sh
+curl -fsSL https://durable-workflow.com/install.sh | VERSION=0.1.80 sh
 ```
 
 ```powershell
@@ -28,7 +28,7 @@ irm https://durable-workflow.com/install.ps1 | iex
 
 ```powershell
 # Windows, exact release
-$env:VERSION = '0.1.63'
+$env:VERSION = '0.1.80'
 irm https://durable-workflow.com/install.ps1 | iex
 ```
 
@@ -43,7 +43,10 @@ installed to make the installer also verify artifact attestations for the
 downloaded binary and `SHA256SUMS` before installation.
 
 Or download a native binary directly from the [releases
-page](https://github.com/durable-workflow/cli/releases). Available assets:
+page](https://github.com/durable-workflow/cli/releases). The current
+supported exact release in these examples is
+[`0.1.80`](https://github.com/durable-workflow/cli/releases/tag/0.1.80).
+Available assets:
 `dw-linux-x86_64`, `dw-linux-aarch64`,
 `dw-macos-aarch64`, `dw-windows-x86_64.exe`.
 

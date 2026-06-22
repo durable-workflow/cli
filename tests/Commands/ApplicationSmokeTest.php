@@ -21,6 +21,8 @@ class ApplicationSmokeTest extends TestCase
         $tester = new ApplicationTester($application);
 
         foreach ([
+            'activity:list',
+            'activity:describe',
             'workflow:start',
             'workflow:list',
             'workflow:list-runs',
@@ -32,6 +34,27 @@ class ApplicationSmokeTest extends TestCase
                 'command' => $command,
                 '--help' => true,
             ]));
+        }
+    }
+
+    public function test_grouped_activity_commands_map_to_activity_visibility_commands(): void
+    {
+        foreach (['activity', 'activities'] as $group) {
+            foreach (['list', 'describe'] as $verb) {
+                $application = new Application();
+                $application->setAutoExit(false);
+                $output = new BufferedOutput();
+
+                $exit = $application->run(new ArgvInput([
+                    'dw',
+                    $group,
+                    $verb,
+                    '--help',
+                ]), $output);
+
+                self::assertSame(0, $exit, "{$group} {$verb} should resolve to activity:{$verb}");
+                self::assertStringContainsString('activity:'.$verb, $output->fetch());
+            }
         }
     }
 

@@ -31,7 +31,9 @@ abstract class BaseCommand extends Command
 
     private const NAMESPACE_SCOPED_COMMAND_NAMES = [
         'activity:complete',
+        'activity:describe',
         'activity:fail',
+        'activity:list',
         'bridge:webhook',
         'debug',
         'query-task:complete',
@@ -314,7 +316,7 @@ abstract class BaseCommand extends Command
         return str_starts_with($name, 'worker:')
             || str_starts_with($name, 'workflow-task:')
             || str_starts_with($name, 'query-task:')
-            || str_starts_with($name, 'activity:');
+            || in_array($name, ['activity:complete', 'activity:fail'], true);
     }
 
     private function assertServerCompatibilityBeforeUse(ServerClient $client): void

@@ -40,6 +40,14 @@ use Symfony\Component\Console\Output\OutputInterface;
 class Application extends ConsoleApplication
 {
     private const GROUPED_COMMAND_ALIASES = [
+        'activity' => [
+            'describe' => 'activity:describe',
+            'list' => 'activity:list',
+        ],
+        'activities' => [
+            'describe' => 'activity:describe',
+            'list' => 'activity:list',
+        ],
         'workflow' => [
             'list' => 'workflow:list',
         ],
@@ -153,6 +161,8 @@ class Application extends ConsoleApplication
             new StorageCommand\TestCommand(),
 
             // Activity operations
+            new ActivityCommand\ListCommand(),
+            new ActivityCommand\DescribeCommand(),
             new ActivityCommand\CompleteCommand(),
             new ActivityCommand\FailCommand(),
 

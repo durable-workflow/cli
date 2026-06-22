@@ -386,7 +386,9 @@ class OutputContractTest extends TestCase
     public static function namespaceScopedCommandNames(): iterable
     {
         yield 'activity complete' => ['activity:complete'];
+        yield 'activity describe' => ['activity:describe'];
         yield 'activity fail' => ['activity:fail'];
+        yield 'activity list' => ['activity:list'];
         yield 'bridge adapter webhook' => ['bridge:webhook'];
         yield 'debug workflow diagnostics' => ['debug'];
         yield 'query task complete' => ['query-task:complete'];

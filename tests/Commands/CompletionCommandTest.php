@@ -41,6 +41,7 @@ class CompletionCommandTest extends TestCase
 
         self::assertStringContainsString('workflow:list', $commands);
         self::assertStringContainsString('workflow:list-runs', $commands);
+        self::assertStringContainsString('activity:list', $this->complete(1, ['dw', 'activity:l']));
 
         $options = $this->complete(2, ['dw', 'workflow:list', '--st']);
 
@@ -73,6 +74,11 @@ class CompletionCommandTest extends TestCase
         self::assertSame(
             ['running', 'completed', 'failed'],
             $this->completionLines($this->complete(2, ['dw', 'workflow:list', '--status=r'])),
+        );
+
+        self::assertSame(
+            ['running'],
+            $this->completionLines($this->complete(2, ['dw', 'activity:list', '--status=r'])),
         );
 
         self::assertSame(

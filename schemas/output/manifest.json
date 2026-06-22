@@ -14,10 +14,30 @@
       "schema": "schemas/output/activity-task-result.schema.json",
       "schema_id": "https://durable-workflow.com/schemas/cli/output/activity-task-result.schema.json"
     },
+    "activity:describe": {
+      "output": "--json",
+      "schema": "schemas/output/activity.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/activity.schema.json"
+    },
     "activity:fail": {
       "output": "--json",
       "schema": "schemas/output/activity-task-result.schema.json",
       "schema_id": "https://durable-workflow.com/schemas/cli/output/activity-task-result.schema.json"
+    },
+    "activity:list": {
+      "output": "--json",
+      "schema": "schemas/output/activity-list.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/activity-list.schema.json"
+    },
+    "activities:describe": {
+      "output": "--json",
+      "schema": "schemas/output/activity.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/activity.schema.json"
+    },
+    "activities:list": {
+      "output": "--json",
+      "schema": "schemas/output/activity-list.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/activity-list.schema.json"
     },
     "bridge:webhook": {
       "output": "--json",

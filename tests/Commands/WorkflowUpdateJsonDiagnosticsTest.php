@@ -70,6 +70,14 @@ final class WorkflowUpdateJsonDiagnosticsTest extends TestCase
         self::assertSame('accepted-request-1', $decoded['update_diagnostics']['request_id']);
         self::assertSame([['approved' => true]], $decoded['update_diagnostics']['payload']);
         self::assertSame(11, $decoded['update_diagnostics']['history_references']['workflow_sequence']);
+        self::assertSame('workflow:update --json', $decoded['cli_fields']['surface']);
+        self::assertContains('workflow:update.update_id', $decoded['cli_fields']['fields_present']);
+        self::assertContains('workflow:update.payload', $decoded['cli_fields']['fields_present']);
+        self::assertSame('accepted', $decoded['cli_fields']['state']);
+        self::assertSame('accepted-request-1', $decoded['cli_fields']['request_id']);
+        self::assertSame('upd-accepted', $decoded['cli_fields']['update_id']);
+        self::assertSame('update_accepted', $decoded['cli_fields']['outcome']);
+        self::assertSame([['approved' => true]], $decoded['cli_fields']['payload']);
     }
 
     public function test_completed_update_json_surfaces_result_payload_and_history_references(): void
@@ -121,6 +129,44 @@ final class WorkflowUpdateJsonDiagnosticsTest extends TestCase
         self::assertSame('completed', $decoded['update_diagnostics']['state']);
         self::assertSame(['approved' => true, 'source' => 'cli'], $decoded['update_diagnostics']['result']);
         self::assertSame('json', $decoded['update_diagnostics']['result_envelope']['codec']);
+        self::assertContains('workflow:update.result', $decoded['cli_fields']['fields_present']);
+        self::assertContains('workflow:update.result_envelope', $decoded['cli_fields']['fields_present']);
+        self::assertSame('completed', $decoded['cli_fields']['state']);
+        self::assertSame(['approved' => true, 'source' => 'cli'], $decoded['cli_fields']['result']);
+    }
+
+    public function test_accepted_update_json_allows_no_history_references(): void
+    {
+        $client = new WorkflowUpdateDiagnosticsClient([
+            'workflow_id' => 'wf-accepted-no-history',
+            'run_id' => 'run-accepted-no-history',
+            'update_name' => 'approve',
+            'update_id' => 'upd-accepted-no-history',
+            'request_id' => 'accepted-no-history-request-1',
+            'command_status' => 'accepted',
+            'update_status' => 'accepted',
+        ]);
+
+        $tester = $this->executeUpdate($client, [
+            'workflow-id' => 'wf-accepted-no-history',
+            'update-name' => 'approve',
+            '--wait' => 'accepted',
+            '--request-id' => 'accepted-no-history-request-1',
+            '--json' => true,
+        ]);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode());
+
+        $decoded = $this->json($tester);
+
+        self::assertSame('accepted', $decoded['state']);
+        self::assertSame('update_accepted', $decoded['outcome']);
+        self::assertArrayHasKey('history_references', $decoded);
+        self::assertNull($decoded['history_references']);
+        self::assertArrayHasKey('history_references', $decoded['update_diagnostics']);
+        self::assertNull($decoded['update_diagnostics']['history_references']);
+        self::assertContains('workflow:update.history_references', $decoded['cli_fields']['fields_present']);
+        self::assertNull($decoded['cli_fields']['history_references']);
     }
 
     public function test_failed_update_json_error_promotes_update_diagnostics(): void
@@ -186,6 +232,11 @@ final class WorkflowUpdateJsonDiagnosticsTest extends TestCase
         self::assertSame(422, $decoded['update_diagnostics']['error']['status_code']);
         self::assertSame('update_handler_failed', $decoded['update_diagnostics']['error']['reason']);
         self::assertSame([['approved' => false]], $decoded['update_diagnostics']['payload']);
+        self::assertContains('workflow:update.error_details', $decoded['cli_fields']['fields_present']);
+        self::assertSame('failed', $decoded['cli_fields']['state']);
+        self::assertSame('update_failed', $decoded['cli_fields']['outcome']);
+        self::assertSame('update_handler_failed', $decoded['cli_fields']['reason']);
+        self::assertSame('failure-1', $decoded['cli_fields']['error']['failure_id']);
         self::assertSame($body, $decoded['server_response']);
     }
 
@@ -234,6 +285,24 @@ final class WorkflowUpdateJsonDiagnosticsTest extends TestCase
         self::assertSame(404, $decoded['update_diagnostics']['error']['status_code']);
         self::assertSame('Workflow not found.', $decoded['update_diagnostics']['error']['message']);
         self::assertSame([['approved' => true]], $decoded['update_diagnostics']['payload']);
+        self::assertArrayHasKey('update_id', $decoded);
+        self::assertArrayHasKey('result', $decoded);
+        self::assertArrayHasKey('result_envelope', $decoded);
+        self::assertArrayHasKey('history_references', $decoded);
+        self::assertNull($decoded['update_id']);
+        self::assertNull($decoded['result']);
+        self::assertNull($decoded['result_envelope']);
+        self::assertNull($decoded['history_references']);
+        self::assertArrayHasKey('history_references', $decoded['update_diagnostics']);
+        self::assertNull($decoded['update_diagnostics']['history_references']);
+        self::assertContains('workflow:update.update_id', $decoded['cli_fields']['fields_present']);
+        self::assertContains('workflow:update.error_details', $decoded['cli_fields']['fields_present']);
+        self::assertContains('workflow:update.history_references', $decoded['cli_fields']['fields_present']);
+        self::assertSame('refused', $decoded['cli_fields']['state']);
+        self::assertSame('update_refused', $decoded['cli_fields']['outcome']);
+        self::assertSame('instance_not_found', $decoded['cli_fields']['reason']);
+        self::assertSame('refused-request-1', $decoded['cli_fields']['request_id']);
+        self::assertNull($decoded['cli_fields']['history_references']);
         self::assertSame($body, $decoded['server_response']);
     }
 

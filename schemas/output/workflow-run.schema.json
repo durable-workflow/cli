@@ -33,7 +33,76 @@
     "output": true,
     "memo": { "type": ["object", "array", "null"] },
     "search_attributes": { "type": ["object", "null"] },
-    "actions": { "type": ["object", "null"], "additionalProperties": { "type": "boolean" } }
+    "actions": { "type": ["object", "null"], "additionalProperties": { "type": "boolean" } },
+    "commands": {
+      "type": ["array", "null"],
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": ["string", "null"] },
+          "sequence": { "type": ["integer", "null"] },
+          "type": { "type": ["string", "null"] },
+          "target_scope": { "type": ["string", "null"] },
+          "requested_run_id": { "type": ["string", "null"] },
+          "resolved_run_id": { "type": ["string", "null"] },
+          "target_name": { "type": ["string", "null"] },
+          "source": { "type": ["string", "null"] },
+          "request_id": { "type": ["string", "null"] },
+          "status": { "type": ["string", "null"] },
+          "outcome": { "type": ["string", "null"] },
+          "reason": { "type": ["string", "null"] },
+          "rejection_reason": { "type": ["string", "null"] },
+          "validation_errors": { "type": ["object", "null"] },
+          "update_id": { "type": ["string", "null"] },
+          "update_status": { "type": ["string", "null"] },
+          "failure_id": { "type": ["string", "null"] },
+          "failure_message": { "type": ["string", "null"] },
+          "principal": {
+            "type": ["object", "null"],
+            "additionalProperties": true
+          },
+          "accepted_at": { "type": ["string", "null"] },
+          "applied_at": { "type": ["string", "null"] },
+          "rejected_at": { "type": ["string", "null"] },
+          "completed_at": { "type": ["string", "null"] }
+        },
+        "additionalProperties": true
+      }
+    },
+    "updates": {
+      "type": ["array", "null"],
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": ["string", "null"] },
+          "command_id": { "type": ["string", "null"] },
+          "workflow_id": { "type": ["string", "null"] },
+          "run_id": { "type": ["string", "null"] },
+          "target_scope": { "type": ["string", "null"] },
+          "requested_run_id": { "type": ["string", "null"] },
+          "resolved_run_id": { "type": ["string", "null"] },
+          "update_name": { "type": ["string", "null"] },
+          "status": { "type": ["string", "null"] },
+          "outcome": { "type": ["string", "null"] },
+          "command_sequence": { "type": ["integer", "null"] },
+          "workflow_sequence": { "type": ["integer", "null"] },
+          "rejection_reason": { "type": ["string", "null"] },
+          "validation_errors": { "type": ["object", "null"] },
+          "failure_id": { "type": ["string", "null"] },
+          "failure_message": { "type": ["string", "null"] },
+          "principal": {
+            "type": ["object", "null"],
+            "additionalProperties": true
+          },
+          "request_id": { "type": ["string", "null"] },
+          "accepted_at": { "type": ["string", "null"] },
+          "applied_at": { "type": ["string", "null"] },
+          "rejected_at": { "type": ["string", "null"] },
+          "closed_at": { "type": ["string", "null"] }
+        },
+        "additionalProperties": true
+      }
+    }
   },
   "additionalProperties": true
 }

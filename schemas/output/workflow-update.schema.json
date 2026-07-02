@@ -3,7 +3,7 @@
   "$id": "https://durable-workflow.com/schemas/cli/output/workflow-update.schema.json",
   "title": "dw workflow:update --json",
   "type": "object",
-  "required": ["namespace", "workflow_id", "update_name", "outcome", "update_diagnostics"],
+  "required": ["namespace", "workflow_id", "update_name", "outcome", "update_diagnostics", "cli_fields"],
   "properties": {
     "namespace": { "type": "string" },
     "workflow_id": { "type": "string" },
@@ -41,6 +41,7 @@
     "message": { "type": ["string", "null"] },
     "validation_errors": { "type": ["object", "null"] },
     "principal": { "type": ["object", "null"] },
+    "payload": true,
     "request": {
       "type": "object",
       "properties": {
@@ -53,8 +54,35 @@
       },
       "additionalProperties": true
     },
-    "history_references": {
+    "cli_fields": {
       "type": "object",
+      "required": ["surface", "fields_present", "state", "request_id", "update_id", "outcome", "reason", "payload", "result", "error", "history_references"],
+      "properties": {
+        "surface": { "const": "workflow:update --json" },
+        "fields_present": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "state": { "type": ["string", "null"] },
+        "request_id": { "type": ["string", "null"] },
+        "update_id": { "type": ["string", "null"] },
+        "outcome": { "type": ["string", "null"] },
+        "reason": { "type": ["string", "null"] },
+        "payload": true,
+        "result": true,
+        "error": {
+          "type": ["object", "null"],
+          "additionalProperties": true
+        },
+        "history_references": {
+          "type": ["object", "null"],
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "history_references": {
+      "type": ["object", "null"],
       "properties": {
         "workflow_sequence": { "type": ["integer", "null"] },
         "command_sequence": { "type": ["integer", "null"] },
@@ -113,7 +141,7 @@
         },
         "payload": true,
         "history_references": {
-          "type": "object",
+          "type": ["object", "null"],
           "additionalProperties": true
         },
         "result": true,

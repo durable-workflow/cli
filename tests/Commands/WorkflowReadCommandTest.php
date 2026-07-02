@@ -792,6 +792,93 @@ class WorkflowReadCommandTest extends TestCase
         self::assertStringContainsString('Actions: can_signal, can_query, can_cancel, can_repair', $display);
     }
 
+    public function test_describe_json_preserves_published_server_update_diagnostics(): void
+    {
+        $command = new DescribeCommand();
+        $command->setServerClient(new WorkflowReadFakeServerClient([
+            'workflow_id' => 'wf-updates',
+            'run_id' => 'run-updates',
+            'status' => 'running',
+            'commands' => [
+                [
+                    'id' => 'cmd-accepted',
+                    'sequence' => 7,
+                    'type' => 'update',
+                    'target_name' => 'approve',
+                    'request_id' => 'accepted-request-1',
+                    'status' => 'accepted',
+                    'outcome' => 'update_accepted',
+                    'update_id' => 'upd-accepted',
+                    'update_status' => 'accepted',
+                    'accepted_at' => '2026-07-02T12:00:00Z',
+                ],
+                [
+                    'id' => 'cmd-refused',
+                    'sequence' => 8,
+                    'type' => 'update',
+                    'target_name' => 'missing_update',
+                    'request_id' => 'refused-request-1',
+                    'status' => 'rejected',
+                    'outcome' => 'rejected_unknown_update',
+                    'reason' => 'unknown_update',
+                    'rejection_reason' => 'unknown_update',
+                    'update_id' => null,
+                    'update_status' => null,
+                    'rejected_at' => '2026-07-02T12:00:05Z',
+                ],
+            ],
+            'updates' => [
+                [
+                    'id' => 'upd-accepted',
+                    'command_id' => 'cmd-accepted',
+                    'workflow_id' => 'wf-updates',
+                    'run_id' => 'run-updates',
+                    'update_name' => 'approve',
+                    'status' => 'accepted',
+                    'outcome' => 'update_accepted',
+                    'command_sequence' => 7,
+                    'workflow_sequence' => 11,
+                    'request_id' => 'accepted-request-1',
+                    'accepted_at' => '2026-07-02T12:00:00Z',
+                ],
+                [
+                    'id' => 'upd-failed',
+                    'command_id' => 'cmd-failed',
+                    'workflow_id' => 'wf-updates',
+                    'run_id' => 'run-updates',
+                    'update_name' => 'approve',
+                    'status' => 'failed',
+                    'outcome' => 'update_failed',
+                    'command_sequence' => 9,
+                    'workflow_sequence' => 13,
+                    'request_id' => 'failed-request-1',
+                    'failure_id' => 'failure-1',
+                    'failure_message' => 'Handler rejected approval.',
+                    'closed_at' => '2026-07-02T12:02:00Z',
+                ],
+            ],
+        ]));
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            'workflow-id' => 'wf-updates',
+            '--run-id' => 'run-updates',
+            '--output' => 'json',
+        ]));
+
+        $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+
+        self::assertSame('upd-accepted', $decoded['commands'][0]['update_id']);
+        self::assertSame('accepted-request-1', $decoded['commands'][0]['request_id']);
+        self::assertSame('unknown_update', $decoded['commands'][1]['reason']);
+        self::assertNull($decoded['commands'][1]['update_id']);
+        self::assertSame('accepted', $decoded['updates'][0]['status']);
+        self::assertSame(11, $decoded['updates'][0]['workflow_sequence']);
+        self::assertSame('failed', $decoded['updates'][1]['status']);
+        self::assertSame('failure-1', $decoded['updates'][1]['failure_id']);
+    }
+
     private static function requestContract(): ControlPlaneRequestContract
     {
         return new ControlPlaneRequestContract([

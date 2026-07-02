@@ -728,7 +728,26 @@ abstract class BaseCommand extends Command
             $payload['history_references'] = $historyReferences;
         }
 
+        foreach ([
+            'update_id',
+            'request_id',
+            'reason',
+            'rejection_reason',
+            'rejection_category',
+            'result',
+            'result_envelope',
+            'error_details',
+            'history_references',
+        ] as $field) {
+            $payload[$field] ??= null;
+        }
+
+        if (! array_key_exists('payload', $payload) && is_array($payload['request'] ?? null) && array_key_exists('input', $payload['request'])) {
+            $payload['payload'] = $payload['request']['input'];
+        }
+
         $payload['update_diagnostics'] ??= $this->workflowUpdateDiagnosticEnvelope($payload);
+        $payload['cli_fields'] ??= $this->workflowUpdateCliFields($payload);
 
         return $payload;
     }
@@ -826,6 +845,7 @@ abstract class BaseCommand extends Command
             'failure_message',
             'principal',
             'request',
+            'payload',
             'history_references',
             'result_envelope',
         ] as $field) {
@@ -847,6 +867,68 @@ abstract class BaseCommand extends Command
         }
 
         return $diagnostics;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array{surface: string, fields_present: list<string>, state: mixed, request_id: mixed, update_id: mixed, outcome: mixed, reason: mixed, payload: mixed, result: mixed, error: mixed, history_references: mixed}
+     */
+    private function workflowUpdateCliFields(array $payload): array
+    {
+        $fields = [
+            'workflow_id',
+            'run_id',
+            'requested_run_id',
+            'resolved_run_id',
+            'update_name',
+            'update_id',
+            'request_id',
+            'state',
+            'update_state',
+            'outcome',
+            'reason',
+            'rejection_reason',
+            'rejection_category',
+            'command_status',
+            'command_id',
+            'workflow_command_id',
+            'command_sequence',
+            'update_status',
+            'workflow_sequence',
+            'wait_for',
+            'wait_timed_out',
+            'wait_timeout_seconds',
+            'payload',
+            'result',
+            'result_envelope',
+            'error_details',
+            'failure_id',
+            'failure_message',
+            'principal',
+            'history_references',
+            'update_diagnostics',
+        ];
+
+        $present = [];
+        foreach ($fields as $field) {
+            if (array_key_exists($field, $payload)) {
+                $present[] = 'workflow:update.'.$field;
+            }
+        }
+
+        return [
+            'surface' => 'workflow:update --json',
+            'fields_present' => $present,
+            'state' => $payload['state'] ?? $payload['update_state'] ?? null,
+            'request_id' => $payload['request_id'] ?? null,
+            'update_id' => $payload['update_id'] ?? null,
+            'outcome' => $payload['outcome'] ?? null,
+            'reason' => $payload['reason'] ?? $payload['rejection_reason'] ?? null,
+            'payload' => $payload['payload'] ?? null,
+            'result' => $payload['result'] ?? null,
+            'error' => $payload['error_details'] ?? null,
+            'history_references' => $payload['history_references'] ?? null,
+        ];
     }
 
     /**

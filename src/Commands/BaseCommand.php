@@ -821,6 +821,11 @@ abstract class BaseCommand extends Command
             $envelope['namespace'] = $namespace;
         }
 
+        $requestId = $this->errorRequestIdContext($input);
+        if ($requestId !== null) {
+            $envelope['request_id'] = $requestId;
+        }
+
         if ($e instanceof ServerHttpException) {
             $envelope['status_code'] = $e->statusCode;
 
@@ -835,6 +840,8 @@ abstract class BaseCommand extends Command
                         $envelope[$key] = $value;
                     }
                 }
+
+                $this->copyServerResponseDiagnostics($envelope, $e->body);
             }
 
             if ($e->validationErrors() !== null) {
@@ -843,6 +850,12 @@ abstract class BaseCommand extends Command
 
             if ($e->body !== null) {
                 $envelope['server_response'] = $e->body;
+            }
+        }
+
+        foreach ($this->errorArgumentContext($input) as $field => $value) {
+            if (! array_key_exists($field, $envelope)) {
+                $envelope[$field] = $value;
             }
         }
 
@@ -856,6 +869,73 @@ abstract class BaseCommand extends Command
         }
 
         return json_encode($envelope, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * @param array<string, mixed> $envelope
+     * @param array<string, mixed> $body
+     */
+    private function copyServerResponseDiagnostics(array &$envelope, array $body): void
+    {
+        foreach ([
+            'workflow_id',
+            'run_id',
+            'requested_run_id',
+            'resolved_run_id',
+            'workflow_type',
+            'command_id',
+            'workflow_command_id',
+            'command_sequence',
+            'target_scope',
+            'command_status',
+            'command_source',
+            'command_reason',
+            'update_name',
+            'update_id',
+            'update_status',
+            'outcome',
+            'reason',
+            'rejection_reason',
+            'rejection_category',
+            'request_id',
+            'workflow_sequence',
+            'result',
+            'result_envelope',
+            'failure_id',
+            'failure_message',
+            'principal',
+            'accepted_at',
+            'applied_at',
+            'rejected_at',
+            'closed_at',
+            'wait_for',
+            'wait_timed_out',
+            'wait_timeout_seconds',
+            'accepted',
+            'message',
+        ] as $field) {
+            if (array_key_exists($field, $body) && ! array_key_exists($field, $envelope)) {
+                $envelope[$field] = $body[$field];
+            }
+        }
+
+        $historyReferences = [];
+        foreach ([
+            'workflow_sequence',
+            'command_sequence',
+            'accepted_at',
+            'applied_at',
+            'rejected_at',
+            'closed_at',
+        ] as $field) {
+            if (array_key_exists($field, $body)) {
+                $historyReferences[$field] = $body[$field];
+            }
+        }
+
+        if ($historyReferences !== [] && ! array_key_exists('history_references', $envelope)) {
+            $envelope['history_references'] = $historyReferences;
+        }
     }
 
     private function writeHumanError(OutputInterface $output, string $message): void
@@ -944,6 +1024,72 @@ abstract class BaseCommand extends Command
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    private function errorRequestIdContext(InputInterface $input): ?string
+    {
+        if (! $input->hasOption('request-id')) {
+            return null;
+        }
+
+        $requestId = $input->getOption('request-id');
+
+        if (! is_scalar($requestId)) {
+            return null;
+        }
+
+        $requestId = trim((string) $requestId);
+
+        return $requestId === '' ? null : $requestId;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function errorArgumentContext(InputInterface $input): array
+    {
+        $context = [];
+
+        foreach ([
+            'workflow-id' => 'workflow_id',
+            'signal-name' => 'signal_name',
+            'query-name' => 'query_name',
+            'update-name' => 'update_name',
+        ] as $argument => $field) {
+            if (! $input->hasArgument($argument)) {
+                continue;
+            }
+
+            $value = $input->getArgument($argument);
+            if (! is_scalar($value)) {
+                continue;
+            }
+
+            $value = trim((string) $value);
+            if ($value !== '') {
+                $context[$field] = $value;
+            }
+        }
+
+        foreach ([
+            'run-id' => 'run_id',
+        ] as $option => $field) {
+            if (! $input->hasOption($option)) {
+                continue;
+            }
+
+            $value = $input->getOption($option);
+            if (! is_scalar($value)) {
+                continue;
+            }
+
+            $value = trim((string) $value);
+            if ($value !== '') {
+                $context[$field] = $value;
+            }
+        }
+
+        return $context;
     }
 
     private function isNamespaceScopedCommand(): bool

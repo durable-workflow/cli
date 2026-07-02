@@ -22,7 +22,6 @@ final class WorkflowUpdateJsonDiagnosticsTest extends TestCase
             'run_id' => 'run-accepted',
             'update_name' => 'approve',
             'update_id' => 'upd-accepted',
-            'outcome' => 'update_accepted',
             'command_status' => 'accepted',
             'update_status' => 'accepted',
             'wait_for' => 'accepted',
@@ -57,6 +56,8 @@ final class WorkflowUpdateJsonDiagnosticsTest extends TestCase
         self::assertSame('upd-accepted', $decoded['update_id']);
         self::assertSame('accepted-request-1', $decoded['request_id']);
         self::assertSame('update_accepted', $decoded['outcome']);
+        self::assertSame('accepted', $decoded['state']);
+        self::assertSame('accepted', $decoded['update_state']);
         self::assertSame('accepted', $decoded['command_status']);
         self::assertSame('accepted', $decoded['update_status']);
         self::assertSame('accepted-request-1', $decoded['request']['request_id']);
@@ -64,6 +65,11 @@ final class WorkflowUpdateJsonDiagnosticsTest extends TestCase
         self::assertSame(11, $decoded['history_references']['workflow_sequence']);
         self::assertSame(7, $decoded['history_references']['command_sequence']);
         self::assertSame('2026-07-02T12:00:00Z', $decoded['history_references']['accepted_at']);
+        self::assertSame('accepted', $decoded['update_diagnostics']['state']);
+        self::assertSame('upd-accepted', $decoded['update_diagnostics']['update_id']);
+        self::assertSame('accepted-request-1', $decoded['update_diagnostics']['request_id']);
+        self::assertSame([['approved' => true]], $decoded['update_diagnostics']['payload']);
+        self::assertSame(11, $decoded['update_diagnostics']['history_references']['workflow_sequence']);
     }
 
     public function test_completed_update_json_surfaces_result_payload_and_history_references(): void
@@ -94,7 +100,7 @@ final class WorkflowUpdateJsonDiagnosticsTest extends TestCase
             'update-name' => 'approve',
             '--wait' => 'completed',
             '--request-id' => 'completed-request-1',
-            '--json' => true,
+            '--output' => 'json',
         ]);
 
         self::assertSame(Command::SUCCESS, $tester->getStatusCode());
@@ -103,6 +109,8 @@ final class WorkflowUpdateJsonDiagnosticsTest extends TestCase
 
         self::assertSame('completed-request-1', $decoded['request_id']);
         self::assertSame('update_completed', $decoded['outcome']);
+        self::assertSame('completed', $decoded['state']);
+        self::assertSame('completed', $decoded['update_state']);
         self::assertSame('completed', $decoded['update_status']);
         self::assertSame(['approved' => true, 'source' => 'cli'], $decoded['result']);
         self::assertSame('json', $decoded['result_envelope']['codec']);
@@ -110,6 +118,9 @@ final class WorkflowUpdateJsonDiagnosticsTest extends TestCase
         self::assertSame(12, $decoded['history_references']['workflow_sequence']);
         self::assertSame('2026-07-02T12:01:00Z', $decoded['history_references']['applied_at']);
         self::assertSame('completed', $decoded['request']['wait_for']);
+        self::assertSame('completed', $decoded['update_diagnostics']['state']);
+        self::assertSame(['approved' => true, 'source' => 'cli'], $decoded['update_diagnostics']['result']);
+        self::assertSame('json', $decoded['update_diagnostics']['result_envelope']['codec']);
     }
 
     public function test_failed_update_json_error_promotes_update_diagnostics(): void
@@ -145,6 +156,7 @@ final class WorkflowUpdateJsonDiagnosticsTest extends TestCase
             'update-name' => 'approve',
             '--wait' => 'completed',
             '--request-id' => 'failed-request-1',
+            '--input' => '[{"approved":false}]',
             '--json' => true,
         ]);
 
@@ -158,11 +170,22 @@ final class WorkflowUpdateJsonDiagnosticsTest extends TestCase
         self::assertSame('upd-failed', $decoded['update_id']);
         self::assertSame('failed-request-1', $decoded['request_id']);
         self::assertSame('update_failed', $decoded['outcome']);
+        self::assertSame('failed', $decoded['state']);
+        self::assertSame('failed', $decoded['update_state']);
         self::assertSame('update_handler_failed', $decoded['reason']);
         self::assertSame('failed', $decoded['update_status']);
         self::assertSame('failure-1', $decoded['failure_id']);
         self::assertSame('Handler rejected approval.', $decoded['failure_message']);
+        self::assertSame('failed-request-1', $decoded['request']['request_id']);
+        self::assertSame('completed', $decoded['request']['wait_for']);
+        self::assertSame([['approved' => false]], $decoded['request']['input']);
         self::assertSame(13, $decoded['history_references']['workflow_sequence']);
+        self::assertSame('failed', $decoded['update_diagnostics']['state']);
+        self::assertSame('failure-1', $decoded['update_diagnostics']['failure_id']);
+        self::assertNull($decoded['update_diagnostics']['result']);
+        self::assertSame(422, $decoded['update_diagnostics']['error']['status_code']);
+        self::assertSame('update_handler_failed', $decoded['update_diagnostics']['error']['reason']);
+        self::assertSame([['approved' => false]], $decoded['update_diagnostics']['payload']);
         self::assertSame($body, $decoded['server_response']);
     }
 
@@ -183,6 +206,7 @@ final class WorkflowUpdateJsonDiagnosticsTest extends TestCase
             'workflow-id' => 'wf-missing',
             'update-name' => 'approve',
             '--request-id' => 'refused-request-1',
+            '--input' => '[{"approved":true}]',
             '--json' => true,
         ]);
 
@@ -194,8 +218,22 @@ final class WorkflowUpdateJsonDiagnosticsTest extends TestCase
         self::assertSame('wf-missing', $decoded['workflow_id']);
         self::assertSame('approve', $decoded['update_name']);
         self::assertSame('refused-request-1', $decoded['request_id']);
+        self::assertSame('update_refused', $decoded['outcome']);
+        self::assertSame('refused', $decoded['state']);
+        self::assertSame('refused', $decoded['update_state']);
         self::assertSame('instance_not_found', $decoded['reason']);
         self::assertSame('Workflow not found.', $decoded['message']);
+        self::assertSame('wf-missing', $decoded['request']['workflow_id']);
+        self::assertSame('approve', $decoded['request']['update_name']);
+        self::assertSame('refused-request-1', $decoded['request']['request_id']);
+        self::assertSame('accepted', $decoded['request']['wait_for']);
+        self::assertSame([['approved' => true]], $decoded['request']['input']);
+        self::assertSame('refused', $decoded['update_diagnostics']['state']);
+        self::assertSame('update_refused', $decoded['update_diagnostics']['outcome']);
+        self::assertSame('instance_not_found', $decoded['update_diagnostics']['reason']);
+        self::assertSame(404, $decoded['update_diagnostics']['error']['status_code']);
+        self::assertSame('Workflow not found.', $decoded['update_diagnostics']['error']['message']);
+        self::assertSame([['approved' => true]], $decoded['update_diagnostics']['payload']);
         self::assertSame($body, $decoded['server_response']);
     }
 

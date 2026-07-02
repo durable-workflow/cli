@@ -653,6 +653,226 @@ abstract class BaseCommand extends Command
         return $payload;
     }
 
+    /**
+     * @param array<string, mixed> $payload
+     * @param array<string, mixed> $request
+     * @param array<string, mixed>|null $error
+     * @return array<string, mixed>
+     */
+    protected function withWorkflowUpdateDiagnostics(
+        array $payload,
+        string $workflowId,
+        string $updateName,
+        ?string $runId,
+        array $request,
+        ?array $error = null,
+    ): array {
+        $payload['workflow_id'] ??= $workflowId;
+        $payload['update_name'] ??= $updateName;
+
+        if ($runId !== null) {
+            $payload['run_id'] ??= $runId;
+        }
+
+        if (! array_key_exists('request_id', $payload) && isset($request['request_id'])) {
+            $payload['request_id'] = $request['request_id'];
+        }
+
+        if (! array_key_exists('wait_for', $payload) && isset($request['wait_for'])) {
+            $payload['wait_for'] = $request['wait_for'];
+        }
+
+        $requestEnvelope = array_filter([
+            'workflow_id' => $workflowId,
+            'run_id' => $runId,
+            'update_name' => $updateName,
+            'request_id' => $request['request_id'] ?? $payload['request_id'] ?? null,
+            'wait_for' => $request['wait_for'] ?? $payload['wait_for'] ?? null,
+            'input' => $request['input'] ?? null,
+        ], static fn (mixed $value): bool => $value !== null);
+
+        $existingRequest = is_array($payload['request'] ?? null) ? $payload['request'] : [];
+        $payload['request'] = array_replace($requestEnvelope, $existingRequest);
+
+        $state = $this->workflowUpdateDiagnosticState($payload, $error);
+        if ($state !== null) {
+            $payload['update_state'] ??= $state;
+            $payload['state'] ??= $state;
+        }
+
+        if (! $this->hasNonEmptyString($payload['outcome'] ?? null)) {
+            $outcome = $this->workflowUpdateOutcomeForState($state, $error);
+            if ($outcome !== null) {
+                $payload['outcome'] = $outcome;
+            }
+        }
+
+        if ($error !== null) {
+            if (! array_key_exists('outcome', $payload)) {
+                $payload['outcome'] = 'update_refused';
+            }
+
+            $payload['error_details'] ??= array_filter([
+                'status_code' => $error['status_code'] ?? null,
+                'message' => $payload['message'] ?? $error['message'] ?? null,
+                'reason' => $payload['reason'] ?? $error['reason'] ?? null,
+                'outcome' => $payload['outcome'] ?? null,
+                'validation_errors' => $payload['validation_errors'] ?? null,
+                'failure_id' => $payload['failure_id'] ?? null,
+                'failure_message' => $payload['failure_message'] ?? null,
+            ], static fn (mixed $value): bool => $value !== null);
+        }
+
+        $historyReferences = $this->workflowUpdateHistoryReferences($payload);
+        if ($historyReferences !== [] && ! array_key_exists('history_references', $payload)) {
+            $payload['history_references'] = $historyReferences;
+        }
+
+        $payload['update_diagnostics'] ??= $this->workflowUpdateDiagnosticEnvelope($payload);
+
+        return $payload;
+    }
+
+    /**
+     * @param array<string, mixed>|null $error
+     */
+    private function workflowUpdateOutcomeForState(?string $state, ?array $error): ?string
+    {
+        return match ($state) {
+            'accepted' => 'update_accepted',
+            'completed' => 'update_completed',
+            'failed' => 'update_failed',
+            'refused' => 'update_refused',
+            default => $error === null ? null : 'update_refused',
+        };
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @param array<string, mixed>|null $error
+     */
+    private function workflowUpdateDiagnosticState(array $payload, ?array $error): ?string
+    {
+        foreach (['update_status', 'update_state', 'state'] as $field) {
+            $value = $payload[$field] ?? null;
+            if (is_scalar($value) && trim((string) $value) !== '') {
+                return strtolower(trim((string) $value));
+            }
+        }
+
+        $commandStatus = $payload['command_status'] ?? null;
+        if (is_scalar($commandStatus) && trim((string) $commandStatus) !== '') {
+            $normalized = strtolower(trim((string) $commandStatus));
+            if (in_array($normalized, ['rejected', 'refused'], true)) {
+                return 'refused';
+            }
+
+            return $normalized;
+        }
+
+        $outcome = $payload['outcome'] ?? null;
+        if (is_scalar($outcome) && trim((string) $outcome) !== '') {
+            $normalized = strtolower(trim((string) $outcome));
+            if (str_contains($normalized, 'failed')) {
+                return 'failed';
+            }
+            if (str_contains($normalized, 'completed')) {
+                return 'completed';
+            }
+            if (str_contains($normalized, 'accepted')) {
+                return 'accepted';
+            }
+            if (str_starts_with($normalized, 'rejected') || str_contains($normalized, 'refused')) {
+                return 'refused';
+            }
+        }
+
+        return $error === null ? null : 'refused';
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    private function workflowUpdateDiagnosticEnvelope(array $payload): array
+    {
+        $diagnostics = [];
+
+        foreach ([
+            'state',
+            'update_state',
+            'namespace',
+            'workflow_id',
+            'run_id',
+            'requested_run_id',
+            'resolved_run_id',
+            'update_name',
+            'update_id',
+            'request_id',
+            'outcome',
+            'reason',
+            'rejection_reason',
+            'rejection_category',
+            'command_status',
+            'command_source',
+            'command_id',
+            'command_sequence',
+            'update_status',
+            'workflow_sequence',
+            'wait_for',
+            'wait_timed_out',
+            'wait_timeout_seconds',
+            'failure_id',
+            'failure_message',
+            'principal',
+            'request',
+            'history_references',
+            'result_envelope',
+        ] as $field) {
+            if (array_key_exists($field, $payload)) {
+                $diagnostics[$field] = $payload[$field];
+            }
+        }
+
+        if (array_key_exists('result', $payload)) {
+            $diagnostics['result'] = $payload['result'];
+        }
+
+        if (is_array($payload['request'] ?? null) && array_key_exists('input', $payload['request'])) {
+            $diagnostics['payload'] = $payload['request']['input'];
+        }
+
+        if (array_key_exists('error_details', $payload)) {
+            $diagnostics['error'] = $payload['error_details'];
+        }
+
+        return $diagnostics;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    private function workflowUpdateHistoryReferences(array $payload): array
+    {
+        $references = [];
+
+        foreach ([
+            'workflow_sequence',
+            'command_sequence',
+            'accepted_at',
+            'applied_at',
+            'rejected_at',
+            'closed_at',
+        ] as $field) {
+            if (array_key_exists($field, $payload)) {
+                $references[$field] = $payload[$field];
+            }
+        }
+
+        return $references;
+    }
+
     protected function writeNamespaceLine(OutputInterface $output, array $payload): void
     {
         $namespace = $this->hasNonEmptyString($payload['namespace'] ?? null)
@@ -859,6 +1079,10 @@ abstract class BaseCommand extends Command
             }
         }
 
+        if ((string) $this->getName() === 'workflow:update') {
+            $envelope = $this->withWorkflowUpdateErrorDiagnostics($envelope, $e, $input);
+        }
+
         if ($e instanceof CompatibilityException) {
             $envelope['compatibility'] = $e->diagnostic();
         }
@@ -913,6 +1137,11 @@ abstract class BaseCommand extends Command
             'wait_timeout_seconds',
             'accepted',
             'message',
+            'state',
+            'update_state',
+            'request',
+            'error_details',
+            'update_diagnostics',
         ] as $field) {
             if (array_key_exists($field, $body) && ! array_key_exists($field, $envelope)) {
                 $envelope[$field] = $body[$field];
@@ -1044,6 +1273,69 @@ abstract class BaseCommand extends Command
     }
 
     /**
+     * @param array<string, mixed> $envelope
+     * @return array<string, mixed>
+     */
+    private function withWorkflowUpdateErrorDiagnostics(
+        array $envelope,
+        \Throwable $e,
+        InputInterface $input,
+    ): array {
+        $workflowId = $this->stringArgumentContext($input, 'workflow-id')
+            ?? (is_scalar($envelope['workflow_id'] ?? null) ? (string) $envelope['workflow_id'] : '');
+        $updateName = $this->stringArgumentContext($input, 'update-name')
+            ?? (is_scalar($envelope['update_name'] ?? null) ? (string) $envelope['update_name'] : '');
+
+        if ($workflowId === '' || $updateName === '') {
+            return $envelope;
+        }
+
+        $runId = $this->stringOptionContext($input, 'run-id')
+            ?? (is_scalar($envelope['run_id'] ?? null) ? (string) $envelope['run_id'] : null);
+
+        $request = array_filter([
+            'wait_for' => $this->stringOptionContext($input, 'wait') ?? (is_scalar($envelope['wait_for'] ?? null) ? (string) $envelope['wait_for'] : 'accepted'),
+            'request_id' => $this->stringOptionContext($input, 'request-id') ?? (is_scalar($envelope['request_id'] ?? null) ? (string) $envelope['request_id'] : null),
+            'input' => $this->workflowUpdateInputContext($input),
+        ], static fn (mixed $value): bool => $value !== null);
+
+        $error = null;
+        if ($e instanceof ServerHttpException) {
+            $error = [
+                'status_code' => $e->statusCode,
+                'message' => $e->body['message'] ?? $e->getMessage(),
+                'reason' => $e->reason(),
+            ];
+        } else {
+            $error = [
+                'message' => $e->getMessage(),
+            ];
+        }
+
+        return $this->withWorkflowUpdateDiagnostics(
+            payload: $envelope,
+            workflowId: $workflowId,
+            updateName: $updateName,
+            runId: $runId,
+            request: $request,
+            error: $error,
+        );
+    }
+
+    private function workflowUpdateInputContext(InputInterface $input): mixed
+    {
+        if ($this->stringOptionContext($input, 'input-file') !== null) {
+            return null;
+        }
+
+        try {
+            return $this->parseInputArgumentsOption($input);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
      * @return array<string, string>
      */
     private function errorArgumentContext(InputInterface $input): array
@@ -1090,6 +1382,39 @@ abstract class BaseCommand extends Command
         }
 
         return $context;
+    }
+
+    private function stringArgumentContext(InputInterface $input, string $argument): ?string
+    {
+        if (! $input->hasArgument($argument)) {
+            return null;
+        }
+
+        $value = $input->getArgument($argument);
+
+        return $this->nonEmptyScalarString($value);
+    }
+
+    private function stringOptionContext(InputInterface $input, string $option): ?string
+    {
+        if (! $input->hasOption($option)) {
+            return null;
+        }
+
+        $value = $input->getOption($option);
+
+        return $this->nonEmptyScalarString($value);
+    }
+
+    private function nonEmptyScalarString(mixed $value): ?string
+    {
+        if (! is_scalar($value)) {
+            return null;
+        }
+
+        $value = trim((string) $value);
+
+        return $value === '' ? null : $value;
     }
 
     private function isNamespaceScopedCommand(): bool

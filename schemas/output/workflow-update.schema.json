@@ -3,7 +3,7 @@
   "$id": "https://durable-workflow.com/schemas/cli/output/workflow-update.schema.json",
   "title": "dw workflow:update --json",
   "type": "object",
-  "required": ["namespace", "workflow_id", "update_name", "update_id", "outcome"],
+  "required": ["namespace", "workflow_id", "update_name", "outcome", "update_diagnostics"],
   "properties": {
     "namespace": { "type": "string" },
     "workflow_id": { "type": "string" },
@@ -11,9 +11,11 @@
     "requested_run_id": { "type": ["string", "null"] },
     "resolved_run_id": { "type": ["string", "null"] },
     "update_name": { "type": "string" },
-    "update_id": { "type": "string" },
+    "update_id": { "type": ["string", "null"] },
     "request_id": { "type": ["string", "null"] },
     "outcome": { "type": "string" },
+    "state": { "type": ["string", "null"] },
+    "update_state": { "type": ["string", "null"] },
     "reason": { "type": ["string", "null"] },
     "rejection_reason": { "type": ["string", "null"] },
     "rejection_category": { "type": ["string", "null"] },
@@ -60,6 +62,69 @@
         "applied_at": { "type": ["string", "null"] },
         "rejected_at": { "type": ["string", "null"] },
         "closed_at": { "type": ["string", "null"] }
+      },
+      "additionalProperties": true
+    },
+    "error_details": {
+      "type": ["object", "null"],
+      "properties": {
+        "status_code": { "type": ["integer", "null"] },
+        "message": { "type": ["string", "null"] },
+        "reason": { "type": ["string", "null"] },
+        "outcome": { "type": ["string", "null"] },
+        "validation_errors": { "type": ["object", "null"] },
+        "failure_id": { "type": ["string", "null"] },
+        "failure_message": { "type": ["string", "null"] }
+      },
+      "additionalProperties": true
+    },
+    "update_diagnostics": {
+      "type": "object",
+      "properties": {
+        "state": { "type": ["string", "null"] },
+        "update_state": { "type": ["string", "null"] },
+        "namespace": { "type": ["string", "null"] },
+        "workflow_id": { "type": ["string", "null"] },
+        "run_id": { "type": ["string", "null"] },
+        "requested_run_id": { "type": ["string", "null"] },
+        "resolved_run_id": { "type": ["string", "null"] },
+        "update_name": { "type": ["string", "null"] },
+        "update_id": { "type": ["string", "null"] },
+        "request_id": { "type": ["string", "null"] },
+        "outcome": { "type": ["string", "null"] },
+        "reason": { "type": ["string", "null"] },
+        "rejection_reason": { "type": ["string", "null"] },
+        "rejection_category": { "type": ["string", "null"] },
+        "command_status": { "type": ["string", "null"] },
+        "command_source": { "type": ["string", "null"] },
+        "command_id": { "type": ["string", "null"] },
+        "command_sequence": { "type": ["integer", "null"] },
+        "update_status": { "type": ["string", "null"] },
+        "workflow_sequence": { "type": ["integer", "null"] },
+        "wait_for": { "type": ["string", "null"] },
+        "wait_timed_out": { "type": ["boolean", "null"] },
+        "wait_timeout_seconds": { "type": ["integer", "null"] },
+        "failure_id": { "type": ["string", "null"] },
+        "failure_message": { "type": ["string", "null"] },
+        "principal": { "type": ["object", "null"] },
+        "request": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "payload": true,
+        "history_references": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "result": true,
+        "result_envelope": {
+          "type": ["object", "null"],
+          "additionalProperties": true
+        },
+        "error": {
+          "type": ["object", "null"],
+          "additionalProperties": true
+        }
       },
       "additionalProperties": true
     },

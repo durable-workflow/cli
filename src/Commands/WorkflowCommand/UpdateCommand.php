@@ -76,7 +76,7 @@ HELP)
             : "/workflows/{$workflowId}/update/{$updateName}";
 
         $result = $this->addNamespaceContext($input, $client->post($path, $body));
-        $result = $this->withUpdateDiagnostics(
+        $result = $this->withWorkflowUpdateDiagnostics(
             payload: $result,
             workflowId: (string) $workflowId,
             updateName: (string) $updateName,
@@ -118,69 +118,5 @@ HELP)
         return $value === ''
             ? null
             : $value;
-    }
-
-    /**
-     * @param array<string, mixed> $payload
-     * @param array<string, mixed> $request
-     * @return array<string, mixed>
-     */
-    private function withUpdateDiagnostics(
-        array $payload,
-        string $workflowId,
-        string $updateName,
-        ?string $runId,
-        array $request,
-    ): array {
-        $payload['workflow_id'] ??= $workflowId;
-        $payload['update_name'] ??= $updateName;
-
-        if ($runId !== null) {
-            $payload['run_id'] ??= $runId;
-        }
-
-        if (! array_key_exists('request_id', $payload) && isset($request['request_id'])) {
-            $payload['request_id'] = $request['request_id'];
-        }
-
-        $payload['request'] ??= array_filter([
-            'workflow_id' => $workflowId,
-            'run_id' => $runId,
-            'update_name' => $updateName,
-            'request_id' => $request['request_id'] ?? $payload['request_id'] ?? null,
-            'wait_for' => $request['wait_for'] ?? null,
-            'input' => $request['input'] ?? null,
-        ], static fn (mixed $value): bool => $value !== null);
-
-        $historyReferences = $this->historyReferences($payload);
-        if ($historyReferences !== [] && ! array_key_exists('history_references', $payload)) {
-            $payload['history_references'] = $historyReferences;
-        }
-
-        return $payload;
-    }
-
-    /**
-     * @param array<string, mixed> $payload
-     * @return array<string, mixed>
-     */
-    private function historyReferences(array $payload): array
-    {
-        $references = [];
-
-        foreach ([
-            'workflow_sequence',
-            'command_sequence',
-            'accepted_at',
-            'applied_at',
-            'rejected_at',
-            'closed_at',
-        ] as $field) {
-            if (array_key_exists($field, $payload)) {
-                $references[$field] = $payload[$field];
-            }
-        }
-
-        return $references;
     }
 }

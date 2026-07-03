@@ -306,6 +306,85 @@ final class WorkflowUpdateJsonDiagnosticsTest extends TestCase
         self::assertSame($body, $decoded['server_response']);
     }
 
+    public function test_refused_update_json_normalizes_rejected_unknown_update_state(): void
+    {
+        $body = [
+            'workflow_id' => 'wf-refused',
+            'run_id' => 'run-refused',
+            'update_name' => 'missing_update',
+            'request_id' => 'refused-request-unknown',
+            'update_id' => null,
+            'outcome' => 'rejected_unknown_update',
+            'reason' => 'unknown_update',
+            'rejection_reason' => 'unknown_update',
+            'command_status' => 'rejected',
+            'update_status' => 'unknown',
+            'command_id' => 'cmd-refused-1',
+            'workflow_command_id' => 'cmd-refused-1',
+            'command_sequence' => 10,
+            'workflow_sequence' => 14,
+            'rejected_at' => '2026-07-02T12:03:00Z',
+            'message' => 'Workflow update was refused.',
+        ];
+
+        $client = new WorkflowUpdateDiagnosticsClient($body, exception: new ServerHttpException(
+            'Server error: Workflow update was refused.',
+            422,
+            body: $body,
+        ));
+
+        $tester = $this->executeUpdate($client, [
+            'workflow-id' => 'wf-refused',
+            'update-name' => 'missing_update',
+            '--request-id' => 'refused-request-unknown',
+            '--input' => '[{"approved":true}]',
+            '--json' => true,
+        ]);
+
+        self::assertSame(ExitCode::INVALID, $tester->getStatusCode());
+
+        $decoded = $this->json($tester);
+
+        self::assertSame(422, $decoded['status_code']);
+        self::assertSame('wf-refused', $decoded['workflow_id']);
+        self::assertSame('run-refused', $decoded['run_id']);
+        self::assertSame('missing_update', $decoded['update_name']);
+        self::assertSame('refused-request-unknown', $decoded['request_id']);
+        self::assertSame('rejected_unknown_update', $decoded['outcome']);
+        self::assertSame('unknown_update', $decoded['reason']);
+        self::assertSame('unknown_update', $decoded['rejection_reason']);
+        self::assertSame('refused', $decoded['state']);
+        self::assertSame('refused', $decoded['update_state']);
+        self::assertSame('rejected', $decoded['command_status']);
+        self::assertSame('unknown', $decoded['update_status']);
+        self::assertSame('cmd-refused-1', $decoded['command_id']);
+        self::assertSame('cmd-refused-1', $decoded['workflow_command_id']);
+        self::assertNull($decoded['update_id']);
+        self::assertSame([['approved' => true]], $decoded['payload']);
+        self::assertSame([['approved' => true]], $decoded['request']['input']);
+        self::assertSame(14, $decoded['history_references']['workflow_sequence']);
+        self::assertSame(10, $decoded['history_references']['command_sequence']);
+        self::assertSame('2026-07-02T12:03:00Z', $decoded['history_references']['rejected_at']);
+        self::assertSame('refused', $decoded['update_diagnostics']['state']);
+        self::assertSame('refused', $decoded['update_diagnostics']['update_state']);
+        self::assertSame('unknown', $decoded['update_diagnostics']['update_status']);
+        self::assertSame('rejected_unknown_update', $decoded['update_diagnostics']['outcome']);
+        self::assertSame('unknown_update', $decoded['update_diagnostics']['reason']);
+        self::assertSame(422, $decoded['update_diagnostics']['error']['status_code']);
+        self::assertSame('unknown_update', $decoded['update_diagnostics']['error']['reason']);
+        self::assertSame('rejected_unknown_update', $decoded['update_diagnostics']['error']['outcome']);
+        self::assertSame([['approved' => true]], $decoded['update_diagnostics']['payload']);
+        self::assertSame('refused', $decoded['cli_fields']['state']);
+        self::assertSame('refused-request-unknown', $decoded['cli_fields']['request_id']);
+        self::assertNull($decoded['cli_fields']['update_id']);
+        self::assertSame('rejected_unknown_update', $decoded['cli_fields']['outcome']);
+        self::assertSame('unknown_update', $decoded['cli_fields']['reason']);
+        self::assertSame([['approved' => true]], $decoded['cli_fields']['payload']);
+        self::assertSame('unknown_update', $decoded['cli_fields']['error']['reason']);
+        self::assertSame(14, $decoded['cli_fields']['history_references']['workflow_sequence']);
+        self::assertSame($body, $decoded['server_response']);
+    }
+
     /**
      * @param array<string, mixed> $arguments
      */

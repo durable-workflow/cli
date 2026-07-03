@@ -696,8 +696,13 @@ abstract class BaseCommand extends Command
 
         $state = $this->workflowUpdateDiagnosticState($payload, $error);
         if ($state !== null) {
-            $payload['update_state'] ??= $state;
-            $payload['state'] ??= $state;
+            if ($state === 'refused') {
+                $payload['update_state'] = $state;
+                $payload['state'] = $state;
+            } else {
+                $payload['update_state'] ??= $state;
+                $payload['state'] ??= $state;
+            }
         }
 
         if (! $this->hasNonEmptyString($payload['outcome'] ?? null)) {
@@ -772,6 +777,16 @@ abstract class BaseCommand extends Command
      */
     private function workflowUpdateDiagnosticState(array $payload, ?array $error): ?string
     {
+        $commandStatusState = $this->workflowUpdateStateFromCommandStatus($payload['command_status'] ?? null);
+        if ($commandStatusState === 'refused') {
+            return 'refused';
+        }
+
+        $outcomeState = $this->workflowUpdateStateFromOutcome($payload['outcome'] ?? null);
+        if ($outcomeState === 'refused') {
+            return 'refused';
+        }
+
         foreach (['update_status', 'update_state', 'state'] as $field) {
             $value = $payload[$field] ?? null;
             if (is_scalar($value) && trim((string) $value) !== '') {
@@ -779,34 +794,52 @@ abstract class BaseCommand extends Command
             }
         }
 
-        $commandStatus = $payload['command_status'] ?? null;
-        if (is_scalar($commandStatus) && trim((string) $commandStatus) !== '') {
-            $normalized = strtolower(trim((string) $commandStatus));
-            if (in_array($normalized, ['rejected', 'refused'], true)) {
-                return 'refused';
-            }
-
-            return $normalized;
+        if ($commandStatusState !== null) {
+            return $commandStatusState;
         }
 
-        $outcome = $payload['outcome'] ?? null;
-        if (is_scalar($outcome) && trim((string) $outcome) !== '') {
-            $normalized = strtolower(trim((string) $outcome));
-            if (str_contains($normalized, 'failed')) {
-                return 'failed';
-            }
-            if (str_contains($normalized, 'completed')) {
-                return 'completed';
-            }
-            if (str_contains($normalized, 'accepted')) {
-                return 'accepted';
-            }
-            if (str_starts_with($normalized, 'rejected') || str_contains($normalized, 'refused')) {
-                return 'refused';
-            }
+        if ($outcomeState !== null) {
+            return $outcomeState;
         }
 
         return $error === null ? null : 'refused';
+    }
+
+    private function workflowUpdateStateFromCommandStatus(mixed $commandStatus): ?string
+    {
+        if (! is_scalar($commandStatus) || trim((string) $commandStatus) === '') {
+            return null;
+        }
+
+        $normalized = strtolower(trim((string) $commandStatus));
+        if (in_array($normalized, ['rejected', 'refused'], true)) {
+            return 'refused';
+        }
+
+        return $normalized;
+    }
+
+    private function workflowUpdateStateFromOutcome(mixed $outcome): ?string
+    {
+        if (! is_scalar($outcome) || trim((string) $outcome) === '') {
+            return null;
+        }
+
+        $normalized = strtolower(trim((string) $outcome));
+        if (str_starts_with($normalized, 'rejected') || str_contains($normalized, 'refused')) {
+            return 'refused';
+        }
+        if (str_contains($normalized, 'failed')) {
+            return 'failed';
+        }
+        if (str_contains($normalized, 'completed')) {
+            return 'completed';
+        }
+        if (str_contains($normalized, 'accepted')) {
+            return 'accepted';
+        }
+
+        return null;
     }
 
     /**

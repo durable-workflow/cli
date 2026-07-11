@@ -248,7 +248,7 @@ class Application extends ConsoleApplication
 
         if (true === $input->hasParameterOption(['--version', '-V'], true)) {
             $output->writeln($this->getLongVersion());
-            $this->emitVersionCompatibilityWarning($output);
+            $this->emitVersionCompatibilityWarning($input, $output);
 
             return 0;
         }
@@ -339,18 +339,19 @@ class Application extends ConsoleApplication
         return parent::doRunCommand($command, $input, $output);
     }
 
-    private function emitVersionCompatibilityWarning(OutputInterface $output): void
+    private function emitVersionCompatibilityWarning(InputInterface $input, OutputInterface $output): void
     {
-        if (! $this->hasExplicitVersionWarningTarget()) {
+        if (! $this->hasExplicitVersionWarningTarget($input)) {
             return;
         }
 
         try {
             $resolved = (new ProfileResolver(new ProfileStore()))->resolve(
-                flagEnv: null,
-                flagServer: null,
-                flagNamespace: null,
-                flagToken: null,
+                flagEnv: $this->parameterOption($input, 'env'),
+                flagServer: $this->parameterOption($input, 'server', ['-s']),
+                flagNamespace: $this->parameterOption($input, 'namespace'),
+                flagToken: $this->parameterOption($input, 'token'),
+                flagTlsVerify: $this->parameterOption($input, 'tls-verify'),
             );
             $client = is_callable($this->serverClientFactory)
                 ? ($this->serverClientFactory)($resolved)
@@ -361,7 +362,7 @@ class Application extends ConsoleApplication
                     tlsVerify: $resolved->tlsVerify,
                     timeout: 1.0,
                 );
-            $warnings = CompatibilityDiagnostics::warnings($client->clusterInfoUnchecked(), BuildInfo::version());
+            $warnings = CompatibilityDiagnostics::warnings($client->clusterInfoUnchecked(1.0), BuildInfo::version());
         } catch (\Throwable) {
             return;
         }
@@ -373,10 +374,26 @@ class Application extends ConsoleApplication
         $this->writeCompatibilityWarning($output, $warnings[0].' Run `dw doctor` for details.');
     }
 
-    private function hasExplicitVersionWarningTarget(): bool
+    private function hasExplicitVersionWarningTarget(InputInterface $input): bool
     {
-        return self::envString('DURABLE_WORKFLOW_SERVER_URL') !== null
+        return $this->parameterOption($input, 'server', ['-s']) !== null
+            || $this->parameterOption($input, 'env') !== null
+            || self::envString('DURABLE_WORKFLOW_SERVER_URL') !== null
             || self::envString('DW_ENV') !== null;
+    }
+
+    /**
+     * Read connection flags before Symfony binds the selected command's
+     * definition. Compatibility checks run at that point and must still use
+     * the same effective connection as command execution.
+     *
+     * @param  list<string>  $aliases
+     */
+    private function parameterOption(InputInterface $input, string $name, array $aliases = []): ?string
+    {
+        $value = $input->getParameterOption(array_merge(['--'.$name], $aliases), null, true);
+
+        return is_string($value) && $value !== '' ? $value : null;
     }
 
     private function writeCompatibilityWarning(OutputInterface $output, string $message): void

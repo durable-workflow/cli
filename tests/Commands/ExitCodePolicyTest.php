@@ -152,7 +152,12 @@ class ExitCodePolicyTest extends TestCase
             $requests = [];
             $http = new MockHttpClient(
                 static function (string $method, string $url, array $options) use (&$requests): MockResponse {
-                    $requests[] = [$method, $url];
+                    $requests[] = [
+                        $method,
+                        $url,
+                        $options['timeout'] ?? null,
+                        $options['max_duration'] ?? null,
+                    ];
 
                     if (str_ends_with($url, '/api/cluster/info')) {
                         return new MockResponse(json_encode([
@@ -190,6 +195,8 @@ class ExitCodePolicyTest extends TestCase
             self::assertCount(1, $requests);
             self::assertSame('GET', $requests[0][0]);
             self::assertStringEndsWith('/api/cluster/info', $requests[0][1]);
+            self::assertSame(1.0, $requests[0][2]);
+            self::assertSame(1.0, $requests[0][3]);
 
             $envelope = json_decode(trim($tester->getDisplay()), true, 512, JSON_THROW_ON_ERROR);
             self::assertSame('0.1.5', $envelope['compatibility']['cli_version'] ?? null);

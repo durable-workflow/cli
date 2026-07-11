@@ -327,9 +327,18 @@ class ApplicationCompatibilityWarningTest extends TestCase
     public function test_compatibility_probe_does_not_poison_command_connection_flags(): void
     {
         $workflowListConnections = [];
+        $preflightConnections = [];
         $clusterInfo = self::clusterInfo(serverVersion: '9.8.7', supportedCliVersions: '0.1.x');
         $application = new Application(
-            static function (ResolvedConnection $resolved) use ($clusterInfo, &$workflowListConnections): ApplicationCompatibilityRecordingClient {
+            static function (ResolvedConnection $resolved, ?float $timeout = null) use ($clusterInfo, &$workflowListConnections, &$preflightConnections): ApplicationCompatibilityRecordingClient {
+                $preflightConnections[] = [
+                    'server' => $resolved->server,
+                    'namespace' => $resolved->namespace,
+                    'token' => $resolved->token,
+                    'tls_verify' => $resolved->tlsVerify,
+                    'timeout' => $timeout,
+                ];
+
                 return new ApplicationCompatibilityRecordingClient(
                     $clusterInfo,
                     $resolved,
@@ -344,9 +353,27 @@ class ApplicationCompatibilityWarningTest extends TestCase
             'command' => 'workflow:list',
             '--server' => 'https://flag.example',
             '--namespace' => 'tenant-a',
+            '--token' => 'flag-token',
+            '--tls-verify' => 'false',
             '--output' => 'json',
         ]));
 
+        self::assertSame([
+            [
+                'server' => 'https://flag.example',
+                'namespace' => 'tenant-a',
+                'token' => 'flag-token',
+                'tls_verify' => false,
+                'timeout' => 1.0,
+            ],
+            [
+                'server' => 'https://flag.example',
+                'namespace' => 'tenant-a',
+                'token' => 'flag-token',
+                'tls_verify' => false,
+                'timeout' => null,
+            ],
+        ], $preflightConnections);
         self::assertSame([[
             'server' => 'https://flag.example',
             'namespace' => 'tenant-a',
@@ -358,34 +385,47 @@ class ApplicationCompatibilityWarningTest extends TestCase
         self::assertSame('wf-tenant-a', $decoded['workflows'][0]['workflow_id']);
     }
 
-    public function test_compatibility_probe_does_not_seed_non_factory_client_before_flags_are_bound(): void
+    public function test_compatibility_preflight_uses_explicit_connection_before_command_options_are_bound(): void
     {
-        $defaultServer = $this->startFakeHttpServer('default');
+        $defaultServer = $this->startFakeHttpServer('default', clusterInfoDelayMilliseconds: 3000);
         $flagServer = $this->startFakeHttpServer('flag');
         $this->setEnv('DURABLE_WORKFLOW_SERVER_URL', $defaultServer['base_url']);
         $this->setEnv('DURABLE_WORKFLOW_NAMESPACE', 'default');
+        $this->setEnv('DURABLE_WORKFLOW_AUTH_TOKEN', 'default-token');
 
         $application = new Application();
         $application->setAutoExit(false);
         $tester = new ApplicationTester($application);
 
+        $startedAt = microtime(true);
         self::assertSame(0, $tester->run([
             'command' => 'schedule:list',
             '--server' => $flagServer['base_url'],
             '--namespace' => 'tenant-a',
+            '--token' => 'flag-token',
+            '--tls-verify' => 'false',
             '--output' => 'json',
         ]));
+        $elapsed = microtime(true) - $startedAt;
 
         $defaultRequests = $this->fakeServerRequests($defaultServer['log']);
         $flagRequests = $this->fakeServerRequests($flagServer['log']);
         $defaultScheduleRequests = self::requestsForPath($defaultRequests, '/api/schedules');
         $flagScheduleRequests = self::requestsForPath($flagRequests, '/api/schedules');
 
-        self::assertNotEmpty(self::requestsForPath($defaultRequests, '/api/cluster/info'));
+        self::assertSame([], $defaultRequests);
         self::assertSame([], $defaultScheduleRequests);
+        self::assertLessThan(1.5, $elapsed, 'The explicit target should not wait for compatibility metadata from the default server.');
+        self::assertCount(2, self::requestsForPath($flagRequests, '/api/cluster/info'));
         self::assertCount(1, $flagScheduleRequests);
         self::assertSame('tenant-a', $flagScheduleRequests[0]['namespace']);
         self::assertSame('flag', $flagScheduleRequests[0]['server']);
+        self::assertSame('Bearer flag-token', $flagScheduleRequests[0]['authorization']);
+
+        foreach ($flagRequests as $request) {
+            self::assertSame('tenant-a', $request['namespace']);
+            self::assertSame('Bearer flag-token', $request['authorization']);
+        }
 
         $decoded = json_decode($tester->getDisplay(), true, 512, JSON_THROW_ON_ERROR);
         self::assertSame('tenant-a', $decoded['namespace']);
@@ -418,6 +458,37 @@ class ApplicationCompatibilityWarningTest extends TestCase
         self::assertStringNotContainsString('server app version', $display);
     }
 
+    public function test_version_compatibility_probe_resolves_explicit_connection_flags(): void
+    {
+        $resolvedConnections = [];
+        $application = new Application(
+            static function (ResolvedConnection $resolved) use (&$resolvedConnections): ApplicationCompatibilityFakeClient {
+                $resolvedConnections[] = $resolved;
+
+                return new ApplicationCompatibilityFakeClient(
+                    self::clusterInfo(serverVersion: '9.8.7', supportedCliVersions: '0.2.x'),
+                );
+            },
+        );
+        $application->setAutoExit(false);
+        $tester = new ApplicationTester($application);
+
+        self::assertSame(0, $tester->run([
+            '--version' => true,
+            '--server' => 'https://flag.example',
+            '--namespace' => 'tenant-a',
+            '--token' => 'flag-token',
+            '--tls-verify' => 'false',
+        ]));
+
+        self::assertCount(1, $resolvedConnections);
+        self::assertSame('https://flag.example', $resolvedConnections[0]->server);
+        self::assertSame('tenant-a', $resolvedConnections[0]->namespace);
+        self::assertSame('flag-token', $resolvedConnections[0]->token);
+        self::assertFalse($resolvedConnections[0]->tlsVerify);
+        self::assertStringContainsString('Compatibility warning:', $tester->getDisplay());
+    }
+
     private function applicationWithClient(ApplicationCompatibilityFakeClient $client): Application
     {
         $application = new Application(static fn ($resolved) => $client);
@@ -429,7 +500,7 @@ class ApplicationCompatibilityWarningTest extends TestCase
     /**
      * @return array{base_url: string, log: string}
      */
-    private function startFakeHttpServer(string $name): array
+    private function startFakeHttpServer(string $name, int $clusterInfoDelayMilliseconds = 0): array
     {
         $directory = sys_get_temp_dir().'/dw-cli-http-'.bin2hex(random_bytes(8));
         if (! mkdir($directory, 0777, true) && ! is_dir($directory)) {
@@ -447,6 +518,7 @@ class ApplicationCompatibilityWarningTest extends TestCase
             [
                 'DW_CLI_FAKE_SERVER_NAME' => $name,
                 'DW_CLI_FAKE_REQUEST_LOG' => $log,
+                'DW_CLI_FAKE_CLUSTER_INFO_DELAY_MS' => (string) $clusterInfoDelayMilliseconds,
             ],
             null,
             null,
@@ -513,13 +585,23 @@ if (\$log !== '') {
         'path' => \$path,
         'query' => \$_SERVER['QUERY_STRING'] ?? '',
         'namespace' => \$namespace,
+        'authorization' => dw_cli_header_value(\$headers, 'Authorization'),
     ], JSON_UNESCAPED_SLASHES).PHP_EOL, FILE_APPEND);
 }
 
 header('Content-Type: application/json');
 
 if (\$path === '/api/cluster/info') {
+    \$delayMilliseconds = (int) (getenv('DW_CLI_FAKE_CLUSTER_INFO_DELAY_MS') ?: 0);
+    if (\$delayMilliseconds > 0) {
+        usleep(\$delayMilliseconds * 1000);
+    }
     echo json_encode(\$clusterInfo, JSON_UNESCAPED_SLASHES);
+    return true;
+}
+
+if (\$path === '/ready') {
+    echo json_encode(['ready' => true]);
     return true;
 }
 
@@ -572,7 +654,7 @@ PHP;
                 self::fail('Fake HTTP server exited early: '.$process->getErrorOutput());
             }
 
-            if (@file_get_contents($baseUrl.'/api/cluster/info', false, $context) !== false) {
+            if (@file_get_contents($baseUrl.'/ready', false, $context) !== false) {
                 return;
             }
 

@@ -65,6 +65,8 @@ class ServerClient
 
     private bool $workerProtocolCompatibilityChecked = false;
 
+    private ?float $requestTimeoutOverride = null;
+
     public function __construct(
         ?string $baseUrl = null,
         ?string $token = null,
@@ -164,20 +166,28 @@ class ServerClient
      *
      * @return array<string, mixed>
      */
-    public function clusterInfoUnchecked(): array
+    public function clusterInfoUnchecked(?float $timeout = null): array
     {
         if (is_array($this->clusterInfoCache)) {
             return $this->clusterInfoCache;
         }
 
-        $this->clusterInfoCache = $this->get('/cluster/info');
+        $previousTimeout = $this->requestTimeoutOverride;
+        $this->requestTimeoutOverride = $timeout;
+
+        try {
+            // Keep this call polymorphic for injected diagnostic clients.
+            $this->clusterInfoCache = $this->get('/cluster/info');
+        } finally {
+            $this->requestTimeoutOverride = $previousTimeout;
+        }
 
         return $this->clusterInfoCache;
     }
 
-    public function assertServerCompatibility(bool $includeWorkerProtocol = false): void
+    public function assertServerCompatibility(bool $includeWorkerProtocol = false, ?float $timeout = null): void
     {
-        $this->clusterInfoUnchecked();
+        $this->clusterInfoUnchecked($timeout);
         $this->checkServerCompatibility();
 
         if ($includeWorkerProtocol) {
@@ -322,6 +332,11 @@ class ServerClient
 
     private function request(string $method, string $path, array $options = []): array
     {
+        if ($this->requestTimeoutOverride !== null) {
+            $options['timeout'] ??= $this->requestTimeoutOverride;
+            $options['max_duration'] ??= $this->requestTimeoutOverride;
+        }
+
         $options['headers'] = array_merge($this->defaultHeaders, $options['headers'] ?? []);
 
         try {

@@ -27,6 +27,8 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 abstract class BaseCommand extends Command
 {
+    private const COMPATIBILITY_PREFLIGHT_TIMEOUT_SECONDS = 1.0;
+
     private const INPUT_ENCODINGS = ['json', 'raw', 'base64'];
 
     private const NAMESPACE_SCOPED_COMMAND_NAMES = [
@@ -295,7 +297,9 @@ abstract class BaseCommand extends Command
 
         try {
             $warnings = CompatibilityDiagnostics::warnings(
-                $this->freshClient($input)->clusterInfoUnchecked(),
+                $this->freshClient($input, self::COMPATIBILITY_PREFLIGHT_TIMEOUT_SECONDS)->clusterInfoUnchecked(
+                    self::COMPATIBILITY_PREFLIGHT_TIMEOUT_SECONDS,
+                ),
                 BuildInfo::version(),
                 $this->includeWorkerProtocolCompatibilityWarning(),
             );
@@ -327,7 +331,10 @@ abstract class BaseCommand extends Command
         }
 
         $this->serverCompatibilityAsserted = true;
-        $client->assertServerCompatibility($this->includeWorkerProtocolCompatibilityWarning());
+        $client->assertServerCompatibility(
+            $this->includeWorkerProtocolCompatibilityWarning(),
+            self::COMPATIBILITY_PREFLIGHT_TIMEOUT_SECONDS,
+        );
     }
 
     private function enforcesServerCompatibilityBeforeUse(): bool
@@ -356,11 +363,13 @@ abstract class BaseCommand extends Command
 
     private function optionValue(InputInterface $input, string $name): ?string
     {
-        if (! $input->hasOption($name)) {
-            return null;
-        }
-
-        $value = $input->getOption($name);
+        $value = $input->hasOption($name)
+            ? $input->getOption($name)
+            : $input->getParameterOption(
+                $name === 'server' ? ['--server', '-s'] : ['--'.$name],
+                null,
+                true,
+            );
 
         if (! is_string($value) || $value === '') {
             return null;

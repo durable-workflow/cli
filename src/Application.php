@@ -50,9 +50,11 @@ class Application extends ConsoleApplication
         ],
         'workflow' => [
             'list' => 'workflow:list',
+            'migrate-v1' => 'workflow:migrate-v1',
         ],
         'workflows' => [
             'list' => 'workflow:list',
+            'migrate-v1' => 'workflow:migrate-v1',
         ],
         'schedule' => [
             'backfill' => 'schedule:backfill',
@@ -95,6 +97,7 @@ class Application extends ConsoleApplication
         '--namespace',
         '--output',
         '--server',
+        '--source-id',
         '--tls-verify',
         '--token',
         '-s',
@@ -141,6 +144,7 @@ class Application extends ConsoleApplication
             new WorkflowCommand\ShowRunCommand(),
             new WorkflowCommand\HistoryCommand(),
             new WorkflowCommand\HistoryExportCommand(),
+            new WorkflowCommand\MigrateV1Command(),
 
             // Environment profiles (local config)
             new EnvCommand\ListCommand(),

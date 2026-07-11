@@ -22,9 +22,9 @@ class WorkflowHistoryExportTest extends TestCase
                 'run_id' => 'run-1',
                 'workflow_type' => 'orders.process',
             ],
-            'events' => [
-                ['sequence' => 1, 'event_type' => 'WorkflowStarted'],
-                ['sequence' => 2, 'event_type' => 'WorkflowCompleted'],
+            'history_events' => [
+                ['sequence' => 1, 'type' => 'WorkflowStarted', 'payload' => []],
+                ['sequence' => 2, 'type' => 'WorkflowCompleted', 'payload' => []],
             ],
         ]));
 
@@ -41,7 +41,7 @@ class WorkflowHistoryExportTest extends TestCase
         self::assertSame('durable-workflow.v2.history-export', $decoded['schema']);
         self::assertSame('wf-123', $decoded['workflow']['instance_id']);
         self::assertSame('run-1', $decoded['workflow']['run_id']);
-        self::assertCount(2, $decoded['events']);
+        self::assertCount(2, $decoded['history_events']);
     }
 
     public function test_export_command_writes_to_file(): void
@@ -53,7 +53,7 @@ class WorkflowHistoryExportTest extends TestCase
                 'instance_id' => 'wf-456',
                 'run_id' => 'run-2',
             ],
-            'events' => [],
+            'history_events' => [],
         ]));
 
         $outputFile = sys_get_temp_dir().'/dw-cli-test-export-'.getmypid().'.json';
@@ -84,7 +84,7 @@ class WorkflowHistoryExportTest extends TestCase
         $client = new HistoryExportFakeClient([
             'schema' => 'durable-workflow.v2.history-export',
             'workflow' => ['instance_id' => 'wf-789', 'run_id' => 'run-3'],
-            'events' => [],
+            'history_events' => [],
         ]);
 
         $command = new HistoryExportCommand();

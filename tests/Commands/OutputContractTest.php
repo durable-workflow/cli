@@ -433,6 +433,7 @@ class OutputContractTest extends TestCase
         yield 'workflow history export' => ['workflow:history-export'];
         yield 'workflow list' => ['workflow:list'];
         yield 'workflow list runs' => ['workflow:list-runs'];
+        yield 'workflow migrate v1' => ['workflow:migrate-v1'];
         yield 'workflow query' => ['workflow:query'];
         yield 'workflow repair' => ['workflow:repair'];
         yield 'workflow show run' => ['workflow:show-run'];

@@ -34,6 +34,30 @@
     "memo": { "type": ["object", "array", "null"] },
     "search_attributes": { "type": ["object", "null"] },
     "actions": { "type": ["object", "null"], "additionalProperties": { "type": "boolean" } },
+    "action_blocked_reason": { "type": ["string", "null"] },
+    "migration_projection": {
+      "type": ["object", "null"],
+      "properties": {
+        "origin": { "type": ["object", "null"], "additionalProperties": true },
+        "identity": { "type": ["object", "null"], "additionalProperties": true },
+        "task_queue_context": { "type": ["object", "null"], "additionalProperties": true },
+        "unsupported_fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["field", "reason", "remediation"],
+            "properties": {
+              "field": { "type": "string" },
+              "reason": { "type": "string" },
+              "remediation": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "projection": { "type": ["object", "null"], "additionalProperties": true }
+      },
+      "additionalProperties": true
+    },
     "commands": {
       "type": ["array", "null"],
       "items": {

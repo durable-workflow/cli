@@ -344,6 +344,11 @@
       "schema": "schemas/output/workflow-history-export.schema.json",
       "schema_id": "https://durable-workflow.com/schemas/cli/output/workflow-history-export.schema.json"
     },
+    "workflow:migrate-v1": {
+      "output": "--json",
+      "schema": "schemas/output/workflow-v1-projection.schema.json",
+      "schema_id": "https://durable-workflow.com/schemas/cli/output/workflow-v1-projection.schema.json"
+    },
     "workflow:list": {
       "output": "--json",
       "schema": "schemas/output/workflow-list.schema.json",

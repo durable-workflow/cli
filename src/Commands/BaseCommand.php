@@ -78,6 +78,7 @@ abstract class BaseCommand extends Command
         'workflow:history-export',
         'workflow:list',
         'workflow:list-runs',
+        'workflow:migrate-v1',
         'workflow:query',
         'workflow:repair',
         'workflow:show-run',

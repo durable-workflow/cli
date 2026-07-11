@@ -58,7 +58,7 @@ final class WorkflowHistoryParityFixtureTest extends TestCase
         self::assertSame($semantic['schema'], $decoded['schema'] ?? null, 'history export schema drifted from fixture semantics.');
         self::assertSame($semantic['workflow_id'], $decoded['workflow']['instance_id'] ?? null, 'history export workflow id drifted from fixture semantics.');
         self::assertSame($semantic['run_id'], $decoded['workflow']['run_id'] ?? null, 'history export run id drifted from fixture semantics.');
-        self::assertCount($semantic['event_count'], $decoded['events'] ?? []);
+        self::assertCount($semantic['event_count'], $decoded['history_events'] ?? []);
     }
 
     /**

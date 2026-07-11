@@ -3,7 +3,7 @@
   "$id": "https://durable-workflow.com/schemas/cli/output/workflow-history-export.schema.json",
   "title": "dw workflow:history-export",
   "type": "object",
-  "required": ["namespace", "schema", "workflow", "events"],
+  "required": ["namespace", "schema", "workflow", "history_events"],
   "properties": {
     "namespace": { "type": "string" },
     "schema": { "const": "durable-workflow.v2.history-export" },
@@ -17,13 +17,25 @@
       },
       "additionalProperties": true
     },
-    "events": {
+    "history_events": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["event_type"],
+        "required": ["sequence", "type", "payload"],
+        "properties": {
+          "id": { "type": ["string", "null"] },
+          "sequence": { "type": "integer" },
+          "type": { "type": "string" },
+          "recorded_at": { "type": ["string", "null"] },
+          "payload": { "type": "object" }
+        },
         "additionalProperties": true
       }
+    },
+    "migration_projection": {
+      "type": "object",
+      "required": ["origin", "identity", "task_queue_context", "unsupported_fields", "projection"],
+      "additionalProperties": true
     }
   },
   "additionalProperties": true

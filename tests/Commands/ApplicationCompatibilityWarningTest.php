@@ -364,7 +364,7 @@ class ApplicationCompatibilityWarningTest extends TestCase
                 'namespace' => 'tenant-a',
                 'token' => 'flag-token',
                 'tls_verify' => false,
-                'timeout' => 1.0,
+                'timeout' => 5.0,
             ],
             [
                 'server' => 'https://flag.example',
@@ -431,6 +431,53 @@ class ApplicationCompatibilityWarningTest extends TestCase
         self::assertSame('tenant-a', $decoded['namespace']);
         self::assertSame('tenant-a', $decoded['schedules'][0]['namespace']);
         self::assertSame('sched-tenant-a', $decoded['schedules'][0]['schedule_id']);
+    }
+
+    public function test_repeated_commands_tolerate_delayed_compatibility_metadata_under_worker_traffic(): void
+    {
+        $server = $this->startFakeHttpServer(
+            'loaded',
+            clusterInfoDelayMilliseconds: 1050,
+            workerTrafficDelayMilliseconds: 200,
+        );
+        $traffic = new Process([
+            PHP_BINARY,
+            '-r',
+            'file_get_contents($argv[1]);',
+            $server['base_url'].'/worker-traffic',
+        ]);
+        $traffic->start();
+        $this->waitForFakeServerRequest($server['log'], '/worker-traffic');
+
+        try {
+            for ($attempt = 0; $attempt < 2; $attempt++) {
+                $application = new Application();
+                $application->setAutoExit(false);
+                $tester = new ApplicationTester($application);
+
+                self::assertSame(0, $tester->run([
+                    'command' => 'schedule:list',
+                    '--server' => $server['base_url'],
+                    '--namespace' => 'tenant-load',
+                    '--token' => 'load-token',
+                    '--tls-verify' => 'false',
+                    '--output' => 'json',
+                ]));
+
+                $decoded = json_decode($tester->getDisplay(), true, 512, JSON_THROW_ON_ERROR);
+                self::assertSame('tenant-load', $decoded['namespace']);
+                self::assertSame('sched-tenant-load', $decoded['schedules'][0]['schedule_id']);
+            }
+        } finally {
+            if ($traffic->isRunning()) {
+                $traffic->stop(0.2);
+            }
+        }
+
+        $requests = $this->fakeServerRequests($server['log']);
+        self::assertCount(1, self::requestsForPath($requests, '/worker-traffic'));
+        self::assertCount(4, self::requestsForPath($requests, '/api/cluster/info'));
+        self::assertCount(2, self::requestsForPath($requests, '/api/schedules'));
     }
 
     public function test_version_output_warns_from_explicit_target_client_compatibility_metadata(): void
@@ -500,7 +547,11 @@ class ApplicationCompatibilityWarningTest extends TestCase
     /**
      * @return array{base_url: string, log: string}
      */
-    private function startFakeHttpServer(string $name, int $clusterInfoDelayMilliseconds = 0): array
+    private function startFakeHttpServer(
+        string $name,
+        int $clusterInfoDelayMilliseconds = 0,
+        int $workerTrafficDelayMilliseconds = 0,
+    ): array
     {
         $directory = sys_get_temp_dir().'/dw-cli-http-'.bin2hex(random_bytes(8));
         if (! mkdir($directory, 0777, true) && ! is_dir($directory)) {
@@ -519,6 +570,7 @@ class ApplicationCompatibilityWarningTest extends TestCase
                 'DW_CLI_FAKE_SERVER_NAME' => $name,
                 'DW_CLI_FAKE_REQUEST_LOG' => $log,
                 'DW_CLI_FAKE_CLUSTER_INFO_DELAY_MS' => (string) $clusterInfoDelayMilliseconds,
+                'DW_CLI_FAKE_WORKER_TRAFFIC_DELAY_MS' => (string) $workerTrafficDelayMilliseconds,
             ],
             null,
             null,
@@ -605,6 +657,15 @@ if (\$path === '/ready') {
     return true;
 }
 
+if (\$path === '/worker-traffic') {
+    \$delayMilliseconds = (int) (getenv('DW_CLI_FAKE_WORKER_TRAFFIC_DELAY_MS') ?: 0);
+    if (\$delayMilliseconds > 0) {
+        usleep(\$delayMilliseconds * 1000);
+    }
+    echo json_encode(['accepted' => true]);
+    return true;
+}
+
 if (\$path === '/api/schedules') {
     echo json_encode([
         'schedules' => [[
@@ -662,6 +723,21 @@ PHP;
         } while (microtime(true) < $deadline);
 
         self::fail('Fake HTTP server did not become ready: '.$process->getErrorOutput());
+    }
+
+    private function waitForFakeServerRequest(string $log, string $path): void
+    {
+        $deadline = microtime(true) + 5.0;
+
+        do {
+            if (self::requestsForPath($this->fakeServerRequests($log), $path) !== []) {
+                return;
+            }
+
+            usleep(10_000);
+        } while (microtime(true) < $deadline);
+
+        self::fail('Fake HTTP server did not receive '.$path.'.');
     }
 
     /**

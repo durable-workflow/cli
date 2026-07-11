@@ -27,8 +27,6 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 abstract class BaseCommand extends Command
 {
-    private const COMPATIBILITY_PREFLIGHT_TIMEOUT_SECONDS = 1.0;
-
     private const INPUT_ENCODINGS = ['json', 'raw', 'base64'];
 
     private const NAMESPACE_SCOPED_COMMAND_NAMES = [
@@ -297,8 +295,8 @@ abstract class BaseCommand extends Command
 
         try {
             $warnings = CompatibilityDiagnostics::warnings(
-                $this->freshClient($input, self::COMPATIBILITY_PREFLIGHT_TIMEOUT_SECONDS)->clusterInfoUnchecked(
-                    self::COMPATIBILITY_PREFLIGHT_TIMEOUT_SECONDS,
+                $this->freshClient($input, ServerClient::COMPATIBILITY_PREFLIGHT_TIMEOUT_SECONDS)->clusterInfoUnchecked(
+                    ServerClient::COMPATIBILITY_PREFLIGHT_TIMEOUT_SECONDS,
                 ),
                 BuildInfo::version(),
                 $this->includeWorkerProtocolCompatibilityWarning(),
@@ -333,7 +331,7 @@ abstract class BaseCommand extends Command
         $this->serverCompatibilityAsserted = true;
         $client->assertServerCompatibility(
             $this->includeWorkerProtocolCompatibilityWarning(),
-            self::COMPATIBILITY_PREFLIGHT_TIMEOUT_SECONDS,
+            ServerClient::COMPATIBILITY_PREFLIGHT_TIMEOUT_SECONDS,
         );
     }
 

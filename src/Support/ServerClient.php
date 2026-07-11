@@ -17,6 +17,8 @@ class ServerClient
 
     public const CONTROL_PLANE_VERSION = '2';
 
+    public const COMPATIBILITY_PREFLIGHT_TIMEOUT_SECONDS = 5.0;
+
     public const WORKER_PROTOCOL_HEADER = 'X-Durable-Workflow-Protocol-Version';
 
     public const CONTROL_PLANE_HEADER = 'X-Durable-Workflow-Control-Plane-Version';

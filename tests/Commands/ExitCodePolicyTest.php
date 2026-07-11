@@ -195,8 +195,8 @@ class ExitCodePolicyTest extends TestCase
             self::assertCount(1, $requests);
             self::assertSame('GET', $requests[0][0]);
             self::assertStringEndsWith('/api/cluster/info', $requests[0][1]);
-            self::assertSame(1.0, $requests[0][2]);
-            self::assertSame(1.0, $requests[0][3]);
+            self::assertSame(5.0, $requests[0][2]);
+            self::assertSame(5.0, $requests[0][3]);
 
             $envelope = json_decode(trim($tester->getDisplay()), true, 512, JSON_THROW_ON_ERROR);
             self::assertSame('0.1.5', $envelope['compatibility']['cli_version'] ?? null);

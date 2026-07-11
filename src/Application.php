@@ -360,9 +360,12 @@ class Application extends ConsoleApplication
                     token: $resolved->token,
                     namespace: $resolved->namespace,
                     tlsVerify: $resolved->tlsVerify,
-                    timeout: 1.0,
+                    timeout: ServerClient::COMPATIBILITY_PREFLIGHT_TIMEOUT_SECONDS,
                 );
-            $warnings = CompatibilityDiagnostics::warnings($client->clusterInfoUnchecked(1.0), BuildInfo::version());
+            $warnings = CompatibilityDiagnostics::warnings(
+                $client->clusterInfoUnchecked(ServerClient::COMPATIBILITY_PREFLIGHT_TIMEOUT_SECONDS),
+                BuildInfo::version(),
+            );
         } catch (\Throwable) {
             return;
         }

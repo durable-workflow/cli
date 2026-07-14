@@ -487,6 +487,9 @@ dw schedules create --schedule-id=daily-report --workflow-type=reports.daily --c
 # List schedules
 dw schedules list
 dw schedules list --namespace=orders
+dw schedules list --status=active --type=reports.daily --limit=25 --json
+dw schedules list --query='Region = "eu" AND Priority = 2' --json
+dw schedules list --next-page-token='opaque-token-from-previous-page' --json
 
 # Describe a schedule
 dw schedules describe daily-report
@@ -504,6 +507,14 @@ dw schedules backfill daily-report --start-time=2024-01-01T00:00:00Z --end-time=
 # Delete a schedule
 dw schedules delete daily-report
 ```
+
+Schedule-list filters execute on the server and combine with AND semantics.
+The JSON envelope retains `next_page_token`; pass a non-null token back
+unchanged with the same namespace, status, workflow type, and visibility query.
+Human table output also prints the next token when another page exists. Invalid
+filters and malformed, mismatched, cross-namespace, or stale tokens retain the
+server's status, reason, field errors, and `last_safe_cursor` in JSON error
+output.
 
 ### Task Queues
 

@@ -17,6 +17,7 @@ use DurableWorkflow\Cli\Commands\ScheduleCommand\UpdateCommand;
 use DurableWorkflow\Cli\Support\ServerClient;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Exception\InvalidArgumentException;
 use Symfony\Component\Console\Tester\CommandTester;
 
 final class ScheduleParityFixtureTest extends TestCase
@@ -79,6 +80,145 @@ final class ScheduleParityFixtureTest extends TestCase
         }
 
         self::assertSame($semantic['statuses'], $statuses);
+    }
+
+    public function test_schedule_list_forwards_all_visibility_filters_and_preserves_cursor(): void
+    {
+        $client = new ScheduleParityClient([
+            'schedules' => [[
+                'schedule_id' => 'reports-eu',
+                'workflow_type' => 'reports.rollup',
+                'status' => 'paused',
+            ]],
+            'schedule_count' => 1,
+            'next_page_token' => 'opaque+/= token',
+        ]);
+        $command = new ListCommand();
+        $command->setServerClient($client);
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            '--namespace' => 'ops',
+            '--status' => 'paused',
+            '--type' => 'reports.rollup',
+            '--query' => 'Region = "eu west"',
+            '--limit' => '1',
+            '--next-page-token' => 'page+/= one',
+            '--json' => true,
+        ]));
+
+        self::assertSame('/schedules', $client->lastPath);
+        self::assertSame([
+            'status' => 'paused',
+            'workflow_type' => 'reports.rollup',
+            'query' => 'Region = "eu west"',
+            'page_size' => 1,
+            'next_page_token' => 'page+/= one',
+        ], $client->lastQuery);
+
+        $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame('opaque+/= token', $decoded['next_page_token'] ?? null);
+        self::assertSame('ops', $decoded['namespace'] ?? null);
+        self::assertSame('ops', $decoded['schedules'][0]['namespace'] ?? null);
+    }
+
+    public function test_schedule_list_human_output_exposes_the_next_page_token(): void
+    {
+        $client = new ScheduleParityClient([
+            'schedules' => [[
+                'schedule_id' => 'reports-eu',
+                'workflow_type' => 'reports.rollup',
+                'status' => 'active',
+            ]],
+            'next_page_token' => 'next-page-token',
+        ]);
+        $command = new ListCommand();
+        $command->setServerClient($client);
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+        self::assertStringContainsString('Next page token: next-page-token', $tester->getDisplay());
+    }
+
+    /**
+     * @dataProvider scheduleListValueOptions
+     */
+    public function test_schedule_list_requires_an_explicit_value_for_every_filter(string $option): void
+    {
+        $client = new ScheduleParityClient([]);
+        $command = new ListCommand();
+        $command->setServerClient($client);
+        $tester = new CommandTester($command);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(sprintf('The "--%s" option requires a value.', $option));
+
+        try {
+            $tester->execute(['--'.$option => null]);
+        } finally {
+            self::assertNull($client->lastPath, 'Invalid input must not issue an unfiltered request.');
+        }
+    }
+
+    /**
+     * @dataProvider scheduleListValueOptions
+     */
+    public function test_schedule_list_rejects_blank_filter_values(string $option): void
+    {
+        $client = new ScheduleParityClient([]);
+        $command = new ListCommand();
+        $command->setServerClient($client);
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::INVALID, $tester->execute(['--'.$option => '']));
+        self::assertStringContainsString(
+            $option === 'limit'
+                ? '--limit must be an integer between 1 and 200.'
+                : sprintf('--%s must not be blank.', $option),
+            $tester->getDisplay(),
+        );
+        self::assertNull($client->lastPath, 'Invalid input must not issue an unfiltered request.');
+    }
+
+    /**
+     * @dataProvider malformedScheduleListPageSizes
+     */
+    public function test_schedule_list_rejects_malformed_page_sizes_without_coercion(string $pageSize): void
+    {
+        $client = new ScheduleParityClient([]);
+        $command = new ListCommand();
+        $command->setServerClient($client);
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::INVALID, $tester->execute(['--limit' => $pageSize]));
+        self::assertStringContainsString(
+            '--limit must be an integer between 1 and 200.',
+            $tester->getDisplay(),
+        );
+        self::assertNull($client->lastPath, 'Malformed input must not issue a request with a coerced page size.');
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function scheduleListValueOptions(): iterable
+    {
+        yield 'status' => ['status'];
+        yield 'workflow type' => ['type'];
+        yield 'visibility query' => ['query'];
+        yield 'page size' => ['limit'];
+        yield 'continuation token' => ['next-page-token'];
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function malformedScheduleListPageSizes(): iterable
+    {
+        yield 'integer prefix' => ['1x'];
+        yield 'decimal' => ['1.5'];
+        yield 'zero' => ['0'];
+        yield 'above server maximum' => ['201'];
     }
 
     public function test_schedule_describe_matches_polyglot_request_fixture(): void

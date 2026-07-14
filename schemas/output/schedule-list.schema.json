@@ -3,7 +3,7 @@
   "$id": "https://durable-workflow.com/schemas/cli/output/schedule-list.schema.json",
   "title": "dw schedule:list --json",
   "type": "object",
-  "required": ["namespace", "schedules"],
+  "required": ["namespace", "schedules", "next_page_token"],
   "properties": {
     "namespace": { "type": "string" },
     "schedules": {
@@ -14,16 +14,22 @@
         "properties": {
           "namespace": { "type": "string" },
           "schedule_id": { "type": "string" },
+          "status": { "type": ["string", "null"], "enum": ["active", "paused", null] },
           "workflow_type": { "type": ["string", "null"] },
           "paused": { "type": ["boolean", "null"] },
           "next_fire": { "type": ["string", "null"] },
           "next_fire_at": { "type": ["string", "null"] },
           "last_fire": { "type": ["string", "null"] },
-          "last_fire_at": { "type": ["string", "null"] }
+          "last_fire_at": { "type": ["string", "null"] },
+          "search_attributes": { "type": ["object", "null"] },
+          "created_at": { "type": ["string", "null"] },
+          "updated_at": { "type": ["string", "null"] }
         },
         "additionalProperties": true
       }
-    }
+    },
+    "schedule_count": { "type": "integer", "minimum": 0 },
+    "next_page_token": { "type": ["string", "null"] }
   },
   "additionalProperties": true
 }

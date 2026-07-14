@@ -19,6 +19,8 @@ final class CompletionValues
         'allow_all',
     ];
 
+    public const SCHEDULE_STATUSES = ['active', 'paused'];
+
     public const SEARCH_ATTRIBUTE_TYPES = [
         'keyword',
         'text',

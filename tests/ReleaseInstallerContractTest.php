@@ -220,13 +220,20 @@ final class ReleaseInstallerContractTest extends TestCase
     {
         $verifier = self::readRepoFile('scripts/verify-reproducible-build.sh');
         $buildWorkflow = self::readRepoFile('.github/workflows/build.yml');
+        $composer = self::readRepoFile('composer.json');
+        $box = self::readRepoFile('box.json.dist');
 
         self::assertStringContainsString('SOURCE_DATE_EPOCH', $verifier);
         self::assertStringContainsString('scripts/build.sh phar', $verifier);
         self::assertStringContainsString('mktemp -d', $verifier);
         self::assertStringContainsString('trap cleanup EXIT', $verifier);
+        self::assertStringContainsString('git -C "$ROOT" archive', $verifier);
+        self::assertStringContainsString('source.1', $verifier);
+        self::assertStringContainsString('source.2', $verifier);
         self::assertStringNotContainsString('$ROOT/build/.repro', $verifier);
         self::assertStringContainsString('PHAR builds are not bit-identical', $verifier);
+        self::assertStringContainsString('"autoloader-suffix": "DurableWorkflowCli"', $composer);
+        self::assertStringContainsString('"alias": "dw.phar"', $box);
 
         self::assertStringContainsString('reproducible-build:', $buildWorkflow);
         self::assertStringContainsString('scripts/verify-reproducible-build.sh', $buildWorkflow);

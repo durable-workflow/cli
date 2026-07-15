@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Build the durable-workflow PHAR twice from the current source tree and
-# confirm both builds produce byte-identical output. This is the local
+# Build the durable-workflow PHAR twice from independent copies of the
+# committed source tree and confirm both builds produce byte-identical
+# output. This is the local
 # proof point for the reproducible-build claim documented in
 # docs/distribution.md: the same source must produce the same artifact,
 # so any operator can independently verify the bytes a tagged release
@@ -16,9 +17,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-BUILD_DIR="$ROOT/build"
-PHAR_OUT="$BUILD_DIR/dw.phar"
 ATTEMPT_DIR="$(mktemp -d "${TMPDIR:-/tmp}/dw-cli-repro.XXXXXX")"
+FIRST_TREE="$ATTEMPT_DIR/source.1"
+SECOND_TREE="$ATTEMPT_DIR/source.2"
 
 cleanup() {
     rm -rf -- "$ATTEMPT_DIR"
@@ -42,31 +43,68 @@ sha256_of() {
     fi
 }
 
+if ! command -v git >/dev/null 2>&1; then
+    err "git is required to create independent source trees"
+fi
+if ! command -v tar >/dev/null 2>&1; then
+    err "tar is required to create independent source trees"
+fi
+
+SOURCE_COMMIT="$(git -C "$ROOT" rev-parse --verify 'HEAD^{commit}' 2>/dev/null || true)"
+if [[ -z "$SOURCE_COMMIT" ]]; then
+    err "git HEAD is not available"
+fi
+
 if [[ -z "${SOURCE_DATE_EPOCH:-}" ]]; then
-    if [[ -d "$ROOT/.git" ]] && command -v git >/dev/null 2>&1; then
-        SOURCE_DATE_EPOCH="$(git -C "$ROOT" log -1 --pretty=%ct 2>/dev/null || true)"
-    fi
+    SOURCE_DATE_EPOCH="$(git -C "$ROOT" log -1 --pretty=%ct "$SOURCE_COMMIT" 2>/dev/null || true)"
     if [[ -z "${SOURCE_DATE_EPOCH:-}" ]]; then
         err "SOURCE_DATE_EPOCH is unset and git HEAD timestamp is not available"
     fi
     export SOURCE_DATE_EPOCH
 fi
 
+if [[ -z "${DW_CLI_COMMIT:-}" ]]; then
+    export DW_CLI_COMMIT="$SOURCE_COMMIT"
+fi
+
+if [[ -z "${DW_CLI_VERSION:-}" && "${GITHUB_REF_TYPE:-}" != "tag" ]]; then
+    source_tag="$(git -C "$ROOT" describe --tags --exact-match "$SOURCE_COMMIT" 2>/dev/null || true)"
+    if [[ -n "$source_tag" ]]; then
+        export DW_CLI_VERSION="${source_tag#v}"
+    fi
+fi
+
 echo ">> Reproducible-build check: SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"
 
-scripts/build.sh clean >/dev/null
-scripts/build.sh phar
-[[ -s "$PHAR_OUT" ]] || err "first build did not produce $PHAR_OUT"
+create_source_tree() {
+    local tree="$1"
+
+    mkdir -p "$tree"
+    git -C "$ROOT" archive --format=tar "$SOURCE_COMMIT" | tar -xf - -C "$tree"
+}
+
+build_attempt() {
+    local label="$1"
+    local tree="$2"
+    local output="$3"
+
+    echo ">> Preparing $label build in an independent source tree"
+    create_source_tree "$tree"
+    (
+        cd "$tree"
+        scripts/build.sh phar
+    )
+    [[ -s "$tree/build/dw.phar" ]] || err "$label build did not produce $tree/build/dw.phar"
+    cp "$tree/build/dw.phar" "$output"
+}
+
 first="$ATTEMPT_DIR/dw.phar.1"
-cp "$PHAR_OUT" "$first"
+build_attempt "first" "$FIRST_TREE" "$first"
 sha1="$(sha256_of "$first")"
 echo ">> First build sha256:  $sha1"
 
-scripts/build.sh clean >/dev/null
-scripts/build.sh phar
-[[ -s "$PHAR_OUT" ]] || err "second build did not produce $PHAR_OUT"
 second="$ATTEMPT_DIR/dw.phar.2"
-cp "$PHAR_OUT" "$second"
+build_attempt "second" "$SECOND_TREE" "$second"
 sha2="$(sha256_of "$second")"
 echo ">> Second build sha256: $sha2"
 

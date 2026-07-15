@@ -23,6 +23,9 @@
             "Tests\\": "tests/"
         }
     },
+    "config": {
+        "autoloader-suffix": "DurableWorkflowCli"
+    },
     "scripts": {
         "test": "phpunit --testdox"
     },

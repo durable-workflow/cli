@@ -163,7 +163,10 @@ class MutatingCommandJsonTest extends TestCase
  */
 class StubServerClient extends ServerClient
 {
-    public function __construct() {}
+    public function __construct()
+    {
+        parent::__construct('http://localhost');
+    }
 
     public function get(string $path, array $query = []): array
     {

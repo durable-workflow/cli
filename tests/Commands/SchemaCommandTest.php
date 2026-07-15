@@ -85,7 +85,7 @@ class SchemaCommandTest extends TestCase
             'https://durable-workflow.com/schemas/cli/output/workflow-list.schema.json',
             $schema['$id'],
         );
-        self::assertSame(['workflows'], $schema['required']);
+        self::assertSame(['namespace', 'workflows'], $schema['required']);
     }
 
     public function test_show_command_outputs_schema_for_server_diagnostics(): void

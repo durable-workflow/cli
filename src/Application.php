@@ -303,10 +303,15 @@ class Application extends ConsoleApplication
 
             $verb = isset($tokens[$i + 1]) ? (string) $tokens[$i + 1] : null;
             if ($verb !== null && isset(self::GROUPED_COMMAND_ALIASES[$token][$verb])) {
-                $tokens[$i] = self::GROUPED_COMMAND_ALIASES[$token][$verb];
-                array_splice($tokens, $i + 1, 1);
+                $command = self::GROUPED_COMMAND_ALIASES[$token][$verb];
+                $beforeCommand = array_slice($tokens, 0, $i);
+                $afterVerb = array_slice($tokens, $i + 2);
 
-                return array_values($tokens);
+                // Connection options belong to each concrete command rather
+                // than the application definition. Move options written
+                // before a grouped alias behind its canonical command name so
+                // Symfony binds them to that command.
+                return array_values([$command, ...$beforeCommand, ...$afterVerb]);
             }
 
             return null;

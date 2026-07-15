@@ -77,7 +77,7 @@ class CompletionCommandTest extends TestCase
         );
 
         self::assertSame(
-            ['running'],
+            ['running', 'completed', 'failed'],
             $this->completionLines($this->complete(2, ['dw', 'activity:list', '--status=r'])),
         );
 

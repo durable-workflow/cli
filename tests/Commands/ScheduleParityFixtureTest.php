@@ -17,7 +17,7 @@ use DurableWorkflow\Cli\Commands\ScheduleCommand\UpdateCommand;
 use DurableWorkflow\Cli\Support\ServerClient;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
-use Symfony\Component\Console\Exception\InvalidArgumentException;
+use Symfony\Component\Console\Exception\InvalidOptionException;
 use Symfony\Component\Console\Tester\CommandTester;
 
 final class ScheduleParityFixtureTest extends TestCase
@@ -150,7 +150,7 @@ final class ScheduleParityFixtureTest extends TestCase
         $command->setServerClient($client);
         $tester = new CommandTester($command);
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(InvalidOptionException::class);
         $this->expectExceptionMessage(sprintf('The "--%s" option requires a value.', $option));
 
         try {

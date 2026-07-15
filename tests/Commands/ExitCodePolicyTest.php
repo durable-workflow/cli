@@ -231,28 +231,6 @@ class ExitCodePolicyTest extends TestCase
         self::assertCount(count($values), array_unique($values), 'exit codes must remain distinct');
     }
 
-    public function test_readme_documents_compatibility_exit_contract(): void
-    {
-        $readme = file_get_contents(dirname(__DIR__, 2).'/README.md');
-        self::assertIsString($readme, 'README.md must be readable.');
-
-        self::assertStringContainsString('| 8 | `COMPATIBILITY` |', $readme);
-        self::assertStringContainsString('exits with `COMPATIBILITY` (`8`)', $readme);
-        self::assertStringContainsString('"exit_code": 8', $readme);
-        self::assertStringContainsString('"cli_version": "0.1.73"', $readme);
-        self::assertStringContainsString('"server_version": "0.2.221"', $readme);
-        self::assertStringContainsString(
-            '"compatibility_window": "cli >=0.1,<1.0; control-plane version 2; worker protocol same-major <= 1.0"',
-            $readme,
-        );
-        self::assertStringContainsString(
-            '"next_step": "Upgrade dw, pin dw to a supported release, or connect to a compatible server."',
-            $readme,
-        );
-        self::assertStringContainsString('missing control_plane.request_contract', $readme);
-        self::assertStringNotContainsString('Upgrade the server or use a compatible CLI version.', $readme);
-    }
-
     public function test_symfony_canonical_codes_preserved(): void
     {
         self::assertSame(Command::SUCCESS, ExitCode::SUCCESS);

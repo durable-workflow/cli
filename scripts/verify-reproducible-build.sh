@@ -18,7 +18,14 @@ cd "$ROOT"
 
 BUILD_DIR="$ROOT/build"
 PHAR_OUT="$BUILD_DIR/dw.phar"
-ATTEMPT_DIR="$ROOT/build/.repro"
+ATTEMPT_DIR="$(mktemp -d "${TMPDIR:-/tmp}/dw-cli-repro.XXXXXX")"
+
+cleanup() {
+    rm -rf -- "$ATTEMPT_DIR"
+}
+
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
 
 err() {
     printf 'error: %s\n' "$*" >&2
@@ -44,8 +51,6 @@ if [[ -z "${SOURCE_DATE_EPOCH:-}" ]]; then
     fi
     export SOURCE_DATE_EPOCH
 fi
-
-mkdir -p "$ATTEMPT_DIR"
 
 echo ">> Reproducible-build check: SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"
 

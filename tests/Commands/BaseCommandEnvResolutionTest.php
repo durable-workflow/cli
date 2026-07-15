@@ -9,6 +9,7 @@ use DurableWorkflow\Cli\Support\ExitCode;
 use DurableWorkflow\Cli\Support\OutputMode;
 use DurableWorkflow\Cli\Support\Profile;
 use DurableWorkflow\Cli\Support\ProfileStore;
+use DurableWorkflow\Cli\Support\ResolvedConnection;
 use DurableWorkflow\Cli\Support\ServerClient;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
@@ -231,6 +232,12 @@ class BaseCommandEnvResolutionTest extends TestCase
             public function __construct()
             {
                 parent::__construct('probe:env');
+                $this->setServerClientFactory(static fn (ResolvedConnection $resolved): ServerClient => new ServerClient(
+                    baseUrl: $resolved->server,
+                    token: $resolved->token,
+                    namespace: $resolved->namespace,
+                    tlsVerify: $resolved->tlsVerify,
+                ));
             }
 
             protected function configure(): void

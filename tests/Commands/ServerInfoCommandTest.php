@@ -739,12 +739,25 @@ class ServerInfoCommandTest extends TestCase
 
 class ServerInfoFakeClient extends ServerClient
 {
+    /** @var array<string, mixed> */
+    private readonly array $payload;
+
     /**
      * @param  array<string, mixed>  $payload
      */
-    public function __construct(
-        private readonly array $payload,
-    ) {
+    public function __construct(array $payload)
+    {
+        $payload['control_plane'] ??= [
+            'version' => ServerClient::CONTROL_PLANE_VERSION,
+            'request_contract' => [
+                'schema' => ControlPlaneRequestContract::SCHEMA,
+                'version' => ControlPlaneRequestContract::VERSION,
+                'operations' => [],
+            ],
+        ];
+
+        $this->payload = $payload;
+        parent::__construct('http://localhost');
     }
 
     public function get(string $path, array $query = []): array

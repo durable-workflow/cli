@@ -6,6 +6,7 @@ namespace Tests\Commands;
 
 use DurableWorkflow\Cli\Commands\WorkflowCommand\HistoryCommand;
 use DurableWorkflow\Cli\Commands\WorkflowCommand\QueryCommand;
+use DurableWorkflow\Cli\Support\ControlPlaneRequestContract;
 use DurableWorkflow\Cli\Support\ResolvedConnection;
 use DurableWorkflow\Cli\Support\ServerClient;
 use PHPUnit\Framework\TestCase;
@@ -274,6 +275,14 @@ class WorkflowHistoryQueryTest extends TestCase
     public function test_query_command_extends_http_timeout_beyond_server_query_wait_budget(): void
     {
         $command = new CachingQueryTimeoutTrackingCommand([
+            'control_plane' => [
+                'version' => ServerClient::CONTROL_PLANE_VERSION,
+                'request_contract' => [
+                    'schema' => ControlPlaneRequestContract::SCHEMA,
+                    'version' => ControlPlaneRequestContract::VERSION,
+                    'operations' => [],
+                ],
+            ],
             'worker_protocol' => [
                 'server_capabilities' => [
                     'query_task_timeouts' => [
@@ -382,7 +391,9 @@ class QueryTimeoutFakeClient extends ServerClient
     /** @param array<string, mixed> $clusterInfo */
     public function __construct(
         private readonly array $clusterInfo,
-    ) {}
+    ) {
+        parent::__construct('http://example.test');
+    }
 
     public function get(string $path, array $query = []): array
     {

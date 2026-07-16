@@ -1,5 +1,7 @@
 name: Release
 
+run-name: Release ${{ inputs.tag || github.ref_name }} for ${{ inputs.release_plan || 'direct' }}
+
 on:
   push:
     tags:
@@ -9,11 +11,19 @@ on:
       tag:
         description: 'Release tag (for manual dispatch, e.g. 0.0.1-test or v0.0.1-test)'
         required: true
+      release_plan:
+        description: 'Immutable release-plan tag initiating this recovery run'
+        required: false
+        default: 'direct'
 
 permissions:
   attestations: write
   contents: write
   id-token: write
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
 
 env:
   SPC_EXTENSIONS: curl,mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets
@@ -146,7 +156,8 @@ jobs:
               printf '## Public CLI asset preflight\n\n'
               printf '%s\n\n' "$message"
               if [ "$present" = "true" ]; then
-                printf 'Because the complete public asset set already exists, the live docs release-audit gate runs before any rebuild or upload.\n'
+                printf '%s' 'Because the complete public asset set already exists, '
+                printf '%s\n' 'the live docs release-audit gate runs before any rebuild or upload.'
               else
                 printf 'The live docs release-audit gate will run after this release publishes and verifies the public download surface.\n'
               fi
@@ -177,7 +188,11 @@ jobs:
     name: Build PHAR
     needs: [resolve-release, release-preflight]
     runs-on: ubuntu-latest
-    if: ${{ always() && needs.resolve-release.result == 'success' && needs.release-preflight.result == 'success' && needs.release-preflight.outputs.public_assets_present != 'true' }}
+    if: >-
+      always() &&
+      needs.resolve-release.result == 'success' &&
+      needs.release-preflight.result == 'success' &&
+      needs.release-preflight.outputs.public_assets_present != 'true'
     outputs:
       phar-name: dw.phar
     steps:
@@ -238,7 +253,12 @@ jobs:
   build-binary:
     name: Build ${{ matrix.name }}
     needs: [resolve-release, release-preflight, build-phar]
-    if: ${{ always() && needs.resolve-release.result == 'success' && needs.release-preflight.result == 'success' && needs.release-preflight.outputs.public_assets_present != 'true' && needs.build-phar.result == 'success' }}
+    if: >-
+      always() &&
+      needs.resolve-release.result == 'success' &&
+      needs.release-preflight.result == 'success' &&
+      needs.release-preflight.outputs.public_assets_present != 'true' &&
+      needs.build-phar.result == 'success'
     strategy:
       fail-fast: false
       matrix:
@@ -357,7 +377,12 @@ jobs:
   build-binary-windows:
     name: Build windows-x86_64
     needs: [resolve-release, release-preflight, build-phar]
-    if: ${{ always() && needs.resolve-release.result == 'success' && needs.release-preflight.result == 'success' && needs.release-preflight.outputs.public_assets_present != 'true' && needs.build-phar.result == 'success' }}
+    if: >-
+      always() &&
+      needs.resolve-release.result == 'success' &&
+      needs.release-preflight.result == 'success' &&
+      needs.release-preflight.outputs.public_assets_present != 'true' &&
+      needs.build-phar.result == 'success'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -510,7 +535,15 @@ jobs:
     # considered complete.
     needs: [resolve-release, release-preflight, build-phar, build-binary, build-binary-windows]
     runs-on: ubuntu-latest
-    if: ${{ always() && needs.resolve-release.result == 'success' && needs.release-preflight.result == 'success' && needs.release-preflight.outputs.public_assets_present != 'true' && needs.build-phar.result == 'success' && needs.build-binary.result == 'success' && needs.build-binary-windows.result == 'success' }}
+    environment: github-release
+    if: >-
+      always() &&
+      needs.resolve-release.result == 'success' &&
+      needs.release-preflight.result == 'success' &&
+      needs.release-preflight.outputs.public_assets_present != 'true' &&
+      needs.build-phar.result == 'success' &&
+      needs.build-binary.result == 'success' &&
+      needs.build-binary-windows.result == 'success'
     steps:
       - uses: actions/checkout@v4
         with:

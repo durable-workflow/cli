@@ -3,6 +3,8 @@ name: Build
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -11,10 +13,13 @@ permissions:
 jobs:
   test:
     name: Test (PHP ${{ matrix.php }})
+    if: ${{ github.server_url == 'https://github.com' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
+      fail-fast: false
       matrix:
-        php: ['8.4']
+        php: ['8.2', '8.3', '8.4', '8.5']
     steps:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
@@ -39,7 +44,9 @@ jobs:
 
   build-phar:
     name: Build PHAR (smoke test)
+    if: ${{ github.server_url == 'https://github.com' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
@@ -56,7 +63,9 @@ jobs:
 
   reproducible-build:
     name: Reproducible build (PHAR is bit-identical across rebuilds)
+    if: ${{ github.server_url == 'https://github.com' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
@@ -72,7 +81,9 @@ jobs:
 
   sdk-python-parity:
     name: SDK-Python parity fixtures
+    if: ${{ github.server_url == 'https://github.com' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
         with:
@@ -84,3 +95,22 @@ jobs:
       - name: Compare shared control-plane parity fixtures
         working-directory: cli
         run: scripts/check-sdk-python-parity.sh ../sdk-python
+
+  target-branch-qualification:
+    name: Target branch qualification
+    if: ${{ always() && github.server_url == 'https://github.com' }}
+    needs: [test, build-phar, reproducible-build, sdk-python-parity]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Require every build cell
+        env:
+          TEST_RESULT: ${{ needs.test.result }}
+          PHAR_RESULT: ${{ needs.build-phar.result }}
+          REPRODUCIBLE_RESULT: ${{ needs.reproducible-build.result }}
+          PARITY_RESULT: ${{ needs.sdk-python-parity.result }}
+        run: |
+          test "$TEST_RESULT" = success
+          test "$PHAR_RESULT" = success
+          test "$REPRODUCIBLE_RESULT" = success
+          test "$PARITY_RESULT" = success

@@ -33,6 +33,8 @@ jobs:
           bash -n scripts/verify-public-release-assets.sh
           bash -n scripts/verify-reproducible-build.sh
           pwsh -NoProfile -Command '$null = [scriptblock]::Create((Get-Content -Raw scripts/install.ps1))'
+      - name: Verify release recovery source contracts
+        run: python scripts/ci/test-component-release-recovery.py
       - run: composer test
 
   build-phar:

@@ -97,7 +97,7 @@ jobs:
     outputs:
       public_assets_present: ${{ steps.public_assets.outputs.present }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ needs.resolve-release.outputs.commit }}
 
@@ -195,7 +195,7 @@ jobs:
 
       - name: Upload release preflight evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-preflight-evidence
           path: |
@@ -216,7 +216,7 @@ jobs:
     outputs:
       phar-name: dw.phar
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           ref: ${{ needs.resolve-release.outputs.commit }}
@@ -264,7 +264,7 @@ jobs:
           php build/dw.phar --version || true
           box info build/dw.phar
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: dw-phar
           path: build/dw.phar
@@ -294,12 +294,12 @@ jobs:
             spc_asset: spc-macos-aarch64
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ needs.resolve-release.outputs.commit }}
 
       - name: Download PHAR artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: dw-phar
           path: build/
@@ -320,7 +320,7 @@ jobs:
           chmod +x build/.tools/spc
 
       - name: Cache spc downloads
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             build/.tools/downloads
@@ -369,7 +369,7 @@ jobs:
 
       - name: Upload spc build logs (always)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.name }}-spc-logs
           path: build/.tools/log/
@@ -388,7 +388,7 @@ jobs:
           ./build/dw-${{ matrix.name }} runtime:check
           ./build/dw-${{ matrix.name }} list
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: dw-${{ matrix.name }}
           path: build/dw-${{ matrix.name }}
@@ -405,12 +405,12 @@ jobs:
       needs.build-phar.result == 'success'
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ needs.resolve-release.outputs.commit }}
 
       - name: Download PHAR artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: dw-phar
           path: build/
@@ -435,7 +435,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
 
       - name: Cache spc downloads
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             build/spc-src/downloads
@@ -522,7 +522,7 @@ jobs:
 
       - name: Upload spc build logs (always)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-spc-logs
           path: build/spc-src/log/
@@ -542,7 +542,7 @@ jobs:
           .\build\dw-windows-x86_64.exe runtime:check
           .\build\dw-windows-x86_64.exe list
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: dw-windows-x86_64
           path: build/dw-windows-x86_64.exe
@@ -565,7 +565,7 @@ jobs:
       needs.build-binary.result == 'success' &&
       needs.build-binary-windows.result == 'success'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ needs.resolve-release.outputs.commit }}
 
@@ -582,7 +582,7 @@ jobs:
           fi
 
       - name: Download release artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: dist
           pattern: dw-*
@@ -633,7 +633,7 @@ jobs:
         run: scripts/ci/verify-release-tag-source.sh
 
       - name: Attest release artifacts
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: dist/*
 
@@ -655,7 +655,7 @@ jobs:
           EOF
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.resolve-release.outputs.tag }}
           name: ${{ needs.resolve-release.outputs.tag }}
@@ -780,7 +780,7 @@ jobs:
 
       - name: Upload release evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-evidence
           path: |

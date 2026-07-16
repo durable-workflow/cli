@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests;
 
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Process\Process;
 
 final class ReleaseInstallerContractTest extends TestCase
 {
@@ -17,7 +18,7 @@ final class ReleaseInstallerContractTest extends TestCase
         self::assertStringContainsString('0.0.1-test or v0.0.1-test', $releaseWorkflow);
         self::assertStringContainsString('raw_tag="$tag"', $releaseWorkflow);
         self::assertStringContainsString('tag="${tag#v}"', $releaseWorkflow);
-        self::assertStringContainsString('ref: ${{ needs.resolve-release.outputs.tag }}', $releaseWorkflow);
+        self::assertStringContainsString('ref: ${{ needs.resolve-release.outputs.commit }}', $releaseWorkflow);
         self::assertStringContainsString('DW_CLI_VERSION: ${{ needs.resolve-release.outputs.tag }}', $releaseWorkflow);
         self::assertStringContainsString('DW_CLI_COMMIT="$(git rev-parse HEAD)"', $releaseWorkflow);
         self::assertStringContainsString('release-preflight:', $releaseWorkflow);
@@ -95,7 +96,112 @@ final class ReleaseInstallerContractTest extends TestCase
         self::assertStringContainsString('sh -n scripts/verify-release.sh', $buildWorkflow);
         self::assertStringContainsString('bash -n scripts/verify-public-release-assets.sh', $buildWorkflow);
         self::assertStringContainsString('sh -n scripts/ci/check-docs-release-audit.sh', $buildWorkflow);
+        self::assertStringContainsString('bash -n scripts/ci/verify-release-tag-source.sh', $buildWorkflow);
         self::assertStringContainsString('scripts/install.ps1', $buildWorkflow);
+    }
+
+    public function test_release_recovery_retains_the_planned_commit_at_publication(): void
+    {
+        $releaseWorkflow = self::readRepoFile('.github/workflows/release.yml');
+        $recoveryWorkflow = self::readRepoFile('.github/workflows/release-plan-recovery.yml');
+
+        self::assertStringContainsString('release_commit:', $releaseWorkflow);
+        self::assertStringContainsString('commit: ${{ steps.resolve.outputs.commit }}', $releaseWorkflow);
+        self::assertStringContainsString('DISPATCH_COMMIT: ${{ inputs.release_commit }}', $releaseWorkflow);
+        self::assertStringContainsString('PUSH_COMMIT: ${{ github.sha }}', $releaseWorkflow);
+        self::assertSame(5, substr_count($releaseWorkflow, 'ref: ${{ needs.resolve-release.outputs.commit }}'));
+        self::assertStringNotContainsString('|| github.ref }}', $releaseWorkflow);
+        self::assertStringContainsString('EXPECTED_COMMIT: ${{ needs.resolve-release.outputs.commit }}', $releaseWorkflow);
+        self::assertSame(2, substr_count($releaseWorkflow, 'RELEASE_COMMIT: ${{ needs.resolve-release.outputs.commit }}'));
+        self::assertStringContainsString('-f release_commit="$RELEASE_COMMIT"', $recoveryWorkflow);
+        self::assertSame(2, substr_count($recoveryWorkflow, 'scripts/ci/verify-release-tag-source.sh'));
+
+        $sourceCheck = strpos($releaseWorkflow, 'Resolve exact source identity');
+        $boundaryCheck = strpos($releaseWorkflow, 'Verify immutable release tag at publication boundary');
+        $attestation = strpos($releaseWorkflow, 'Attest release artifacts');
+        $publication = strpos($releaseWorkflow, 'Create GitHub Release');
+        self::assertIsInt($sourceCheck);
+        self::assertIsInt($boundaryCheck);
+        self::assertIsInt($attestation);
+        self::assertIsInt($publication);
+        self::assertLessThan($boundaryCheck, $sourceCheck);
+        self::assertLessThan($attestation, $boundaryCheck);
+        self::assertLessThan($publication, $boundaryCheck);
+    }
+
+    public function test_recovery_reused_push_run_rejects_tag_movement_before_publication(): void
+    {
+        $releaseWorkflow = self::readRepoFile('.github/workflows/release.yml');
+        $plannedCommit = str_repeat('a', 40);
+        $movedCommit = str_repeat('b', 40);
+        $temporary = sys_get_temp_dir().'/cli-release-tag-'.bin2hex(random_bytes(4));
+        self::assertTrue(mkdir($temporary));
+        $fakeGh = $temporary.'/gh';
+        $publicationRuns = $temporary.'/publication-runs.json';
+        file_put_contents($fakeGh, <<<'SH'
+#!/usr/bin/env sh
+set -eu
+printf 'commit %s\n' "$FAKE_TAG_SHA"
+SH);
+        self::assertTrue(chmod($fakeGh, 0755));
+        file_put_contents($publicationRuns, json_encode([
+            [
+                'databaseId' => 1234,
+                'displayTitle' => 'Release 1.2.3-alpha.4 for direct',
+                'event' => 'push',
+                'headBranch' => '1.2.3-alpha.4',
+                'headSha' => $plannedCommit,
+                'status' => 'in_progress',
+                'conclusion' => null,
+            ],
+        ], JSON_THROW_ON_ERROR));
+
+        self::assertStringContainsString('PUSH_COMMIT: ${{ github.sha }}', $releaseWorkflow);
+        self::assertSame(5, substr_count($releaseWorkflow, 'ref: ${{ needs.resolve-release.outputs.commit }}'));
+        self::assertSame(2, substr_count($releaseWorkflow, 'RELEASE_COMMIT: ${{ needs.resolve-release.outputs.commit }}'));
+
+        $environment = [
+            'GH_CLI' => $fakeGh,
+            'GITHUB_REPOSITORY' => 'durable-workflow/cli',
+            'RELEASE_TAG' => '1.2.3-alpha.4',
+            'RELEASE_COMMIT' => $plannedCommit,
+        ];
+
+        try {
+            $selection = new Process([
+                'python3',
+                dirname(__DIR__).'/scripts/ci/component-release-recovery.py',
+                'select-publication-run',
+                '--release-tag',
+                '1.2.3-alpha.4',
+                '--release-commit',
+                $plannedCommit,
+                '--runs',
+                $publicationRuns,
+            ], dirname(__DIR__));
+            self::assertSame(0, $selection->run(), $selection->getErrorOutput());
+            self::assertSame("wait\t1234\tin_progress\t\n", $selection->getOutput());
+
+            $exact = new Process(
+                [dirname(__DIR__).'/scripts/ci/verify-release-tag-source.sh'],
+                dirname(__DIR__),
+                $environment + ['FAKE_TAG_SHA' => $plannedCommit],
+            );
+            self::assertSame(0, $exact->run(), $exact->getErrorOutput());
+
+            $moved = new Process(
+                [dirname(__DIR__).'/scripts/ci/verify-release-tag-source.sh'],
+                dirname(__DIR__),
+                $environment + ['FAKE_TAG_SHA' => $movedCommit],
+            );
+            self::assertSame(1, $moved->run());
+            self::assertStringContainsString($movedCommit, $moved->getErrorOutput());
+            self::assertStringContainsString($plannedCommit, $moved->getErrorOutput());
+        } finally {
+            @unlink($fakeGh);
+            @unlink($publicationRuns);
+            @rmdir($temporary);
+        }
     }
 
     public function test_release_includes_checksum_and_attestation_verifier(): void

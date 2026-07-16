@@ -11,6 +11,9 @@ on:
       tag:
         description: 'Release tag (for manual dispatch, e.g. 0.0.1-test or v0.0.1-test)'
         required: true
+      release_commit:
+        description: 'Exact source commit declared by the immutable release plan'
+        required: true
       release_plan:
         description: 'Immutable release-plan tag initiating this recovery run'
         required: false
@@ -48,17 +51,22 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.resolve.outputs.tag }}
+      commit: ${{ steps.resolve.outputs.commit }}
     steps:
       - id: resolve
         shell: bash
         env:
           DISPATCH_TAG: ${{ inputs.tag }}
+          DISPATCH_COMMIT: ${{ inputs.release_commit }}
+          PUSH_COMMIT: ${{ github.sha }}
         run: |
           set -euo pipefail
           if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
             tag="$DISPATCH_TAG"
+            commit="$DISPATCH_COMMIT"
           else
             tag="${GITHUB_REF_NAME}"
+            commit="$PUSH_COMMIT"
           fi
 
           if [ -z "$tag" ]; then
@@ -73,9 +81,14 @@ jobs:
             echo "::error::Invalid release tag: $raw_tag"
             exit 1
           fi
+          if ! printf '%s\n' "$commit" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "::error::Release commit must be a full lowercase Git commit SHA"
+            exit 1
+          fi
 
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "Resolved release tag: $tag"
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+          echo "Resolved release tag $tag at immutable commit $commit"
 
   release-preflight:
     name: Release preflight
@@ -86,7 +99,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.resolve-release.outputs.tag }}
+          ref: ${{ needs.resolve-release.outputs.commit }}
+
+      - name: Verify expected release source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.resolve-release.outputs.tag }}
+          RELEASE_COMMIT: ${{ needs.resolve-release.outputs.commit }}
+        run: scripts/ci/verify-release-tag-source.sh
 
       - name: Inspect existing public release assets
         id: public_assets
@@ -199,7 +219,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ needs.resolve-release.outputs.tag }}
+          ref: ${{ needs.resolve-release.outputs.commit }}
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -276,7 +296,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.resolve-release.outputs.tag }}
+          ref: ${{ needs.resolve-release.outputs.commit }}
 
       - name: Download PHAR artifact
         uses: actions/download-artifact@v4
@@ -387,7 +407,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.resolve-release.outputs.tag }}
+          ref: ${{ needs.resolve-release.outputs.commit }}
 
       - name: Download PHAR artifact
         uses: actions/download-artifact@v4
@@ -547,7 +567,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.resolve-release.outputs.tag }}
+          ref: ${{ needs.resolve-release.outputs.commit }}
+
+      - name: Resolve exact source identity
+        env:
+          EXPECTED_COMMIT: ${{ needs.resolve-release.outputs.commit }}
+        run: |
+          set -euo pipefail
+          head_commit="$(git rev-parse HEAD)"
+          if [ "$head_commit" != "$EXPECTED_COMMIT" ]; then
+            printf 'release checkout %s does not match expected commit %s\n' \
+              "$head_commit" "$EXPECTED_COMMIT" >&2
+            exit 1
+          fi
 
       - name: Download release artifacts
         uses: actions/download-artifact@v4
@@ -592,6 +624,13 @@ jobs:
       - name: Generate checksums
         working-directory: dist
         run: sha256sum -- * > SHA256SUMS
+
+      - name: Verify immutable release tag at publication boundary
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.resolve-release.outputs.tag }}
+          RELEASE_COMMIT: ${{ needs.resolve-release.outputs.commit }}
+        run: scripts/ci/verify-release-tag-source.sh
 
       - name: Attest release artifacts
         uses: actions/attest-build-provenance@v2

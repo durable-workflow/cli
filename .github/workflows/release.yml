@@ -52,21 +52,30 @@ jobs:
     outputs:
       tag: ${{ steps.resolve.outputs.tag }}
       commit: ${{ steps.resolve.outputs.commit }}
+      control_ref: ${{ steps.resolve.outputs.control_ref }}
+      control_commit: ${{ steps.resolve.outputs.control_commit }}
+      initiator: ${{ steps.resolve.outputs.initiator }}
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.release_commit || github.sha }}
+          ref: ${{ github.sha }}
       - id: resolve
         shell: bash
         env:
           DISPATCH_TAG: ${{ inputs.tag }}
           DISPATCH_COMMIT: ${{ inputs.release_commit }}
           PUSH_COMMIT: ${{ github.sha }}
+          CONTROL_REF: ${{ github.ref }}
+          CONTROL_COMMIT: ${{ github.sha }}
         run: |
           set -euo pipefail
           if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
             tag="$DISPATCH_TAG"
             commit="$DISPATCH_COMMIT"
+            if [ "$CONTROL_REF" != "refs/heads/main" ]; then
+              echo "::error::Protected release dispatch must execute from refs/heads/main"
+              exit 1
+            fi
           else
             tag="${GITHUB_REF_NAME}"
             commit="$PUSH_COMMIT"
@@ -89,7 +98,36 @@ jobs:
 
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "commit=$commit" >> "$GITHUB_OUTPUT"
+          echo "control_ref=$CONTROL_REF" >> "$GITHUB_OUTPUT"
+          echo "control_commit=$CONTROL_COMMIT" >> "$GITHUB_OUTPUT"
+          echo "initiator=$GITHUB_EVENT_NAME" >> "$GITHUB_OUTPUT"
           echo "Resolved release tag $tag at immutable commit $commit"
+
+      - name: Record release control and package authorities
+        env:
+          RELEASE_TAG: ${{ steps.resolve.outputs.tag }}
+          RELEASE_COMMIT: ${{ steps.resolve.outputs.commit }}
+          CONTROL_REF: ${{ steps.resolve.outputs.control_ref }}
+          CONTROL_COMMIT: ${{ steps.resolve.outputs.control_commit }}
+          INITIATOR: ${{ steps.resolve.outputs.initiator }}
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+
+          fs.writeFileSync('release-control-authority.json', `${JSON.stringify({
+            schema: 'durable-workflow.cli.release-control-authority/v1',
+            initiator: process.env.INITIATOR,
+            control: {ref: process.env.CONTROL_REF, commit: process.env.CONTROL_COMMIT},
+            package: {tag: process.env.RELEASE_TAG, commit: process.env.RELEASE_COMMIT},
+          }, null, 2)}\n`);
+          NODE
+
+      - name: Retain release control authority
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-control-authority
+          path: release-control-authority.json
+          if-no-files-found: error
 
   release-preflight:
     name: Release preflight
@@ -102,12 +140,19 @@ jobs:
         with:
           ref: ${{ needs.resolve-release.outputs.commit }}
 
+      - name: Checkout qualified release policy authority
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.resolve-release.outputs.control_commit }}
+          path: release-control
+          persist-credentials: false
+
       - name: Verify expected release source
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ needs.resolve-release.outputs.tag }}
           RELEASE_COMMIT: ${{ needs.resolve-release.outputs.commit }}
-        run: scripts/ci/verify-release-tag-source.sh
+        run: release-control/scripts/ci/verify-release-tag-source.sh
 
       - name: Inspect existing public release assets
         id: public_assets
@@ -123,7 +168,7 @@ jobs:
           message="No complete public CLI asset set was found for ${tag}."
 
           if DURABLE_WORKFLOW_RELEASE_ASSET_ATTEMPTS=1 DURABLE_WORKFLOW_RELEASE_ASSET_RETRY_SLEEP=0 \
-              scripts/verify-public-release-assets.sh "$tag"; then
+              release-control/scripts/verify-public-release-assets.sh "$tag"; then
             present="true"
             status="present"
             message="A complete public CLI asset set is already downloadable for ${tag}."
@@ -193,7 +238,7 @@ jobs:
           DOCS_RELEASE_AUDIT_EVIDENCE: docs-release-audit-evidence.json
           DOCS_RELEASE_AUDIT_HANDOFF: docs-release-audit-handoff.json
           DOCS_RELEASE_AUDIT_STALE_MODE: advisory
-        run: scripts/ci/check-docs-release-audit.sh
+        run: release-control/scripts/ci/check-docs-release-audit.sh
 
       - name: Upload release preflight evidence
         if: always()
@@ -571,6 +616,13 @@ jobs:
         with:
           ref: ${{ needs.resolve-release.outputs.commit }}
 
+      - name: Checkout qualified release policy authority
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.resolve-release.outputs.control_commit }}
+          path: release-control
+          persist-credentials: false
+
       - name: Resolve exact source identity
         env:
           EXPECTED_COMMIT: ${{ needs.resolve-release.outputs.commit }}
@@ -632,7 +684,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ needs.resolve-release.outputs.tag }}
           RELEASE_COMMIT: ${{ needs.resolve-release.outputs.commit }}
-        run: scripts/ci/verify-release-tag-source.sh
+        run: release-control/scripts/ci/verify-release-tag-source.sh
 
       - name: Attest release artifacts
         uses: actions/attest-build-provenance@v4
@@ -668,6 +720,10 @@ jobs:
           fail_on_unmatched_files: true
 
       - name: Verify public release downloads
+        env:
+          RELEASE_CONTROL_REF: ${{ needs.resolve-release.outputs.control_ref }}
+          RELEASE_CONTROL_COMMIT: ${{ needs.resolve-release.outputs.control_commit }}
+          RELEASE_INITIATOR: ${{ needs.resolve-release.outputs.initiator }}
         run: |
           set -euo pipefail
           tag="${{ needs.resolve-release.outputs.tag }}"
@@ -744,6 +800,9 @@ jobs:
             printf '{\n'
             printf '  "tag": "%s",\n' "$tag"
             printf '  "commit": "%s",\n' "$release_commit"
+            printf '  "initiator": "%s",\n' "$RELEASE_INITIATOR"
+            printf '  "control": {"ref": "%s", "commit": "%s"},\n' \
+              "$RELEASE_CONTROL_REF" "$RELEASE_CONTROL_COMMIT"
             printf '  "artifact_versions": {"cli": "%s"},\n' "$tag"
             printf '  "installable_artifacts": {"verified_public_downloads": true, "version": "%s"},\n' "$tag"
             printf '  "verified_at": "%s",\n' "$verified_at"
@@ -779,7 +838,7 @@ jobs:
           DOCS_RELEASE_AUDIT_EVIDENCE: docs-release-audit-evidence.json
           DOCS_RELEASE_AUDIT_HANDOFF: docs-release-audit-handoff.json
           DOCS_RELEASE_AUDIT_STALE_MODE: advisory
-        run: scripts/ci/check-docs-release-audit.sh
+        run: release-control/scripts/ci/check-docs-release-audit.sh
 
       - name: Upload release evidence
         if: always()

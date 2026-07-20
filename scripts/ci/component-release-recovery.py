@@ -57,9 +57,14 @@ INFRASTRUCTURE_EXIT_CODE = 75
 
 SOURCE_CHANGELOGS = {"workflow", "waterline", "sdk-php", "sdk-python"}
 
-# SHA-256 of durable-workflow/sdk-rust's prepared-plan recovery workflow. The
-# verifier normalizes only
-# CRLF line endings to LF before hashing. Exact source identity is the bounded
+# SHA-256 of durable-workflow/cli's protected release recovery workflow.
+# Exact source identity is required because source-pattern matching cannot
+# prove that tag creation remains inside the protected repository authority.
+CLI_RELEASE_RECOVERY_SHA256 = "ecbc3ca73416b6960aef4eea0198b8f5b437376c66794793111f9cc15fc41a38"
+
+# SHA-256 of durable-workflow/sdk-rust's release recovery workflow using the
+# supported action runtimes. The verifier normalizes only CRLF line endings to
+# LF before hashing. Exact source identity is the bounded
 # security contract because arbitrary shell execution cannot be proven safe by
 # source-pattern matching.
 SDK_RUST_RELEASE_RECOVERY_SHA256 = "58b452f99b60fc272afe1833352906659e3836457a844b285a13e9fc7b24dcbb"
@@ -655,6 +660,16 @@ def discover_plan(
 
 def verify_recovery_workflow_source(name: str, source: str) -> None:
     component = COMPONENTS[name]
+    if name == "cli":
+        normalized_source = source.replace("\r\n", "\n").encode("utf-8")
+        actual_digest = hashlib.sha256(normalized_source).hexdigest()
+        if not hmac.compare_digest(actual_digest, CLI_RELEASE_RECOVERY_SHA256):
+            raise RecoveryError(
+                f"{component.repository} release recovery workflow does not match the approved "
+                "protected publication source identity",
+                "default-branch-preflight",
+            )
+        return
     if name == "sdk-rust":
         normalized_source = source.replace("\r\n", "\n").encode("utf-8")
         actual_digest = hashlib.sha256(normalized_source).hexdigest()
@@ -711,44 +726,262 @@ def verify_recovery_workflow_source(name: str, source: str) -> None:
 def select_publication_run(
     release_tag: str,
     release_commit: str,
+    required_event: str,
+    required_head_branch: str,
+    required_display_title: str,
     runs: Any,
 ) -> dict[str, Any]:
     if not VERSION_PATTERN.fullmatch(release_tag) or not COMMIT_PATTERN.fullmatch(release_commit):
         raise RecoveryError("publication run selection requires an exact release identity", "publication")
+    if (
+        required_event != "workflow_dispatch"
+        or required_head_branch != "main"
+        or not required_display_title
+        or any(character in required_display_title for character in "\r\n\0")
+    ):
+        raise RecoveryError("publication run selection requires the protected main workflow authority", "publication")
     if not isinstance(runs, list):
         raise RecoveryError("publication run metadata must be a JSON array", "publication")
 
     exact_runs: list[dict[str, Any]] = []
     for run in runs:
-        if not isinstance(run, dict) or run.get("headBranch") != release_tag:
+        if not isinstance(run, dict):
             continue
-        if run.get("headSha") != release_commit:
-            raise RecoveryError(
-                f"publication run {run.get('databaseId')} for {release_tag} is bound to a different source commit",
-                "publication",
-            )
-        if not isinstance(run.get("databaseId"), int) or not isinstance(run.get("status"), str):
+        if (
+            run.get("event") != required_event
+            or run.get("headBranch") != required_head_branch
+            or run.get("displayTitle") != required_display_title
+        ):
+            continue
+        run_id = run.get("databaseId")
+        status = run.get("status")
+        head_sha = run.get("headSha")
+        url = run.get("url")
+        if (
+            not isinstance(run_id, int)
+            or run_id < 1
+            or not isinstance(status, str)
+            or not status
+            or not isinstance(head_sha, str)
+            or not COMMIT_PATTERN.fullmatch(head_sha)
+            or not isinstance(url, str)
+            or not re.fullmatch(rf"https://github\.com/[^/]+/[^/]+/actions/runs/{run_id}", url)
+        ):
             raise RecoveryError("publication run metadata is incomplete", "publication")
         exact_runs.append(run)
 
-    selected = next((run for run in exact_runs if run["status"] != "completed"), None)
-    action = "wait"
-    if selected is None:
-        selected = next(
-            (run for run in exact_runs if run["status"] == "completed" and run.get("conclusion") == "success"),
-            None,
+    if len(exact_runs) > 1:
+        raise RecoveryError(
+            f"multiple protected publication runs claim exact release {release_tag} at {release_commit}",
+            "publication",
         )
-        action = "complete"
-    if selected is None:
-        selected = next((run for run in exact_runs if run["status"] == "completed"), None)
-        action = "rerun"
+
+    selected = exact_runs[0] if exact_runs else None
     if selected is None:
         return {"action": "dispatch", "run_id": None, "status": None, "conclusion": None}
+
+    action = "wait"
+    if selected["status"] == "completed" and selected.get("conclusion") == "success":
+        action = "complete"
+    elif selected["status"] == "completed":
+        if not isinstance(selected.get("conclusion"), str) or not selected["conclusion"]:
+            raise RecoveryError("completed publication run has no conclusion", "publication")
+        action = "rerun"
     return {
         "action": action,
         "run_id": selected["databaseId"],
         "status": selected["status"],
         "conclusion": selected.get("conclusion"),
+    }
+
+
+def select_tag_push_run(release_tag: str, release_commit: str, runs: Any) -> dict[str, Any]:
+    if not VERSION_PATTERN.fullmatch(release_tag) or not COMMIT_PATTERN.fullmatch(release_commit):
+        raise RecoveryError("tag-push run selection requires an exact release identity", "publication")
+    if not isinstance(runs, list):
+        raise RecoveryError("tag-push run metadata must be a JSON array", "publication")
+
+    exact_runs: list[dict[str, Any]] = []
+    for run in runs:
+        if not isinstance(run, dict) or run.get("event") != "push" or run.get("headBranch") != release_tag:
+            continue
+        if run.get("headSha") != release_commit:
+            raise RecoveryError(
+                f"tag-push run {run.get('databaseId')} for {release_tag} names a different source commit",
+                "publication",
+            )
+        run_id = run.get("databaseId")
+        status = run.get("status")
+        url = run.get("url")
+        if (
+            not isinstance(run_id, int)
+            or run_id < 1
+            or not isinstance(status, str)
+            or not status
+            or run.get("workflowName") != "Release"
+            or run.get("displayTitle") != f"Release {release_tag} for direct"
+            or not isinstance(url, str)
+            or not re.fullmatch(rf"https://github\.com/[^/]+/[^/]+/actions/runs/{run_id}", url)
+        ):
+            raise RecoveryError("tag-push run metadata is incomplete", "publication")
+        exact_runs.append(run)
+
+    if len(exact_runs) > 1:
+        raise RecoveryError(f"multiple tag-push runs claim exact release {release_tag}", "publication")
+    if not exact_runs:
+        return {"action": "observe", "run_id": None, "status": None, "conclusion": None}
+
+    selected = exact_runs[0]
+    conclusion = selected.get("conclusion")
+    if selected["status"] != "completed":
+        action = "cancel"
+    elif conclusion == "cancelled":
+        action = "complete"
+    else:
+        raise RecoveryError(
+            f"tag-push run {selected['databaseId']} reached disallowed conclusion {conclusion or '<missing>'}",
+            "publication",
+        )
+    return {
+        "action": action,
+        "run_id": selected["databaseId"],
+        "status": selected["status"],
+        "conclusion": conclusion,
+    }
+
+
+def retain_tag_push_run(
+    repository: str,
+    release_tag: str,
+    release_commit: str,
+    run_id: int,
+    run: Any,
+) -> dict[str, Any]:
+    if (
+        not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository)
+        or not VERSION_PATTERN.fullmatch(release_tag)
+        or not COMMIT_PATTERN.fullmatch(release_commit)
+        or run_id < 1
+        or not isinstance(run, dict)
+    ):
+        raise RecoveryError("tag-push retention requires an exact release identity", "publication")
+    expected_url = f"https://github.com/{repository}/actions/runs/{run_id}"
+    required = {
+        "databaseId": run_id,
+        "event": "push",
+        "displayTitle": f"Release {release_tag} for direct",
+        "headBranch": release_tag,
+        "headSha": release_commit,
+        "status": "completed",
+        "conclusion": "cancelled",
+        "url": expected_url,
+        "workflowName": "Release",
+    }
+    mismatches = [field for field, expected in required.items() if run.get(field) != expected]
+    if mismatches:
+        raise RecoveryError(
+            f"tag-push run {run_id} was not quarantined under the exact source identity: {sorted(mismatches)}",
+            "publication",
+        )
+    return {
+        "schema": "durable-workflow.release-tag-push-quarantine/v1",
+        "repository": repository,
+        "release": {"tag": release_tag, "commit": release_commit},
+        "run": {
+            "id": run_id,
+            "event": "push",
+            "display_title": required["displayTitle"],
+            "head_branch": release_tag,
+            "head_commit": release_commit,
+            "status": "completed",
+            "conclusion": "cancelled",
+            "url": expected_url,
+            "workflow": "Release",
+        },
+    }
+
+
+def validate_dispatch_response(repository: str, response: Any) -> int:
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository):
+        raise RecoveryError("publication repository has an invalid identity", "publication")
+    if not isinstance(response, dict):
+        raise RecoveryError("workflow dispatch did not return a run identity", "publication")
+    run_id = response.get("workflow_run_id")
+    if not isinstance(run_id, int) or run_id < 1:
+        raise RecoveryError("workflow dispatch did not return a valid run identifier", "publication")
+    expected_api_url = f"https://api.github.com/repos/{repository}/actions/runs/{run_id}"
+    expected_html_url = f"https://github.com/{repository}/actions/runs/{run_id}"
+    if response.get("run_url") != expected_api_url or response.get("html_url") != expected_html_url:
+        raise RecoveryError("workflow dispatch returned a run outside the requested repository", "publication")
+    return run_id
+
+
+def retain_publication_run(
+    repository: str,
+    release_tag: str,
+    release_commit: str,
+    control_ref: str,
+    display_title: str,
+    run_id: int,
+    run: Any,
+    *,
+    reject_completed_failure: bool = False,
+    require_success: bool = False,
+) -> dict[str, Any]:
+    if (
+        not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository)
+        or not VERSION_PATTERN.fullmatch(release_tag)
+        or not COMMIT_PATTERN.fullmatch(release_commit)
+        or control_ref != "main"
+        or not display_title
+        or run_id < 1
+    ):
+        raise RecoveryError("publication retention requires an exact protected release identity", "publication")
+    if not isinstance(run, dict):
+        raise RecoveryError("publication run metadata must be a JSON object", "publication")
+
+    expected_url = f"https://github.com/{repository}/actions/runs/{run_id}"
+    required = {
+        "databaseId": run_id,
+        "event": "workflow_dispatch",
+        "displayTitle": display_title,
+        "headBranch": control_ref,
+        "url": expected_url,
+        "workflowName": "Release",
+    }
+    mismatches = [field for field, expected in required.items() if run.get(field) != expected]
+    head_sha = run.get("headSha")
+    status = run.get("status")
+    conclusion = run.get("conclusion")
+    if mismatches or not isinstance(head_sha, str) or not COMMIT_PATTERN.fullmatch(head_sha):
+        raise RecoveryError(
+            f"publication run {run_id} does not match the protected authority: {sorted(mismatches)}",
+            "publication",
+        )
+    if not isinstance(status, str) or not status:
+        raise RecoveryError(f"publication run {run_id} has no observable status", "publication")
+    if status == "completed" and (not isinstance(conclusion, str) or not conclusion):
+        raise RecoveryError(f"completed publication run {run_id} has no conclusion", "publication")
+    if reject_completed_failure and status == "completed" and conclusion != "success":
+        raise RecoveryError(f"publication run {run_id} is still completed with conclusion {conclusion}", "publication")
+    if require_success and (status != "completed" or conclusion != "success"):
+        raise RecoveryError(f"publication run {run_id} did not complete successfully", "publication")
+
+    return {
+        "schema": "durable-workflow.release-publication-run/v1",
+        "repository": repository,
+        "release": {"tag": release_tag, "commit": release_commit},
+        "run": {
+            "id": run_id,
+            "event": run["event"],
+            "display_title": run["displayTitle"],
+            "control_ref": control_ref,
+            "control_commit": head_sha,
+            "status": status,
+            "conclusion": conclusion,
+            "url": expected_url,
+            "workflow": run["workflowName"],
+        },
     }
 
 
@@ -1038,7 +1271,20 @@ def verify_cli(client: PublicClient, component: Component, version: str, commit:
         )
 
     verified_assets: list[dict[str, Any]] = []
-    source_ref = f"refs/tags/{version}"
+    signer_workflow = f"{component.repository}/.github/workflows/release.yml"
+    attestation_modes = [
+        (
+            "exact-tag",
+            ["--source-ref", f"refs/tags/{version}", "--source-digest", commit],
+            {"mode": "exact-tag", "ref": f"refs/tags/{version}", "commit": commit},
+        ),
+        (
+            "qualified-main-workflow",
+            ["--source-ref", "refs/heads/main", "--signer-workflow", signer_workflow],
+            {"mode": "qualified-main-workflow", "ref": "refs/heads/main", "workflow": signer_workflow},
+        ),
+    ]
+    selected_attestation_mode: tuple[str, list[str], dict[str, str]] | None = None
     with tempfile.TemporaryDirectory(prefix="release-recovery-cli-") as temporary:
         directory = Path(temporary)
         downloaded_paths: list[Path] = []
@@ -1073,35 +1319,44 @@ def verify_cli(client: PublicClient, component: Component, version: str, commit:
                 "registry-publication",
             )
         for asset_path in downloaded_paths:
-            process = subprocess.run(
-                [
-                    "gh",
-                    "attestation",
-                    "verify",
-                    str(asset_path),
-                    "--repo",
-                    component.repository,
-                    "--source-digest",
-                    commit,
-                    "--source-ref",
-                    source_ref,
-                ],
-                check=False,
-                text=True,
-                capture_output=True,
-            )
-            if process.returncode:
+            base_arguments = ["gh", "attestation", "verify", str(asset_path), "--repo", component.repository]
+            candidates = attestation_modes if selected_attestation_mode is None else [selected_attestation_mode]
+            failures: list[str] = []
+            for mode in candidates:
+                process = subprocess.run([*base_arguments, *mode[1]], check=False, text=True, capture_output=True)
+                if process.returncode == 0:
+                    selected_attestation_mode = mode
+                    break
+                failures.append(f"{mode[0]}: {process.stderr.strip()}")
+            else:
                 raise RecoveryError(
-                    f"CLI build attestation failed for {asset_path.name}: {process.stderr.strip()}",
+                    f"CLI build attestation failed for {asset_path.name}: {'; '.join(failures)}",
                     "registry-publication",
                 )
+
+        assert selected_attestation_mode is not None
+        if shutil.which("php") is None:
+            raise RecoveryError("PHP is required to verify CLI release source metadata", "registry-publication")
+        phar_version = subprocess.run(
+            ["php", str(directory / "dw.phar"), "--version"],
+            check=False,
+            text=True,
+            capture_output=True,
+            env={"PATH": os.environ.get("PATH", os.defpath)},
+        )
+        expected_identity = f"{version} (commit {commit[:12]},"
+        if phar_version.returncode or expected_identity not in phar_version.stdout:
+            raise RecoveryError(
+                f"CLI PHAR for {version} does not embed planned source commit {commit}", "registry-publication"
+            )
 
     return {
         "kind": "github-release",
         "id": release.get("id"),
         "url": release.get("html_url"),
         "build_attestations_verified": True,
-        "build_attestation_source": {"commit": commit, "ref": source_ref},
+        "build_attestation_authority": selected_attestation_mode[2],
+        "package_source": {"commit": commit, "embedded_phar_identity": phar_version.stdout.strip()},
         "assets": verified_assets,
     }
 
@@ -1326,7 +1581,39 @@ def main() -> int:
     select_run = subparsers.add_parser("select-publication-run")
     select_run.add_argument("--release-tag", required=True)
     select_run.add_argument("--release-commit", required=True)
+    select_run.add_argument("--required-event", required=True)
+    select_run.add_argument("--required-head-branch", required=True)
+    select_run.add_argument("--required-display-title", required=True)
     select_run.add_argument("--runs", required=True, type=Path)
+
+    select_push_run = subparsers.add_parser("select-tag-push-run")
+    select_push_run.add_argument("--release-tag", required=True)
+    select_push_run.add_argument("--release-commit", required=True)
+    select_push_run.add_argument("--runs", required=True, type=Path)
+
+    retain_push_run = subparsers.add_parser("retain-tag-push-run")
+    retain_push_run.add_argument("--repository", required=True)
+    retain_push_run.add_argument("--release-tag", required=True)
+    retain_push_run.add_argument("--release-commit", required=True)
+    retain_push_run.add_argument("--run-id", required=True, type=int)
+    retain_push_run.add_argument("--run", required=True, type=Path)
+    retain_push_run.add_argument("--evidence", required=True, type=Path)
+
+    dispatch_response = subparsers.add_parser("validate-dispatch-response")
+    dispatch_response.add_argument("--repository", required=True)
+    dispatch_response.add_argument("--response", required=True, type=Path)
+
+    retain_run = subparsers.add_parser("retain-publication-run")
+    retain_run.add_argument("--repository", required=True)
+    retain_run.add_argument("--release-tag", required=True)
+    retain_run.add_argument("--release-commit", required=True)
+    retain_run.add_argument("--control-ref", required=True)
+    retain_run.add_argument("--display-title", required=True)
+    retain_run.add_argument("--run-id", required=True, type=int)
+    retain_run.add_argument("--run", required=True, type=Path)
+    retain_run.add_argument("--evidence", required=True, type=Path)
+    retain_run.add_argument("--reject-completed-failure", action="store_true")
+    retain_run.add_argument("--require-success", action="store_true")
 
     args = parser.parse_args()
     token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
@@ -1337,13 +1624,70 @@ def main() -> int:
                 runs = json.loads(args.runs.read_bytes())
             except (OSError, json.JSONDecodeError) as error:
                 raise RecoveryError(f"cannot read publication run metadata: {error}", "publication") from error
-            selection = select_publication_run(args.release_tag, args.release_commit, runs)
+            selection = select_publication_run(
+                args.release_tag,
+                args.release_commit,
+                args.required_event,
+                args.required_head_branch,
+                args.required_display_title,
+                runs,
+            )
             print(
                 "\t".join(
                     str(selection.get(field) or "")
                     for field in ("action", "run_id", "status", "conclusion")
                 )
             )
+        elif args.command == "select-tag-push-run":
+            try:
+                runs = json.loads(args.runs.read_bytes())
+            except (OSError, json.JSONDecodeError) as error:
+                raise RecoveryError(f"cannot read tag-push run metadata: {error}", "publication") from error
+            selection = select_tag_push_run(args.release_tag, args.release_commit, runs)
+            print(
+                "\t".join(
+                    str(selection.get(field) or "")
+                    for field in ("action", "run_id", "status", "conclusion")
+                )
+            )
+        elif args.command == "retain-tag-push-run":
+            try:
+                run = json.loads(args.run.read_bytes())
+            except (OSError, json.JSONDecodeError) as error:
+                raise RecoveryError(f"cannot read tag-push run metadata: {error}", "publication") from error
+            evidence = retain_tag_push_run(
+                args.repository,
+                args.release_tag,
+                args.release_commit,
+                args.run_id,
+                run,
+            )
+            args.evidence.write_bytes(canonical_json(evidence))
+            print(f"retained cancelled tag-push run {args.run_id} for {args.release_tag} at {args.release_commit}")
+        elif args.command == "validate-dispatch-response":
+            try:
+                response = json.loads(args.response.read_bytes())
+            except (OSError, json.JSONDecodeError) as error:
+                raise RecoveryError(f"cannot read workflow dispatch response: {error}", "publication") from error
+            print(validate_dispatch_response(args.repository, response))
+        elif args.command == "retain-publication-run":
+            try:
+                run = json.loads(args.run.read_bytes())
+            except (OSError, json.JSONDecodeError) as error:
+                raise RecoveryError(f"cannot read publication run metadata: {error}", "publication") from error
+            evidence = retain_publication_run(
+                args.repository,
+                args.release_tag,
+                args.release_commit,
+                args.control_ref,
+                args.display_title,
+                args.run_id,
+                run,
+                reject_completed_failure=args.reject_completed_failure,
+                require_success=args.require_success,
+            )
+            args.evidence.write_bytes(canonical_json(evidence))
+            print(f"retained exact publication run {args.run_id} for {args.release_tag} at {args.release_commit}")
         elif args.command == "resolve":
             tag: str | None = args.plan_tag
             record_commit: str | None = None

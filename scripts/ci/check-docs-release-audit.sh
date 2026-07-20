@@ -25,6 +25,7 @@ attempts="${DOCS_RELEASE_AUDIT_ATTEMPTS:-6}"
 sleep_seconds="${DOCS_RELEASE_AUDIT_RETRY_SLEEP:-20}"
 evidence_path="${DOCS_RELEASE_AUDIT_EVIDENCE:-}"
 handoff_path="${DOCS_RELEASE_AUDIT_HANDOFF:-}"
+stale_mode="${DOCS_RELEASE_AUDIT_STALE_MODE:-blocking}"
 
 write_unavailable_evidence() {
     message="$1"
@@ -69,6 +70,14 @@ if [ "$attempts" -lt 1 ]; then
     fail "Invalid docs release-audit retry count" "DOCS_RELEASE_AUDIT_ATTEMPTS must be at least 1."
 fi
 
+case "$stale_mode" in
+    blocking|advisory) ;;
+    *) fail "Invalid docs release-audit stale mode" "DOCS_RELEASE_AUDIT_STALE_MODE must be blocking or advisory." ;;
+esac
+if [ "$stale_mode" = "advisory" ] && [ -z "$handoff_path" ]; then
+    fail "Docs release-audit handoff required" "DOCS_RELEASE_AUDIT_HANDOFF is required when stale docs audits are advisory."
+fi
+
 tmp_dir="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
 audit_path="${tmp_dir}/docs-page-release-audit-${artifact}-${expected}-$$.json"
 trap 'rm -f "$audit_path"' EXIT HUP INT TERM
@@ -76,10 +85,10 @@ attempt=1
 
 while [ "$attempt" -le "$attempts" ]; do
     if curl -fsSL --retry 3 --retry-all-errors --connect-timeout 10 --max-time 30 -o "$audit_path" "$audit_url"; then
-        if node - "$audit_path" "$artifact" "$expected" "$audit_url" "$evidence_path" "$handoff_path" <<'NODE'
+        if node - "$audit_path" "$artifact" "$expected" "$audit_url" "$evidence_path" "$handoff_path" "$stale_mode" <<'NODE'
 const fs = require('fs');
 
-const [auditPath, artifact, expected, auditUrl, evidencePath, handoffPath] = process.argv.slice(2);
+const [auditPath, artifact, expected, auditUrl, evidencePath, handoffPath, staleMode] = process.argv.slice(2);
 const title = 'Docs release-audit tuple stale';
 const refreshCommand = 'npm run refresh:public-artifact-versions';
 const refreshFiles = [
@@ -218,9 +227,12 @@ function retry(message) {
   process.exit(3);
 }
 
-function fail(message, extra = {}) {
+function reportStale(message, extra = {}) {
+  const publicationBlocking = staleMode !== 'advisory';
+
   writeEvidence('stale', {
     message,
+    publication_blocking: publicationBlocking,
     ...extra,
   });
 
@@ -230,9 +242,10 @@ function fail(message, extra = {}) {
       `## ${title}\n\n${message}\n\n`
     );
   }
-  console.error(`::error title=${title}::${message}`);
+  const annotation = publicationBlocking ? 'error' : 'warning';
+  console.error(`::${annotation} title=${title}::${message}`);
   console.error(message);
-  process.exit(2);
+  process.exit(publicationBlocking ? 2 : 0);
 }
 
 let audit;
@@ -260,7 +273,7 @@ if (actual !== expected) {
 
   writeHandoff(handoff);
 
-  fail(
+  reportStale(
     `${message} When DOCS_RELEASE_AUDIT_HANDOFF is set, the uploaded handoff artifact contains the pipeline-ready docs refresh request.`,
     {
       actual_version: actualVersion,

@@ -31,6 +31,7 @@ final class ReleaseInstallerContractTest extends TestCase
         self::assertStringContainsString("if: steps.public_assets.outputs.present == 'true'", $releaseWorkflow);
         self::assertStringContainsString('DOCS_RELEASE_AUDIT_EVIDENCE: docs-release-audit-evidence.json', $releaseWorkflow);
         self::assertStringContainsString('DOCS_RELEASE_AUDIT_HANDOFF: docs-release-audit-handoff.json', $releaseWorkflow);
+        self::assertSame(2, substr_count($releaseWorkflow, 'DOCS_RELEASE_AUDIT_STALE_MODE: advisory'));
         self::assertStringContainsString('release-preflight-public-assets-evidence.json', $releaseWorkflow);
         self::assertStringContainsString('docs-release-audit-handoff.json', $releaseWorkflow);
         self::assertStringContainsString('needs: [resolve-release, release-preflight]', $releaseWorkflow);
@@ -46,6 +47,9 @@ final class ReleaseInstallerContractTest extends TestCase
         self::assertStringContainsString('VERSION="$tag" DURABLE_WORKFLOW_INSTALL_DIR="$install_dir"', $releaseWorkflow);
         self::assertStringNotContainsString('scripts/verify-public-release-assets.sh "${{ needs.resolve-release.outputs.tag }}"', $releaseWorkflow);
         self::assertStringNotContainsString('continue-on-error: true', $releaseWorkflow);
+        self::assertStringContainsString('fail_on_unmatched_files: true', $releaseWorkflow);
+        self::assertStringContainsString('Missing required release artifact: $artifact', $releaseWorkflow);
+        self::assertStringContainsString('Public release asset is not downloadable: $url', $releaseWorkflow);
         self::assertStringContainsString("needs.build-binary-windows.result == 'success'", $releaseWorkflow);
         self::assertStringContainsString('dw-windows-x86_64.exe', $releaseWorkflow);
         self::assertStringContainsString('.\\build\\dw-windows-x86_64.exe runtime:check', $releaseWorkflow);

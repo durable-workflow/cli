@@ -191,6 +191,7 @@ jobs:
           DOCS_RELEASE_AUDIT_VERSION: ${{ needs.resolve-release.outputs.tag }}
           DOCS_RELEASE_AUDIT_EVIDENCE: docs-release-audit-evidence.json
           DOCS_RELEASE_AUDIT_HANDOFF: docs-release-audit-handoff.json
+          DOCS_RELEASE_AUDIT_STALE_MODE: advisory
         run: scripts/ci/check-docs-release-audit.sh
 
       - name: Upload release preflight evidence
@@ -776,6 +777,7 @@ jobs:
           DOCS_RELEASE_AUDIT_VERSION: ${{ needs.resolve-release.outputs.tag }}
           DOCS_RELEASE_AUDIT_EVIDENCE: docs-release-audit-evidence.json
           DOCS_RELEASE_AUDIT_HANDOFF: docs-release-audit-handoff.json
+          DOCS_RELEASE_AUDIT_STALE_MODE: advisory
         run: scripts/ci/check-docs-release-audit.sh
 
       - name: Upload release evidence

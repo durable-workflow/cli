@@ -120,6 +120,77 @@ function releaseCheckSource() {
   };
 }
 
+function releaseVersionRank(version) {
+  if (typeof version !== 'string') {
+    return null;
+  }
+
+  const match = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*))?(?:\+[0-9A-Za-z.-]+)?$/.exec(version);
+  if (!match) {
+    return null;
+  }
+
+  return {
+    core: match.slice(1, 4).map(Number),
+    prerelease: match[4] ? match[4].split('.') : null,
+  };
+}
+
+function compareReleaseVersions(left, right) {
+  const leftRank = releaseVersionRank(left);
+  const rightRank = releaseVersionRank(right);
+
+  if (!leftRank || !rightRank) {
+    return null;
+  }
+
+  for (let index = 0; index < leftRank.core.length; index += 1) {
+    const difference = leftRank.core[index] - rightRank.core[index];
+    if (difference !== 0) {
+      return difference;
+    }
+  }
+
+  if (leftRank.prerelease === null || rightRank.prerelease === null) {
+    if (leftRank.prerelease === rightRank.prerelease) {
+      return 0;
+    }
+
+    return leftRank.prerelease === null ? 1 : -1;
+  }
+
+  const width = Math.max(leftRank.prerelease.length, rightRank.prerelease.length);
+  for (let index = 0; index < width; index += 1) {
+    const leftPart = leftRank.prerelease[index];
+    const rightPart = rightRank.prerelease[index];
+
+    if (leftPart === undefined || rightPart === undefined) {
+      return leftPart === undefined ? -1 : 1;
+    }
+
+    const leftNumeric = /^\d+$/.test(leftPart);
+    const rightNumeric = /^\d+$/.test(rightPart);
+    if (leftNumeric && rightNumeric) {
+      const difference = Number(leftPart) - Number(rightPart);
+      if (difference !== 0) {
+        return difference;
+      }
+      continue;
+    }
+
+    if (leftNumeric !== rightNumeric) {
+      return leftNumeric ? -1 : 1;
+    }
+
+    const difference = leftPart.localeCompare(rightPart);
+    if (difference !== 0) {
+      return difference;
+    }
+  }
+
+  return 0;
+}
+
 function docsRefreshHandoff(message, actualVersion, observedVersions) {
   const staleArtifact = {
     name: artifact,
@@ -265,8 +336,28 @@ if (!versions || typeof versions !== 'object' || Array.isArray(versions)) {
 }
 
 const actual = versions[artifact];
+const actualPresent = Object.prototype.hasOwnProperty.call(versions, artifact);
+if (actualPresent && releaseVersionRank(actual) === null) {
+  retry(`${auditUrl} reports invalid artifact_versions.${artifact}=${String(actual)}.`);
+}
+
 if (actual !== expected) {
-  const actualVersion = Object.prototype.hasOwnProperty.call(versions, artifact) ? actual : null;
+  const actualVersion = actualPresent ? actual : null;
+  const versionOrder = compareReleaseVersions(actualVersion, expected);
+
+  if (versionOrder !== null && versionOrder > 0) {
+    const message = `${auditUrl} already reports newer artifact_versions.${artifact}=${actualVersion}; ` +
+      `the replayed ${expected} release is superseded and must not request a docs tuple refresh.`;
+
+    writeEvidence('superseded', {
+      actual_version: actualVersion,
+      publication_blocking: false,
+      message,
+    });
+    console.log(message);
+    process.exit(0);
+  }
+
   const message = `${auditUrl} reports artifact_versions.${artifact}=${actual || '<missing>'}, expected ${expected}. ` +
     'Run npm run refresh:public-artifact-versions in durable-workflow.github.io and land scripts/public-artifact-versions.json plus docs/compatibility.md through the normal docs merge path before treating this release as fully surfaced.';
   const handoff = docsRefreshHandoff(message, actualVersion, versions);

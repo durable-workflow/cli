@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 
@@ -68,6 +69,146 @@ final class DocsReleaseAuditTest extends TestCase
         self::assertSame(1, $process->getExitCode());
         self::assertStringContainsString('::error title=Docs release-audit tuple stale::', $process->getErrorOutput());
         self::assertTrue($this->readJson($evidence)['publication_blocking']);
+    }
+
+    public function test_older_release_replay_does_not_request_a_docs_tuple_downgrade(): void
+    {
+        $sandbox = $this->createSandbox();
+        $audit = $this->writeAudit($sandbox, '0.1.94');
+        $evidence = $sandbox.'/evidence.json';
+        $handoff = $sandbox.'/handoff.json';
+
+        $process = $this->runAudit($sandbox, $audit, $evidence, $handoff, 'advisory');
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        self::assertStringContainsString(
+            'the replayed 0.1.93 release is superseded and must not request a docs tuple refresh',
+            $process->getOutput(),
+        );
+        self::assertStringNotContainsString('Docs release-audit tuple stale', $process->getErrorOutput());
+        self::assertFileDoesNotExist($handoff);
+
+        $evidencePayload = $this->readJson($evidence);
+        self::assertSame('superseded', $evidencePayload['outcome']);
+        self::assertSame('0.1.93', $evidencePayload['expected_version']);
+        self::assertSame('0.1.94', $evidencePayload['actual_version']);
+        self::assertFalse($evidencePayload['publication_blocking']);
+        self::assertArrayNotHasKey('docs_refresh_request', $evidencePayload);
+        self::assertArrayNotHasKey('docs_artifact_tuple_handoff', $evidencePayload);
+    }
+
+    public function test_exact_docs_tuple_passes_without_a_handoff(): void
+    {
+        $sandbox = $this->createSandbox();
+        $audit = $this->writeAudit($sandbox, '0.1.93');
+        $evidence = $sandbox.'/evidence.json';
+        $handoff = $sandbox.'/handoff.json';
+
+        $process = $this->runAudit($sandbox, $audit, $evidence, $handoff, 'advisory');
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        self::assertStringContainsString(
+            'confirms artifact_versions.cli=0.1.93',
+            $process->getOutput(),
+        );
+        self::assertStringNotContainsString('Docs release-audit tuple stale', $process->getErrorOutput());
+        self::assertFileDoesNotExist($handoff);
+
+        $evidencePayload = $this->readJson($evidence);
+        self::assertSame('pass', $evidencePayload['outcome']);
+        self::assertSame('0.1.93', $evidencePayload['expected_version']);
+        self::assertSame('0.1.93', $evidencePayload['actual_version']);
+        self::assertArrayNotHasKey('docs_refresh_request', $evidencePayload);
+        self::assertArrayNotHasKey('docs_artifact_tuple_handoff', $evidencePayload);
+    }
+
+    public function test_newer_numeric_prerelease_does_not_request_a_docs_tuple_downgrade(): void
+    {
+        $sandbox = $this->createSandbox();
+        $audit = $this->writeAudit($sandbox, '2.0.0-alpha.138');
+        $evidence = $sandbox.'/evidence.json';
+        $handoff = $sandbox.'/handoff.json';
+
+        $process = $this->runAudit(
+            $sandbox,
+            $audit,
+            $evidence,
+            $handoff,
+            'advisory',
+            '2.0.0-alpha.137',
+        );
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        self::assertStringContainsString(
+            'the replayed 2.0.0-alpha.137 release is superseded and must not request a docs tuple refresh',
+            $process->getOutput(),
+        );
+        self::assertStringNotContainsString('Docs release-audit tuple stale', $process->getErrorOutput());
+        self::assertFileDoesNotExist($handoff);
+
+        $evidencePayload = $this->readJson($evidence);
+        self::assertSame('superseded', $evidencePayload['outcome']);
+        self::assertSame('2.0.0-alpha.137', $evidencePayload['expected_version']);
+        self::assertSame('2.0.0-alpha.138', $evidencePayload['actual_version']);
+        self::assertFalse($evidencePayload['publication_blocking']);
+        self::assertArrayNotHasKey('docs_refresh_request', $evidencePayload);
+        self::assertArrayNotHasKey('docs_artifact_tuple_handoff', $evidencePayload);
+    }
+
+    public function test_older_numeric_prerelease_remains_stale_and_requests_a_handoff(): void
+    {
+        $sandbox = $this->createSandbox();
+        $audit = $this->writeAudit($sandbox, '2.0.0-alpha.136');
+        $evidence = $sandbox.'/evidence.json';
+        $handoff = $sandbox.'/handoff.json';
+
+        $process = $this->runAudit(
+            $sandbox,
+            $audit,
+            $evidence,
+            $handoff,
+            'advisory',
+            '2.0.0-alpha.137',
+        );
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        self::assertStringContainsString('::warning title=Docs release-audit tuple stale::', $process->getErrorOutput());
+
+        $evidencePayload = $this->readJson($evidence);
+        self::assertSame('stale', $evidencePayload['outcome']);
+        self::assertSame('2.0.0-alpha.137', $evidencePayload['expected_version']);
+        self::assertSame('2.0.0-alpha.136', $evidencePayload['actual_version']);
+        self::assertFalse($evidencePayload['publication_blocking']);
+
+        $handoffPayload = $this->readJson($handoff);
+        self::assertSame('2.0.0-alpha.137', $handoffPayload['stale_artifact']['expected_version']);
+        self::assertSame('2.0.0-alpha.136', $handoffPayload['stale_artifact']['live_version']);
+    }
+
+    #[DataProvider('staleModes')]
+    public function test_invalid_advertised_version_is_a_hard_failure_without_a_handoff(?string $staleMode): void
+    {
+        $sandbox = $this->createSandbox();
+        $audit = $this->writeAudit($sandbox, 'not-a-version');
+        $evidence = $sandbox.'/evidence.json';
+        $handoff = $sandbox.'/handoff.json';
+
+        $process = $this->runAudit($sandbox, $audit, $evidence, $handoff, $staleMode);
+
+        self::assertSame(1, $process->getExitCode());
+        self::assertStringContainsString(
+            'reports invalid artifact_versions.cli=not-a-version',
+            $process->getErrorOutput(),
+        );
+        self::assertSame('unavailable', $this->readJson($evidence)['outcome']);
+        self::assertFileDoesNotExist($handoff);
+    }
+
+    /** @return iterable<string, array{?string}> */
+    public static function staleModes(): iterable
+    {
+        yield 'blocking' => [null];
+        yield 'advisory' => ['advisory'];
     }
 
     public function test_advisory_mode_requires_an_uploadable_handoff(): void
@@ -153,6 +294,7 @@ SH));
         string $evidence,
         string $handoff,
         ?string $staleMode = null,
+        string $expectedVersion = '0.1.93',
     ): Process {
         $summary = $sandbox.'/summary.md';
         $this->temporaryPaths[] = $summary;
@@ -165,7 +307,7 @@ SH));
             'PATH' => $sandbox.':'.getenv('PATH'),
             'FAKE_AUDIT_SOURCE' => $audit,
             'DOCS_RELEASE_AUDIT_ARTIFACT' => 'cli',
-            'DOCS_RELEASE_AUDIT_VERSION' => '0.1.93',
+            'DOCS_RELEASE_AUDIT_VERSION' => $expectedVersion,
             'DOCS_RELEASE_AUDIT_URL' => 'https://docs.example.invalid/release-audit.json',
             'DOCS_RELEASE_AUDIT_ATTEMPTS' => '1',
             'DOCS_RELEASE_AUDIT_RETRY_SLEEP' => '0',
@@ -174,7 +316,7 @@ SH));
             'GITHUB_STEP_SUMMARY' => $summary,
             'GITHUB_SERVER_URL' => 'https://github.com',
             'GITHUB_REPOSITORY' => 'durable-workflow/cli',
-            'GITHUB_REF_NAME' => '0.1.93',
+            'GITHUB_REF_NAME' => $expectedVersion,
             'GITHUB_SHA' => str_repeat('a', 40),
             'GITHUB_RUN_ID' => '1234',
             'GITHUB_RUN_ATTEMPT' => '1',

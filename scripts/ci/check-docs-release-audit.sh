@@ -26,6 +26,8 @@ sleep_seconds="${DOCS_RELEASE_AUDIT_RETRY_SLEEP:-20}"
 evidence_path="${DOCS_RELEASE_AUDIT_EVIDENCE:-}"
 handoff_path="${DOCS_RELEASE_AUDIT_HANDOFF:-}"
 stale_mode="${DOCS_RELEASE_AUDIT_STALE_MODE:-blocking}"
+script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+release_version_helper="${script_dir}/release-version.js"
 
 write_unavailable_evidence() {
     message="$1"
@@ -55,9 +57,11 @@ case "$artifact" in
     *) fail "Docs release-audit artifact required" "DOCS_RELEASE_AUDIT_ARTIFACT must be one of cli, sdk-python, server, workflow, or waterline." ;;
 esac
 
-expected="${expected#v}"
 if [ -z "$expected" ]; then
     fail "Docs release-audit version required" "DOCS_RELEASE_AUDIT_VERSION or GITHUB_REF_NAME must name the published artifact version."
+fi
+if ! expected="$(node "$release_version_helper" normalize "$expected" 2>/dev/null)"; then
+    fail "Invalid docs release-audit version" "DOCS_RELEASE_AUDIT_VERSION or GITHUB_REF_NAME must be exact SemVer with at most one leading v."
 fi
 
 case "$attempts" in
@@ -85,10 +89,11 @@ attempt=1
 
 while [ "$attempt" -le "$attempts" ]; do
     if curl -fsSL --retry 3 --retry-all-errors --connect-timeout 10 --max-time 30 -o "$audit_path" "$audit_url"; then
-        if node - "$audit_path" "$artifact" "$expected" "$audit_url" "$evidence_path" "$handoff_path" "$stale_mode" <<'NODE'
+        if node - "$audit_path" "$artifact" "$expected" "$audit_url" "$evidence_path" "$handoff_path" "$stale_mode" "$release_version_helper" <<'NODE'
 const fs = require('fs');
 
-const [auditPath, artifact, expected, auditUrl, evidencePath, handoffPath, staleMode] = process.argv.slice(2);
+const [auditPath, artifact, expected, auditUrl, evidencePath, handoffPath, staleMode, releaseVersionHelper] = process.argv.slice(2);
+const {compareReleaseVersions, parseReleaseVersion} = require(releaseVersionHelper);
 const title = 'Docs release-audit tuple stale';
 const refreshCommand = 'npm run refresh:public-artifact-versions';
 const refreshFiles = [
@@ -118,77 +123,6 @@ function releaseCheckSource() {
       ? `${serverUrl}/${repository}/actions/runs/${runId}`
       : null,
   };
-}
-
-function releaseVersionRank(version) {
-  if (typeof version !== 'string') {
-    return null;
-  }
-
-  const match = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*))?(?:\+[0-9A-Za-z.-]+)?$/.exec(version);
-  if (!match) {
-    return null;
-  }
-
-  return {
-    core: match.slice(1, 4).map(Number),
-    prerelease: match[4] ? match[4].split('.') : null,
-  };
-}
-
-function compareReleaseVersions(left, right) {
-  const leftRank = releaseVersionRank(left);
-  const rightRank = releaseVersionRank(right);
-
-  if (!leftRank || !rightRank) {
-    return null;
-  }
-
-  for (let index = 0; index < leftRank.core.length; index += 1) {
-    const difference = leftRank.core[index] - rightRank.core[index];
-    if (difference !== 0) {
-      return difference;
-    }
-  }
-
-  if (leftRank.prerelease === null || rightRank.prerelease === null) {
-    if (leftRank.prerelease === rightRank.prerelease) {
-      return 0;
-    }
-
-    return leftRank.prerelease === null ? 1 : -1;
-  }
-
-  const width = Math.max(leftRank.prerelease.length, rightRank.prerelease.length);
-  for (let index = 0; index < width; index += 1) {
-    const leftPart = leftRank.prerelease[index];
-    const rightPart = rightRank.prerelease[index];
-
-    if (leftPart === undefined || rightPart === undefined) {
-      return leftPart === undefined ? -1 : 1;
-    }
-
-    const leftNumeric = /^\d+$/.test(leftPart);
-    const rightNumeric = /^\d+$/.test(rightPart);
-    if (leftNumeric && rightNumeric) {
-      const difference = Number(leftPart) - Number(rightPart);
-      if (difference !== 0) {
-        return difference;
-      }
-      continue;
-    }
-
-    if (leftNumeric !== rightNumeric) {
-      return leftNumeric ? -1 : 1;
-    }
-
-    const difference = leftPart.localeCompare(rightPart);
-    if (difference !== 0) {
-      return difference;
-    }
-  }
-
-  return 0;
 }
 
 function docsRefreshHandoff(message, actualVersion, observedVersions) {
@@ -337,7 +271,7 @@ if (!versions || typeof versions !== 'object' || Array.isArray(versions)) {
 
 const actual = versions[artifact];
 const actualPresent = Object.prototype.hasOwnProperty.call(versions, artifact);
-if (actualPresent && releaseVersionRank(actual) === null) {
+if (actualPresent && parseReleaseVersion(actual) === null) {
   retry(`${auditUrl} reports invalid artifact_versions.${artifact}=${String(actual)}.`);
 }
 

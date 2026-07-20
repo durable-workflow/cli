@@ -17,7 +17,7 @@ final class ReleaseInstallerContractTest extends TestCase
         self::assertStringContainsString('DISPATCH_TAG: ${{ inputs.tag }}', $releaseWorkflow);
         self::assertStringContainsString('0.0.1-test or v0.0.1-test', $releaseWorkflow);
         self::assertStringContainsString('raw_tag="$tag"', $releaseWorkflow);
-        self::assertStringContainsString('tag="${tag#v}"', $releaseWorkflow);
+        self::assertStringContainsString('node scripts/ci/release-version.js normalize "$raw_tag"', $releaseWorkflow);
         self::assertStringContainsString('ref: ${{ needs.resolve-release.outputs.commit }}', $releaseWorkflow);
         self::assertStringContainsString('DW_CLI_VERSION: ${{ needs.resolve-release.outputs.tag }}', $releaseWorkflow);
         self::assertStringContainsString('DW_CLI_COMMIT="$(git rev-parse HEAD)"', $releaseWorkflow);
@@ -100,6 +100,7 @@ final class ReleaseInstallerContractTest extends TestCase
         self::assertStringContainsString('sh -n scripts/verify-release.sh', $buildWorkflow);
         self::assertStringContainsString('bash -n scripts/verify-public-release-assets.sh', $buildWorkflow);
         self::assertStringContainsString('sh -n scripts/ci/check-docs-release-audit.sh', $buildWorkflow);
+        self::assertStringContainsString('node --check scripts/ci/release-version.js', $buildWorkflow);
         self::assertStringContainsString('bash -n scripts/ci/verify-release-tag-source.sh', $buildWorkflow);
         self::assertStringContainsString('scripts/install.ps1', $buildWorkflow);
     }
@@ -218,7 +219,7 @@ SH);
         self::assertStringContainsString('gh attestation verify', $verifier);
         self::assertStringContainsString('DURABLE_WORKFLOW_VERIFY_ATTESTATIONS', $verifier);
         self::assertStringContainsString('raw_tag="${1:-}"', $publicAssetVerifier);
-        self::assertStringContainsString('tag="${raw_tag#v}"', $publicAssetVerifier);
+        self::assertStringContainsString('release-version.js" normalize "$raw_tag"', $publicAssetVerifier);
         self::assertStringContainsString('releases/download/${tag}/${artifact}', $publicAssetVerifier);
         self::assertStringContainsString('curl -fsSLI --retry 3 --retry-all-errors', $publicAssetVerifier);
         self::assertStringContainsString('dw-windows-x86_64.exe', $publicAssetVerifier);

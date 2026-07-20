@@ -11,9 +11,11 @@ release_tag="${RELEASE_TAG:-}"
 release_commit="${RELEASE_COMMIT:-}"
 repository="${GITHUB_REPOSITORY:-}"
 gh_cli="${GH_CLI:-gh}"
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
-[[ "$release_tag" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z][0-9A-Za-z.-]*)?$ ]] \
-    || fail "RELEASE_TAG must be an exact release version."
+if ! release_tag="$(node "$script_dir/release-version.js" normalize "$release_tag" 2>/dev/null)"; then
+    fail "RELEASE_TAG must be an exact SemVer release version with at most one leading v."
+fi
 [[ "$release_commit" =~ ^[0-9a-f]{40}$ ]] \
     || fail "RELEASE_COMMIT must be a full lowercase Git commit SHA."
 [[ "$repository" =~ ^[0-9A-Za-z_.-]+/[0-9A-Za-z_.-]+$ ]] \

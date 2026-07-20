@@ -122,6 +122,66 @@ final class DocsReleaseAuditTest extends TestCase
         self::assertArrayNotHasKey('docs_artifact_tuple_handoff', $evidencePayload);
     }
 
+    #[DataProvider('acceptedReleaseVersions')]
+    public function test_release_resolver_versions_exactly_match_the_docs_audit(
+        string $releaseTag,
+        string $advertisedVersion,
+    ): void {
+        $resolver = $this->runReleaseResolver($releaseTag);
+        self::assertSame(0, $resolver->getExitCode(), $resolver->getErrorOutput());
+        self::assertSame($advertisedVersion."\n", $resolver->getOutput());
+
+        $sandbox = $this->createSandbox();
+        $audit = $this->writeAudit($sandbox, $advertisedVersion);
+        $evidence = $sandbox.'/evidence.json';
+        $handoff = $sandbox.'/handoff.json';
+        $process = $this->runAudit(
+            $sandbox,
+            $audit,
+            $evidence,
+            $handoff,
+            'advisory',
+            $advertisedVersion,
+        );
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        self::assertSame('pass', $this->readJson($evidence)['outcome']);
+        self::assertFileDoesNotExist($handoff);
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function acceptedReleaseVersions(): iterable
+    {
+        yield 'stable' => ['1.2.3', '1.2.3'];
+        yield 'optional v prefix' => ['v1.2.3-rc-linux.1', '1.2.3-rc-linux.1'];
+        yield 'hyphenated prerelease identifier' => ['1.2.3-rc-linux.1', '1.2.3-rc-linux.1'];
+        yield 'hyphenated prerelease and build identifiers' => [
+            '1.2.3-rc-linux.1+linux-x86-64.7',
+            '1.2.3-rc-linux.1+linux-x86-64.7',
+        ];
+    }
+
+    public function test_hyphenated_prerelease_identifiers_follow_semver_precedence(): void
+    {
+        $sandbox = $this->createSandbox();
+        $audit = $this->writeAudit($sandbox, '1.2.3-rc-linux.10');
+        $evidence = $sandbox.'/evidence.json';
+        $handoff = $sandbox.'/handoff.json';
+
+        $process = $this->runAudit(
+            $sandbox,
+            $audit,
+            $evidence,
+            $handoff,
+            'advisory',
+            '1.2.3-rc-linux.2',
+        );
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        self::assertSame('superseded', $this->readJson($evidence)['outcome']);
+        self::assertFileDoesNotExist($handoff);
+    }
+
     public function test_newer_numeric_prerelease_does_not_request_a_docs_tuple_downgrade(): void
     {
         $sandbox = $this->createSandbox();
@@ -202,6 +262,35 @@ final class DocsReleaseAuditTest extends TestCase
         );
         self::assertSame('unavailable', $this->readJson($evidence)['outcome']);
         self::assertFileDoesNotExist($handoff);
+    }
+
+    #[DataProvider('malformedReleaseVersions')]
+    public function test_malformed_versions_are_rejected_by_the_resolver_and_docs_audit(string $version): void
+    {
+        $resolver = $this->runReleaseResolver($version);
+        self::assertSame(1, $resolver->getExitCode());
+
+        $sandbox = $this->createSandbox();
+        $audit = $this->writeAudit($sandbox, $version);
+        $evidence = $sandbox.'/evidence.json';
+        $handoff = $sandbox.'/handoff.json';
+        $process = $this->runAudit($sandbox, $audit, $evidence, $handoff, 'advisory');
+
+        self::assertSame(1, $process->getExitCode());
+        self::assertStringContainsString(
+            "reports invalid artifact_versions.cli={$version}",
+            $process->getErrorOutput(),
+        );
+        self::assertFileDoesNotExist($handoff);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function malformedReleaseVersions(): iterable
+    {
+        yield 'leading zero in core' => ['01.2.3'];
+        yield 'leading zero in numeric prerelease' => ['1.2.3-01'];
+        yield 'empty prerelease identifier' => ['1.2.3-rc..1'];
+        yield 'empty build identifier' => ['1.2.3+linux..1'];
     }
 
     /** @return iterable<string, array{?string}> */
@@ -330,6 +419,19 @@ SH));
             dirname(__DIR__),
             $environment,
         );
+        $process->run();
+
+        return $process;
+    }
+
+    private function runReleaseResolver(string $version): Process
+    {
+        $process = new Process([
+            'node',
+            dirname(__DIR__).'/scripts/ci/release-version.js',
+            'normalize',
+            $version,
+        ], dirname(__DIR__));
         $process->run();
 
         return $process;

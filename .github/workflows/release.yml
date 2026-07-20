@@ -53,6 +53,9 @@ jobs:
       tag: ${{ steps.resolve.outputs.tag }}
       commit: ${{ steps.resolve.outputs.commit }}
     steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.release_commit || github.sha }}
       - id: resolve
         shell: bash
         env:
@@ -75,9 +78,7 @@ jobs:
           fi
 
           raw_tag="$tag"
-          tag="${tag#v}"
-
-          if ! printf '%s\n' "$tag" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z][0-9A-Za-z.-]*)?$'; then
+          if ! tag="$(node scripts/ci/release-version.js normalize "$raw_tag")"; then
             echo "::error::Invalid release tag: $raw_tag"
             exit 1
           fi

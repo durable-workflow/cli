@@ -34,6 +34,7 @@ jobs:
           sh -n scripts/generate-homebrew-formula.sh
           sh -n scripts/verify-release.sh
           sh -n scripts/ci/check-docs-release-audit.sh
+          node --check scripts/ci/release-version.js
           bash -n scripts/ci/verify-release-tag-source.sh
           bash -n scripts/verify-public-release-assets.sh
           bash -n scripts/verify-reproducible-build.sh

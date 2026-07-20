@@ -7,6 +7,7 @@ set -euo pipefail
 REPO="${DURABLE_WORKFLOW_REPO:-durable-workflow/cli}"
 ATTEMPTS="${DURABLE_WORKFLOW_RELEASE_ASSET_ATTEMPTS:-12}"
 SLEEP_SECONDS="${DURABLE_WORKFLOW_RELEASE_ASSET_RETRY_SLEEP:-10}"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
 err() {
     printf 'error: %s\n' "$*" >&2
@@ -34,8 +35,7 @@ if [ -z "$raw_tag" ]; then
 fi
 shift
 
-tag="${raw_tag#v}"
-if ! printf '%s\n' "$tag" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z][0-9A-Za-z.-]*)?$'; then
+if ! tag="$(node "$SCRIPT_DIR/ci/release-version.js" normalize "$raw_tag" 2>/dev/null)"; then
     err "invalid release tag: $raw_tag"
 fi
 

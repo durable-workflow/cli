@@ -21,6 +21,20 @@ CONTROL_COMMIT = "d2b069acbd23219074f78a3162f2a2394b7beffc"
 RUN_ID = 194
 
 
+def workflow_job(workflow: str, name: str) -> str:
+    lines = workflow.splitlines()
+    start = lines.index(f"  {name}:")
+    end = next(
+        (
+            index
+            for index, line in enumerate(lines[start + 1 :], start=start + 1)
+            if line.startswith("  ") and not line.startswith("   ")
+        ),
+        len(lines),
+    )
+    return "\n".join(lines[start:end])
+
+
 def load_recovery_module():
     spec = importlib.util.spec_from_file_location("component_release_recovery_run_test", RECOVERY_SCRIPT)
     assert spec is not None and spec.loader is not None
@@ -81,6 +95,26 @@ class PublicationRunRetentionTest(unittest.TestCase):
         )
         value.update(updates)
         return value
+
+    def test_manual_dispatches_require_main_before_repository_source_execution(self) -> None:
+        workflows = {
+            "release recovery": (
+                REPOSITORY_ROOT / ".github/workflows/release-plan-recovery.yml",
+                "discover",
+            ),
+            "release": (REPOSITORY_ROOT / ".github/workflows/release.yml", "resolve-release"),
+        }
+        protected_dispatch_guard = """    if: >-
+      github.event_name != 'workflow_dispatch' ||
+      github.ref == 'refs/heads/main'"""
+
+        for label, (path, first_job) in workflows.items():
+            with self.subTest(workflow=label):
+                source = workflow_job(path.read_text(encoding="utf-8"), first_job)
+                pre_steps, separator, steps = source.partition("    steps:\n")
+                self.assertEqual("    steps:\n", separator)
+                self.assertEqual(1, pre_steps.count(protected_dispatch_guard))
+                self.assertIn("actions/checkout@", steps)
 
     def test_repository_workflow_is_the_pinned_protected_source(self) -> None:
         workflow = (REPOSITORY_ROOT / ".github/workflows/release-plan-recovery.yml").read_text(encoding="utf-8")

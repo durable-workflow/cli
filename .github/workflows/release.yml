@@ -46,6 +46,9 @@ env:
 jobs:
   resolve-release:
     name: Resolve release tag
+    if: >-
+      github.event_name != 'workflow_dispatch' ||
+      github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.resolve.outputs.tag }}
@@ -254,6 +257,8 @@ jobs:
     needs: [resolve-release, release-preflight]
     runs-on: ubuntu-latest
     if: >-
+      (github.event_name != 'workflow_dispatch' ||
+       github.ref == 'refs/heads/main') &&
       always() &&
       needs.resolve-release.result == 'success' &&
       needs.release-preflight.result == 'success' &&
@@ -606,6 +611,8 @@ jobs:
       contents: write
       id-token: write
     if: >-
+      (github.event_name != 'workflow_dispatch' ||
+       github.ref == 'refs/heads/main') &&
       always() &&
       needs.resolve-release.result == 'success' &&
       needs.release-preflight.result == 'success' &&

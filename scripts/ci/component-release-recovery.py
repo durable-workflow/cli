@@ -60,14 +60,14 @@ SOURCE_CHANGELOGS = {"workflow", "waterline", "sdk-php", "sdk-python"}
 # SHA-256 of durable-workflow/cli's protected release recovery workflow.
 # Exact source identity is required because source-pattern matching cannot
 # prove that tag creation remains inside the protected repository authority.
-CLI_RELEASE_RECOVERY_SHA256 = "29fde398856e0db8c43c14dc3c3544fcb21ad9c79db71661db1637e8f89c588a"
+CLI_RELEASE_RECOVERY_SHA256 = "de1e7f37bcbadf3644b53d127abcae11ec823fd6602a682a58617c6b257dae11"
 
 # SHA-256 of durable-workflow/sdk-rust's release recovery workflow using the
 # supported action runtimes. The verifier normalizes only CRLF line endings to
 # LF before hashing. Exact source identity is the bounded
 # security contract because arbitrary shell execution cannot be proven safe by
 # source-pattern matching.
-SDK_RUST_RELEASE_RECOVERY_SHA256 = "0055b197f7ef3f826275bd5514a33891a9cbf10f5d74b9fefa1647f5eefe868a"
+SDK_RUST_RELEASE_RECOVERY_SHA256 = "58684e7002d4674f2a6e819bb3c4aea18279bf17a4c8e90abc1d777d63034b0f"
 
 
 @dataclass(frozen=True)

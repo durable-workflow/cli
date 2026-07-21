@@ -434,7 +434,7 @@ final class CompatibilityDiagnostics
 
             $matches = true;
             foreach ($requirements as $requirement) {
-                if (! self::matchesSingleRequirement($versionParts, $requirement)) {
+                if (! self::matchesSingleRequirement($version, $versionParts, $requirement)) {
                     $matches = false;
                     break;
                 }
@@ -451,7 +451,7 @@ final class CompatibilityDiagnostics
     /**
      * @param  array{0: int, 1: int, 2: int}  $versionParts
      */
-    private static function matchesSingleRequirement(array $versionParts, string $requirement): bool
+    private static function matchesSingleRequirement(string $version, array $versionParts, string $requirement): bool
     {
         if ($requirement === '*' || $requirement === 'x') {
             return true;
@@ -466,7 +466,7 @@ final class CompatibilityDiagnostics
             return $versionParts[0] === (int) $matches[1];
         }
 
-        if (preg_match('/^(<=|>=|<|>|=)?\\s*v?(\\d+)(?:\\.(\\d+))?(?:\\.(\\d+))?/', $requirement, $matches) !== 1) {
+        if (preg_match('/^(<=|>=|<|>|=)?\\s*v?(\\d+)(?:\\.(\\d+))?(?:\\.(\\d+))?((?:-[0-9A-Za-z][0-9A-Za-z.-]*)?)$/', $requirement, $matches) !== 1) {
             return false;
         }
 
@@ -476,6 +476,13 @@ final class CompatibilityDiagnostics
             isset($matches[3]) && $matches[3] !== '' ? (int) $matches[3] : 0,
             isset($matches[4]) && $matches[4] !== '' ? (int) $matches[4] : 0,
         ];
+        $requiredVersion = implode('.', $requiredParts).($matches[5] ?? '');
+        $normalizedVersion = ltrim(trim($version), 'v');
+
+        if (($matches[5] ?? '') !== '' || str_contains($normalizedVersion, '-')) {
+            return version_compare($normalizedVersion, $requiredVersion, $operator);
+        }
+
         $comparison = self::compareVersionParts($versionParts, $requiredParts);
 
         return match ($operator) {

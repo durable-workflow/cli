@@ -18,7 +18,7 @@ Pin an exact release for CI, conformance, or reproducible automation:
 
 ```bash
 # Linux and macOS
-curl -fsSL https://durable-workflow.com/install.sh | VERSION=0.1.80 sh
+curl -fsSL https://durable-workflow.com/install.sh | VERSION=2.0.0-beta.3 sh
 ```
 
 ```powershell
@@ -28,7 +28,7 @@ irm https://durable-workflow.com/install.ps1 | iex
 
 ```powershell
 # Windows, exact release
-$env:VERSION = '0.1.80'
+$env:VERSION = '2.0.0-beta.3'
 irm https://durable-workflow.com/install.ps1 | iex
 ```
 
@@ -45,7 +45,7 @@ downloaded binary and `SHA256SUMS` before installation.
 Or download a native binary directly from the [releases
 page](https://github.com/durable-workflow/cli/releases). The current
 supported exact release in these examples is
-[`0.1.80`](https://github.com/durable-workflow/cli/releases/tag/0.1.80).
+[`2.0.0-beta.3`](https://github.com/durable-workflow/cli/releases/tag/2.0.0-beta.3).
 Available assets:
 `dw-linux-x86_64`, `dw-linux-aarch64`,
 `dw-macos-aarch64`, `dw-windows-x86_64.exe`.
@@ -129,14 +129,14 @@ asset, including `SHA256SUMS`, the installer scripts, and the generated
 Homebrew formula, so operators can verify both checksum integrity and GitHub
 Actions build provenance with `gh attestation verify` or the release-bundled
 `verify-release.sh --attest` helper. These attestations are the current
-machine-verifiable provenance mechanism for the 0.1.x line. The one-line
+machine-verifiable provenance mechanism for the 2.0 line. The one-line
 installers keep checksum verification as the baseline and add attestation
 verification when `DURABLE_WORKFLOW_INSTALL_VERIFY_ATTESTATIONS=1` is set.
 
 Native binaries and PHARs are not currently code-signed or notarized. Treat the
 GitHub release tag, artifact attestations, and `SHA256SUMS` as the current
 provenance boundary. Signing and notarization are explicitly out of scope for
-the 0.1.x line; see [`docs/distribution.md`](docs/distribution.md) for the
+the 2.0 line; see [`docs/distribution.md`](docs/distribution.md) for the
 rationale and the conditions under which that decision would be revisited.
 
 `dw` does not auto-update itself; the explicit `dw upgrade` command is the
@@ -144,10 +144,10 @@ only update path for standalone binary installs, and it never runs
 unsolicited. The standalone installer and direct GitHub release assets are the
 public release channels for CI and conformance jobs that only need the `dw`
 binary. Composer package metadata is not a supported public CLI distribution
-channel for the 0.1.x line. The CLI also does not collect telemetry — there is
+channel for the 2.0 line. The CLI also does not collect telemetry — there is
 no background network traffic beyond commands that explicitly contact the
 configured Durable Workflow server. Telemetry is permanently out of scope for
-the 0.1.x line.
+the 2.0 line.
 
 The PHAR is a reproducible build: given the same tag and the
 `SOURCE_DATE_EPOCH` recorded by the release workflow, locally rebuilding from
@@ -324,7 +324,8 @@ policy, worker status, search attribute type, and local dev database driver.
 
 ## Compatibility
 
-CLI version 0.1.x is compatible with servers that advertise
+CLI version `2.0.0-beta.3` is the CLI member of the supported Durable Workflow
+`2.0.0-beta.3` product train. It is compatible with servers that advertise
 `control_plane.version: "2"`,
 `control_plane.request_contract.schema: durable-workflow.v2.control-plane-request.contract`
 version `1`, and a `client_compatibility.clients.cli.supported_versions`
@@ -341,7 +342,7 @@ names the CLI version, server version, compatibility window, and next step:
 
 ```bash
 $ dw workflow:list
-Server compatibility error: refusing before the requested operation because dw 0.1.73 cannot safely interoperate with server 0.2.221. Compatibility window: cli >=0.1,<1.0; control-plane version 2; worker protocol same-major <= 1.0. Next step: Upgrade dw, pin dw to a supported release, or connect to a compatible server. Detail: Server compatibility error: missing control_plane.request_contract; expected durable-workflow.v2.control-plane-request.contract v1.
+Server compatibility error: refusing before the requested operation because dw 2.0.0-beta.3 cannot safely interoperate with server 2.0.0-beta.3. Compatibility window: cli >=2.0.0-beta.3,<2.0.0-beta.4; control-plane version 2; worker protocol same-major <= 1.0. Next step: Upgrade dw, pin dw to a supported release, or connect to a compatible server. Detail: Server compatibility error: missing control_plane.request_contract; expected durable-workflow.v2.control-plane-request.contract v1.
 Next steps:
   - Upgrade dw, pin dw to a supported release, or connect to a compatible server.
     Try: dw doctor --output=json
@@ -354,9 +355,9 @@ object for automation:
 {
   "exit_code": 8,
   "compatibility": {
-    "cli_version": "0.1.73",
-    "server_version": "0.2.221",
-    "compatibility_window": "cli >=0.1,<1.0; control-plane version 2; worker protocol same-major <= 1.0",
+    "cli_version": "2.0.0-beta.3",
+    "server_version": "2.0.0-beta.3",
+    "compatibility_window": "cli >=2.0.0-beta.3,<2.0.0-beta.4; control-plane version 2; worker protocol same-major <= 1.0",
     "next_step": "Upgrade dw, pin dw to a supported release, or connect to a compatible server.",
     "detail": "Server compatibility error: missing control_plane.request_contract; expected durable-workflow.v2.control-plane-request.contract v1."
   }

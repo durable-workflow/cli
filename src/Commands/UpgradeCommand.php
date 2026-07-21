@@ -53,7 +53,7 @@ installs are refused with a pointer at the right managing tool.
 <comment>Examples:</comment>
 
   <info>dw upgrade</info>
-    <info>dw upgrade --tag=0.1.5</info>
+    <info>dw upgrade --tag=2.0.0-beta.3</info>
   <info>dw upgrade --dry-run</info>
   <info>dw upgrade --output=json</info>
 HELP)
@@ -304,8 +304,8 @@ HELP)
     {
         $normalize = static function (string $value): string {
             $value = trim($value);
-            // BuildInfo::version() may return "0.1.5-dev" or "0.1.5" or fallback
-            // "0.1.0-dev"; only compare the core semver head for the noop check.
+            // BuildInfo::version() may include a development suffix; compare
+            // only the core semver head for the noop check.
             if (preg_match('/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?/', ltrim($value, 'v'), $m)) {
                 return $m[0];
             }

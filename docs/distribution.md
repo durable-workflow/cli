@@ -2,7 +2,7 @@
 
 This document describes how `dw` is distributed, how operators verify the
 artifacts they install, and which optional distribution-hardening surfaces
-are deliberately out of scope for the 0.1.x line.
+are deliberately out of scope for the 2.0 line.
 
 It is the canonical reference for security-conscious users who need to
 answer "is this binary the one the project built?" and "what does this CLI
@@ -28,16 +28,16 @@ and refuse to proceed when the checksum does not match.
 For exact-version automation, set `VERSION` to the release tag:
 
 ```bash
-curl -fsSL https://durable-workflow.com/install.sh | VERSION=0.1.80 sh
+curl -fsSL https://durable-workflow.com/install.sh | VERSION=2.0.0-beta.3 sh
 ```
 
-Release `0.1.80` is available from the GitHub release page at
-<https://github.com/durable-workflow/cli/releases/tag/0.1.80>. Replace the
+Release `2.0.0-beta.3` is available from the GitHub release page at
+<https://github.com/durable-workflow/cli/releases/tag/2.0.0-beta.3>. Replace the
 tag when pinning a newer release.
 
 ## Provenance boundary
 
-The provenance boundary for the 0.1.x line is:
+The provenance boundary for the 2.0 line is:
 
 1. **The git tag** — every release is built from a tag pushed to
    `durable-workflow/cli`. The release workflow runs only on
@@ -73,7 +73,7 @@ is pinned to the same tag as the binaries it checks.
 
 ## Code signing and notarization
 
-**Decision: explicitly out of scope for the 0.1.x line. GitHub artifact
+**Decision: explicitly out of scope for the 2.0 line. GitHub artifact
 attestations are the primary provenance mechanism.**
 
 ### Why
@@ -86,7 +86,7 @@ that pass Apple Notary Service review or carry an Authenticode signature
 trusted by SmartScreen. Acquiring those identities, holding the signing
 keys correctly, and integrating them into a hosted release workflow is a
 distinct piece of operational work that we have intentionally not taken
-on for the 0.1.x line — it would not strengthen the cryptographic
+on for the 2.0 line — it would not strengthen the cryptographic
 provenance of the binary, only its handling by the OS-level publisher
 trust UX.
 
@@ -129,7 +129,7 @@ This decision is reviewable when one of the following becomes true:
 ## Telemetry
 
 **Decision: permanently out of scope. The CLI does not collect telemetry
-and will not gain a telemetry surface in the 0.1.x line.**
+and will not gain a telemetry surface in the 2.0 line.**
 
 ### Behavior contract
 
@@ -162,7 +162,7 @@ assertion is to never ship a telemetry surface at all.
 
 ### What would change this
 
-This decision is fixed for the 0.1.x line. Any future telemetry surface
+This decision is fixed for the 2.0 line. Any future telemetry surface
 would be opt-in by default, would be documented here before it shipped,
 and would be subject to the same provenance and verification expectations
 as the rest of the binary.
@@ -178,7 +178,7 @@ binary. Behavior:
   proceed if checksum verification fails, and refuses to overwrite
   Composer-managed PHAR installs and Homebrew-managed binaries because
   the package manager owns those install paths. Composer package metadata
-  is not a supported public CLI distribution channel for the 0.1.x line;
+  is not a supported public CLI distribution channel for the 2.0 line;
   use the exact-version installer or direct release assets for public,
   source-free automation.
 - Flags: `--version=<tag>` for a specific release, `--dry-run` to print
@@ -296,6 +296,8 @@ Before promoting `dw` into a production runbook:
 
 ## Change history
 
+- 2.0.0-beta.3 — Joined the synchronized Durable Workflow 2.0 product
+  train and retained the established distribution and verification policy.
 - 0.1.x — Initial distribution policy. Signing/notarization out of scope,
   telemetry permanently out of scope, reproducible-build contract
   established with `verify-reproducible-build.sh`.

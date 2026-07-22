@@ -53,7 +53,7 @@ installs are refused with a pointer at the right managing tool.
 <comment>Examples:</comment>
 
   <info>dw upgrade</info>
-    <info>dw upgrade --tag=2.0.0-beta.3</info>
+    <info>dw upgrade --tag=2.0.0-beta.4</info>
   <info>dw upgrade --dry-run</info>
   <info>dw upgrade --output=json</info>
 HELP)

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import subprocess
@@ -136,7 +137,9 @@ class PublicationRunRetentionTest(unittest.TestCase):
         self.assertNotIn("CLI_RELEASE_DEPLOY_KEY", verification_source)
         self.assertIn("persist-credentials: false", verification_source)
         self.assertIn("--component cli --plan recovery-input/release-plan.json", verification_source)
-        self.recovery.verify_recovery_workflow_source("cli", workflow)
+        self.recovery.verify_recovery_workflow_source(
+            "cli", workflow, hashlib.sha256(workflow.encode("utf-8")).hexdigest()
+        )
 
         embedded = workflow.partition(" <<'PY'\n")[2].partition("\n          PY")[0]
         dispatch_source = "\n".join(line.removeprefix("          ") for line in embedded.splitlines())

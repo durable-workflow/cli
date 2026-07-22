@@ -67,7 +67,7 @@ CLI_RELEASE_RECOVERY_SHA256 = "de1e7f37bcbadf3644b53d127abcae11ec823fd6602a682a5
 # LF before hashing. Exact source identity is the bounded
 # security contract because arbitrary shell execution cannot be proven safe by
 # source-pattern matching.
-SDK_RUST_RELEASE_RECOVERY_SHA256 = "58684e7002d4674f2a6e819bb3c4aea18279bf17a4c8e90abc1d777d63034b0f"
+SDK_RUST_RELEASE_RECOVERY_SHA256 = "d6bca15d3f09aa3e7ecf6fc796b81a008e3e4cba2fdea10391f8ede0cab3548c"
 
 
 @dataclass(frozen=True)

@@ -26,23 +26,6 @@ concurrency:
   group: release-${{ inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
-env:
-  SPC_EXTENSIONS: curl,mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets
-  STANDALONE_RUNTIME_EXTENSIONS: curl,mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets
-  STANDALONE_RUNTIME_EXTENSIONS_WINDOWS: mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets
-  # Windows uses Symfony's native stream transport over OpenSSL. Avoid
-  # requesting ext-curl from phpmicro there because the Windows build can
-  # compile successfully while the generated micro runtime does not load curl.
-  SPC_EXTENSIONS_WINDOWS: mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets
-  PHP_VERSION: '8.4'
-  PHP_VERSION_WINDOWS: '8.4'
-  BOX_VERSION: '4.6.6'
-  SPC_DOWNLOAD_RETRY: '5'
-  SPC_DOWNLOAD_OUTER_ATTEMPTS: '4'
-  # Passed to every spc step so it can use authenticated GitHub API calls
-  # when fetching source tarballs / pre-built libs (avoids 403 rate limits).
-  GITHUB_TOKEN: ${{ github.token }}
-
 jobs:
   resolve-release:
     name: Resolve release tag
@@ -265,6 +248,10 @@ jobs:
       needs.release-preflight.outputs.public_assets_present != 'true'
     outputs:
       phar-name: dw.phar
+    env:
+      BOX_VERSION: '4.6.6'
+      GITHUB_TOKEN: ${{ github.token }}
+      PHP_VERSION: '8.4'
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
         with:
@@ -343,6 +330,13 @@ jobs:
             runner: macos-14
             spc_asset: spc-macos-aarch64
     runs-on: ${{ matrix.runner }}
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+      PHP_VERSION: '8.4'
+      SPC_DOWNLOAD_OUTER_ATTEMPTS: '4'
+      SPC_DOWNLOAD_RETRY: '5'
+      SPC_EXTENSIONS: curl,mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets
+      STANDALONE_RUNTIME_EXTENSIONS: curl,mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
         with:
@@ -454,6 +448,15 @@ jobs:
       needs.release-preflight.outputs.public_assets_present != 'true' &&
       needs.build-phar.result == 'success'
     runs-on: windows-latest
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+      PHP_VERSION_WINDOWS: '8.4'
+      SPC_DOWNLOAD_OUTER_ATTEMPTS: '4'
+      SPC_DOWNLOAD_RETRY: '5'
+      # Windows uses Symfony's native stream transport over OpenSSL. Avoid ext-curl because
+      # the generated micro runtime can compile successfully without loading the extension.
+      SPC_EXTENSIONS_WINDOWS: mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets
+      STANDALONE_RUNTIME_EXTENSIONS_WINDOWS: mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
         with:
@@ -598,15 +601,60 @@ jobs:
           path: build/dw-windows-x86_64.exe
           if-no-files-found: error
 
+  bundle-release:
+    name: Bind exact release artifacts for publication
+    needs: [resolve-release, release-preflight, build-phar, build-binary, build-binary-windows]
+    if: >-
+      (github.event_name != 'workflow_dispatch' ||
+       github.ref == 'refs/heads/main') &&
+      always() &&
+      needs.resolve-release.result == 'success' &&
+      needs.release-preflight.result == 'success' &&
+      needs.release-preflight.outputs.public_assets_present != 'true' &&
+      needs.build-phar.result == 'success' &&
+      needs.build-binary.result == 'success' &&
+      needs.build-binary-windows.result == 'success'
+    runs-on: ubuntu-latest
+    outputs:
+      artifact-digest: ${{ steps.privileged-handoff.outputs.artifact-digest }}
+      artifact-id: ${{ steps.privileged-handoff.outputs.artifact-id }}
+      source-run-attempt: ${{ github.run_attempt }}
+      source-run-id: ${{ github.run_id }}
+    steps:
+      - name: Restore the complete release artifact set
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8
+        with:
+          path: release-assets
+          pattern: dw-*
+          merge-multiple: true
+
+      - name: Package the privileged release handoff as one immutable file
+        run: tar -cf cli-release-handoff.tar -C release-assets .
+
+      - name: Bind the privileged release handoff identity and digest
+        id: privileged-handoff
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
+        with:
+          archive: false
+          if-no-files-found: error
+          path: cli-release-handoff.tar
+
   release:
     name: Publish Release
     # Every supported standalone platform must publish before the release
     # asset list, SHA256SUMS, installers, and public download endpoints are
     # considered complete.
-    needs: [resolve-release, release-preflight, build-phar, build-binary, build-binary-windows]
+    needs:
+      - resolve-release
+      - release-preflight
+      - build-phar
+      - build-binary
+      - build-binary-windows
+      - bundle-release
     runs-on: ubuntu-latest
     environment: github-release
     permissions:
+      actions: read
       attestations: write
       contents: write
       id-token: write
@@ -619,10 +667,71 @@ jobs:
       needs.release-preflight.outputs.public_assets_present != 'true' &&
       needs.build-phar.result == 'success' &&
       needs.build-binary.result == 'success' &&
-      needs.build-binary-windows.result == 'success'
+      needs.build-binary-windows.result == 'success' &&
+      needs.bundle-release.result == 'success'
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
         with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.sha }}
+
+      - name: Download the exact release handoff
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8
+        with:
+          artifact-ids: ${{ needs.bundle-release.outputs.artifact-id }}
+          digest-mismatch: error
+          github-token: ${{ github.token }}
+          path: isolated-cli-release
+          repository: ${{ github.repository }}
+          run-id: ${{ needs.bundle-release.outputs.source-run-id }}
+
+      - name: Validate the exact producer artifact before use
+        env:
+          ARTIFACT_DIRECTORY: isolated-cli-release
+          EXPECTED_ARTIFACT_DIGEST: ${{ needs.bundle-release.outputs.artifact-digest }}
+          EXPECTED_ARTIFACT_ID: ${{ needs.bundle-release.outputs.artifact-id }}
+          EXPECTED_SOURCE_RUN_ATTEMPT: ${{ needs.bundle-release.outputs.source-run-attempt }}
+          EXPECTED_SOURCE_RUN_ID: ${{ needs.bundle-release.outputs.source-run-id }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$EXPECTED_ARTIFACT_DIGEST" =~ ^[0-9a-f]{64}$ ]]; then
+            printf 'producer artifact digest is not an exact SHA-256 digest\n' >&2
+            exit 1
+          fi
+          for identity in "$EXPECTED_ARTIFACT_ID" "$EXPECTED_SOURCE_RUN_ID" "$EXPECTED_SOURCE_RUN_ATTEMPT"; do
+            if [[ ! "$identity" =~ ^[1-9][0-9]*$ ]]; then
+              printf 'producer artifact identity is invalid\n' >&2
+              exit 1
+            fi
+          done
+          if [[ ! "$ARTIFACT_DIRECTORY" =~ ^isolated-[a-z0-9][a-z0-9._-]*$ ]]; then
+            printf 'artifact validation directory is unsafe\n' >&2
+            exit 1
+          fi
+          mapfile -d '' entries < <(
+            /usr/bin/find "$ARTIFACT_DIRECTORY" -mindepth 1 -maxdepth 1 -print0
+          )
+          if [ "${#entries[@]}" -ne 1 ] || [ ! -f "${entries[0]}" ] || [ -L "${entries[0]}" ]; then
+            printf 'artifact handoff must contain exactly one regular file\n' >&2
+            exit 1
+          fi
+          observed_digest="$(/usr/bin/sha256sum "${entries[0]}")"
+          observed_digest="${observed_digest%% *}"
+          if [ "$observed_digest" != "$EXPECTED_ARTIFACT_DIGEST" ]; then
+            printf 'artifact digest mismatch: expected %s, got %s\n' \
+              "$EXPECTED_ARTIFACT_DIGEST" "$observed_digest" >&2
+            exit 1
+          fi
+          printf 'validated artifact %s from run %s attempt %s\n' \
+            "$EXPECTED_ARTIFACT_ID" "$EXPECTED_SOURCE_RUN_ID" "$EXPECTED_SOURCE_RUN_ATTEMPT"
+
+      - name: Check out the exact release source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
+        with:
+          clean: false
+          fetch-depth: 0
+          persist-credentials: false
           ref: ${{ needs.resolve-release.outputs.commit }}
 
       - name: Checkout qualified release policy authority
@@ -644,12 +753,10 @@ jobs:
             exit 1
           fi
 
-      - name: Download release artifacts
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8
-        with:
-          path: dist
-          pattern: dw-*
-          merge-multiple: true
+      - name: Extract the validated release handoff
+        run: |
+          mkdir dist
+          tar -xf isolated-cli-release/cli-release-handoff.tar -C dist
 
       - name: Add installer scripts
         run: |

@@ -51,7 +51,7 @@ if ($version === null && $env('GITHUB_REF_TYPE') === 'tag') {
     $version = $normalizeVersion($env('GITHUB_REF_NAME'));
 }
 $version ??= $normalizeVersion($git('describe --tags --exact-match'));
-$version ??= '2.0.0-beta.6-dev';
+$version ??= '2.0.0-beta.10-dev';
 
 $commit = $env('DW_CLI_COMMIT') ?? $env('GITHUB_SHA') ?? $git('rev-parse HEAD') ?? 'unknown';
 

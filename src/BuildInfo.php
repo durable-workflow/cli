@@ -6,7 +6,7 @@ namespace DurableWorkflow\Cli;
 
 final class BuildInfo
 {
-    private const FALLBACK_VERSION = '2.0.0-beta.6-dev';
+    private const FALLBACK_VERSION = '2.0.0-beta.10-dev';
 
     public static function consoleVersion(): string
     {

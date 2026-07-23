@@ -9,6 +9,7 @@ import importlib.util
 import io
 import json
 import sys
+import tempfile
 import unittest
 import urllib.error
 from pathlib import Path
@@ -489,12 +490,17 @@ class ImmutablePlanDiscoveryTest(unittest.TestCase):
             mock.patch.object(
                 self.recovery,
                 "read_plan_authority",
-                side_effect=[(older, None), (newer, None)],
+                side_effect=[(older, None), (newer, None), (older, None), (newer, None)],
             ),
             mock.patch.object(
                 self.recovery,
                 "direct_plan_lifecycle",
-                side_effect=[("completed", None), ("completed", None)],
+                side_effect=[
+                    ("completed", None),
+                    ("completed", None),
+                    ("completed", None),
+                    ("completed", None),
+                ],
             ),
             mock.patch.object(
                 self.recovery,
@@ -511,6 +517,292 @@ class ImmutablePlanDiscoveryTest(unittest.TestCase):
 
         self.assertEqual(tags[1], selected["tag"])
         self.assertEqual("completed", selected["lifecycle"])
+
+    def test_convergence_rechecks_nonselected_lifecycle_authority(self) -> None:
+        older = {"tag": "release-plan/older", "lifecycle": "completed"}
+        changed_older = {**older, "lifecycle": "superseded"}
+        latest = {"tag": "release-plan/latest", "lifecycle": "actionable"}
+        current_snapshot = [changed_older, latest]
+
+        with mock.patch.object(
+            self.recovery,
+            "classify_implicit_plan_authority",
+            side_effect=[
+                (latest, [older, latest]),
+                (latest, current_snapshot),
+                (latest, current_snapshot),
+                (latest, current_snapshot),
+            ],
+        ) as classify:
+            selected = self.recovery.select_implicit_plan_authority(mock.Mock())
+
+        self.assertEqual(4, classify.call_count)
+        self.assertEqual(current_snapshot, selected["authority_snapshot"])
+
+    def test_final_implicit_boundary_rejects_stale_publish_but_manual_recovery_does_not(self) -> None:
+        candidate = lifecycle_plan(self.recovery)
+        candidate_preparation = {
+            "components": {
+                "workflow": {
+                    "release_notes": {
+                        "release_date": "2026-07-23",
+                        "sha256": "c" * 64,
+                        "source": {},
+                    }
+                }
+            }
+        }
+        component = self.recovery.COMPONENTS["workflow"]
+        publication_preflight = mock.Mock(
+            side_effect=self.recovery.NotFound("not published")
+        )
+        implicit_authority = {
+            "authority_snapshot": [
+                {"tag": "release-plan/older", "lifecycle": "actionable"}
+            ]
+        }
+        current_snapshot = [
+            {"tag": "release-plan/older", "lifecycle": "superseded"},
+            {"tag": "release-plan/successor", "lifecycle": "actionable"},
+        ]
+
+        with (
+            mock.patch.object(self.recovery, "verify_plan_authority", return_value=({}, {})),
+            mock.patch.object(self.recovery, "validate_release_preparation"),
+            mock.patch.object(self.recovery, "resolve_tag", return_value=None),
+            mock.patch.object(
+                self.recovery,
+                "classify_implicit_plan_authority",
+                return_value=(current_snapshot[-1], current_snapshot),
+            ) as classify,
+            mock.patch.dict(
+                self.recovery.VERIFIERS,
+                {component.distribution: publication_preflight},
+            ),
+        ):
+            with self.assertRaisesRegex(
+                self.recovery.RecoveryError,
+                "refusing a stale recovery action",
+            ):
+                self.recovery.resolve_component(
+                    mock.Mock(),
+                    "workflow",
+                    "release-plan/older",
+                    "a" * 40,
+                    candidate,
+                    candidate_preparation,
+                    implicit_authority,
+                )
+
+            state, outputs = self.recovery.resolve_component(
+                mock.Mock(),
+                "workflow",
+                "release-plan/older",
+                "a" * 40,
+                candidate,
+                candidate_preparation,
+            )
+
+        self.assertEqual("publish", outputs["action"])
+        self.assertEqual("publication", state["phase"])
+        self.assertEqual(1, classify.call_count)
+        self.assertEqual(2, publication_preflight.call_count)
+
+    def test_discover_to_resolve_rejects_a_successor_inserted_after_convergence(self) -> None:
+        candidate = lifecycle_plan(self.recovery)
+        candidate["plan"] = "older-plan"
+        successor = json.loads(json.dumps(candidate))
+        successor["plan"] = "successor-plan"
+        successor["components"]["workflow"]["version"] = "2.0.0-alpha.2"
+        candidate_preparation = {
+            "components": {
+                "workflow": {
+                    "release_notes": {
+                        "release_date": "2026-07-23",
+                        "sha256": "c" * 64,
+                        "source": {},
+                    }
+                }
+            }
+        }
+        successor_preparation = json.loads(json.dumps(candidate_preparation))
+        older_tag = f"release-plan/{candidate['plan']}"
+        successor_tag = f"release-plan/{successor['plan']}"
+        older_commit = "a" * 40
+        successor_commit = "b" * 40
+        failure_commit = "c" * 40
+        commits = {older_tag: older_commit, successor_tag: successor_commit}
+        plans = {
+            older_tag: (candidate, candidate_preparation),
+            successor_tag: (successor, successor_preparation),
+        }
+        recorded = {
+            older_commit: dt.datetime(2026, 7, 20, tzinfo=dt.UTC),
+            successor_commit: dt.datetime(2026, 7, 21, tzinfo=dt.UTC),
+        }
+        failure = supersession_record(
+            self.recovery,
+            candidate,
+            successor,
+            older_commit,
+        )
+        terminal_failure: dict[str, object] = {}
+        registry_reads = 0
+        client = mock.Mock()
+
+        def list_tags(_client: mock.Mock) -> list[str]:
+            nonlocal registry_reads
+            registry_reads += 1
+            return [older_tag, successor_tag] if terminal_failure else [older_tag]
+
+        def resolve(
+            _client: mock.Mock,
+            repository: str,
+            tag: str,
+        ) -> str | None:
+            if repository != self.recovery.CONTROL_REPOSITORY:
+                return None
+            if tag == f"{self.recovery.FAILURE_TAG_PREFIX}{candidate['plan']}":
+                return failure_commit if terminal_failure else None
+            if tag == successor_tag and not terminal_failure:
+                return None
+            return commits.get(tag)
+
+        def read_lifecycle_record(
+            _client: mock.Mock,
+            tag: str,
+            commit: str,
+            filename: str,
+        ) -> dict[str, object]:
+            if (
+                tag == f"{self.recovery.FAILURE_TAG_PREFIX}{candidate['plan']}"
+                and commit == failure_commit
+            ):
+                if filename == "release-plan-failure.json":
+                    return failure
+                if filename == "successor-release-plan.json":
+                    return successor
+            self.fail(f"unexpected lifecycle record read: {tag} {commit} {filename}")
+
+        def read_release(_url: str) -> dict[str, object]:
+            if not terminal_failure:
+                self.assertEqual(2, registry_reads)
+                terminal_failure.update(
+                    {"outcome": "terminal-failure", "successor": successor_tag}
+                )
+            return {"draft": False, "tag_name": older_tag}
+
+        client.json.side_effect = read_release
+        component = self.recovery.COMPONENTS["workflow"]
+        publication_preflight = mock.Mock(
+            side_effect=self.recovery.NotFound("not published")
+        )
+
+        with (
+            tempfile.TemporaryDirectory(prefix="cli-release-recovery-") as directory,
+            mock.patch.object(self.recovery, "PublicClient", return_value=client),
+            mock.patch.object(
+                self.recovery,
+                "list_release_plan_tags",
+                side_effect=list_tags,
+            ),
+            mock.patch.object(
+                self.recovery,
+                "resolve_tag",
+                side_effect=resolve,
+            ),
+            mock.patch.object(
+                self.recovery,
+                "read_plan_authority",
+                side_effect=lambda _client, tag, _commit: plans[tag],
+            ),
+            mock.patch.object(
+                self.recovery,
+                "read_record",
+                side_effect=read_lifecycle_record,
+            ),
+            mock.patch.object(
+                self.recovery,
+                "immutable_plan_recorded_at",
+                side_effect=lambda _client, commit: recorded[commit],
+            ),
+            mock.patch.object(
+                self.recovery,
+                "accepted_continuity_supersession",
+                return_value=None,
+            ),
+            mock.patch.object(self.recovery, "validate_release_mirrors"),
+            mock.patch.object(
+                self.recovery,
+                "verify_plan_authority",
+                return_value=({}, {}),
+            ),
+            mock.patch.object(self.recovery, "validate_release_preparation"),
+            mock.patch.dict(
+                self.recovery.VERIFIERS,
+                {component.distribution: publication_preflight},
+            ),
+        ):
+            output_directory = Path(directory)
+            implicit_output = output_directory / "implicit-output"
+            implicit_evidence = output_directory / "implicit-evidence.json"
+            implicit_arguments = [
+                "component-release-recovery.py",
+                "resolve",
+                "--component",
+                "workflow",
+                "--plan-output",
+                str(output_directory / "implicit-plan.json"),
+                "--preparation-output",
+                str(output_directory / "implicit-preparation.json"),
+                "--evidence",
+                str(implicit_evidence),
+                "--github-output",
+                str(implicit_output),
+            ]
+            with (
+                mock.patch.object(sys, "argv", implicit_arguments),
+                mock.patch.object(sys, "stderr", new=io.StringIO()),
+            ):
+                self.assertEqual(1, self.recovery.main())
+
+            self.assertFalse(implicit_output.exists())
+            implicit_failure = json.loads(implicit_evidence.read_text())
+            self.assertEqual("plan-discovery", implicit_failure["phase"])
+            self.assertEqual("failed", implicit_failure["outcome"])
+            self.assertIn("refusing a stale recovery action", implicit_failure["reason"])
+
+            explicit_output = output_directory / "explicit-output"
+            explicit_evidence = output_directory / "explicit-evidence.json"
+            explicit_arguments = [
+                "component-release-recovery.py",
+                "resolve",
+                "--component",
+                "workflow",
+                "--plan-tag",
+                older_tag,
+                "--plan-output",
+                str(output_directory / "explicit-plan.json"),
+                "--preparation-output",
+                str(output_directory / "explicit-preparation.json"),
+                "--evidence",
+                str(explicit_evidence),
+                "--github-output",
+                str(explicit_output),
+            ]
+            with mock.patch.object(sys, "argv", explicit_arguments):
+                self.assertEqual(0, self.recovery.main())
+
+            explicit_outputs = dict(
+                line.split("=", 1)
+                for line in explicit_output.read_text().splitlines()
+            )
+            self.assertEqual("publish", explicit_outputs["action"])
+            self.assertEqual(older_tag, explicit_outputs["plan_tag"])
+            self.assertEqual("publication", json.loads(explicit_evidence.read_text())["phase"])
+
+        self.assertEqual(3, registry_reads)
+        self.assertEqual(2, publication_preflight.call_count)
 
     def test_terminal_failure_successor_requires_exact_authorized_plan_identity(self) -> None:
         failed = lifecycle_plan(self.recovery)

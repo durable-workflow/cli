@@ -18,7 +18,7 @@ Pin an exact release for CI, conformance, or reproducible automation:
 
 ```bash
 # Linux and macOS
-curl -fsSL https://durable-workflow.com/install.sh | VERSION=2.0.0-beta.5 sh
+curl -fsSL https://durable-workflow.com/install.sh | VERSION=2.0.0-beta.6 sh
 ```
 
 ```powershell
@@ -28,7 +28,7 @@ irm https://durable-workflow.com/install.ps1 | iex
 
 ```powershell
 # Windows, exact release
-$env:VERSION = '2.0.0-beta.5'
+$env:VERSION = '2.0.0-beta.6'
 irm https://durable-workflow.com/install.ps1 | iex
 ```
 
@@ -45,7 +45,7 @@ downloaded binary and `SHA256SUMS` before installation.
 Or download a native binary directly from the [releases
 page](https://github.com/durable-workflow/cli/releases). The current
 supported exact release in these examples is
-[`2.0.0-beta.5`](https://github.com/durable-workflow/cli/releases/tag/2.0.0-beta.5).
+[`2.0.0-beta.6`](https://github.com/durable-workflow/cli/releases/tag/2.0.0-beta.6).
 Available assets:
 `dw-linux-x86_64`, `dw-linux-aarch64`,
 `dw-macos-aarch64`, `dw-windows-x86_64.exe`.
@@ -324,8 +324,8 @@ policy, worker status, search attribute type, and local dev database driver.
 
 ## Compatibility
 
-CLI version `2.0.0-beta.5` is the CLI member of the supported Durable Workflow
-`2.0.0-beta.5` product train. It is compatible with servers that advertise
+CLI version `2.0.0-beta.6` is the CLI member of the supported Durable Workflow
+`2.0.0-beta.6` product train. It is compatible with servers that advertise
 `control_plane.version: "2"`,
 `control_plane.request_contract.schema: durable-workflow.v2.control-plane-request.contract`
 version `1`, and a `client_compatibility.clients.cli.supported_versions`
@@ -342,7 +342,7 @@ names the CLI version, server version, compatibility window, and next step:
 
 ```bash
 $ dw workflow:list
-Server compatibility error: refusing before the requested operation because dw 2.0.0-beta.5 cannot safely interoperate with server 2.0.0-beta.5. Compatibility window: cli >=2.0.0-beta.5,<2.0.0-beta.6; control-plane version 2; worker protocol same-major <= 1.0. Next step: Upgrade dw, pin dw to a supported release, or connect to a compatible server. Detail: Server compatibility error: missing control_plane.request_contract; expected durable-workflow.v2.control-plane-request.contract v1.
+Server compatibility error: refusing before the requested operation because dw 2.0.0-beta.6 cannot safely interoperate with server 2.0.0-beta.6. Compatibility window: cli >=2.0.0-beta.6,<2.0.0-beta.7; control-plane version 2; worker protocol same-major <= 1.0. Next step: Upgrade dw, pin dw to a supported release, or connect to a compatible server. Detail: Server compatibility error: missing control_plane.request_contract; expected durable-workflow.v2.control-plane-request.contract v1.
 Next steps:
   - Upgrade dw, pin dw to a supported release, or connect to a compatible server.
     Try: dw doctor --output=json
@@ -355,9 +355,9 @@ object for automation:
 {
   "exit_code": 8,
   "compatibility": {
-    "cli_version": "2.0.0-beta.5",
-    "server_version": "2.0.0-beta.5",
-    "compatibility_window": "cli >=2.0.0-beta.5,<2.0.0-beta.6; control-plane version 2; worker protocol same-major <= 1.0",
+    "cli_version": "2.0.0-beta.6",
+    "server_version": "2.0.0-beta.6",
+    "compatibility_window": "cli >=2.0.0-beta.6,<2.0.0-beta.7; control-plane version 2; worker protocol same-major <= 1.0",
     "next_step": "Upgrade dw, pin dw to a supported release, or connect to a compatible server.",
     "detail": "Server compatibility error: missing control_plane.request_contract; expected durable-workflow.v2.control-plane-request.contract v1."
   }

@@ -37,6 +37,7 @@ from recovery_workflow_authority import (
 SCHEMA = "durable-workflow.release-plan/v1"
 PREPARATION_SCHEMA = "durable-workflow.release-preparation/v1"
 STATE_SCHEMA = "durable-workflow.component-release-recovery/v1"
+PUBLICATION_AUTHORITY_SCHEMA = "durable-workflow.release-publication-authority/v1"
 CONTROL_REPOSITORY = "durable-workflow/.github"
 PLAN_TAG_PREFIX = "release-plan/"
 COMPLETION_TAG_PREFIX = "release-candidate/"
@@ -2109,6 +2110,212 @@ def revalidate_explicit_plan_authority(
         )
 
 
+def lifecycle_authority_snapshot(
+    authority: dict[str, Any],
+    *,
+    selection: str | None = None,
+) -> dict[str, Any]:
+    plan = authority["plan"]
+    preparation = authority["preparation"]
+    lifecycle = authority["lifecycle"]
+    successor = authority["successor"]
+    selected_by = selection or str(authority.get("selection") or "implicit")
+    expected_tag = f"{PLAN_TAG_PREFIX}{plan['plan']}"
+    if (
+        selected_by not in {"explicit", "implicit"}
+        or authority["tag"] != expected_tag
+        or not COMMIT_PATTERN.fullmatch(str(authority["commit"]))
+        or lifecycle not in {"actionable", "interrupted", "completed", "superseded"}
+        or (preparation is not None and not isinstance(preparation, dict))
+    ):
+        raise RecoveryError(
+            "release plan lifecycle authority has a malformed plan identity",
+            "publication-authorization",
+        )
+    successor_identity = None
+    if lifecycle == "superseded" and isinstance(successor, dict):
+        successor_tag = successor.get("tag")
+        successor_sha256 = successor.get("sha256")
+        if (
+            not isinstance(successor_tag, str)
+            or not successor_tag.startswith(PLAN_TAG_PREFIX)
+            or not re.fullmatch(r"[0-9a-f]{64}", str(successor_sha256))
+        ):
+            raise RecoveryError(
+                "release plan lifecycle authority has a malformed successor identity",
+                "publication-authorization",
+            )
+        successor_identity = {
+            "tag": successor_tag,
+            "sha256": successor_sha256,
+        }
+    elif lifecycle == "interrupted":
+        expected_interruption = (
+            f"{CONTINUITY_TAG_PREFIX}{plan['plan']}/interrupted"
+        )
+        if successor != expected_interruption:
+            raise RecoveryError(
+                "release plan lifecycle authority has a malformed interruption identity",
+                "publication-authorization",
+            )
+    elif successor is not None:
+        raise RecoveryError(
+            "release plan lifecycle authority has a malformed successor identity",
+            "publication-authorization",
+        )
+    return {
+        "schema": PUBLICATION_AUTHORITY_SCHEMA,
+        "selection": selected_by,
+        "plan_record": {
+            "tag": expected_tag,
+            "commit": authority["commit"],
+            "sha256": manifest_digest(plan),
+        },
+        "preparation_sha256": (
+            manifest_digest(preparation) if preparation is not None else None
+        ),
+        "lifecycle": lifecycle,
+        "successor": successor_identity,
+    }
+
+
+def validate_publication_authority_snapshot(
+    value: Any,
+    plan: dict[str, Any],
+    preparation: dict[str, Any],
+) -> dict[str, Any]:
+    expected_keys = {
+        "schema",
+        "selection",
+        "plan_record",
+        "preparation_sha256",
+        "lifecycle",
+        "successor",
+    }
+    if not isinstance(value, dict) or set(value) != expected_keys:
+        raise RecoveryError(
+            "publication lifecycle authority snapshot has an invalid shape",
+            "publication-authorization",
+        )
+    plan_record = value["plan_record"]
+    expected_record = {
+        "tag": f"{PLAN_TAG_PREFIX}{plan['plan']}",
+        "commit": plan_record.get("commit") if isinstance(plan_record, dict) else None,
+        "sha256": manifest_digest(plan),
+    }
+    if (
+        value["schema"] != PUBLICATION_AUTHORITY_SCHEMA
+        or value["selection"] not in {"explicit", "implicit"}
+        or value["lifecycle"] not in {"actionable", "interrupted"}
+        or value["successor"] is not None
+        or not isinstance(plan_record, dict)
+        or set(plan_record) != {"tag", "commit", "sha256"}
+        or not COMMIT_PATTERN.fullmatch(str(plan_record.get("commit", "")))
+        or plan_record != expected_record
+        or value["preparation_sha256"] != manifest_digest(preparation)
+    ):
+        raise RecoveryError(
+            "publication lifecycle authority snapshot is malformed or identity-mismatched",
+            "publication-authorization",
+        )
+    return value
+
+
+def authorize_publication(
+    client: PublicClient,
+    component_name: str,
+    plan: dict[str, Any],
+    preparation: dict[str, Any],
+    recovery_evidence: Any,
+    expected_plan_tag: str,
+    expected_release_tag: str,
+    expected_release_commit: str,
+) -> dict[str, Any]:
+    if component_name not in COMPONENTS:
+        raise RecoveryError(
+            f"unknown release component: {component_name}",
+            "publication-authorization",
+        )
+    validate_plan(plan)
+    validate_release_preparation(preparation, plan)
+    component_identity = plan["components"][component_name]
+    if (
+        expected_plan_tag != f"{PLAN_TAG_PREFIX}{plan['plan']}"
+        or expected_release_tag != component_identity["version"]
+        or expected_release_commit != component_identity["commit"]
+    ):
+        raise RecoveryError(
+            "protected publication inputs do not match the immutable release plan",
+            "publication-authorization",
+        )
+    if (
+        not isinstance(recovery_evidence, dict)
+        or recovery_evidence.get("schema") != STATE_SCHEMA
+        or recovery_evidence.get("component") != component_name
+        or recovery_evidence.get("release_plan_tag") != expected_plan_tag
+        or recovery_evidence.get("plan") != plan["plan"]
+        or recovery_evidence.get("channel") != plan["channel"]
+        or recovery_evidence.get("phase") != "publication"
+        or recovery_evidence.get("outcome") != "ready"
+        or recovery_evidence.get("declared_identity") != component_identity
+    ):
+        raise RecoveryError(
+            "publication recovery evidence is absent, malformed, or identity-mismatched",
+            "publication-authorization",
+        )
+    snapshot = validate_publication_authority_snapshot(
+        recovery_evidence.get("lifecycle_authority"),
+        plan,
+        preparation,
+    )
+    plan_record = snapshot["plan_record"]
+    if recovery_evidence.get("plan_record_commit") != plan_record["commit"]:
+        raise RecoveryError(
+            "publication recovery evidence names a conflicting plan record",
+            "publication-authorization",
+        )
+
+    selection = snapshot["selection"]
+    if selection == "implicit":
+        current = select_implicit_plan_authority(client)
+        if scheduled_continuity_pause(client, plan) is not None:
+            raise RecoveryError(
+                "continuity pause authority changed at the protected publication boundary",
+                "publication-authorization",
+            )
+    else:
+        matches = [
+            authority
+            for authority in classify_plan_authorities(client)
+            if authority["tag"] == expected_plan_tag
+        ]
+        if len(matches) != 1:
+            raise RecoveryError(
+                "exact release plan lifecycle authority is absent at the protected "
+                "publication boundary",
+                "publication-authorization",
+            )
+        current = matches[0]
+
+    current_snapshot = lifecycle_authority_snapshot(current, selection=selection)
+    if current_snapshot != snapshot:
+        raise RecoveryError(
+            "exact release plan lifecycle or successor authority changed at the "
+            "protected publication boundary",
+            "publication-authorization",
+        )
+    return {
+        "schema": PUBLICATION_AUTHORITY_SCHEMA,
+        "outcome": "authorized",
+        "component": component_name,
+        "release_identity": {
+            "tag": expected_release_tag,
+            "commit": expected_release_commit,
+        },
+        "lifecycle_authority": current_snapshot,
+    }
+
+
 def discover_plan(
     client: PublicClient, requested_tag: str | None, component_name: str
 ) -> tuple[
@@ -2981,6 +3188,8 @@ def resolve_component(
             ),
         }
     )
+    if plan_authority is not None:
+        state["lifecycle_authority"] = lifecycle_authority_snapshot(plan_authority)
     authority_evidence = next(iter(recovery_workflows.values()), {}).get("authority")
     if authority_evidence is not None:
         state["recovery_workflow_authority"] = authority_evidence
@@ -3047,6 +3256,16 @@ def main() -> int:
     resolve.add_argument("--evidence", required=True, type=Path)
     resolve.add_argument("--github-output", type=Path)
     resolve.add_argument("--allow-empty", action="store_true")
+
+    authorize = subparsers.add_parser("authorize-publication")
+    authorize.add_argument("--component", required=True, choices=sorted(COMPONENTS))
+    authorize.add_argument("--plan", required=True, type=Path)
+    authorize.add_argument("--preparation", required=True, type=Path)
+    authorize.add_argument("--recovery-evidence", required=True, type=Path)
+    authorize.add_argument("--plan-tag", required=True)
+    authorize.add_argument("--release-tag", required=True)
+    authorize.add_argument("--release-commit", required=True)
+    authorize.add_argument("--evidence", required=True, type=Path)
 
     verify = subparsers.add_parser("verify")
     verify.add_argument("--component", required=True, choices=sorted(COMPONENTS))
@@ -3166,6 +3385,53 @@ def main() -> int:
             )
             args.evidence.write_bytes(canonical_json(evidence))
             print(f"retained exact publication run {args.run_id} for {args.release_tag} at {args.release_commit}")
+        elif args.command == "authorize-publication":
+            inputs: dict[str, Any] = {}
+            for name, path in (
+                ("release plan", args.plan),
+                ("release preparation", args.preparation),
+                ("recovery evidence", args.recovery_evidence),
+            ):
+                try:
+                    inputs[name] = json.loads(path.read_bytes())
+                except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+                    raise RecoveryError(
+                        f"cannot read {name}: {error}",
+                        "publication-authorization",
+                    ) from error
+            try:
+                evidence = authorize_publication(
+                    client,
+                    args.component,
+                    inputs["release plan"],
+                    inputs["release preparation"],
+                    inputs["recovery evidence"],
+                    args.plan_tag,
+                    args.release_tag,
+                    args.release_commit,
+                )
+                args.evidence.write_bytes(canonical_json(evidence))
+                print(
+                    f"authorized protected publication for {args.release_tag} "
+                    f"at {args.release_commit}"
+                )
+            except RecoveryError as error:
+                failure = base_state(
+                    args.component,
+                    args.plan_tag,
+                    inputs["release plan"]
+                    if isinstance(inputs["release plan"], dict)
+                    else None,
+                )
+                failure.update(
+                    {
+                        "phase": "publication-authorization",
+                        "outcome": "failed",
+                        "reason": str(error),
+                    }
+                )
+                args.evidence.write_bytes(canonical_json(failure))
+                raise
         elif args.command == "resolve":
             tag: str | None = args.plan_tag
             record_commit: str | None = None

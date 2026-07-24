@@ -168,17 +168,34 @@ jobs:
           printf 'validated artifact %s from run %s attempt %s\n' \
             "$EXPECTED_ARTIFACT_ID" "$EXPECTED_SOURCE_RUN_ID" "$EXPECTED_SOURCE_RUN_ATTEMPT"
 
+      - name: Extract the validated release recovery handoff
+        run: |
+          mkdir recovery-input
+          tar -xf isolated-release-recovery/release-recovery-handoff.tar -C recovery-input
+
+      - name: Revalidate lifecycle authority at the protected publication boundary
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PLAN_TAG: ${{ needs.discover.outputs.plan_tag }}
+          RELEASE_TAG: ${{ needs.discover.outputs.version }}
+          RELEASE_COMMIT: ${{ needs.discover.outputs.commit }}
+        run: |
+          python scripts/ci/component-release-recovery.py authorize-publication \
+            --component cli \
+            --plan recovery-input/release-plan.json \
+            --preparation recovery-input/release-preparation.json \
+            --recovery-evidence recovery-input/release-recovery-evidence.json \
+            --plan-tag "$PLAN_TAG" \
+            --release-tag "$RELEASE_TAG" \
+            --release-commit "$RELEASE_COMMIT" \
+            --evidence release-publication-authority.json
+
       - name: Configure repository publication credential
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
         with:
           clean: false
           fetch-depth: 0
           ssh-key: ${{ secrets.CLI_RELEASE_DEPLOY_KEY }}
-
-      - name: Extract the validated release recovery handoff
-        run: |
-          mkdir recovery-input
-          tar -xf isolated-release-recovery/release-recovery-handoff.tar -C recovery-input
 
       - name: Require repository publication credential
         env:
@@ -366,6 +383,7 @@ jobs:
         with:
           name: cli-release-publication-${{ needs.discover.outputs.plan }}
           path: |
+            release-publication-authority.json
             release-tag-publication-evidence.json
             tag-push-runs.json
             tag-push-run.json

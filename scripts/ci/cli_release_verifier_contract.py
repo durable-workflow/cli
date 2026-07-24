@@ -73,6 +73,36 @@ class CliRecoveryWorkflowSourceTest(unittest.TestCase):
         self.assertIn(non_persistent_checkout, verification_job)
         self.assertIn("component-release-recovery.py verify", verification_job)
 
+    def test_protected_publication_revalidates_lifecycle_before_privileged_handoffs(
+        self,
+    ) -> None:
+        lines = CURRENT_CLI_RECOVERY_WORKFLOW.splitlines()
+        publish_start = lines.index("  publish:") + 1
+        publish_end = lines.index("  verify-publication:")
+        publish_job = "\n".join(lines[publish_start:publish_end])
+        boundary = publish_job.index(
+            "Revalidate lifecycle authority at the protected publication boundary"
+        )
+        privileged_markers = (
+            "Configure repository publication credential",
+            "CLI_RELEASE_DEPLOY_KEY",
+            "Create or verify the exact planned source tag",
+            "Quarantine the exact tag-triggered publication run",
+            "Start or resume the exact repository-owned publication run",
+            "gh api --method POST",
+            "gh run watch",
+        )
+        for marker in privileged_markers:
+            with self.subTest(marker=marker):
+                self.assertLess(boundary, publish_job.index(marker))
+
+        before_boundary = publish_job[:boundary]
+        self.assertIn("Extract the validated release recovery handoff", before_boundary)
+        self.assertNotIn("ssh-key:", before_boundary)
+        self.assertNotIn("publish-planned-tag.py", before_boundary)
+        self.assertNotIn("gh run", before_boundary)
+        self.assertNotIn("gh api --method POST", before_boundary)
+
 
 class CliReleaseAuthorityTest(unittest.TestCase):
     @classmethod

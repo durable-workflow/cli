@@ -1090,6 +1090,7 @@ class ImmutablePlanDiscoveryTest(unittest.TestCase):
         self,
     ) -> None:
         candidate = lifecycle_plan(self.recovery)
+        candidate["plan"] = "older"
         candidate_preparation = {
             "components": {
                 "workflow": {
@@ -1167,6 +1168,14 @@ class ImmutablePlanDiscoveryTest(unittest.TestCase):
                 with self.subTest(explicit_lifecycle=lifecycle):
                     explicit_authority["lifecycle"] = lifecycle
                     current_explicit_authority["lifecycle"] = lifecycle
+                    explicit_authority["successor"] = (
+                        f"{self.recovery.CONTINUITY_TAG_PREFIX}{candidate['plan']}/interrupted"
+                        if lifecycle == "interrupted"
+                        else None
+                    )
+                    current_explicit_authority["successor"] = explicit_authority[
+                        "successor"
+                    ]
                     state, outputs = self.recovery.resolve_component(
                         mock.Mock(),
                         "workflow",
@@ -2147,6 +2156,430 @@ class ImmutablePlanDiscoveryTest(unittest.TestCase):
         self.assertEqual(1, publication_preflight.call_count)
 
 
+class PublicationBoundaryAuthorityTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.recovery = load_recovery_module()
+
+    def publication_case(
+        self,
+        *,
+        selection: str = "explicit",
+        lifecycle: str = "actionable",
+    ) -> tuple[
+        dict[str, object],
+        dict[str, object],
+        dict[str, object],
+        dict[str, object],
+    ]:
+        plan = lifecycle_plan(self.recovery)
+        preparation = {
+            "schema": self.recovery.PREPARATION_SCHEMA,
+            "components": {
+                name: {
+                    "release_notes": {
+                        "release_date": "2026-07-24",
+                        "sha256": "c" * 64,
+                        "source": {},
+                    }
+                }
+                for name in self.recovery.COMPONENTS
+            },
+        }
+        authority = {
+            "tag": f"{self.recovery.PLAN_TAG_PREFIX}{plan['plan']}",
+            "commit": "a" * 40,
+            "recorded_at": dt.datetime(2026, 7, 24, tzinfo=dt.UTC),
+            "plan": plan,
+            "preparation": preparation,
+            "lifecycle": lifecycle,
+            "successor": (
+                f"{self.recovery.CONTINUITY_TAG_PREFIX}{plan['plan']}/interrupted"
+                if lifecycle == "interrupted"
+                else None
+            ),
+        }
+        snapshot = self.recovery.lifecycle_authority_snapshot(
+            authority,
+            selection=selection,
+        )
+        component_identity = plan["components"]["cli"]
+        evidence = self.recovery.base_state("cli", authority["tag"], plan)
+        evidence.update(
+            {
+                "phase": "publication",
+                "outcome": "ready",
+                "plan_record_commit": authority["commit"],
+                "declared_identity": component_identity,
+                "lifecycle_authority": snapshot,
+            }
+        )
+        return plan, preparation, authority, evidence
+
+    def authorize(
+        self,
+        plan: dict[str, object],
+        preparation: dict[str, object],
+        evidence: dict[str, object],
+    ) -> dict[str, object]:
+        identity = plan["components"]["cli"]
+        return self.recovery.authorize_publication(
+            mock.Mock(),
+            "cli",
+            plan,
+            preparation,
+            evidence,
+            f"{self.recovery.PLAN_TAG_PREFIX}{plan['plan']}",
+            identity["version"],
+            identity["commit"],
+        )
+
+    def test_unchanged_explicit_actionable_and_intentional_continuity_are_authorized(
+        self,
+    ) -> None:
+        for lifecycle in ("actionable", "interrupted"):
+            with self.subTest(lifecycle=lifecycle):
+                plan, preparation, authority, evidence = self.publication_case(
+                    lifecycle=lifecycle
+                )
+                with (
+                    mock.patch.object(
+                        self.recovery,
+                        "validate_release_preparation",
+                    ),
+                    mock.patch.object(
+                        self.recovery,
+                        "classify_plan_authorities",
+                        return_value=[authority],
+                    ),
+                ):
+                    authorized = self.authorize(plan, preparation, evidence)
+
+                self.assertEqual("authorized", authorized["outcome"])
+                self.assertEqual(lifecycle, authorized["lifecycle_authority"]["lifecycle"])
+
+    def test_unchanged_implicit_selection_is_reselected_before_authorization(self) -> None:
+        plan, preparation, authority, evidence = self.publication_case(
+            selection="implicit"
+        )
+        selected = {**authority, "authority_snapshot": [authority]}
+        with (
+            mock.patch.object(self.recovery, "validate_release_preparation"),
+            mock.patch.object(
+                self.recovery,
+                "select_implicit_plan_authority",
+                return_value=selected,
+            ) as reselect,
+            mock.patch.object(
+                self.recovery,
+                "scheduled_continuity_pause",
+                return_value=None,
+            ),
+        ):
+            authorized = self.authorize(plan, preparation, evidence)
+
+        self.assertEqual("authorized", authorized["outcome"])
+        reselect.assert_called_once()
+
+    def test_absent_malformed_and_identity_mismatched_handoffs_fail_closed(
+        self,
+    ) -> None:
+        plan, preparation, _authority, evidence = self.publication_case()
+        malformed_cases = {
+            "absent lifecycle authority": {
+                key: value
+                for key, value in evidence.items()
+                if key != "lifecycle_authority"
+            },
+            "terminal discovery snapshot": {
+                **evidence,
+                "lifecycle_authority": {
+                    **evidence["lifecycle_authority"],
+                    "lifecycle": "superseded",
+                },
+            },
+            "mismatched plan digest": {
+                **evidence,
+                "lifecycle_authority": {
+                    **evidence["lifecycle_authority"],
+                    "plan_record": {
+                        **evidence["lifecycle_authority"]["plan_record"],
+                        "sha256": "f" * 64,
+                    },
+                },
+            },
+            "conflicting record commit": {
+                **evidence,
+                "plan_record_commit": "b" * 40,
+            },
+        }
+        for description, malformed in malformed_cases.items():
+            with (
+                self.subTest(description),
+                mock.patch.object(self.recovery, "validate_release_preparation"),
+                mock.patch.object(
+                    self.recovery,
+                    "classify_plan_authorities",
+                ) as classify,
+                self.assertRaisesRegex(
+                    self.recovery.RecoveryError,
+                    "snapshot|conflicting plan record",
+                ),
+            ):
+                self.authorize(plan, preparation, malformed)
+            classify.assert_not_called()
+
+    def test_current_plan_record_identity_mismatch_fails_closed(self) -> None:
+        plan, preparation, authority, evidence = self.publication_case()
+        changed = {**authority, "commit": "b" * 40}
+        with (
+            mock.patch.object(self.recovery, "validate_release_preparation"),
+            mock.patch.object(
+                self.recovery,
+                "classify_plan_authorities",
+                return_value=[changed],
+            ),
+            self.assertRaisesRegex(
+                self.recovery.RecoveryError,
+                "lifecycle or successor authority changed",
+            ),
+        ):
+            self.authorize(plan, preparation, evidence)
+
+    def test_absent_malformed_and_conflicting_current_authority_fails_closed(
+        self,
+    ) -> None:
+        plan, preparation, authority, evidence = self.publication_case()
+        cases = (
+            ("absent", [], None, "lifecycle authority is absent"),
+            (
+                "malformed successor",
+                [
+                    {
+                        **authority,
+                        "lifecycle": "superseded",
+                        "successor": {"tag": "release-plan/successor"},
+                    }
+                ],
+                None,
+                "malformed successor identity",
+            ),
+            (
+                "conflicting terminal records",
+                None,
+                self.recovery.RecoveryError(
+                    "release plan has conflicting completion and terminal-failure records",
+                    "plan-discovery",
+                ),
+                "conflicting completion and terminal-failure records",
+            ),
+        )
+        for description, authorities, error, message in cases:
+            patch_arguments = (
+                {"side_effect": error}
+                if error is not None
+                else {"return_value": authorities}
+            )
+            with (
+                self.subTest(description),
+                mock.patch.object(self.recovery, "validate_release_preparation"),
+                mock.patch.object(
+                    self.recovery,
+                    "classify_plan_authorities",
+                    **patch_arguments,
+                ),
+                self.assertRaisesRegex(self.recovery.RecoveryError, message),
+            ):
+                self.authorize(plan, preparation, evidence)
+
+    def test_intentional_continuity_superseded_after_discovery_fails_closed(
+        self,
+    ) -> None:
+        plan, preparation, authority, evidence = self.publication_case(
+            lifecycle="interrupted"
+        )
+        successor = json.loads(json.dumps(plan))
+        successor["plan"] = "continuity-successor"
+        current = {
+            **authority,
+            "lifecycle": "superseded",
+            "successor": {
+                "tag": f"{self.recovery.PLAN_TAG_PREFIX}{successor['plan']}",
+                "sha256": self.recovery.manifest_digest(successor),
+                "plan": successor,
+            },
+        }
+        with (
+            mock.patch.object(self.recovery, "validate_release_preparation"),
+            mock.patch.object(
+                self.recovery,
+                "classify_plan_authorities",
+                return_value=[current],
+            ),
+            self.assertRaisesRegex(
+                self.recovery.RecoveryError,
+                "lifecycle or successor authority changed",
+            ),
+        ):
+            self.authorize(plan, preparation, evidence)
+
+    def test_each_terminal_conflict_shape_appearing_after_discovery_blocks_all_handoffs(
+        self,
+    ) -> None:
+        reasons = (
+            self.recovery.SUPERSESSION_REASON,
+            self.recovery.SOURCE_MANIFEST_REASON,
+            self.recovery.OCCUPIED_SOURCE_MANIFEST_REASON,
+        )
+        for reason in reasons:
+            with self.subTest(reason=reason):
+                registry = ExplicitTerminalConflictRegistry(
+                    self.recovery,
+                    reason,
+                    visible_from_round=3,
+                )
+                component = self.recovery.COMPONENTS[registry.component_name]
+                source_tag = mock.Mock()
+                release_dispatch = mock.Mock()
+                registry_wait = mock.Mock()
+                publication_handoff = mock.Mock()
+                with tempfile.TemporaryDirectory(
+                    prefix="cli-protected-publication-authority-"
+                ) as directory:
+                    root = Path(directory)
+                    plan_path = root / "release-plan.json"
+                    preparation_path = root / "release-preparation.json"
+                    recovery_path = root / "release-recovery-evidence.json"
+                    output_path = root / "github-output"
+                    authorization_path = root / "publication-authority.json"
+                    discovery_arguments = [
+                        "component-release-recovery.py",
+                        "resolve",
+                        "--component",
+                        registry.component_name,
+                        "--plan-tag",
+                        registry.failed_tag,
+                        "--plan-output",
+                        str(plan_path),
+                        "--preparation-output",
+                        str(preparation_path),
+                        "--evidence",
+                        str(recovery_path),
+                        "--github-output",
+                        str(output_path),
+                    ]
+                    boundary_arguments = [
+                        "component-release-recovery.py",
+                        "authorize-publication",
+                        "--component",
+                        registry.component_name,
+                        "--plan",
+                        str(plan_path),
+                        "--preparation",
+                        str(preparation_path),
+                        "--recovery-evidence",
+                        str(recovery_path),
+                        "--plan-tag",
+                        registry.failed_tag,
+                        "--release-tag",
+                        registry.failed["components"][registry.component_name][
+                            "version"
+                        ],
+                        "--release-commit",
+                        registry.failed["components"][registry.component_name][
+                            "commit"
+                        ],
+                        "--evidence",
+                        str(authorization_path),
+                    ]
+                    with (
+                        mock.patch.object(
+                            self.recovery,
+                            "PublicClient",
+                            return_value=registry.client,
+                        ),
+                        mock.patch.object(
+                            self.recovery,
+                            "list_release_plan_tags",
+                            side_effect=registry.list_release_plan_tags,
+                        ),
+                        mock.patch.object(
+                            self.recovery,
+                            "resolve_tag",
+                            side_effect=registry.resolve_tag,
+                        ),
+                        mock.patch.object(
+                            self.recovery,
+                            "read_plan_authority",
+                            side_effect=registry.read_plan_authority,
+                        ),
+                        mock.patch.object(
+                            self.recovery,
+                            "read_record",
+                            side_effect=registry.read_record,
+                        ),
+                        mock.patch.object(
+                            self.recovery,
+                            "immutable_plan_recorded_at",
+                            side_effect=registry.immutable_plan_recorded_at,
+                        ),
+                        mock.patch.object(
+                            self.recovery,
+                            "validate_release_mirrors",
+                        ),
+                        mock.patch.object(
+                            self.recovery,
+                            "verify_plan_authority",
+                            return_value=({}, {}),
+                        ),
+                        mock.patch.object(
+                            self.recovery,
+                            "verify_component",
+                            return_value={"status": "published"},
+                        ),
+                        mock.patch.object(
+                            self.recovery,
+                            "validate_release_preparation",
+                        ),
+                        mock.patch.dict(
+                            self.recovery.VERIFIERS,
+                            {component.distribution: registry.artifact_verifier},
+                        ),
+                    ):
+                        with (
+                            mock.patch.object(sys, "argv", discovery_arguments),
+                            mock.patch.object(sys, "stderr", new=io.StringIO()),
+                        ):
+                            discovery_exit = self.recovery.main()
+                        with (
+                            mock.patch.object(sys, "argv", boundary_arguments),
+                            mock.patch.object(sys, "stderr", new=io.StringIO()),
+                        ):
+                            boundary_exit = self.recovery.main()
+                        if boundary_exit == 0:
+                            source_tag()
+                            release_dispatch()
+                            registry_wait()
+                            publication_handoff()
+
+                    output = output_path.read_text()
+                    failure = json.loads(authorization_path.read_text())
+                    self.assertEqual(0, discovery_exit)
+                    self.assertIn("action=publish", output)
+                    self.assertEqual(1, boundary_exit)
+                    self.assertEqual("publication-authorization", failure["phase"])
+                    self.assertIn(
+                        "lifecycle or successor authority changed",
+                        failure["reason"],
+                    )
+                    self.assertEqual(3, registry.classification_round)
+
+                source_tag.assert_not_called()
+                release_dispatch.assert_not_called()
+                registry_wait.assert_not_called()
+                publication_handoff.assert_not_called()
+
+
 class ReleasePreparationRecoveryTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -2253,6 +2686,7 @@ class ReleasePreparationRecoveryTest(unittest.TestCase):
 
         self.assertEqual("skip", outputs["action"])
         self.assertEqual("complete", state["phase"])
+        self.assertEqual("completed", state["lifecycle_authority"]["lifecycle"])
         self.assertNotIn("release_preparation", state)
 
 

@@ -178,6 +178,33 @@ final class ReleaseInstallerContractTest extends TestCase
             'Remove-Item -Recurse -Force downloads,source,buildroot',
             $releaseWorkflow,
         );
+        self::assertStringContainsString('runner: ubuntu-24.04', $releaseWorkflow);
+        self::assertStringContainsString('runner: ubuntu-24.04-arm', $releaseWorkflow);
+        self::assertStringContainsString('runner: macos-14', $releaseWorkflow);
+        self::assertStringContainsString('runs-on: windows-2022', $releaseWorkflow);
+        self::assertStringNotContainsString('runs-on: windows-latest', $releaseWorkflow);
+        self::assertStringContainsString(
+            'sudo apt-get install --no-install-recommends -y build-essential pkg-config',
+            $releaseWorkflow,
+        );
+        self::assertStringContainsString('brew install pkgconf', $releaseWorkflow);
+        self::assertStringContainsString(
+            '-requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64',
+            $releaseWorkflow,
+        );
+        self::assertStringContainsString(
+            '$sevenZip = "php-sdk-binary-tools\bin\7za.exe"',
+            $releaseWorkflow,
+        );
+        self::assertStringContainsString(
+            'Test-Path source\php-src\main\php_version.h -PathType Leaf',
+            $releaseWorkflow,
+        );
+        self::assertSame(2, substr_count(
+            $releaseWorkflow,
+            'native_toolchain_id=${{ steps.native-prerequisites.outputs.toolchain_id }}',
+        ));
+        self::assertStringContainsString('runner_label=windows-2022', $releaseWorkflow);
 
         self::assertSame(2, substr_count($releaseWorkflow, "PHPMICRO_UNCACHED_BASELINE_SECONDS: '480'"));
         self::assertSame(2, substr_count(

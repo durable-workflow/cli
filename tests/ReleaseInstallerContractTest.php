@@ -91,6 +91,103 @@ final class ReleaseInstallerContractTest extends TestCase
         self::assertLessThan($postUploadDocsGatePosition, $publicDownloadPosition);
     }
 
+    public function test_release_phpmicro_toolchain_is_pinned_verified_and_trust_scoped(): void
+    {
+        $releaseWorkflow = self::readRepoFile('.github/workflows/release.yml');
+
+        self::assertSame(2, substr_count($releaseWorkflow, "SPC_VERSION: '2.8.5'"));
+        self::assertSame(2, substr_count(
+            $releaseWorkflow,
+            'SPC_REVISION: 4318ef8fa32a02460ec1554746674a7bc42b49fa',
+        ));
+        self::assertSame(1, substr_count($releaseWorkflow, "PHP_VERSION: '8.4.23'"));
+        self::assertSame(1, substr_count($releaseWorkflow, "PHP_VERSION_WINDOWS: '8.4.23'"));
+        self::assertStringContainsString(
+            'spc_sha256: 523ba4279c54c7a377156c0dd3a36adf92ee64b01e9a7f5e9e2ec084b8e458e5',
+            $releaseWorkflow,
+        );
+        self::assertStringContainsString(
+            'spc_sha256: 675a3840dcdc4ed041fe20eaa54310ce019a9984c1c03951df9ec66df5795213',
+            $releaseWorkflow,
+        );
+        self::assertStringContainsString(
+            'spc_sha256: acf2f25d56d0cbf8e65aa82e5054fef555f7be7c5c38046c6e0819f266d83225',
+            $releaseWorkflow,
+        );
+        self::assertStringContainsString(
+            'SPC_WINDOWS_SHA256: 425b54ab857e21409c1fd9b818899ffebabd1e2817ef0a0ed5ae8a3d9f5b463b',
+            $releaseWorkflow,
+        );
+        self::assertStringContainsString('releases/download/${SPC_VERSION}/${{ matrix.spc_asset }}', $releaseWorkflow);
+        self::assertStringContainsString('releases/download/$env:SPC_VERSION/spc-windows-x64.exe', $releaseWorkflow);
+        self::assertStringContainsString('actual_sha256="$(sha256sum "$archive"', $releaseWorkflow);
+        self::assertStringContainsString('Get-FileHash -Algorithm SHA256 $spcPath', $releaseWorkflow);
+        self::assertStringNotContainsString('/nightly/', $releaseWorkflow);
+        self::assertStringNotContainsString('git clone', $releaseWorkflow);
+
+        self::assertSame(2, substr_count($releaseWorkflow, "github.repository == 'durable-workflow/cli'"));
+        self::assertSame(2, substr_count($releaseWorkflow, "github.event_name != 'pull_request'"));
+        self::assertSame(2, substr_count(
+            $releaseWorkflow,
+            "(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')",
+        ));
+        self::assertSame(2, substr_count(
+            $releaseWorkflow,
+            'key: phpmicro-${{ env.PHPMICRO_CACHE_SCHEMA }}-${{ steps.phpmicro-toolchain.outputs.toolchain_id }}',
+        ));
+        self::assertStringNotContainsString('restore-keys:', $releaseWorkflow);
+
+        foreach ([
+            'spc_revision=',
+            'php_version=',
+            'extensions=',
+            'workflow_sha256=',
+            'runner_label=',
+            'runner_os=',
+            'runner_arch=',
+            'runner_image=',
+        ] as $cacheInput) {
+            self::assertGreaterThanOrEqual(2, substr_count($releaseWorkflow, $cacheInput), $cacheInput);
+        }
+        self::assertSame(2, substr_count($releaseWorkflow, 'build/.tools/buildroot/bin/micro.sfx'));
+        self::assertSame(2, substr_count(
+            $releaseWorkflow,
+            'Checkout qualified phpmicro toolchain policy',
+        ));
+        self::assertSame(4, substr_count(
+            $releaseWorkflow,
+            'ref: ${{ needs.resolve-release.outputs.control_commit }}',
+        ));
+        self::assertStringContainsString(
+            'release-toolchain-control/.github/workflows/release.yml',
+            $releaseWorkflow,
+        );
+        self::assertStringContainsString(
+            'release-toolchain-control\.github\workflows\release.yml',
+            $releaseWorkflow,
+        );
+        self::assertSame(4, substr_count($releaseWorkflow, 'schema=durable-workflow.phpmicro-cache/v1'));
+        self::assertSame(2, substr_count($releaseWorkflow, 'cache_valid=true'));
+        self::assertSame(5, substr_count(
+            $releaseWorkflow,
+            "if: steps.verify-phpmicro-cache.outputs.cache_valid != 'true'",
+        ));
+        self::assertStringContainsString('Discarding untrusted or invalid phpmicro cache', $releaseWorkflow);
+        self::assertStringContainsString('rm -rf downloads source buildroot', $releaseWorkflow);
+        self::assertStringContainsString(
+            'Remove-Item -Recurse -Force downloads,source,buildroot',
+            $releaseWorkflow,
+        );
+
+        self::assertSame(2, substr_count($releaseWorkflow, "PHPMICRO_UNCACHED_BASELINE_SECONDS: '480'"));
+        self::assertSame(2, substr_count(
+            $releaseWorkflow,
+            'durable-workflow.cli.phpmicro-toolchain-timing/v1',
+        ));
+        self::assertSame(2, substr_count($releaseWorkflow, 'build/.tools/phpmicro-timing.json'));
+        self::assertStringContainsString('previous_uncached_baseline_seconds', $releaseWorkflow);
+    }
+
     public function test_build_validates_installer_scripts(): void
     {
         $buildWorkflow = self::readRepoFile('.github/workflows/build.yml');
@@ -357,7 +454,7 @@ SH);
         self::assertStringContainsString('SPC_EXTENSIONS_WINDOWS: mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets', $releaseWorkflow);
         self::assertStringNotContainsString('SPC_EXTENSIONS_WINDOWS: curl', $releaseWorkflow);
         self::assertStringContainsString('Remove-Item -Recurse -Force source\php-src -ErrorAction SilentlyContinue', $releaseWorkflow);
-        self::assertStringContainsString('php bin\spc extract php-src', $releaseWorkflow);
+        self::assertStringContainsString('.\spc.exe extract php-src', $releaseWorkflow);
         self::assertStringContainsString('Patch PHP OpenSSL 3 compatibility', $releaseWorkflow);
         self::assertStringContainsString('php_openssl.h was not found after spc extract; continuing without local OpenSSL patch.', $releaseWorkflow);
         self::assertStringContainsString("public const REQUIRED_EXTENSIONS", $runtimeCheck);

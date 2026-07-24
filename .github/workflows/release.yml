@@ -322,25 +322,41 @@ jobs:
         include:
           - name: linux-x86_64
             runner: ubuntu-latest
-            spc_asset: spc-linux-x86_64
+            spc_asset: spc-linux-x86_64.tar.gz
+            spc_sha256: 523ba4279c54c7a377156c0dd3a36adf92ee64b01e9a7f5e9e2ec084b8e458e5
           - name: linux-aarch64
             runner: ubuntu-24.04-arm
-            spc_asset: spc-linux-aarch64
+            spc_asset: spc-linux-aarch64.tar.gz
+            spc_sha256: 675a3840dcdc4ed041fe20eaa54310ce019a9984c1c03951df9ec66df5795213
           - name: macos-aarch64
             runner: macos-14
-            spc_asset: spc-macos-aarch64
+            spc_asset: spc-macos-aarch64.tar.gz
+            spc_sha256: acf2f25d56d0cbf8e65aa82e5054fef555f7be7c5c38046c6e0819f266d83225
     runs-on: ${{ matrix.runner }}
     env:
       GITHUB_TOKEN: ${{ github.token }}
-      PHP_VERSION: '8.4'
+      PHP_VERSION: '8.4.23'
+      PHPMICRO_CACHE_SCHEMA: 'v1'
+      PHPMICRO_UNCACHED_BASELINE_SECONDS: '480'
       SPC_DOWNLOAD_OUTER_ATTEMPTS: '4'
       SPC_DOWNLOAD_RETRY: '5'
       SPC_EXTENSIONS: curl,mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets
+      SPC_REVISION: 4318ef8fa32a02460ec1554746674a7bc42b49fa
+      SPC_VERSION: '2.8.5'
       STANDALONE_RUNTIME_EXTENSIONS: curl,mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
         with:
           ref: ${{ needs.resolve-release.outputs.commit }}
+
+      - name: Checkout qualified phpmicro toolchain policy
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
+        with:
+          ref: ${{ needs.resolve-release.outputs.control_commit }}
+          path: release-toolchain-control
+          persist-credentials: false
+          sparse-checkout: .github/workflows/release.yml
+          sparse-checkout-cone-mode: false
 
       - name: Download PHAR artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8
@@ -348,34 +364,176 @@ jobs:
           name: dw-phar
           path: build/
 
-      - name: Download spc
+      - name: Start phpmicro toolchain timing
+        id: phpmicro-timing-start
+        shell: bash
+        run: echo "started_at=$(date +%s)" >> "$GITHUB_OUTPUT"
+
+      - name: Download and verify pinned spc
+        shell: bash
         run: |
+          set -euo pipefail
           mkdir -p build/.tools
+          archive="build/.tools/${{ matrix.spc_asset }}"
+          rm -f "$archive" build/.tools/spc
           for attempt in 1 2 3 4 5; do
             if curl -fsSL --retry 3 --retry-all-errors --connect-timeout 10 \
-                -o build/.tools/spc \
-                "https://dl.static-php.dev/static-php-cli/spc-bin/nightly/${{ matrix.spc_asset }}"; then
+                -o "$archive" \
+                "https://github.com/crazywhalecc/static-php-cli/releases/download/${SPC_VERSION}/${{ matrix.spc_asset }}"; then
               break
             fi
             echo "spc download attempt $attempt failed, retrying in 10s..."
+            rm -f "$archive"
             sleep 10
           done
+
+          test -s "$archive"
+          if command -v sha256sum >/dev/null 2>&1; then
+            actual_sha256="$(sha256sum "$archive" | awk '{print $1}')"
+          else
+            actual_sha256="$(shasum -a 256 "$archive" | awk '{print $1}')"
+          fi
+          if [ "$actual_sha256" != "${{ matrix.spc_sha256 }}" ]; then
+            echo "::error::Pinned spc archive checksum mismatch"
+            rm -f "$archive"
+            exit 1
+          fi
+
+          tar -xzf "$archive" -C build/.tools
+          rm -f "$archive"
           test -s build/.tools/spc
           chmod +x build/.tools/spc
+          version_output="$(build/.tools/spc --version)"
+          case "$version_output" in
+            *"$SPC_VERSION"*) printf '%s\n' "$version_output" ;;
+            *)
+              echo "::error::Verified spc binary did not report version $SPC_VERSION"
+              exit 1
+              ;;
+          esac
 
-      - name: Cache spc downloads
+      - name: Resolve exact phpmicro cache identity
+        id: phpmicro-toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256_file() {
+            if command -v sha256sum >/dev/null 2>&1; then
+              sha256sum "$1" | awk '{print $1}'
+            else
+              shasum -a 256 "$1" | awk '{print $1}'
+            fi
+          }
+          sha256_stdin() {
+            if command -v sha256sum >/dev/null 2>&1; then
+              sha256sum | awk '{print $1}'
+            else
+              shasum -a 256 | awk '{print $1}'
+            fi
+          }
+
+          if [ -z "${ImageOS:-}" ] || [ -z "${ImageVersion:-}" ]; then
+            echo "::error::GitHub-hosted runner image identity is unavailable"
+            exit 1
+          fi
+
+          workflow_sha="$(sha256_file release-toolchain-control/.github/workflows/release.yml)"
+          extensions_sha="$(printf '%s' "$SPC_EXTENSIONS" | sha256_stdin)"
+          runner_image="${ImageOS}-${ImageVersion}"
+          toolchain_id="$(
+            printf '%s\n' \
+              "schema=$PHPMICRO_CACHE_SCHEMA" \
+              "spc_version=$SPC_VERSION" \
+              "spc_revision=$SPC_REVISION" \
+              "php_version=$PHP_VERSION" \
+              "extensions=$SPC_EXTENSIONS" \
+              "workflow_sha256=$workflow_sha" \
+              "runner_label=${{ matrix.runner }}" \
+              "runner_os=${{ runner.os }}" \
+              "runner_arch=${{ runner.arch }}" \
+              "runner_image=$runner_image" |
+              sha256_stdin
+          )"
+
+          echo "workflow_sha=$workflow_sha" >> "$GITHUB_OUTPUT"
+          echo "extensions_sha=$extensions_sha" >> "$GITHUB_OUTPUT"
+          echo "runner_image=$runner_image" >> "$GITHUB_OUTPUT"
+          echo "toolchain_id=$toolchain_id" >> "$GITHUB_OUTPUT"
+
+      - name: Restore trusted phpmicro cache
+        id: phpmicro-cache
+        if: >-
+          github.repository == 'durable-workflow/cli' &&
+          github.event_name != 'pull_request' &&
+          ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) ||
+           (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'))
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25  # v5
         with:
           path: |
-            build/.tools/downloads
-            build/.tools/source
-          key: spc-${{ matrix.name }}-php${{ env.PHP_VERSION }}-${{ hashFiles('.github/workflows/release.yml') }}
-          restore-keys: |
-            spc-${{ matrix.name }}-php${{ env.PHP_VERSION }}-
+            build/.tools/buildroot/bin/micro.sfx
+            build/.tools/phpmicro-cache.manifest
+          key: phpmicro-${{ env.PHPMICRO_CACHE_SCHEMA }}-${{ steps.phpmicro-toolchain.outputs.toolchain_id }}
 
-      - name: Fetch PHP sources & extension deps
+      - name: Validate restored phpmicro provenance
+        id: verify-phpmicro-cache
         working-directory: build/.tools
+        shell: bash
+        env:
+          CACHE_HIT: ${{ steps.phpmicro-cache.outputs.cache-hit }}
+          TOOLCHAIN_ID: ${{ steps.phpmicro-toolchain.outputs.toolchain_id }}
         run: |
+          set -euo pipefail
+          micro="buildroot/bin/micro.sfx"
+          manifest="phpmicro-cache.manifest"
+          echo "cache_valid=false" >> "$GITHUB_OUTPUT"
+
+          if [ "$CACHE_HIT" != "true" ]; then
+            rm -rf buildroot
+            rm -f "$manifest"
+            exit 0
+          fi
+
+          valid=true
+          if [ ! -s "$micro" ] || [ ! -s "$manifest" ]; then
+            valid=false
+          else
+            expected_manifest="$(
+              printf '%s\n' \
+                "schema=durable-workflow.phpmicro-cache/v1" \
+                "toolchain_id=$TOOLCHAIN_ID" \
+                "sha256=$(sed -n 's/^sha256=//p' "$manifest")"
+            )"
+            if [ "$(cat "$manifest")" != "$expected_manifest" ]; then
+              valid=false
+            else
+              expected_sha256="$(sed -n 's/^sha256=//p' "$manifest")"
+              if command -v sha256sum >/dev/null 2>&1; then
+                actual_sha256="$(sha256sum "$micro" | awk '{print $1}')"
+              else
+                actual_sha256="$(shasum -a 256 "$micro" | awk '{print $1}')"
+              fi
+              if [ "$actual_sha256" != "$expected_sha256" ]; then
+                valid=false
+              fi
+            fi
+          fi
+
+          if [ "$valid" != "true" ]; then
+            echo "::warning::Discarding untrusted or invalid phpmicro cache; rebuilding cleanly"
+            rm -rf buildroot
+            rm -f "$manifest"
+            exit 0
+          fi
+
+          echo "cache_valid=true" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch PHP sources & extension deps on cold build
+        if: steps.verify-phpmicro-cache.outputs.cache_valid != 'true'
+        working-directory: build/.tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf downloads source buildroot
           case "$SPC_DOWNLOAD_OUTER_ATTEMPTS" in
             ''|*[!0-9]*)
               echo "::error::SPC_DOWNLOAD_OUTER_ATTEMPTS must be a positive integer"
@@ -407,16 +565,78 @@ jobs:
           echo "::error::spc dependency download failed after ${SPC_DOWNLOAD_OUTER_ATTEMPTS} attempts"
           exit 1
 
-      - name: Build phpmicro SAPI with extensions
+      - name: Build and bind phpmicro on cold build
+        if: steps.verify-phpmicro-cache.outputs.cache_valid != 'true'
         working-directory: build/.tools
-        run: ./spc build "$SPC_EXTENSIONS" --build-micro
+        shell: bash
+        env:
+          TOOLCHAIN_ID: ${{ steps.phpmicro-toolchain.outputs.toolchain_id }}
+        run: |
+          set -euo pipefail
+          ./spc build "$SPC_EXTENSIONS" --build-micro
+          test -s buildroot/bin/micro.sfx
+          if command -v sha256sum >/dev/null 2>&1; then
+            micro_sha256="$(sha256sum buildroot/bin/micro.sfx | awk '{print $1}')"
+          else
+            micro_sha256="$(shasum -a 256 buildroot/bin/micro.sfx | awk '{print $1}')"
+          fi
+          printf '%s\n' \
+            "schema=durable-workflow.phpmicro-cache/v1" \
+            "toolchain_id=$TOOLCHAIN_ID" \
+            "sha256=$micro_sha256" \
+            > phpmicro-cache.manifest
+
+      - name: Record phpmicro toolchain timing
+        if: always()
+        working-directory: build/.tools
+        shell: bash
+        env:
+          CACHE_HIT: ${{ steps.phpmicro-cache.outputs.cache-hit }}
+          CACHE_VALID: ${{ steps.verify-phpmicro-cache.outputs.cache_valid }}
+          STARTED_AT: ${{ steps.phpmicro-timing-start.outputs.started_at }}
+        run: |
+          set -euo pipefail
+          finished_at="$(date +%s)"
+          elapsed_seconds=$((finished_at - STARTED_AT))
+          cache_mode="cold"
+          if [ "$CACHE_VALID" = "true" ]; then
+            cache_mode="warm"
+          elif [ "$CACHE_HIT" = "true" ]; then
+            cache_mode="cold-fallback"
+          fi
+          outcome="failure"
+          if [ -s buildroot/bin/micro.sfx ] && [ -s phpmicro-cache.manifest ]; then
+            outcome="success"
+          fi
+
+          node - "$cache_mode" "$outcome" "$elapsed_seconds" "$PHPMICRO_UNCACHED_BASELINE_SECONDS" <<'NODE'
+          const fs = require('fs');
+          const [cacheMode, outcome, elapsedSeconds, baselineSeconds] = process.argv.slice(2);
+          fs.writeFileSync('phpmicro-timing.json', `${JSON.stringify({
+            schema: 'durable-workflow.cli.phpmicro-toolchain-timing/v1',
+            cache_mode: cacheMode,
+            outcome,
+            elapsed_seconds: Number(elapsedSeconds),
+            previous_uncached_baseline_seconds: Number(baselineSeconds),
+          }, null, 2)}\n`);
+          NODE
+
+          {
+            printf '## phpmicro toolchain timing (%s)\n\n' '${{ matrix.name }}'
+            printf '| Measurement | Seconds |\n'
+            printf '| --- | ---: |\n'
+            printf '| Previous uncached baseline | %s |\n' "$PHPMICRO_UNCACHED_BASELINE_SECONDS"
+            printf '| This run (%s) | %s |\n\n' "$cache_mode" "$elapsed_seconds"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload spc build logs (always)
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
         with:
           name: ${{ matrix.name }}-spc-logs
-          path: build/.tools/log/
+          path: |
+            build/.tools/log/
+            build/.tools/phpmicro-timing.json
           if-no-files-found: warn
 
       - name: Combine PHAR into standalone binary
@@ -450,9 +670,14 @@ jobs:
     runs-on: windows-latest
     env:
       GITHUB_TOKEN: ${{ github.token }}
-      PHP_VERSION_WINDOWS: '8.4'
+      PHP_VERSION_WINDOWS: '8.4.23'
+      PHPMICRO_CACHE_SCHEMA: 'v1'
+      PHPMICRO_UNCACHED_BASELINE_SECONDS: '480'
       SPC_DOWNLOAD_OUTER_ATTEMPTS: '4'
       SPC_DOWNLOAD_RETRY: '5'
+      SPC_REVISION: 4318ef8fa32a02460ec1554746674a7bc42b49fa
+      SPC_VERSION: '2.8.5'
+      SPC_WINDOWS_SHA256: 425b54ab857e21409c1fd9b818899ffebabd1e2817ef0a0ed5ae8a3d9f5b463b
       # Windows uses Symfony's native stream transport over OpenSSL. Avoid ext-curl because
       # the generated micro runtime can compile successfully without loading the extension.
       SPC_EXTENSIONS_WINDOWS: mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets
@@ -462,45 +687,163 @@ jobs:
         with:
           ref: ${{ needs.resolve-release.outputs.commit }}
 
+      - name: Checkout qualified phpmicro toolchain policy
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
+        with:
+          ref: ${{ needs.resolve-release.outputs.control_commit }}
+          path: release-toolchain-control
+          persist-credentials: false
+          sparse-checkout: .github/workflows/release.yml
+          sparse-checkout-cone-mode: false
+
       - name: Download PHAR artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8
         with:
           name: dw-phar
           path: build/
 
-      - name: Setup PHP for spc
-        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240  # v2
-        with:
-          php-version: ${{ env.PHP_VERSION_WINDOWS }}
-          tools: composer:v2
-          coverage: none
-
-      - name: Clone spc
+      - name: Start phpmicro toolchain timing
+        id: phpmicro-timing-start
         shell: pwsh
         run: |
-          git clone --depth=1 https://github.com/crazywhalecc/static-php-cli.git build\spc-src
+          "started_at=$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())" >> $env:GITHUB_OUTPUT
 
-      - name: Install spc Composer dependencies
+      - name: Download and verify pinned spc
         shell: pwsh
-        working-directory: build\spc-src
-        run: composer install --no-dev --prefer-dist --no-interaction
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          New-Item -ItemType Directory -Path build\.tools -Force | Out-Null
+          $spcPath = "build\.tools\spc.exe"
+          Remove-Item -Force $spcPath -ErrorAction SilentlyContinue
+          for ($attempt = 1; $attempt -le 5; $attempt++) {
+            curl.exe -fsSL --retry 3 --retry-all-errors --connect-timeout 10 `
+              -o $spcPath `
+              "https://github.com/crazywhalecc/static-php-cli/releases/download/$env:SPC_VERSION/spc-windows-x64.exe"
+            if ($LASTEXITCODE -eq 0) {
+              break
+            }
+            Write-Warning "spc download attempt $attempt failed, retrying in 10s"
+            Remove-Item -Force $spcPath -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 10
+          }
 
-      - name: Cache spc downloads
+          if (-not (Test-Path $spcPath -PathType Leaf)) {
+            Write-Error "Pinned spc binary download failed"
+            exit 1
+          }
+          $actualSha256 = (Get-FileHash -Algorithm SHA256 $spcPath).Hash.ToLowerInvariant()
+          if ($actualSha256 -ne $env:SPC_WINDOWS_SHA256) {
+            Remove-Item -Force $spcPath
+            Write-Error "Pinned spc binary checksum mismatch"
+            exit 1
+          }
+
+          $versionOutput = & $spcPath --version
+          if ($LASTEXITCODE -ne 0 -or "$versionOutput" -notlike "*$env:SPC_VERSION*") {
+            Write-Error "Verified spc binary did not report version $env:SPC_VERSION"
+            exit 1
+          }
+          Write-Host $versionOutput
+
+      - name: Resolve exact phpmicro cache identity
+        id: phpmicro-toolchain
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:ImageOS) -or [string]::IsNullOrWhiteSpace($env:ImageVersion)) {
+            Write-Error "GitHub-hosted runner image identity is unavailable"
+            exit 1
+          }
+
+          $workflowSha = (
+            Get-FileHash -Algorithm SHA256 release-toolchain-control\.github\workflows\release.yml
+          ).Hash.ToLowerInvariant()
+          $extensionsBytes = [Text.Encoding]::UTF8.GetBytes($env:SPC_EXTENSIONS_WINDOWS)
+          $extensionsSha = [Convert]::ToHexString(
+            [Security.Cryptography.SHA256]::HashData($extensionsBytes)
+          ).ToLowerInvariant()
+          $runnerImage = "$env:ImageOS-$env:ImageVersion"
+          $identity = @(
+            "schema=$env:PHPMICRO_CACHE_SCHEMA"
+            "spc_version=$env:SPC_VERSION"
+            "spc_revision=$env:SPC_REVISION"
+            "php_version=$env:PHP_VERSION_WINDOWS"
+            "extensions=$env:SPC_EXTENSIONS_WINDOWS"
+            "workflow_sha256=$workflowSha"
+            "runner_label=windows-latest"
+            "runner_os=${{ runner.os }}"
+            "runner_arch=${{ runner.arch }}"
+            "runner_image=$runnerImage"
+          ) -join "`n"
+          $identityBytes = [Text.Encoding]::UTF8.GetBytes("$identity`n")
+          $toolchainId = [Convert]::ToHexString(
+            [Security.Cryptography.SHA256]::HashData($identityBytes)
+          ).ToLowerInvariant()
+
+          "workflow_sha=$workflowSha" >> $env:GITHUB_OUTPUT
+          "extensions_sha=$extensionsSha" >> $env:GITHUB_OUTPUT
+          "runner_image=$runnerImage" >> $env:GITHUB_OUTPUT
+          "toolchain_id=$toolchainId" >> $env:GITHUB_OUTPUT
+
+      - name: Restore trusted phpmicro cache
+        id: phpmicro-cache
+        if: >-
+          github.repository == 'durable-workflow/cli' &&
+          github.event_name != 'pull_request' &&
+          ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) ||
+           (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'))
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25  # v5
         with:
           path: |
-            build/spc-src/downloads
-            build/spc-src/source
-          key: spc-src-windows-x86_64-php${{ env.PHP_VERSION_WINDOWS }}-${{ hashFiles('.github/workflows/release.yml') }}
-          restore-keys: |
-            spc-src-windows-x86_64-php${{ env.PHP_VERSION_WINDOWS }}-
+            build/.tools/buildroot/bin/micro.sfx
+            build/.tools/phpmicro-cache.manifest
+          key: phpmicro-${{ env.PHPMICRO_CACHE_SCHEMA }}-${{ steps.phpmicro-toolchain.outputs.toolchain_id }}
 
-      - name: Fetch PHP sources & extension deps
+      - name: Validate restored phpmicro provenance
+        id: verify-phpmicro-cache
         shell: pwsh
-        working-directory: build\spc-src
+        working-directory: build\.tools
+        env:
+          CACHE_HIT: ${{ steps.phpmicro-cache.outputs.cache-hit }}
+          TOOLCHAIN_ID: ${{ steps.phpmicro-toolchain.outputs.toolchain_id }}
         run: |
+          $micro = "buildroot\bin\micro.sfx"
+          $manifest = "phpmicro-cache.manifest"
+          "cache_valid=false" >> $env:GITHUB_OUTPUT
+          $valid = $env:CACHE_HIT -eq "true"
+
+          if ($valid -and (Test-Path $micro -PathType Leaf) -and (Test-Path $manifest -PathType Leaf)) {
+            $actual = @(Get-Content $manifest)
+            $valid = $actual.Count -eq 3
+            if ($valid) {
+              $valid = $actual[0] -eq "schema=durable-workflow.phpmicro-cache/v1" `
+                -and $actual[1] -eq "toolchain_id=$env:TOOLCHAIN_ID" `
+                -and $actual[2] -match '^sha256=[0-9a-f]{64}$'
+            }
+            if ($valid) {
+              $expectedSha256 = $actual[2].Substring("sha256=".Length)
+              $actualSha256 = (Get-FileHash -Algorithm SHA256 $micro).Hash.ToLowerInvariant()
+              $valid = $actualSha256 -eq $expectedSha256
+            }
+          } else {
+            $valid = $false
+          }
+
+          if (-not $valid) {
+            if ($env:CACHE_HIT -eq "true") {
+              Write-Warning "Discarding untrusted or invalid phpmicro cache; rebuilding cleanly"
+            }
+            Remove-Item -Recurse -Force buildroot -ErrorAction SilentlyContinue
+            Remove-Item -Force $manifest -ErrorAction SilentlyContinue
+            exit 0
+          }
+
+          "cache_valid=true" >> $env:GITHUB_OUTPUT
+
+      - name: Fetch PHP sources & extension deps on cold build
+        if: steps.verify-phpmicro-cache.outputs.cache_valid != 'true'
+        shell: pwsh
+        working-directory: build\.tools
+        run: |
+          Remove-Item -Recurse -Force downloads,source,buildroot -ErrorAction SilentlyContinue
           $outerAttempts = [int]$env:SPC_DOWNLOAD_OUTER_ATTEMPTS
           if ($outerAttempts -lt 1) {
             Write-Error "SPC_DOWNLOAD_OUTER_ATTEMPTS must be at least 1"
@@ -508,8 +851,8 @@ jobs:
           }
 
           for ($attempt = 1; $attempt -le $outerAttempts; $attempt++) {
-            php bin\spc doctor --auto-fix
-            php bin\spc download --with-php=${{ env.PHP_VERSION_WINDOWS }} `
+            .\spc.exe doctor --auto-fix
+            .\spc.exe download --with-php=${{ env.PHP_VERSION_WINDOWS }} `
               --for-extensions="$env:SPC_EXTENSIONS_WINDOWS" --prefer-pre-built `
               --without-suggestions --retry="$env:SPC_DOWNLOAD_RETRY"
             if ($LASTEXITCODE -eq 0) {
@@ -527,11 +870,12 @@ jobs:
           }
 
           Remove-Item -Recurse -Force source\php-src -ErrorAction SilentlyContinue
-          php bin\spc extract php-src
+          .\spc.exe extract php-src
 
       - name: Patch PHP OpenSSL 3 compatibility
+        if: steps.verify-phpmicro-cache.outputs.cache_valid != 'true'
         shell: pwsh
-        working-directory: build\spc-src
+        working-directory: build\.tools
         run: |
           @'
           import pathlib
@@ -568,24 +912,80 @@ jobs:
           python patch-php-openssl.py
           Remove-Item -Recurse -Force buildroot -ErrorAction SilentlyContinue
 
-      - name: Build phpmicro SAPI with extensions
+      - name: Build and bind phpmicro on cold build
+        if: steps.verify-phpmicro-cache.outputs.cache_valid != 'true'
         shell: pwsh
-        working-directory: build\spc-src
-        run: php bin\spc build "$env:SPC_EXTENSIONS_WINDOWS" --build-micro --debug
+        working-directory: build\.tools
+        env:
+          TOOLCHAIN_ID: ${{ steps.phpmicro-toolchain.outputs.toolchain_id }}
+        run: |
+          .\spc.exe build "$env:SPC_EXTENSIONS_WINDOWS" --build-micro --debug
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path buildroot\bin\micro.sfx -PathType Leaf)) {
+            Write-Error "phpmicro build did not produce micro.sfx"
+            exit 1
+          }
+          $microSha256 = (Get-FileHash -Algorithm SHA256 buildroot\bin\micro.sfx).Hash.ToLowerInvariant()
+          @(
+            "schema=durable-workflow.phpmicro-cache/v1"
+            "toolchain_id=$env:TOOLCHAIN_ID"
+            "sha256=$microSha256"
+          ) | Set-Content -Path phpmicro-cache.manifest -Encoding ascii
+
+      - name: Record phpmicro toolchain timing
+        if: always()
+        shell: pwsh
+        working-directory: build\.tools
+        env:
+          CACHE_HIT: ${{ steps.phpmicro-cache.outputs.cache-hit }}
+          CACHE_VALID: ${{ steps.verify-phpmicro-cache.outputs.cache_valid }}
+          STARTED_AT: ${{ steps.phpmicro-timing-start.outputs.started_at }}
+        run: |
+          $finishedAt = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+          $elapsedSeconds = $finishedAt - [long]$env:STARTED_AT
+          $cacheMode = "cold"
+          if ($env:CACHE_VALID -eq "true") {
+            $cacheMode = "warm"
+          } elseif ($env:CACHE_HIT -eq "true") {
+            $cacheMode = "cold-fallback"
+          }
+          $outcome = if (
+            (Test-Path buildroot\bin\micro.sfx -PathType Leaf) `
+              -and (Test-Path phpmicro-cache.manifest -PathType Leaf)
+          ) { "success" } else { "failure" }
+
+          [ordered]@{
+            schema = "durable-workflow.cli.phpmicro-toolchain-timing/v1"
+            cache_mode = $cacheMode
+            outcome = $outcome
+            elapsed_seconds = $elapsedSeconds
+            previous_uncached_baseline_seconds = [int]$env:PHPMICRO_UNCACHED_BASELINE_SECONDS
+          } | ConvertTo-Json | Set-Content -Path phpmicro-timing.json -Encoding utf8
+
+          @(
+            "## phpmicro toolchain timing (windows-x86_64)"
+            ""
+            "| Measurement | Seconds |"
+            "| --- | ---: |"
+            "| Previous uncached baseline | $env:PHPMICRO_UNCACHED_BASELINE_SECONDS |"
+            "| This run ($cacheMode) | $elapsedSeconds |"
+            ""
+          ) | Add-Content -Path $env:GITHUB_STEP_SUMMARY
 
       - name: Upload spc build logs (always)
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
         with:
           name: windows-spc-logs
-          path: build/spc-src/log/
+          path: |
+            build/.tools/log/
+            build/.tools/phpmicro-timing.json
           if-no-files-found: warn
 
       - name: Combine PHAR into standalone binary
         shell: pwsh
-        working-directory: build\spc-src
+        working-directory: build\.tools
         run: |
-          php bin\spc micro:combine ..\..\build\dw.phar `
+          .\spc.exe micro:combine ..\..\build\dw.phar `
             --output=..\..\build\dw-windows-x86_64.exe
 
       - name: Smoke test binary

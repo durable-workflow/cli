@@ -662,6 +662,229 @@ class ImmutablePlanDiscoveryTest(unittest.TestCase):
         self.assertEqual(4, classify.call_count)
         self.assertEqual(current_snapshot, selected["authority_snapshot"])
 
+    def test_final_implicit_boundary_rejects_continuity_pause_activated_after_initial_read(
+        self,
+    ) -> None:
+        candidate = lifecycle_plan(self.recovery)
+        candidate_preparation = {
+            "components": {
+                "workflow": {
+                    "release_notes": {
+                        "release_date": "2026-07-23",
+                        "sha256": "c" * 64,
+                        "source": {},
+                    }
+                }
+            }
+        }
+        component = self.recovery.COMPONENTS["workflow"]
+        selected = {"tag": "release-plan/current", "lifecycle": "actionable"}
+        authority = {"authority_snapshot": [selected]}
+        continuity = mock.Mock(
+            side_effect=[
+                None,
+                {
+                    "accepted_tag": f"beta-continuity/{candidate['plan']}/accepted",
+                    "accepted_commit": "b" * 40,
+                    "resumed_tag": f"beta-continuity/{candidate['plan']}/resumed",
+                },
+            ]
+        )
+        publication_preflight = mock.Mock(
+            side_effect=self.recovery.NotFound("not published")
+        )
+
+        with (
+            mock.patch.object(self.recovery, "verify_plan_authority", return_value=({}, {})),
+            mock.patch.object(self.recovery, "validate_release_preparation"),
+            mock.patch.object(self.recovery, "resolve_tag", return_value=None),
+            mock.patch.object(
+                self.recovery,
+                "classify_implicit_plan_authority",
+                return_value=(selected, [selected]),
+            ),
+            mock.patch.object(
+                self.recovery,
+                "scheduled_continuity_pause",
+                continuity,
+            ),
+            mock.patch.dict(
+                self.recovery.VERIFIERS,
+                {component.distribution: publication_preflight},
+            ),
+        ):
+            self.assertIsNone(continuity(mock.Mock(), candidate))
+            with self.assertRaisesRegex(
+                self.recovery.RecoveryError,
+                "continuity pause authority changed during component preflight",
+            ):
+                self.recovery.resolve_component(
+                    mock.Mock(),
+                    "workflow",
+                    selected["tag"],
+                    "a" * 40,
+                    candidate,
+                    candidate_preparation,
+                    authority,
+                )
+
+        self.assertEqual(2, continuity.call_count)
+        self.assertEqual(1, publication_preflight.call_count)
+
+    def test_discover_to_output_rejects_continuity_accepted_after_initial_read(
+        self,
+    ) -> None:
+        candidate = lifecycle_plan(self.recovery)
+        preparation = {
+            "components": {
+                "workflow": {
+                    "release_notes": {
+                        "release_date": "2026-07-23",
+                        "sha256": "c" * 64,
+                        "source": {},
+                    }
+                }
+            }
+        }
+        tag = f"release-plan/{candidate['plan']}"
+        commit = "a" * 40
+        authority = {
+            "tag": tag,
+            "commit": commit,
+            "recorded_at": dt.datetime(2026, 7, 23, tzinfo=dt.UTC),
+            "plan": candidate,
+            "preparation": preparation,
+            "lifecycle": "actionable",
+            "successor": None,
+        }
+        pause = {
+            "accepted_tag": f"beta-continuity/{candidate['plan']}/accepted",
+            "accepted_commit": "b" * 40,
+            "resumed_tag": f"beta-continuity/{candidate['plan']}/resumed",
+        }
+        continuity = mock.Mock(side_effect=[None, pause])
+        client = mock.Mock()
+        client.json.return_value = {"draft": False, "tag_name": tag}
+        component = self.recovery.COMPONENTS["workflow"]
+        publication_preflight = mock.Mock(
+            side_effect=self.recovery.NotFound("not published")
+        )
+
+        def resolve(
+            _client: mock.Mock,
+            repository: str,
+            requested_tag: str,
+        ) -> str | None:
+            if (
+                repository == self.recovery.CONTROL_REPOSITORY
+                and requested_tag == tag
+            ):
+                return commit
+            return None
+
+        with (
+            tempfile.TemporaryDirectory(prefix="cli-release-recovery-") as directory,
+            mock.patch.object(self.recovery, "PublicClient", return_value=client),
+            mock.patch.object(
+                self.recovery,
+                "classify_plan_authorities",
+                return_value=[authority],
+            ) as classify,
+            mock.patch.object(
+                self.recovery,
+                "resolve_tag",
+                side_effect=resolve,
+            ),
+            mock.patch.object(
+                self.recovery,
+                "read_plan_authority",
+                return_value=(candidate, preparation),
+            ),
+            mock.patch.object(self.recovery, "validate_release_mirrors"),
+            mock.patch.object(
+                self.recovery,
+                "scheduled_continuity_pause",
+                continuity,
+            ),
+            mock.patch.object(
+                self.recovery,
+                "verify_plan_authority",
+                return_value=({}, {}),
+            ),
+            mock.patch.object(self.recovery, "validate_release_preparation"),
+            mock.patch.dict(
+                self.recovery.VERIFIERS,
+                {component.distribution: publication_preflight},
+            ),
+        ):
+            output_directory = Path(directory)
+            implicit_output = output_directory / "implicit-output"
+            implicit_evidence = output_directory / "implicit-evidence.json"
+            implicit_arguments = [
+                "component-release-recovery.py",
+                "resolve",
+                "--component",
+                "workflow",
+                "--plan-output",
+                str(output_directory / "implicit-plan.json"),
+                "--preparation-output",
+                str(output_directory / "implicit-preparation.json"),
+                "--evidence",
+                str(implicit_evidence),
+                "--github-output",
+                str(implicit_output),
+            ]
+            with (
+                mock.patch.object(sys, "argv", implicit_arguments),
+                mock.patch.object(sys, "stderr", new=io.StringIO()),
+            ):
+                self.assertEqual(1, self.recovery.main())
+
+            self.assertFalse(implicit_output.exists())
+            implicit_failure = json.loads(implicit_evidence.read_text())
+            self.assertEqual("continuity-gate", implicit_failure["phase"])
+            self.assertEqual("failed", implicit_failure["outcome"])
+            self.assertIn(
+                "continuity pause authority changed during component preflight",
+                implicit_failure["reason"],
+            )
+
+            explicit_output = output_directory / "explicit-output"
+            explicit_evidence = output_directory / "explicit-evidence.json"
+            explicit_arguments = [
+                "component-release-recovery.py",
+                "resolve",
+                "--component",
+                "workflow",
+                "--plan-tag",
+                tag,
+                "--plan-output",
+                str(output_directory / "explicit-plan.json"),
+                "--preparation-output",
+                str(output_directory / "explicit-preparation.json"),
+                "--evidence",
+                str(explicit_evidence),
+                "--github-output",
+                str(explicit_output),
+            ]
+            with mock.patch.object(sys, "argv", explicit_arguments):
+                self.assertEqual(0, self.recovery.main())
+
+            explicit_outputs = dict(
+                line.split("=", 1)
+                for line in explicit_output.read_text().splitlines()
+            )
+            self.assertEqual("publish", explicit_outputs["action"])
+            self.assertEqual(tag, explicit_outputs["plan_tag"])
+            self.assertEqual(
+                "publication",
+                json.loads(explicit_evidence.read_text())["phase"],
+            )
+
+        self.assertEqual(5, classify.call_count)
+        self.assertEqual(2, continuity.call_count)
+        self.assertEqual(2, publication_preflight.call_count)
+
     def test_final_implicit_boundary_rejects_stale_publish_but_explicit_actionable_recovery_does_not(
         self,
     ) -> None:

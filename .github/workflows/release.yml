@@ -1,19 +1,40 @@
 name: Release
 
-run-name: Release ${{ inputs.tag || github.ref_name }} for ${{ inputs.release_plan || 'direct' }}
+run-name: >-
+  ${{
+    ((github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+     github.event_name == 'schedule' ||
+     inputs.operation == 'phpmicro-cache-warm') &&
+    'Warm phpmicro cache' ||
+    format('Release {0} for {1}', inputs.tag || github.ref_name, inputs.release_plan || 'direct')
+  }}
 
 on:
   push:
+    branches:
+      - main
     tags:
       - '[0-9]+.[0-9]+.[0-9]+*'
+    paths:
+      - '.github/workflows/release.yml'
+  schedule:
+    - cron: '17 3 * * 1'
   workflow_dispatch:
     inputs:
+      operation:
+        description: 'Trusted operation to perform from main'
+        required: true
+        type: choice
+        options:
+          - release
+          - phpmicro-cache-warm
+        default: release
       tag:
-        description: 'Release tag (for manual dispatch, e.g. 0.0.1-test or v0.0.1-test)'
-        required: true
+        description: 'Release tag required for release (e.g. 0.0.1-test or v0.0.1-test)'
+        required: false
       release_commit:
-        description: 'Exact source commit declared by the immutable release plan'
-        required: true
+        description: 'Exact source commit declared by the immutable release plan (required for release)'
+        required: false
       release_plan:
         description: 'Immutable release-plan tag initiating this recovery run'
         required: false
@@ -23,7 +44,14 @@ permissions:
   contents: read
 
 concurrency:
-  group: release-${{ inputs.tag || github.ref_name }}
+  group: >-
+    ${{
+      ((github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+       github.event_name == 'schedule' ||
+       inputs.operation == 'phpmicro-cache-warm') &&
+      'phpmicro-cache-warm' ||
+      format('release-{0}', inputs.tag || github.ref_name)
+    }}
   cancel-in-progress: false
 
 jobs:
@@ -36,6 +64,7 @@ jobs:
     outputs:
       tag: ${{ steps.resolve.outputs.tag }}
       commit: ${{ steps.resolve.outputs.commit }}
+      cache_warm: ${{ steps.resolve.outputs.cache_warm }}
       control_ref: ${{ steps.resolve.outputs.control_ref }}
       control_commit: ${{ steps.resolve.outputs.control_commit }}
       initiator: ${{ steps.resolve.outputs.initiator }}
@@ -46,6 +75,7 @@ jobs:
       - id: resolve
         shell: bash
         env:
+          DISPATCH_OPERATION: ${{ inputs.operation }}
           DISPATCH_TAG: ${{ inputs.tag }}
           DISPATCH_COMMIT: ${{ inputs.release_commit }}
           PUSH_COMMIT: ${{ github.sha }}
@@ -53,7 +83,19 @@ jobs:
           CONTROL_COMMIT: ${{ github.sha }}
         run: |
           set -euo pipefail
-          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+          cache_warm=false
+          if [ "$GITHUB_EVENT_NAME" = "schedule" ] ||
+              { [ "$GITHUB_EVENT_NAME" = "push" ] && [ "$CONTROL_REF" = "refs/heads/main" ]; } ||
+              { [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] &&
+                [ "$DISPATCH_OPERATION" = "phpmicro-cache-warm" ]; }; then
+            if [ "$CONTROL_REF" != "refs/heads/main" ]; then
+              echo "::error::phpmicro cache warming must execute from refs/heads/main"
+              exit 1
+            fi
+            cache_warm=true
+            tag=""
+            commit="$CONTROL_COMMIT"
+          elif [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
             tag="$DISPATCH_TAG"
             commit="$DISPATCH_COMMIT"
             if [ "$CONTROL_REF" != "refs/heads/main" ]; then
@@ -65,29 +107,37 @@ jobs:
             commit="$PUSH_COMMIT"
           fi
 
-          if [ -z "$tag" ]; then
+          if [ "$cache_warm" != "true" ] && [ -z "$tag" ]; then
             echo "::error::Release tag is required for manual dispatch"
             exit 1
           fi
 
-          raw_tag="$tag"
-          if ! tag="$(node scripts/ci/release-version.js normalize "$raw_tag")"; then
-            echo "::error::Invalid release tag: $raw_tag"
-            exit 1
+          if [ "$cache_warm" != "true" ]; then
+            raw_tag="$tag"
+            if ! tag="$(node scripts/ci/release-version.js normalize "$raw_tag")"; then
+              echo "::error::Invalid release tag: $raw_tag"
+              exit 1
+            fi
           fi
           if ! printf '%s\n' "$commit" | grep -Eq '^[0-9a-f]{40}$'; then
-            echo "::error::Release commit must be a full lowercase Git commit SHA"
+            echo "::error::Source commit must be a full lowercase Git commit SHA"
             exit 1
           fi
 
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "commit=$commit" >> "$GITHUB_OUTPUT"
+          echo "cache_warm=$cache_warm" >> "$GITHUB_OUTPUT"
           echo "control_ref=$CONTROL_REF" >> "$GITHUB_OUTPUT"
           echo "control_commit=$CONTROL_COMMIT" >> "$GITHUB_OUTPUT"
           echo "initiator=$GITHUB_EVENT_NAME" >> "$GITHUB_OUTPUT"
-          echo "Resolved release tag $tag at immutable commit $commit"
+          if [ "$cache_warm" = "true" ]; then
+            echo "Resolved trusted phpmicro cache warm at $commit"
+          else
+            echo "Resolved release tag $tag at immutable commit $commit"
+          fi
 
       - name: Record release control and package authorities
+        if: steps.resolve.outputs.cache_warm != 'true'
         env:
           RELEASE_TAG: ${{ steps.resolve.outputs.tag }}
           RELEASE_COMMIT: ${{ steps.resolve.outputs.commit }}
@@ -107,6 +157,7 @@ jobs:
           NODE
 
       - name: Retain release control authority
+        if: steps.resolve.outputs.cache_warm != 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
         with:
           name: release-control-authority
@@ -116,6 +167,7 @@ jobs:
   release-preflight:
     name: Release preflight
     needs: resolve-release
+    if: needs.resolve-release.outputs.cache_warm != 'true'
     runs-on: ubuntu-latest
     outputs:
       public_assets_present: ${{ steps.public_assets.outputs.present }}
@@ -240,6 +292,7 @@ jobs:
     needs: [resolve-release, release-preflight]
     runs-on: ubuntu-latest
     if: >-
+      needs.resolve-release.outputs.cache_warm != 'true' &&
       (github.event_name != 'workflow_dispatch' ||
        github.ref == 'refs/heads/main') &&
       always() &&
@@ -313,9 +366,10 @@ jobs:
     if: >-
       always() &&
       needs.resolve-release.result == 'success' &&
-      needs.release-preflight.result == 'success' &&
-      needs.release-preflight.outputs.public_assets_present != 'true' &&
-      needs.build-phar.result == 'success'
+      (needs.resolve-release.outputs.cache_warm == 'true' ||
+       (needs.release-preflight.result == 'success' &&
+        needs.release-preflight.outputs.public_assets_present != 'true' &&
+        needs.build-phar.result == 'success'))
     strategy:
       fail-fast: false
       matrix:
@@ -359,6 +413,7 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - name: Download PHAR artifact
+        if: needs.resolve-release.outputs.cache_warm != 'true'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8
         with:
           name: dw-phar
@@ -465,8 +520,14 @@ jobs:
         if: >-
           github.repository == 'durable-workflow/cli' &&
           github.event_name != 'pull_request' &&
-          ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) ||
-           (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'))
+          ((needs.resolve-release.outputs.cache_warm == 'true' &&
+            github.ref == 'refs/heads/main' &&
+            (github.event_name == 'push' ||
+             github.event_name == 'schedule' ||
+             github.event_name == 'workflow_dispatch')) ||
+           (needs.resolve-release.outputs.cache_warm != 'true' &&
+            ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) ||
+             (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'))))
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25  # v5
         with:
           path: |
@@ -593,6 +654,11 @@ jobs:
         env:
           CACHE_HIT: ${{ steps.phpmicro-cache.outputs.cache-hit }}
           CACHE_VALID: ${{ steps.verify-phpmicro-cache.outputs.cache_valid }}
+          CACHE_KEY: phpmicro-${{ env.PHPMICRO_CACHE_SCHEMA }}-${{ steps.phpmicro-toolchain.outputs.toolchain_id }}
+          CACHE_SCOPE: ${{ needs.resolve-release.outputs.cache_warm == 'true' && 'default-branch' || (startsWith(github.ref, 'refs/tags/') && 'release-tag' || 'default-branch-release') }}
+          GIT_REF: ${{ github.ref }}
+          PLATFORM: ${{ matrix.name }}
+          RUN_PURPOSE: ${{ needs.resolve-release.outputs.cache_warm == 'true' && 'cache-warm' || 'release' }}
           STARTED_AT: ${{ steps.phpmicro-timing-start.outputs.started_at }}
         run: |
           set -euo pipefail
@@ -609,13 +675,37 @@ jobs:
             outcome="success"
           fi
 
-          node - "$cache_mode" "$outcome" "$elapsed_seconds" "$PHPMICRO_UNCACHED_BASELINE_SECONDS" <<'NODE'
+          node - \
+            "$cache_mode" \
+            "$outcome" \
+            "$elapsed_seconds" \
+            "$PHPMICRO_UNCACHED_BASELINE_SECONDS" \
+            "$CACHE_KEY" \
+            "$CACHE_SCOPE" \
+            "$GIT_REF" \
+            "$PLATFORM" \
+            "$RUN_PURPOSE" <<'NODE'
           const fs = require('fs');
-          const [cacheMode, outcome, elapsedSeconds, baselineSeconds] = process.argv.slice(2);
-          fs.writeFileSync('phpmicro-timing.json', `${JSON.stringify({
-            schema: 'durable-workflow.cli.phpmicro-toolchain-timing/v1',
-            cache_mode: cacheMode,
+          const [
+            cacheMode,
             outcome,
+            elapsedSeconds,
+            baselineSeconds,
+            cacheKey,
+            cacheScope,
+            gitRef,
+            platform,
+            runPurpose,
+          ] = process.argv.slice(2);
+          fs.writeFileSync('phpmicro-timing.json', `${JSON.stringify({
+            schema: 'durable-workflow.cli.phpmicro-toolchain-timing/v2',
+            cache_mode: cacheMode,
+            cache_key: cacheKey,
+            cache_scope: cacheScope,
+            git_ref: gitRef,
+            outcome,
+            platform,
+            run_purpose: runPurpose,
             elapsed_seconds: Number(elapsedSeconds),
             previous_uncached_baseline_seconds: Number(baselineSeconds),
           }, null, 2)}\n`);
@@ -640,12 +730,14 @@ jobs:
           if-no-files-found: warn
 
       - name: Combine PHAR into standalone binary
+        if: needs.resolve-release.outputs.cache_warm != 'true'
         working-directory: build/.tools
         run: |
           ./spc micro:combine ../../build/dw.phar \
             --output=../../build/dw-${{ matrix.name }}
 
       - name: Smoke test binary
+        if: needs.resolve-release.outputs.cache_warm != 'true'
         run: |
           chmod +x build/dw-${{ matrix.name }}
           ./build/dw-${{ matrix.name }} --version
@@ -653,6 +745,7 @@ jobs:
           ./build/dw-${{ matrix.name }} list
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
+        if: needs.resolve-release.outputs.cache_warm != 'true'
         with:
           name: dw-${{ matrix.name }}
           path: build/dw-${{ matrix.name }}
@@ -664,9 +757,10 @@ jobs:
     if: >-
       always() &&
       needs.resolve-release.result == 'success' &&
-      needs.release-preflight.result == 'success' &&
-      needs.release-preflight.outputs.public_assets_present != 'true' &&
-      needs.build-phar.result == 'success'
+      (needs.resolve-release.outputs.cache_warm == 'true' ||
+       (needs.release-preflight.result == 'success' &&
+        needs.release-preflight.outputs.public_assets_present != 'true' &&
+        needs.build-phar.result == 'success'))
     runs-on: windows-latest
     env:
       GITHUB_TOKEN: ${{ github.token }}
@@ -697,6 +791,7 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - name: Download PHAR artifact
+        if: needs.resolve-release.outputs.cache_warm != 'true'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8
         with:
           name: dw-phar
@@ -788,8 +883,14 @@ jobs:
         if: >-
           github.repository == 'durable-workflow/cli' &&
           github.event_name != 'pull_request' &&
-          ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) ||
-           (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'))
+          ((needs.resolve-release.outputs.cache_warm == 'true' &&
+            github.ref == 'refs/heads/main' &&
+            (github.event_name == 'push' ||
+             github.event_name == 'schedule' ||
+             github.event_name == 'workflow_dispatch')) ||
+           (needs.resolve-release.outputs.cache_warm != 'true' &&
+            ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) ||
+             (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'))))
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25  # v5
         with:
           path: |
@@ -938,6 +1039,11 @@ jobs:
         env:
           CACHE_HIT: ${{ steps.phpmicro-cache.outputs.cache-hit }}
           CACHE_VALID: ${{ steps.verify-phpmicro-cache.outputs.cache_valid }}
+          CACHE_KEY: phpmicro-${{ env.PHPMICRO_CACHE_SCHEMA }}-${{ steps.phpmicro-toolchain.outputs.toolchain_id }}
+          CACHE_SCOPE: ${{ needs.resolve-release.outputs.cache_warm == 'true' && 'default-branch' || (startsWith(github.ref, 'refs/tags/') && 'release-tag' || 'default-branch-release') }}
+          GIT_REF: ${{ github.ref }}
+          PLATFORM: windows-x86_64
+          RUN_PURPOSE: ${{ needs.resolve-release.outputs.cache_warm == 'true' && 'cache-warm' || 'release' }}
           STARTED_AT: ${{ steps.phpmicro-timing-start.outputs.started_at }}
         run: |
           $finishedAt = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
@@ -954,9 +1060,14 @@ jobs:
           ) { "success" } else { "failure" }
 
           [ordered]@{
-            schema = "durable-workflow.cli.phpmicro-toolchain-timing/v1"
+            schema = "durable-workflow.cli.phpmicro-toolchain-timing/v2"
             cache_mode = $cacheMode
+            cache_key = $env:CACHE_KEY
+            cache_scope = $env:CACHE_SCOPE
+            git_ref = $env:GIT_REF
             outcome = $outcome
+            platform = $env:PLATFORM
+            run_purpose = $env:RUN_PURPOSE
             elapsed_seconds = $elapsedSeconds
             previous_uncached_baseline_seconds = [int]$env:PHPMICRO_UNCACHED_BASELINE_SECONDS
           } | ConvertTo-Json | Set-Content -Path phpmicro-timing.json -Encoding utf8
@@ -982,6 +1093,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Combine PHAR into standalone binary
+        if: needs.resolve-release.outputs.cache_warm != 'true'
         shell: pwsh
         working-directory: build\.tools
         run: |
@@ -989,6 +1101,7 @@ jobs:
             --output=..\..\build\dw-windows-x86_64.exe
 
       - name: Smoke test binary
+        if: needs.resolve-release.outputs.cache_warm != 'true'
         shell: pwsh
         run: |
           .\build\dw-windows-x86_64.exe --version
@@ -996,6 +1109,7 @@ jobs:
           .\build\dw-windows-x86_64.exe list
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
+        if: needs.resolve-release.outputs.cache_warm != 'true'
         with:
           name: dw-windows-x86_64
           path: build/dw-windows-x86_64.exe
@@ -1005,6 +1119,7 @@ jobs:
     name: Bind exact release artifacts for publication
     needs: [resolve-release, release-preflight, build-phar, build-binary, build-binary-windows]
     if: >-
+      needs.resolve-release.outputs.cache_warm != 'true' &&
       (github.event_name != 'workflow_dispatch' ||
        github.ref == 'refs/heads/main') &&
       always() &&
@@ -1059,6 +1174,7 @@ jobs:
       contents: write
       id-token: write
     if: >-
+      needs.resolve-release.outputs.cache_warm != 'true' &&
       (github.event_name != 'workflow_dispatch' ||
        github.ref == 'refs/heads/main') &&
       always() &&

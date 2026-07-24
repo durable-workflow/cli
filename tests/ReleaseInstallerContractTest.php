@@ -182,10 +182,87 @@ final class ReleaseInstallerContractTest extends TestCase
         self::assertSame(2, substr_count($releaseWorkflow, "PHPMICRO_UNCACHED_BASELINE_SECONDS: '480'"));
         self::assertSame(2, substr_count(
             $releaseWorkflow,
-            'durable-workflow.cli.phpmicro-toolchain-timing/v1',
+            'durable-workflow.cli.phpmicro-toolchain-timing/v2',
         ));
         self::assertSame(2, substr_count($releaseWorkflow, 'build/.tools/phpmicro-timing.json'));
         self::assertStringContainsString('previous_uncached_baseline_seconds', $releaseWorkflow);
+    }
+
+    public function test_release_phpmicro_cache_has_a_non_publishing_default_branch_warm_path(): void
+    {
+        $releaseWorkflow = self::readRepoFile('.github/workflows/release.yml');
+
+        self::assertStringContainsString(
+            "push:\n    branches:\n      - main\n    tags:",
+            $releaseWorkflow,
+        );
+        self::assertStringContainsString("schedule:\n    - cron:", $releaseWorkflow);
+        self::assertStringContainsString('phpmicro-cache-warm', $releaseWorkflow);
+        self::assertMatchesRegularExpression(
+            '/tag:\n\s+description: \'Release tag required for release.*\n\s+required: false/',
+            $releaseWorkflow,
+        );
+        self::assertMatchesRegularExpression(
+            '/release_commit:\n\s+description: \'Exact source commit.*\n\s+required: false/',
+            $releaseWorkflow,
+        );
+        self::assertStringContainsString('DISPATCH_OPERATION: ${{ inputs.operation }}', $releaseWorkflow);
+        self::assertStringContainsString('[ "$CONTROL_REF" = "refs/heads/main" ]', $releaseWorkflow);
+        self::assertStringContainsString('cache_warm=true', $releaseWorkflow);
+        self::assertStringContainsString('tag=""', $releaseWorkflow);
+        self::assertStringContainsString('commit="$CONTROL_COMMIT"', $releaseWorkflow);
+        self::assertStringContainsString('cache_warm: ${{ steps.resolve.outputs.cache_warm }}', $releaseWorkflow);
+
+        self::assertSame(2, substr_count(
+            $releaseWorkflow,
+            "needs.resolve-release.outputs.cache_warm == 'true' &&\n".
+            "            github.ref == 'refs/heads/main'",
+        ));
+        self::assertSame(2, substr_count(
+            $releaseWorkflow,
+            "needs.resolve-release.outputs.cache_warm != 'true' &&\n".
+            "            ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/'))",
+        ));
+        self::assertSame(2, substr_count(
+            $releaseWorkflow,
+            'key: phpmicro-${{ env.PHPMICRO_CACHE_SCHEMA }}-${{ steps.phpmicro-toolchain.outputs.toolchain_id }}',
+        ));
+        self::assertGreaterThanOrEqual(10, substr_count(
+            $releaseWorkflow,
+            "needs.resolve-release.outputs.cache_warm != 'true'",
+        ));
+
+        foreach ([
+            'CACHE_KEY:',
+            'CACHE_SCOPE:',
+            'GIT_REF:',
+            'PLATFORM:',
+            'RUN_PURPOSE:',
+            'cache_key',
+            'cache_scope',
+            'git_ref',
+            'platform',
+            'run_purpose',
+        ] as $timingField) {
+            self::assertGreaterThanOrEqual(2, substr_count($releaseWorkflow, $timingField), $timingField);
+        }
+        self::assertSame(2, substr_count(
+            $releaseWorkflow,
+            'durable-workflow.cli.phpmicro-toolchain-timing/v2',
+        ));
+
+        $preflight = self::workflowJob($releaseWorkflow, 'release-preflight', 'build-phar');
+        $buildPhar = self::workflowJob($releaseWorkflow, 'build-phar', 'build-binary');
+        $bundle = self::workflowJob($releaseWorkflow, 'bundle-release', 'release');
+        $publish = self::workflowJob($releaseWorkflow, 'release', null);
+        foreach ([$preflight, $buildPhar, $bundle, $publish] as $releaseOnlyJob) {
+            self::assertStringContainsString(
+                "needs.resolve-release.outputs.cache_warm != 'true'",
+                $releaseOnlyJob,
+            );
+        }
+        self::assertStringContainsString('Create GitHub Release', $publish);
+        self::assertStringNotContainsString('Create GitHub Release', $bundle);
     }
 
     public function test_build_validates_installer_scripts(): void
@@ -241,7 +318,7 @@ final class ReleaseInstallerContractTest extends TestCase
         self::assertSame(1, substr_count($recoveryWorkflow, 'scripts/ci/verify-release-tag-source.sh'));
         self::assertStringContainsString('CLI_RELEASE_DEPLOY_KEY: ${{ secrets.CLI_RELEASE_DEPLOY_KEY }}', $recoveryWorkflow);
         self::assertStringContainsString('GH_TOKEN: ${{ github.token }}', $recoveryWorkflow);
-        self::assertStringContainsString("push:\n    tags:", $releaseWorkflow);
+        self::assertStringContainsString("tags:\n      - '[0-9]+.[0-9]+.[0-9]+*'", $releaseWorkflow);
         self::assertStringContainsString("workflow_dispatch:\n    inputs:", $releaseWorkflow);
 
         $credentialCheck = strpos($recoveryWorkflow, 'Require repository publication credential');
@@ -516,5 +593,19 @@ SH);
         self::assertIsString($contents, "{$path} must be readable.");
 
         return $contents;
+    }
+
+    private static function workflowJob(string $workflow, string $job, ?string $nextJob): string
+    {
+        $start = strpos($workflow, "\n  {$job}:\n");
+        self::assertIsInt($start, "{$job} job must exist.");
+        if ($nextJob === null) {
+            return substr($workflow, $start);
+        }
+
+        $end = strpos($workflow, "\n  {$nextJob}:\n", $start + 1);
+        self::assertIsInt($end, "{$nextJob} job must follow {$job}.");
+
+        return substr($workflow, $start, $end - $start);
     }
 }

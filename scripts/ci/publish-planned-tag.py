@@ -12,6 +12,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from release_plan_contract import supports_release_plan
+
 COMMIT_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 PLAN_TAG_PATTERN = re.compile(r"^release-plan/[a-z0-9][a-z0-9._-]{0,55}$")
 TAG_PATTERN = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z][0-9A-Za-z.-]*)?$")
@@ -158,7 +160,7 @@ def require_plan_identity(plan_path: Path, plan_tag: str, tag: str, commit: str)
     actual_commit = cli.get("commit") if isinstance(cli, dict) else None
     if (
         not isinstance(plan, dict)
-        or plan.get("schema") != "durable-workflow.release-plan/v1"
+        or not supports_release_plan(plan)
         or plan.get("plan") != expected_plan
         or actual_version != tag
         or actual_commit != commit
@@ -170,6 +172,7 @@ def require_plan_identity(plan_path: Path, plan_tag: str, tag: str, commit: str)
             evidence={
                 "classification": "terminal-plan-identity-conflict",
                 "plan": plan.get("plan") if isinstance(plan, dict) else None,
+                "plan_schema": plan.get("schema") if isinstance(plan, dict) else None,
                 "planned_version": actual_version,
                 "planned_commit_in_record": actual_commit,
             },

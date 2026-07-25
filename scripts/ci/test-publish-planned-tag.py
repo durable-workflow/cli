@@ -11,6 +11,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from release_plan_contract import CURRENT_PLAN_SCHEMA, HISTORICAL_PLAN_SCHEMA
+
 SCRIPT = Path(__file__).with_name("publish-planned-tag.py")
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 PLAN_TAG = "release-plan/cli-recovery-test"
@@ -61,13 +63,14 @@ class PlannedTagPublicationTest(unittest.TestCase):
         *,
         version: str = RELEASE_TAG,
         plan: str = "cli-recovery-test",
+        schema: str = CURRENT_PLAN_SCHEMA,
         name: str = "plan.json",
     ) -> Path:
         path = self.root / name
         path.write_text(
             json.dumps(
                 {
-                    "schema": "durable-workflow.release-plan/v1",
+                    "schema": schema,
                     "plan": plan,
                     "components": {"cli": {"version": version, "commit": commit}},
                 },
@@ -156,6 +159,39 @@ class PlannedTagPublicationTest(unittest.TestCase):
                 rejected = self.publish(self.first, plan=plan, evidence_name=f"{label}.evidence.json")
                 self.assertEqual(1, rejected.returncode)
                 self.assertEqual("plan-identity", self.evidence(f"{label}.evidence.json")["phase"])
+                self.assertEqual(
+                    "",
+                    git("ls-remote", str(self.remote), f"refs/tags/{RELEASE_TAG}").stdout,
+                )
+
+    def test_rejects_unrecorded_or_unsupported_plan_schema_before_mutation(self) -> None:
+        variants = {
+            "unrecorded-v1": self.write_plan(
+                self.first,
+                schema=HISTORICAL_PLAN_SCHEMA,
+                name="unrecorded-v1.json",
+            ),
+            "unsupported-v3": self.write_plan(
+                self.first,
+                schema="durable-workflow.release-plan/v3",
+                name="unsupported-v3.json",
+            ),
+        }
+        for label, plan in variants.items():
+            with self.subTest(label=label):
+                rejected = self.publish(
+                    self.first,
+                    plan=plan,
+                    evidence_name=f"{label}.evidence.json",
+                )
+
+                self.assertEqual(1, rejected.returncode)
+                evidence = self.evidence(f"{label}.evidence.json")
+                self.assertEqual("plan-identity", evidence["phase"])
+                self.assertEqual(
+                    "terminal-plan-identity-conflict",
+                    evidence["classification"],
+                )
                 self.assertEqual(
                     "",
                     git("ls-remote", str(self.remote), f"refs/tags/{RELEASE_TAG}").stdout,

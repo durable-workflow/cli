@@ -23,7 +23,8 @@ use PHPUnit\Framework\TestCase;
  *
  * Required reading before changing this test:
  * - workflow package: docs/architecture/execution-guarantees.md
- * - workflow package: tests/Unit/V2/ExecutionGuaranteesDocumentationTest.php
+ * - workflow package: tests/Feature/V2/V2DuplicateStartPolicyTest.php
+ * - workflow package: tests/Feature/V2/V2WorkflowTaskBridgeTest.php
  */
 final class V2ExecutionSemanticsContractAlignmentTest extends TestCase
 {

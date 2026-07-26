@@ -24,7 +24,7 @@ use PHPUnit\Framework\TestCase;
  *
  * Required reading before changing this test:
  * - workflow package: docs/architecture/worker-compatibility.md
- * - workflow package: tests/Unit/V2/WorkerCompatibilityDocumentationTest.php
+ * - workflow package: tests/Feature/V2/V2CompatibilityWorkflowTest.php
  */
 final class V2WorkerCompatibilityContractAlignmentTest extends TestCase
 {

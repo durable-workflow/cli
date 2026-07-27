@@ -53,6 +53,7 @@ jobs:
             --contract scripts/ci/release-recovery-consumer-contract.json \
             --adapter scripts/ci/release-recovery-consumer-adapter.json \
             "${arguments[@]}"
+          python scripts/ci/test-component-release-recovery.py ConsumerContractIdentityRegressionTest
           python scripts/ci/test-cli-publication-run.py
           python scripts/ci/test-publish-planned-tag.py
       - run: composer test

@@ -127,7 +127,12 @@ def relative_file(root: Path, value: Any, label: str) -> Path:
     path = PurePosixPath(value)
     if path.is_absolute() or ".." in path.parts:
         raise ConformanceError(f"{label} must stay within the repository")
-    resolved = root.joinpath(*path.parts)
+    repository_root = root.resolve()
+    resolved = root.joinpath(*path.parts).resolve()
+    try:
+        resolved.relative_to(repository_root)
+    except ValueError as error:
+        raise ConformanceError(f"{label} must stay within the repository") from error
     if not resolved.is_file():
         raise ConformanceError(f"{label} does not exist: {value}")
     return resolved
@@ -220,6 +225,7 @@ def validate_adapter(
     contract_sha256: str,
     repository_root: Path,
     current_suite: Path,
+    current_contract: Path,
 ) -> tuple[Path, list[str]]:
     expected_keys = {
         "component",
@@ -241,13 +247,19 @@ def validate_adapter(
     if identity not in CONSUMERS or identity not in contract["consumers"]:
         raise ConformanceError("consumer adapter is not in the contract target topology")
     contract_pin = adapter.get("contract")
-    if (
-        not isinstance(contract_pin, dict)
-        or set(contract_pin) != {"path", "sha256", "version"}
-        or contract_pin.get("version") != contract["version"]
-        or contract_pin.get("sha256") != contract_sha256
-    ):
-        raise ConformanceError("consumer adapter does not pin the exact contract version and digest")
+    if not isinstance(contract_pin, dict) or set(contract_pin) != {"path", "sha256", "version"}:
+        raise ConformanceError("consumer adapter does not declare the exact contract pin shape")
+    adapter_contract = relative_file(repository_root, contract_pin["path"], "adapter contract")
+    invoked_contract = current_contract.resolve()
+    if adapter_contract != invoked_contract:
+        raise ConformanceError("the invoked contract is not the adapter's declared contract")
+    declared_contract, declared_contract_raw = load_json_object(adapter_contract, "adapter contract")
+    if declared_contract.get("version") != contract_pin.get("version") or sha256_bytes(
+        declared_contract_raw
+    ) != contract_pin.get("sha256"):
+        raise ConformanceError("the adapter's declared contract does not match its version and digest pins")
+    if contract_pin.get("version") != contract["version"] or contract_pin.get("sha256") != contract_sha256:
+        raise ConformanceError("consumer adapter does not pin the exact invoked contract version and digest")
     suite_pin = adapter.get("suite")
     if (
         not isinstance(suite_pin, dict)
@@ -258,7 +270,6 @@ def validate_adapter(
     adapter_suite = relative_file(repository_root, suite_pin["path"], "adapter suite")
     if adapter_suite.resolve() != current_suite.resolve():
         raise ConformanceError("the invoked suite is not the adapter's declared suite")
-    relative_file(repository_root, contract_pin["path"], "adapter contract")
     consumer = relative_file(repository_root, adapter.get("consumer"), "adapter consumer")
     distribution = adapter.get("distribution_verification")
     if (
@@ -576,11 +587,61 @@ def exercise_continuity_resolution(
     qualification_run: Any,
 ) -> str:
     client = mock.Mock()
-    client.json.return_value = qualification_run
+    resolution_tag = resolution_tags[0] if len(resolution_tags) == 1 else None
+    qualification = resolution.get("qualification") if isinstance(resolution, dict) else None
+    qualification_url = (
+        (
+            f"https://api.github.com/repos/{qualification['repository']}/actions/runs/"
+            f"{qualification['run_id']}/attempts/{qualification['run_attempt']}"
+        )
+        if (
+            isinstance(qualification, dict)
+            and isinstance(qualification.get("repository"), str)
+            and type(qualification.get("run_id")) is int
+            and type(qualification.get("run_attempt")) is int
+        )
+        else None
+    )
+
+    def list_resolution_tags(request_client: Any, interrupted_plan: Any) -> list[str]:
+        if request_client is client and interrupted_plan == interrupted["plan"]["plan"]:
+            return resolution_tags
+        return []
+
+    def resolve_resolution_tag(request_client: Any, repository: Any, tag: Any) -> str | None:
+        if (
+            request_client is client
+            and repository == module.CONTROL_REPOSITORY
+            and tag == resolution_tag
+        ):
+            return resolution_commit
+        return None
+
+    def read_resolution_record(
+        request_client: Any,
+        tag: Any,
+        commit: Any,
+        filename: Any,
+    ) -> Any:
+        if (
+            request_client is client
+            and tag == resolution_tag
+            and commit == resolution_commit
+            and filename == "continuity-successor-resolution.json"
+        ):
+            return resolution
+        return None
+
+    def read_qualification(url: Any, **kwargs: Any) -> Any:
+        if url == qualification_url and not kwargs:
+            return qualification_run
+        return None
+
+    client.json.side_effect = read_qualification
     with (
-        mock.patch.object(module, "list_continuity_resolution_tags", return_value=resolution_tags),
-        mock.patch.object(module, "resolve_tag", return_value=resolution_commit),
-        mock.patch.object(module, "read_record", return_value=resolution),
+        mock.patch.object(module, "list_continuity_resolution_tags", side_effect=list_resolution_tags),
+        mock.patch.object(module, "resolve_tag", side_effect=resolve_resolution_tag),
+        mock.patch.object(module, "read_record", side_effect=read_resolution_record),
     ):
         return module.resolve_continuity_successor_fork(client, interrupted, successors)
 
@@ -1162,6 +1223,7 @@ def main() -> int:
         contract_sha256,
         repository_root,
         suite_path,
+        contract_path,
     )
     module = load_consumer(consumer_path)
     cases, failures = run_cases(module)

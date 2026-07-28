@@ -25,10 +25,10 @@ final class CompatibilityDiagnosticsProductTrainTest extends TestCase
 
     public function testProductTrainPrereleaseFloorRejectsEarlierBeta(): void
     {
-        $clusterInfo = $this->clusterInfo('>=2.0.0-beta.21,<2.0.0-beta.22');
+        $clusterInfo = $this->clusterInfo('>=2.0.0-rc.1,<2.0.0');
 
         self::assertFalse(CompatibilityDiagnostics::cliVersionIsSupported($clusterInfo, '2.0.0-beta.1'));
-        self::assertTrue(CompatibilityDiagnostics::cliVersionIsSupported($clusterInfo, '2.0.0-beta.21'));
+        self::assertTrue(CompatibilityDiagnostics::cliVersionIsSupported($clusterInfo, '2.0.0-rc.1'));
         self::assertFalse(CompatibilityDiagnostics::cliVersionIsSupported($clusterInfo, '2.0.0-beta.7'));
         self::assertFalse(CompatibilityDiagnostics::cliVersionIsSupported($clusterInfo, '2.0.0'));
     }

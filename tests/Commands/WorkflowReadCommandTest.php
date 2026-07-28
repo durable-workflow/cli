@@ -731,6 +731,42 @@ class WorkflowReadCommandTest extends TestCase
         self::assertStringContainsString("\033[", $decoratedDisplay);
     }
 
+    public function test_describe_json_preserves_typed_value_projections_and_lossless_envelopes(): void
+    {
+        $payload = [
+            'workflow_id' => 'wf-typed-values',
+            'run_id' => 'run-typed-values',
+            'status' => 'completed',
+            'input' => [
+                ['$type' => 'bytes', 'base64' => 'AP8='],
+                [
+                    '$type' => 'map',
+                    'entries' => [
+                        ['key' => '0', 'value' => 'zero'],
+                        ['key' => '1', 'value' => ['nested']],
+                    ],
+                ],
+            ],
+            'output' => ['$type' => 'map', 'entries' => []],
+            'input_envelope' => ['codec' => 'avro', 'blob' => 'input-frame'],
+            'output_envelope' => ['codec' => 'avro', 'blob' => 'output-frame'],
+        ];
+        $command = new DescribeCommand();
+        $command->setServerClient(new WorkflowReadFakeServerClient($payload));
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            'workflow-id' => 'wf-typed-values',
+            '--json' => true,
+        ]));
+
+        $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame($payload['input'], $decoded['input']);
+        self::assertSame($payload['output'], $decoded['output']);
+        self::assertSame($payload['input_envelope'], $decoded['input_envelope']);
+        self::assertSame($payload['output_envelope'], $decoded['output_envelope']);
+    }
+
     public function test_describe_command_renders_engine_metadata_and_available_actions(): void
     {
         $command = new DescribeCommand();

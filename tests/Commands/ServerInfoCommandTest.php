@@ -26,6 +26,12 @@ class ServerInfoCommandTest extends TestCase
                 'payload_codecs_engine_specific' => [
                     'php' => ['workflow-serializer-y', 'workflow-serializer-base64'],
                 ],
+                'avro_value_protocol' => [
+                    'schema' => 'durable_workflow.protocol.Value',
+                    'fingerprint' => 'e2a33dff55802237',
+                    'framing' => 'single_object',
+                    'magic_hex' => 'c301',
+                ],
                 'response_compression' => [],
             ],
             'worker_fleet' => [
@@ -123,6 +129,9 @@ class ServerInfoCommandTest extends TestCase
         self::assertStringContainsString('Worker Fleet:', $display);
         self::assertStringContainsString('Client Compatibility:', $display);
         self::assertStringContainsString('Authority: protocol_manifests', $display);
+        self::assertStringContainsString('avro_value_protocol:', $display);
+        self::assertStringContainsString('fingerprint: e2a33dff55802237', $display);
+        self::assertStringContainsString('framing: single_object', $display);
         self::assertStringContainsString('Top-level Version Role: informational', $display);
         self::assertStringContainsString('Fail Closed: yes', $display);
         self::assertStringContainsString('Control Plane:', $display);

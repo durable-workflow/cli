@@ -28,11 +28,11 @@ and refuse to proceed when the checksum does not match.
 For exact-version automation, set `VERSION` to the release tag:
 
 ```bash
-curl -fsSL https://durable-workflow.com/install.sh | VERSION=2.0.0-rc.3 sh
+curl -fsSL https://durable-workflow.com/install.sh | VERSION=2.0.0-rc.4 sh
 ```
 
-Release `2.0.0-rc.3` is available from the GitHub release page at
-<https://github.com/durable-workflow/cli/releases/tag/2.0.0-rc.3>. Replace the
+Release `2.0.0-rc.4` is available from the GitHub release page at
+<https://github.com/durable-workflow/cli/releases/tag/2.0.0-rc.4>. Replace the
 tag when pinning a newer release.
 
 ## Provenance boundary
@@ -296,6 +296,8 @@ Before promoting `dw` into a production runbook:
 
 ## Change history
 
+- 2.0.0-rc.4 — Advanced the synchronized Durable Workflow source train for
+  the corrected managed Waterline release.
 - 2.0.0-rc.3 — Adopted the shared fixed typed Avro Value protocol and advanced
   the synchronized Durable Workflow 2.0 release-candidate train.
 - 2.0.0-rc.1 — Advanced the synchronized Durable Workflow 2.0 product

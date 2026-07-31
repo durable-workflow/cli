@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://durable-workflow.github.io/cli-json-envelopes/v2/schemas/search-attribute.schema.json",
+  "$id": "https://durable-workflow.github.io/cli-json-envelopes/v3/schemas/search-attribute.schema.json",
   "title": "dw search-attribute create/delete --json",
   "type": "object",
   "required": ["namespace"],

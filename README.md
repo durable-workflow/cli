@@ -18,7 +18,7 @@ Pin an exact release for CI, conformance, or reproducible automation:
 
 ```bash
 # Linux and macOS
-curl -fsSL https://durable-workflow.com/install.sh | VERSION=2.0.0-rc.11 sh
+curl -fsSL https://durable-workflow.com/install.sh | VERSION=2.0.0-rc.12 sh
 ```
 
 ```powershell
@@ -28,7 +28,7 @@ irm https://durable-workflow.com/install.ps1 | iex
 
 ```powershell
 # Windows, exact release
-$env:VERSION = '2.0.0-rc.11'
+$env:VERSION = '2.0.0-rc.12'
 irm https://durable-workflow.com/install.ps1 | iex
 ```
 
@@ -45,7 +45,7 @@ downloaded binary and `SHA256SUMS` before installation.
 Or download a native binary directly from the [releases
 page](https://github.com/durable-workflow/cli/releases). The current
 supported exact release in these examples is
-[`2.0.0-rc.11`](https://github.com/durable-workflow/cli/releases/tag/2.0.0-rc.11).
+[`2.0.0-rc.12`](https://github.com/durable-workflow/cli/releases/tag/2.0.0-rc.12).
 Available assets:
 `dw-linux-x86_64`, `dw-linux-aarch64`,
 `dw-macos-aarch64`, `dw-windows-x86_64.exe`.
@@ -324,8 +324,8 @@ policy, worker status, search attribute type, and local dev database driver.
 
 ## Compatibility
 
-CLI version `2.0.0-rc.11` is the CLI member of the supported Durable Workflow
-`2.0.0-rc.11` product train. It is compatible with servers that advertise
+CLI version `2.0.0-rc.12` is the CLI member of the supported Durable Workflow
+`2.0.0-rc.12` product train. It is compatible with servers that advertise
 `control_plane.version: "2"`,
 `control_plane.request_contract.schema: durable-workflow.v2.control-plane-request.contract`
 version `1`, and a `client_compatibility.clients.cli.supported_versions`
@@ -342,7 +342,7 @@ names the CLI version, server version, compatibility window, and next step:
 
 ```bash
 $ dw workflow:list
-Server compatibility error: refusing before the requested operation because dw 2.0.0-rc.11 cannot safely interoperate with server 2.0.0-rc.11. Compatibility window: cli >=2.0.0-rc.1,<2.0.0; control-plane version 2; worker protocol same-major <= 1.0. Next step: Upgrade dw, pin dw to a supported release, or connect to a compatible server. Detail: Server compatibility error: missing control_plane.request_contract; expected durable-workflow.v2.control-plane-request.contract v1.
+Server compatibility error: refusing before the requested operation because dw 2.0.0-rc.12 cannot safely interoperate with server 2.0.0-rc.12. Compatibility window: cli >=2.0.0-rc.1,<2.0.0; control-plane version 2; worker protocol same-major <= 1.0. Next step: Upgrade dw, pin dw to a supported release, or connect to a compatible server. Detail: Server compatibility error: missing control_plane.request_contract; expected durable-workflow.v2.control-plane-request.contract v1.
 Next steps:
   - Upgrade dw, pin dw to a supported release, or connect to a compatible server.
     Try: dw doctor --output=json
@@ -355,8 +355,8 @@ object for automation:
 {
   "exit_code": 8,
   "compatibility": {
-    "cli_version": "2.0.0-rc.11",
-    "server_version": "2.0.0-rc.11",
+    "cli_version": "2.0.0-rc.12",
+    "server_version": "2.0.0-rc.12",
     "compatibility_window": "cli >=2.0.0-rc.1,<2.0.0; control-plane version 2; worker protocol same-major <= 1.0",
     "next_step": "Upgrade dw, pin dw to a supported release, or connect to a compatible server.",
     "detail": "Server compatibility error: missing control_plane.request_contract; expected durable-workflow.v2.control-plane-request.contract v1."
@@ -658,8 +658,10 @@ dw workflow:signal "$wf_id" approve --json | jq '.command_status'
 
 The CLI publishes patch-stable JSON Schema files for JSON and JSONL command
 responses and for `workflow:history-export` replay bundles. The
-[versioned public manifest](https://durable-workflow.github.io/cli-json-envelopes/v2/manifest.json)
-gives every command schema an HTTPS identity and SHA-256 digest. PHAR and
+[versioned public manifest](https://durable-workflow.github.io/cli-json-envelopes/v3/manifest.json)
+gives every JSON envelope and JSONL record schema an HTTPS identity and
+SHA-256 digest. The prior v2 resolver remains available with its original
+bytes for consumers pinned to that revision. PHAR and
 standalone binary builds also bundle the same catalog under `schemas/output/`;
 operators can inspect the embedded catalog without unpacking the artifact:
 
@@ -667,6 +669,7 @@ operators can inspect the embedded catalog without unpacking the artifact:
 dw schema:list
 dw schema:manifest | jq '.commands["workflow:list"].resolver_url'
 dw schema:show workflow:list > workflow-list.schema.json
+dw schema:show workflow:list --output=jsonl > workflow-list-record.schema.json
 ```
 
 Schemas are additive across patch releases: new optional fields may appear, but

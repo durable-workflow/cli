@@ -221,6 +221,7 @@ class ApplicationSmokeTest extends TestCase
 
         foreach (OutputSchemaRegistry::entries() as $entry) {
             $name = (string) $entry['command'];
+            $outputMode = (string) ($entry['output'] ?? '');
 
             self::assertArrayHasKey(
                 $name,
@@ -235,7 +236,14 @@ class ApplicationSmokeTest extends TestCase
                 );
             }
 
-            $schema = OutputSchemaRegistry::schema($name);
+            if ($outputMode === '--output=jsonl') {
+                self::assertTrue(
+                    $commands[$name]->getDefinition()->hasOption('output'),
+                    "Manifest entry {$name} declares JSONL output but the command has no --output option.",
+                );
+            }
+
+            $schema = OutputSchemaRegistry::schema($name, $outputMode);
 
             self::assertSame(
                 $entry['schema_id'] ?? null,
@@ -249,10 +257,40 @@ class ApplicationSmokeTest extends TestCase
             );
             self::assertSame(
                 $entry['sha256'] ?? null,
-                'sha256:'.hash_file('sha256', __DIR__.'/../../'.OutputSchemaRegistry::schemaPath($name)),
+                'sha256:'.hash_file(
+                    'sha256',
+                    __DIR__.'/../../'.OutputSchemaRegistry::schemaPath($name, $outputMode),
+                ),
                 "Manifest SHA-256 for {$name} must bind the bundled schema bytes.",
             );
             self::assertSame('object', $schema['type'] ?? null, "Schema for {$name} must describe a JSON object.");
+
+            if ($outputMode === '--output=jsonl') {
+                $reference = $schema['$ref'] ?? null;
+                self::assertIsString($reference, "JSONL schema for {$name} must bind its emitted envelope item.");
+                self::assertMatchesRegularExpression(
+                    '/\A[a-z0-9.-]+\.schema\.json#\/properties\/[a-z_]+\/items\z/',
+                    $reference,
+                    "JSONL schema for {$name} must resolve an envelope item schema.",
+                );
+
+                [$referenceFile, $pointer] = explode('#/', $reference, 2);
+                $referencedSchema = json_decode(
+                    (string) file_get_contents(__DIR__.'/../../schemas/output/'.$referenceFile),
+                    true,
+                    512,
+                    JSON_THROW_ON_ERROR,
+                );
+                $target = $referencedSchema;
+                foreach (explode('/', $pointer) as $segment) {
+                    self::assertIsArray($target);
+                    self::assertArrayHasKey($segment, $target);
+                    $target = $target[$segment];
+                }
+
+                self::assertIsArray($target);
+                self::assertSame('object', $target['type'] ?? null);
+            }
         }
     }
 }

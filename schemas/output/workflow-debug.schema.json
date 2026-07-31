@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://durable-workflow.github.io/cli-json-envelopes/v2/schemas/workflow-debug.schema.json",
+  "$id": "https://durable-workflow.github.io/cli-json-envelopes/v3/schemas/workflow-debug.schema.json",
   "title": "dw debug workflow --json",
   "type": "object",
   "required": ["workflow_id", "run_id", "diagnostic_status", "execution"],

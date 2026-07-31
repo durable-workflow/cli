@@ -25,6 +25,7 @@ include a public resolver URL and SHA-256 digest for checkout-free consumers.
 
   <info>dw schema:manifest</info>
   <info>dw schema:manifest | jq '.commands["workflow:list"].resolver_url'</info>
+  <info>dw schema:manifest | jq '.jsonl_commands["workflow:list"].resolver_url'</info>
   <info>dw schema:manifest | jq '.config_schemas["external-executor-config"].schema'</info>
 HELP);
     }

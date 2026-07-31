@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://durable-workflow.github.io/cli-json-envelopes/v2/schemas/env-list.schema.json",
+  "$id": "https://durable-workflow.github.io/cli-json-envelopes/v3/schemas/env-list.schema.json",
   "title": "dw env:list --json",
   "type": "object",
   "required": ["envs"],

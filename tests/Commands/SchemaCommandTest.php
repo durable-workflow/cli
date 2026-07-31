@@ -39,13 +39,13 @@ class SchemaCommandTest extends TestCase
         $manifest = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
 
         self::assertSame('durable-workflow.cli.output-schema-manifest', $manifest['schema']);
-        self::assertSame(2, $manifest['version']);
+        self::assertSame(3, $manifest['version']);
         self::assertSame(
-            'durable-workflow.cli.output-schema-manifest@2',
+            'durable-workflow.cli.output-schema-manifest@3',
             $manifest['artifact_id'],
         );
         self::assertSame(
-            'https://durable-workflow.github.io/cli-json-envelopes/v2/manifest.json',
+            'https://durable-workflow.github.io/cli-json-envelopes/v3/manifest.json',
             $manifest['resolver_url'],
         );
         self::assertSame(
@@ -53,13 +53,26 @@ class SchemaCommandTest extends TestCase
             $manifest['commands']['workflow:list']['schema'],
         );
         self::assertSame(
-            'https://durable-workflow.github.io/cli-json-envelopes/v2/schemas/workflow-list.schema.json',
+            'https://durable-workflow.github.io/cli-json-envelopes/v3/schemas/workflow-list.schema.json',
             $manifest['commands']['workflow:list']['resolver_url'],
         );
         self::assertMatchesRegularExpression(
             '/\Asha256:[a-f0-9]{64}\z/',
             $manifest['commands']['workflow:list']['sha256'],
         );
+        self::assertSame(
+            '--output=jsonl',
+            $manifest['jsonl_commands']['workflow:list']['output'],
+        );
+        self::assertSame(
+            'workflows',
+            $manifest['jsonl_commands']['workflow:list']['stream_items_from'],
+        );
+        self::assertSame(
+            'https://durable-workflow.github.io/cli-json-envelopes/v3/schemas/workflow-list-record.schema.json',
+            $manifest['jsonl_commands']['workflow:list']['resolver_url'],
+        );
+        self::assertCount(12, $manifest['jsonl_commands']);
         self::assertSame(
             'schemas/output/server-health.schema.json',
             $manifest['commands']['server:health']['schema'],
@@ -98,10 +111,31 @@ class SchemaCommandTest extends TestCase
         $schema = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
 
         self::assertSame(
-            'https://durable-workflow.github.io/cli-json-envelopes/v2/schemas/workflow-list.schema.json',
+            'https://durable-workflow.github.io/cli-json-envelopes/v3/schemas/workflow-list.schema.json',
             $schema['$id'],
         );
         self::assertSame(['namespace', 'workflows'], $schema['required']);
+    }
+
+    public function test_show_command_outputs_jsonl_record_schema_for_command(): void
+    {
+        $tester = new CommandTester(new ShowCommand());
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            'schema-name' => 'workflow:list',
+            '--output' => 'jsonl',
+        ]));
+
+        $schema = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+
+        self::assertSame(
+            'https://durable-workflow.github.io/cli-json-envelopes/v3/schemas/workflow-list-record.schema.json',
+            $schema['$id'],
+        );
+        self::assertSame(
+            'workflow-list.schema.json#/properties/workflows/items',
+            $schema['$ref'],
+        );
     }
 
     public function test_show_command_outputs_schema_for_server_diagnostics(): void
@@ -115,7 +149,7 @@ class SchemaCommandTest extends TestCase
         $schema = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
 
         self::assertSame(
-            'https://durable-workflow.github.io/cli-json-envelopes/v2/schemas/server-info.schema.json',
+            'https://durable-workflow.github.io/cli-json-envelopes/v3/schemas/server-info.schema.json',
             $schema['$id'],
         );
         self::assertSame(['server_id', 'version'], $schema['required']);

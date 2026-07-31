@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://durable-workflow.github.io/cli-json-envelopes/v2/schemas/repair-pass.schema.json",
+  "$id": "https://durable-workflow.github.io/cli-json-envelopes/v3/schemas/repair-pass.schema.json",
   "title": "dw system:repair-pass --json",
   "type": "object",
   "properties": {

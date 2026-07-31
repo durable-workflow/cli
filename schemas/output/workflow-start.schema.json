@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://durable-workflow.github.io/cli-json-envelopes/v2/schemas/workflow-start.schema.json",
+  "$id": "https://durable-workflow.github.io/cli-json-envelopes/v3/schemas/workflow-start.schema.json",
   "title": "dw workflow:start --json",
   "description": "Without --wait this is the start response; with --wait this is the terminal workflow describe response.",
   "type": "object",

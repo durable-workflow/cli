@@ -18,12 +18,13 @@ class ManifestCommand extends Command
             ->setDescription('Print the bundled JSON schema manifest')
             ->setHelp(<<<'HELP'
 Print the manifest that maps each published machine-readable CLI command
-output and configuration contract to its bundled JSON Schema file.
+output and configuration contract to its JSON Schema. Output-schema entries
+include a public resolver URL and SHA-256 digest for checkout-free consumers.
 
 <comment>Examples:</comment>
 
   <info>dw schema:manifest</info>
-  <info>dw schema:manifest | jq '.commands["workflow:list"].schema'</info>
+  <info>dw schema:manifest | jq '.commands["workflow:list"].resolver_url'</info>
   <info>dw schema:manifest | jq '.config_schemas["external-executor-config"].schema'</info>
 HELP);
     }

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://durable-workflow.com/schemas/cli/output/server-health.schema.json",
+  "$id": "https://durable-workflow.github.io/cli-json-envelopes/v2/schemas/server-health.schema.json",
   "title": "dw server:health --output=json",
   "description": "Server health probe output for scripts, diagnostics, and agent preflight checks.",
   "type": "object",

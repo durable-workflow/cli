@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://durable-workflow.com/schemas/cli/output/task-queue-list.schema.json",
+  "$id": "https://durable-workflow.github.io/cli-json-envelopes/v2/schemas/task-queue-list.schema.json",
   "title": "dw task-queue:list --json",
   "type": "object",
   "required": ["namespace", "task_queues"],

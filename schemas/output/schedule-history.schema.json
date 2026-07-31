@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://durable-workflow.com/schemas/cli/output/schedule-history.schema.json",
+  "$id": "https://durable-workflow.github.io/cli-json-envelopes/v2/schemas/schedule-history.schema.json",
   "title": "dw schedule:history --json",
   "type": "object",
   "required": ["schedule_id", "namespace", "events"],

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://durable-workflow.com/schemas/cli/output/storage-test.schema.json",
+  "$id": "https://durable-workflow.github.io/cli-json-envelopes/v2/schemas/storage-test.schema.json",
   "title": "dw storage:test --json",
   "type": "object",
   "required": ["status", "driver", "small_payload", "large_payload"],

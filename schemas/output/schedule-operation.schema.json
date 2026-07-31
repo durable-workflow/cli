@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://durable-workflow.com/schemas/cli/output/schedule-operation.schema.json",
+  "$id": "https://durable-workflow.github.io/cli-json-envelopes/v2/schemas/schedule-operation.schema.json",
   "title": "dw schedule delete/pause/resume/backfill --json",
   "type": "object",
   "required": ["namespace"],

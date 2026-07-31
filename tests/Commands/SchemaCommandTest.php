@@ -39,10 +39,26 @@ class SchemaCommandTest extends TestCase
         $manifest = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
 
         self::assertSame('durable-workflow.cli.output-schema-manifest', $manifest['schema']);
-        self::assertSame(1, $manifest['version']);
+        self::assertSame(2, $manifest['version']);
+        self::assertSame(
+            'durable-workflow.cli.output-schema-manifest@2',
+            $manifest['artifact_id'],
+        );
+        self::assertSame(
+            'https://durable-workflow.github.io/cli-json-envelopes/v2/manifest.json',
+            $manifest['resolver_url'],
+        );
         self::assertSame(
             'schemas/output/workflow-list.schema.json',
             $manifest['commands']['workflow:list']['schema'],
+        );
+        self::assertSame(
+            'https://durable-workflow.github.io/cli-json-envelopes/v2/schemas/workflow-list.schema.json',
+            $manifest['commands']['workflow:list']['resolver_url'],
+        );
+        self::assertMatchesRegularExpression(
+            '/\Asha256:[a-f0-9]{64}\z/',
+            $manifest['commands']['workflow:list']['sha256'],
         );
         self::assertSame(
             'schemas/output/server-health.schema.json',
@@ -82,7 +98,7 @@ class SchemaCommandTest extends TestCase
         $schema = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
 
         self::assertSame(
-            'https://durable-workflow.com/schemas/cli/output/workflow-list.schema.json',
+            'https://durable-workflow.github.io/cli-json-envelopes/v2/schemas/workflow-list.schema.json',
             $schema['$id'],
         );
         self::assertSame(['namespace', 'workflows'], $schema['required']);
@@ -99,7 +115,7 @@ class SchemaCommandTest extends TestCase
         $schema = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
 
         self::assertSame(
-            'https://durable-workflow.com/schemas/cli/output/server-info.schema.json',
+            'https://durable-workflow.github.io/cli-json-envelopes/v2/schemas/server-info.schema.json',
             $schema['$id'],
         );
         self::assertSame(['server_id', 'version'], $schema['required']);

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://durable-workflow.com/schemas/cli/output/external-storage-policy.schema.json",
+  "$id": "https://durable-workflow.github.io/cli-json-envelopes/v2/schemas/external-storage-policy.schema.json",
   "title": "dw namespace:set-storage-driver --json",
   "type": "object",
   "required": ["name", "namespace"],

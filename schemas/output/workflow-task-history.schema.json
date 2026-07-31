@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://durable-workflow.com/schemas/cli/output/workflow-task-history.schema.json",
+  "$id": "https://durable-workflow.github.io/cli-json-envelopes/v2/schemas/workflow-task-history.schema.json",
   "title": "dw workflow-task:history --json",
   "type": "object",
   "required": ["history_events"],

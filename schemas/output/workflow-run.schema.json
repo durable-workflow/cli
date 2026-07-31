@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://durable-workflow.com/schemas/cli/output/workflow-run.schema.json",
+  "$id": "https://durable-workflow.github.io/cli-json-envelopes/v2/schemas/workflow-run.schema.json",
   "title": "dw workflow:describe/show-run --json",
   "type": "object",
   "required": ["namespace", "workflow_id"],

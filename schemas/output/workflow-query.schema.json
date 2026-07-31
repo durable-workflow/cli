@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://durable-workflow.com/schemas/cli/output/workflow-query.schema.json",
+  "$id": "https://durable-workflow.github.io/cli-json-envelopes/v2/schemas/workflow-query.schema.json",
   "title": "dw workflow:query --json",
   "type": "object",
   "required": ["namespace", "result"],

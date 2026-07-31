@@ -242,6 +242,16 @@ class ApplicationSmokeTest extends TestCase
                 $schema['$id'] ?? null,
                 "Manifest schema_id for {$name} does not match the schema file.",
             );
+            self::assertSame(
+                $entry['schema_id'] ?? null,
+                $entry['resolver_url'] ?? null,
+                "Manifest resolver_url for {$name} must be its schema identity.",
+            );
+            self::assertSame(
+                $entry['sha256'] ?? null,
+                'sha256:'.hash_file('sha256', __DIR__.'/../../'.OutputSchemaRegistry::schemaPath($name)),
+                "Manifest SHA-256 for {$name} must bind the bundled schema bytes.",
+            );
             self::assertSame('object', $schema['type'] ?? null, "Schema for {$name} must describe a JSON object.");
         }
     }

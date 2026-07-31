@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://durable-workflow.com/schemas/cli/output/workflow-update.schema.json",
+  "$id": "https://durable-workflow.github.io/cli-json-envelopes/v2/schemas/workflow-update.schema.json",
   "title": "dw workflow:update --json",
   "type": "object",
   "required": ["namespace", "workflow_id", "update_name", "outcome", "update_diagnostics", "cli_fields"],

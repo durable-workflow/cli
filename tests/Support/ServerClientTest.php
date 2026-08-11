@@ -13,6 +13,25 @@ use Symfony\Component\HttpClient\Response\MockResponse;
 
 class ServerClientTest extends TestCase
 {
+    public function test_self_hosted_cluster_discovery_still_targets_the_root_api(): void
+    {
+        $requestedUrl = null;
+        $http = new MockHttpClient(static function (string $method, string $url) use (&$requestedUrl): MockResponse {
+            $requestedUrl = $url;
+
+            return new MockResponse('{}');
+        });
+        $client = new ServerClient(
+            baseUrl: 'http://server.example.test:8080/',
+            namespace: 'default',
+            http: $http,
+        );
+
+        $client->get('/cluster/info');
+
+        self::assertSame('http://server.example.test:8080/api/cluster/info', $requestedUrl);
+    }
+
     public function test_it_allows_conformance_protocol_overrides_for_request_and_response_validation(): void
     {
         $previousControlPlaneVersion = getenv('DURABLE_WORKFLOW_CONTROL_PLANE_VERSION');

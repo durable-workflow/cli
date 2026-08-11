@@ -5,10 +5,16 @@ declare(strict_types=1);
 namespace Tests\Commands;
 
 use DurableWorkflow\Cli\Commands\WorkflowCommand\StartCommand;
+use DurableWorkflow\Cli\Support\ControlPlaneRequestContract;
+use DurableWorkflow\Cli\Support\ExitCode;
+use DurableWorkflow\Cli\Support\ResolvedConnection;
 use DurableWorkflow\Cli\Support\ServerClient;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
+use Symfony\Component\HttpClient\MockHttpClient;
+use Symfony\Component\HttpClient\Response\MockResponse;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
  * Coverage for the dispatch-shaping options on `dw workflow:start`
@@ -27,6 +33,88 @@ use Symfony\Component\Console\Tester\CommandTester;
  */
 final class WorkflowStartCommandTest extends TestCase
 {
+    private const MANAGED_RUNTIME_URL = 'https://cloud.example.test/api/runtime/v1/namespaces/11111111-1111-4111-8111-111111111111';
+
+    public function test_namespace_scoped_runtime_url_is_preserved_for_discovery_and_workflow_start(): void
+    {
+        $requests = [];
+        $http = new MockHttpClient(
+            static function (string $method, string $url, array $options) use (&$requests): MockResponse {
+                $requests[] = [$method, $url];
+
+                self::assertContains('Authorization: Bearer client-runtime-token', $options['headers']);
+                self::assertContains(
+                    'X-Durable-Workflow-Control-Plane-Version: '.ServerClient::CONTROL_PLANE_VERSION,
+                    $options['headers'],
+                );
+                self::assertContains(
+                    'X-Durable-Workflow-Protocol-Version: '.ServerClient::WORKER_PROTOCOL_VERSION,
+                    $options['headers'],
+                );
+
+                if (str_ends_with($url, '/api/cluster/info')) {
+                    return new MockResponse(json_encode(self::compatibleClusterInfo(), JSON_THROW_ON_ERROR));
+                }
+
+                if (str_ends_with($url, '/api/workflows')) {
+                    return new MockResponse(json_encode(self::workflowStarted(), JSON_THROW_ON_ERROR), [
+                        'http_code' => 201,
+                        'response_headers' => [
+                            ServerClient::CONTROL_PLANE_HEADER.': '.ServerClient::CONTROL_PLANE_VERSION,
+                        ],
+                    ]);
+                }
+
+                self::fail('Unexpected managed runtime request: '.$method.' '.$url);
+            },
+            self::MANAGED_RUNTIME_URL,
+        );
+
+        $tester = new CommandTester(new NamespaceScopedWorkflowStartCommand($http));
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            '--server' => self::MANAGED_RUNTIME_URL,
+            '--namespace' => 'managed.customer',
+            '--token' => 'client-runtime-token',
+            '--type' => 'orders.process',
+            '--json' => true,
+        ]), $tester->getDisplay());
+        self::assertSame([
+            ['GET', self::MANAGED_RUNTIME_URL.'/api/cluster/info'],
+            ['POST', self::MANAGED_RUNTIME_URL.'/api/workflows'],
+        ], $requests);
+    }
+
+    public function test_worker_runtime_credential_failure_names_the_required_client_credential(): void
+    {
+        $http = new MockHttpClient(
+            static function (string $method, string $url): MockResponse {
+                if (str_ends_with($url, '/api/cluster/info')) {
+                    return new MockResponse(json_encode(self::compatibleClusterInfo(), JSON_THROW_ON_ERROR));
+                }
+
+                return new MockResponse(json_encode([
+                    'reason' => 'forbidden',
+                    'message' => 'This runtime credential cannot access the requested operation.',
+                ], JSON_THROW_ON_ERROR), [
+                    'http_code' => 403,
+                ]);
+            },
+            self::MANAGED_RUNTIME_URL,
+        );
+
+        $tester = new CommandTester(new NamespaceScopedWorkflowStartCommand($http));
+
+        self::assertSame(ExitCode::AUTH, $tester->execute([
+            '--server' => self::MANAGED_RUNTIME_URL,
+            '--token' => 'worker-runtime-token',
+            '--type' => 'orders.process',
+        ]));
+        self::assertStringContainsString('client runtime credential', $tester->getDisplay());
+        self::assertStringContainsString('worker runtime credentials', $tester->getDisplay());
+        self::assertStringNotContainsString('invalid control-plane response version', $tester->getDisplay());
+    }
+
     public function test_priority_is_forwarded_as_integer(): void
     {
         $client = $this->newClient();
@@ -167,6 +255,73 @@ final class WorkflowStartCommandTest extends TestCase
         $command->setServerClient($client);
 
         return new CommandTester($command);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function compatibleClusterInfo(): array
+    {
+        return [
+            'version' => '2.0.0-rc.12',
+            'control_plane' => [
+                'version' => ServerClient::CONTROL_PLANE_VERSION,
+                'request_contract' => [
+                    'schema' => ControlPlaneRequestContract::SCHEMA,
+                    'version' => ControlPlaneRequestContract::VERSION,
+                    'operations' => [],
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function workflowStarted(): array
+    {
+        return [
+            'workflow_id' => 'wf-managed',
+            'run_id' => 'run-managed',
+            'workflow_type' => 'orders.process',
+            'outcome' => 'started_new',
+            'control_plane' => [
+                'schema' => 'durable-workflow.v2.control-plane-response',
+                'version' => 1,
+                'operation' => 'start',
+                'workflow_id' => 'wf-managed',
+                'run_id' => 'run-managed',
+                'outcome' => 'started_new',
+                'contract' => [
+                    'schema' => 'durable-workflow.v2.control-plane-response.contract',
+                    'version' => 1,
+                    'legacy_field_policy' => 'reject_non_canonical',
+                    'legacy_fields' => [],
+                    'required_fields' => ['workflow_id', 'run_id'],
+                    'success_fields' => ['outcome'],
+                ],
+            ],
+        ];
+    }
+}
+
+final class NamespaceScopedWorkflowStartCommand extends StartCommand
+{
+    public function __construct(private readonly HttpClientInterface $http)
+    {
+        parent::__construct();
+    }
+
+    protected function makeClient(ResolvedConnection $resolved, ?float $timeout = null): ServerClient
+    {
+        return new ServerClient(
+            baseUrl: $resolved->server,
+            token: $resolved->token,
+            namespace: $resolved->namespace,
+            tlsVerify: $resolved->tlsVerify,
+            http: $this->http,
+            timeout: $timeout,
+        );
     }
 }
 

@@ -50,6 +50,38 @@ final class ControlPlaneResponse
             $body[$nameField] = $contract['operation_name'];
         }
 
+        $body = self::normalizeWorkflowUpdateIdentifier($path, $contract, $body, $statusCode);
+
+        return $body;
+    }
+
+    /**
+     * @param  array<string, mixed>  $contract
+     * @param  array<string, mixed>  $body
+     * @return array<string, mixed>
+     */
+    private static function normalizeWorkflowUpdateIdentifier(
+        string $path,
+        array $contract,
+        array $body,
+        int $statusCode,
+    ): array {
+        if ($statusCode >= 400 || self::stringValue($contract['operation'] ?? null) !== 'update') {
+            return $body;
+        }
+
+        $updateId = self::stringValue($body['update_id'] ?? null)
+            ?? self::stringValue($contract['update_id'] ?? null);
+
+        if ($updateId === null) {
+            throw new \RuntimeException(sprintf(
+                'Server error: successful workflow update response for [%s] is missing required field [update_id].',
+                $path,
+            ));
+        }
+
+        $body['update_id'] = $updateId;
+
         return $body;
     }
 
@@ -147,6 +179,7 @@ final class ControlPlaneResponse
     {
         self::assertMatchingField($path, 'workflow_id', $contract, $body);
         self::assertMatchingField($path, 'run_id', $contract, $body);
+        self::assertMatchingField($path, 'update_id', $contract, $body);
 
         $nameField = self::stringValue($contract['operation_name_field'] ?? null);
 

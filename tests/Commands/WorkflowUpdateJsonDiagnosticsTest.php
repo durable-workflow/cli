@@ -115,6 +115,7 @@ final class WorkflowUpdateJsonDiagnosticsTest extends TestCase
 
         $decoded = $this->json($tester);
 
+        self::assertSame('upd-completed', $decoded['update_id']);
         self::assertSame('completed-request-1', $decoded['request_id']);
         self::assertSame('update_completed', $decoded['outcome']);
         self::assertSame('completed', $decoded['state']);
@@ -127,11 +128,13 @@ final class WorkflowUpdateJsonDiagnosticsTest extends TestCase
         self::assertSame('2026-07-02T12:01:00Z', $decoded['history_references']['applied_at']);
         self::assertSame('completed', $decoded['request']['wait_for']);
         self::assertSame('completed', $decoded['update_diagnostics']['state']);
+        self::assertSame('upd-completed', $decoded['update_diagnostics']['update_id']);
         self::assertSame(['approved' => true, 'source' => 'cli'], $decoded['update_diagnostics']['result']);
         self::assertSame('json', $decoded['update_diagnostics']['result_envelope']['codec']);
         self::assertContains('workflow:update.result', $decoded['cli_fields']['fields_present']);
         self::assertContains('workflow:update.result_envelope', $decoded['cli_fields']['fields_present']);
         self::assertSame('completed', $decoded['cli_fields']['state']);
+        self::assertSame('upd-completed', $decoded['cli_fields']['update_id']);
         self::assertSame(['approved' => true, 'source' => 'cli'], $decoded['cli_fields']['result']);
     }
 

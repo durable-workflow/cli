@@ -565,6 +565,113 @@ class ServerClientTest extends TestCase
         self::assertSame(1, $payload['control_plane_schema_version']);
     }
 
+    public function test_it_promotes_the_completed_update_identifier_from_the_shared_control_plane_contract(): void
+    {
+        $response = new MockResponse(json_encode([
+            'workflow_id' => 'wf-123',
+            'update_name' => 'approve',
+            'update_id' => null,
+            'outcome' => 'update_completed',
+            'update_status' => 'completed',
+            'control_plane' => [
+                'schema' => 'durable-workflow.v2.control-plane-response',
+                'version' => 1,
+                'operation' => 'update',
+                'operation_name' => 'approve',
+                'operation_name_field' => 'update_name',
+                'workflow_id' => 'wf-123',
+                'update_id' => 'upd-completed-123',
+                'outcome' => 'update_completed',
+                'update_status' => 'completed',
+                'contract' => [
+                    'schema' => 'durable-workflow.v2.control-plane-response.contract',
+                    'version' => 1,
+                    'legacy_field_policy' => 'reject_non_canonical',
+                    'legacy_fields' => [
+                        'query' => 'query_name',
+                        'signal' => 'signal_name',
+                        'update' => 'update_name',
+                        'wait_policy' => 'wait_for',
+                    ],
+                    'required_fields' => ['workflow_id', 'operation_name', 'operation_name_field'],
+                    'success_fields' => ['outcome'],
+                ],
+            ],
+        ], JSON_THROW_ON_ERROR), [
+            'http_code' => 200,
+            'response_headers' => [
+                'X-Durable-Workflow-Control-Plane-Version: 2',
+            ],
+        ]);
+
+        $client = new ServerClient(
+            baseUrl: 'http://example.test',
+            namespace: 'default',
+            http: new MockHttpClient($response, 'http://example.test'),
+        );
+
+        $payload = $client->post('/workflows/wf-123/update/approve', [
+            'wait_for' => 'completed',
+        ]);
+
+        self::assertSame('upd-completed-123', $payload['update_id']);
+        self::assertSame('update_completed', $payload['outcome']);
+        self::assertSame('completed', $payload['update_status']);
+    }
+
+    public function test_it_rejects_a_successful_workflow_update_response_without_an_identifier(): void
+    {
+        $response = new MockResponse(json_encode([
+            'workflow_id' => 'wf-123',
+            'update_name' => 'approve',
+            'outcome' => 'update_completed',
+            'update_status' => 'completed',
+            'control_plane' => [
+                'schema' => 'durable-workflow.v2.control-plane-response',
+                'version' => 1,
+                'operation' => 'update',
+                'operation_name' => 'approve',
+                'operation_name_field' => 'update_name',
+                'workflow_id' => 'wf-123',
+                'outcome' => 'update_completed',
+                'update_status' => 'completed',
+                'contract' => [
+                    'schema' => 'durable-workflow.v2.control-plane-response.contract',
+                    'version' => 1,
+                    'legacy_field_policy' => 'reject_non_canonical',
+                    'legacy_fields' => [
+                        'query' => 'query_name',
+                        'signal' => 'signal_name',
+                        'update' => 'update_name',
+                        'wait_policy' => 'wait_for',
+                    ],
+                    'required_fields' => ['workflow_id', 'operation_name', 'operation_name_field'],
+                    'success_fields' => ['outcome'],
+                ],
+            ],
+        ], JSON_THROW_ON_ERROR), [
+            'http_code' => 200,
+            'response_headers' => [
+                'X-Durable-Workflow-Control-Plane-Version: 2',
+            ],
+        ]);
+
+        $client = new ServerClient(
+            baseUrl: 'http://example.test',
+            namespace: 'default',
+            http: new MockHttpClient($response, 'http://example.test'),
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage(
+            'successful workflow update response for [/workflows/wf-123/update/approve] is missing required field [update_id]',
+        );
+
+        $client->post('/workflows/wf-123/update/approve', [
+            'wait_for' => 'completed',
+        ]);
+    }
+
     public function test_it_normalizes_the_shared_control_plane_contract_for_workflow_start_responses(): void
     {
         $response = new MockResponse(json_encode([

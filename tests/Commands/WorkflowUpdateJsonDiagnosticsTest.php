@@ -94,8 +94,8 @@ final class WorkflowUpdateJsonDiagnosticsTest extends TestCase
             'wait_for' => 'completed',
             'result' => ['approved' => true, 'source' => 'cli'],
             'result_envelope' => [
-                'codec' => 'json',
-                'blob' => 'eyJhcHByb3ZlZCI6dHJ1ZX0=',
+                'codec' => 'avro',
+                'blob' => 'wwHioz3/VYAiNw4CEGFwcHJvdmVkAgEA',
             ],
             'workflow_sequence' => 12,
             'command_sequence' => 8,
@@ -122,15 +122,15 @@ final class WorkflowUpdateJsonDiagnosticsTest extends TestCase
         self::assertSame('completed', $decoded['update_state']);
         self::assertSame('completed', $decoded['update_status']);
         self::assertSame(['approved' => true, 'source' => 'cli'], $decoded['result']);
-        self::assertSame('json', $decoded['result_envelope']['codec']);
-        self::assertSame('eyJhcHByb3ZlZCI6dHJ1ZX0=', $decoded['result_envelope']['blob']);
+        self::assertSame('avro', $decoded['result_envelope']['codec']);
+        self::assertSame('wwHioz3/VYAiNw4CEGFwcHJvdmVkAgEA', $decoded['result_envelope']['blob']);
         self::assertSame(12, $decoded['history_references']['workflow_sequence']);
         self::assertSame('2026-07-02T12:01:00Z', $decoded['history_references']['applied_at']);
         self::assertSame('completed', $decoded['request']['wait_for']);
         self::assertSame('completed', $decoded['update_diagnostics']['state']);
         self::assertSame('upd-completed', $decoded['update_diagnostics']['update_id']);
         self::assertSame(['approved' => true, 'source' => 'cli'], $decoded['update_diagnostics']['result']);
-        self::assertSame('json', $decoded['update_diagnostics']['result_envelope']['codec']);
+        self::assertSame('avro', $decoded['update_diagnostics']['result_envelope']['codec']);
         self::assertContains('workflow:update.result', $decoded['cli_fields']['fields_present']);
         self::assertContains('workflow:update.result_envelope', $decoded['cli_fields']['fields_present']);
         self::assertSame('completed', $decoded['cli_fields']['state']);

@@ -21,8 +21,9 @@ class CompleteCommand extends BaseCommand
             ->setDescription('Complete a leased routed workflow query task')
             ->setHelp(<<<'HELP'
 Complete a routed workflow query task through the worker protocol. The result
-is sent as JSON plus a matching JSON result envelope so non-PHP workers and
-operators share the same wire contract.
+option is parsed from JSON as CLI/HTTP transport. The Server encodes the
+durable result with the sole v2 payload codec, Avro; JSON is never sent as a
+workflow payload codec.
 
 <comment>Examples:</comment>
 
@@ -51,10 +52,6 @@ HELP)
             'lease_owner' => $input->getOption('lease-owner'),
             'query_task_attempt' => $attempt,
             'result' => $resultPayload,
-            'result_envelope' => [
-                'codec' => 'json',
-                'blob' => json_encode($resultPayload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
-            ],
         ]);
 
         if ($this->wantsJson($input)) {

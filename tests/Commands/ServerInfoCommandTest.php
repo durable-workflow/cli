@@ -23,9 +23,6 @@ class ServerInfoCommandTest extends TestCase
             'capabilities' => [
                 'workflow_tasks' => true,
                 'payload_codecs' => ['avro'],
-                'payload_codecs_engine_specific' => [
-                    'php' => ['workflow-serializer-y', 'workflow-serializer-base64'],
-                ],
                 'avro_value_protocol' => [
                     'schema' => 'durable_workflow.protocol.Value',
                     'fingerprint' => 'e2a33dff55802237',
@@ -187,12 +184,6 @@ class ServerInfoCommandTest extends TestCase
 
         // Flat list capabilities render inline.
         self::assertStringContainsString('payload_codecs: avro', $display);
-
-        // Associative capability maps render as nested lines so
-        // engine-specific payload codec splits stay readable
-        // (TD-S037 regression guard).
-        self::assertStringContainsString('payload_codecs_engine_specific:', $display);
-        self::assertStringContainsString('php: workflow-serializer-y, workflow-serializer-base64', $display);
 
         // Empty list capabilities render as "none" rather than blank.
         self::assertStringContainsString('response_compression: none', $display);

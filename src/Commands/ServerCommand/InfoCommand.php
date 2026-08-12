@@ -590,7 +590,7 @@ HELP);
      *
      * Flat lists render inline (`commas`). Associative capability maps
      * render as nested key/value lines so output stays readable for
-     * namespaced capabilities like `payload_codecs_engine_specific.php`.
+     * nested capability groups.
      */
     private function renderCapability(OutputInterface $output, string $name, mixed $value, int $indent): void
     {

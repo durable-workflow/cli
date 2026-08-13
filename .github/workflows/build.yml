@@ -95,27 +95,10 @@ jobs:
       - name: Verify dw.phar reproduces bit-for-bit
         run: scripts/verify-reproducible-build.sh
 
-  sdk-python-parity:
-    name: SDK-Python parity fixtures
-    if: ${{ github.server_url == 'https://github.com' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
-        with:
-          path: cli
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
-        with:
-          repository: durable-workflow/sdk-python
-          path: sdk-python
-      - name: Compare shared control-plane parity fixtures
-        working-directory: cli
-        run: scripts/check-sdk-python-parity.sh ../sdk-python
-
   target-branch-qualification:
     name: Target branch qualification
     if: ${{ always() && github.server_url == 'https://github.com' }}
-    needs: [test, build-phar, reproducible-build, sdk-python-parity]
+    needs: [test, build-phar, reproducible-build]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
@@ -124,9 +107,7 @@ jobs:
           TEST_RESULT: ${{ needs.test.result }}
           PHAR_RESULT: ${{ needs.build-phar.result }}
           REPRODUCIBLE_RESULT: ${{ needs.reproducible-build.result }}
-          PARITY_RESULT: ${{ needs.sdk-python-parity.result }}
         run: |
           test "$TEST_RESULT" = success
           test "$PHAR_RESULT" = success
           test "$REPRODUCIBLE_RESULT" = success
-          test "$PARITY_RESULT" = success

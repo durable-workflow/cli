@@ -1,0 +1,49 @@
+name: SDK-Python parity fixtures
+
+on:
+  workflow_dispatch:
+    inputs:
+      cli_ref:
+        description: Full CLI SHA from the synchronized fixture tuple
+        required: true
+        type: string
+      sdk_python_ref:
+        description: Full SDK-Python SHA from the synchronized fixture tuple
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  parity:
+    name: Compare immutable fixture revisions
+    if: ${{ github.server_url == 'https://github.com' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require full commit SHAs
+        env:
+          CLI_REF: ${{ inputs.cli_ref }}
+          SDK_PYTHON_REF: ${{ inputs.sdk_python_ref }}
+        run: |
+          if [[ ! "$CLI_REF" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "cli_ref must be a full lowercase commit SHA" >&2
+            exit 1
+          fi
+          if [[ ! "$SDK_PYTHON_REF" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "sdk_python_ref must be a full lowercase commit SHA" >&2
+            exit 1
+          fi
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
+        with:
+          ref: ${{ inputs.cli_ref }}
+          path: cli
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
+        with:
+          repository: durable-workflow/sdk-python
+          ref: ${{ inputs.sdk_python_ref }}
+          path: sdk-python
+      - name: Compare shared control-plane parity fixtures
+        working-directory: cli
+        run: scripts/check-sdk-python-parity.sh ../sdk-python

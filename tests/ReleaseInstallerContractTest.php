@@ -280,9 +280,9 @@ SH;
         self::assertStringNotContainsString('/nightly/', $releaseWorkflow);
         self::assertStringNotContainsString('git clone', $releaseWorkflow);
 
-        self::assertSame(2, substr_count($releaseWorkflow, "github.repository == 'durable-workflow/cli'"));
-        self::assertSame(2, substr_count($releaseWorkflow, "github.event_name != 'pull_request'"));
-        self::assertSame(2, substr_count(
+        self::assertSame(3, substr_count($releaseWorkflow, "github.repository == 'durable-workflow/cli'"));
+        self::assertSame(3, substr_count($releaseWorkflow, "github.event_name != 'pull_request'"));
+        self::assertSame(3, substr_count(
             $releaseWorkflow,
             "(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')",
         ));
@@ -291,6 +291,17 @@ SH;
             'key: phpmicro-${{ env.PHPMICRO_CACHE_SCHEMA }}-${{ steps.phpmicro-toolchain.outputs.toolchain_id }}',
         ));
         self::assertStringNotContainsString('restore-keys:', $releaseWorkflow);
+        self::assertStringContainsString(
+            'MUSL_SHA256: a9a118bbe84d8764da0ea0d28b3ab3fae8477fc7e4085d90102b8596fc7c75e4',
+            $releaseWorkflow,
+        );
+        self::assertStringContainsString(
+            'key: native-prerequisite-${{ env.NATIVE_PREREQUISITE_CACHE_SCHEMA }}-musl-'.
+            '${{ env.MUSL_VERSION }}-${{ env.MUSL_SHA256 }}',
+            $releaseWorkflow,
+        );
+        self::assertStringContainsString('native_prerequisite_identity=', $releaseWorkflow);
+        self::assertStringContainsString('native_prerequisite_script_sha256=', $releaseWorkflow);
 
         foreach ([
             'spc_revision=',
@@ -328,7 +339,8 @@ SH;
             "if: steps.verify-phpmicro-cache.outputs.cache_valid != 'true'",
         ));
         self::assertStringContainsString('Discarding untrusted or invalid phpmicro cache', $releaseWorkflow);
-        self::assertStringContainsString('rm -rf downloads source buildroot', $releaseWorkflow);
+        self::assertStringContainsString('rm -rf source buildroot', $releaseWorkflow);
+        self::assertStringNotContainsString('rm -rf downloads source buildroot', $releaseWorkflow);
         self::assertStringContainsString(
             'Remove-Item -Recurse -Force downloads,source,buildroot',
             $releaseWorkflow,
@@ -395,12 +407,12 @@ SH;
         self::assertStringContainsString('commit="$CONTROL_COMMIT"', $releaseWorkflow);
         self::assertStringContainsString('cache_warm: ${{ steps.resolve.outputs.cache_warm }}', $releaseWorkflow);
 
-        self::assertSame(2, substr_count(
+        self::assertSame(3, substr_count(
             $releaseWorkflow,
             "needs.resolve-release.outputs.cache_warm == 'true' &&\n".
             "            github.ref == 'refs/heads/main'",
         ));
-        self::assertSame(2, substr_count(
+        self::assertSame(3, substr_count(
             $releaseWorkflow,
             "needs.resolve-release.outputs.cache_warm != 'true' &&\n".
             "            ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/'))",

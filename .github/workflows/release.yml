@@ -389,6 +389,9 @@ jobs:
     runs-on: ${{ matrix.runner }}
     env:
       GITHUB_TOKEN: ${{ github.token }}
+      MUSL_SHA256: a9a118bbe84d8764da0ea0d28b3ab3fae8477fc7e4085d90102b8596fc7c75e4
+      MUSL_VERSION: '1.2.5'
+      NATIVE_PREREQUISITE_CACHE_SCHEMA: 'v1'
       PHP_VERSION: '8.4.23'
       PHPMICRO_CACHE_SCHEMA: 'v1'
       PHPMICRO_UNCACHED_BASELINE_SECONDS: '480'
@@ -409,7 +412,9 @@ jobs:
           ref: ${{ needs.resolve-release.outputs.control_commit }}
           path: release-toolchain-control
           persist-credentials: false
-          sparse-checkout: .github/workflows/release.yml
+          sparse-checkout: |
+            .github/workflows/release.yml
+            scripts/ci/establish-native-prerequisites.sh
           sparse-checkout-cone-mode: false
 
       - name: Download PHAR artifact
@@ -467,6 +472,25 @@ jobs:
               ;;
           esac
 
+      - name: Restore trusted native prerequisite cache
+        id: native-prerequisite-cache
+        if: >-
+          runner.os == 'Linux' &&
+          github.repository == 'durable-workflow/cli' &&
+          github.event_name != 'pull_request' &&
+          ((needs.resolve-release.outputs.cache_warm == 'true' &&
+            github.ref == 'refs/heads/main' &&
+            (github.event_name == 'push' ||
+             github.event_name == 'schedule' ||
+             github.event_name == 'workflow_dispatch')) ||
+           (needs.resolve-release.outputs.cache_warm != 'true' &&
+            ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) ||
+             (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'))))
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25  # v5
+        with:
+          path: build/.tools/native-prerequisite-cache/musl-${{ env.MUSL_VERSION }}.tar.gz
+          key: native-prerequisite-${{ env.NATIVE_PREREQUISITE_CACHE_SCHEMA }}-musl-${{ env.MUSL_VERSION }}-${{ env.MUSL_SHA256 }}
+
       - name: Establish and verify native build prerequisites
         id: native-prerequisites
         working-directory: build/.tools
@@ -497,7 +521,9 @@ jobs:
               ;;
           esac
 
-          ./spc doctor --auto-fix
+          NATIVE_PREREQUISITE_EVIDENCE=native-prerequisite-evidence.json \
+            ../../release-toolchain-control/scripts/ci/establish-native-prerequisites.sh \
+            "${{ runner.os }}" "${{ runner.arch }}" ./spc native-prerequisite-cache
           for tool in "$compiler" make pkg-config tar; do
             if ! command -v "$tool" >/dev/null 2>&1; then
               echo "::error::Required native build tool is unavailable: $tool"
@@ -552,6 +578,9 @@ jobs:
           fi
 
           workflow_sha="$(sha256_file release-toolchain-control/.github/workflows/release.yml)"
+          native_prerequisite_script_sha="$(
+            sha256_file release-toolchain-control/scripts/ci/establish-native-prerequisites.sh
+          )"
           extensions_sha="$(printf '%s' "$SPC_EXTENSIONS" | sha256_stdin)"
           runner_image="${ImageOS}-${ImageVersion}"
           toolchain_id="$(
@@ -562,6 +591,8 @@ jobs:
               "php_version=$PHP_VERSION" \
               "extensions=$SPC_EXTENSIONS" \
               "native_toolchain_id=${{ steps.native-prerequisites.outputs.toolchain_id }}" \
+              "native_prerequisite_identity=${{ steps.native-prerequisites.outputs.identity }}" \
+              "native_prerequisite_script_sha256=$native_prerequisite_script_sha" \
               "workflow_sha256=$workflow_sha" \
               "runner_label=${{ matrix.runner }}" \
               "runner_os=${{ runner.os }}" \
@@ -572,6 +603,7 @@ jobs:
 
           echo "workflow_sha=$workflow_sha" >> "$GITHUB_OUTPUT"
           echo "extensions_sha=$extensions_sha" >> "$GITHUB_OUTPUT"
+          echo "native_prerequisite_script_sha=$native_prerequisite_script_sha" >> "$GITHUB_OUTPUT"
           echo "runner_image=$runner_image" >> "$GITHUB_OUTPUT"
           echo "toolchain_id=$toolchain_id" >> "$GITHUB_OUTPUT"
 
@@ -654,7 +686,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf downloads source buildroot
+          # Keep the SHA-256-verified musl archive and lock established above.
+          # This remains the trusted input to spc download on a cold build.
+          rm -rf source buildroot
           case "$SPC_DOWNLOAD_OUTER_ATTEMPTS" in
             ''|*[!0-9]*)
               echo "::error::SPC_DOWNLOAD_OUTER_ATTEMPTS must be a positive integer"
@@ -719,6 +753,9 @@ jobs:
           PLATFORM: ${{ matrix.name }}
           RUN_PURPOSE: ${{ needs.resolve-release.outputs.cache_warm == 'true' && 'cache-warm' || 'release' }}
           STARTED_AT: ${{ steps.phpmicro-timing-start.outputs.started_at }}
+          NATIVE_PREREQUISITE_IDENTITY: ${{ steps.native-prerequisites.outputs.identity }}
+          NATIVE_PREREQUISITE_MODE: ${{ steps.native-prerequisites.outputs.mode }}
+          NATIVE_PREREQUISITE_SOURCE: ${{ steps.native-prerequisites.outputs.source }}
         run: |
           set -euo pipefail
           finished_at="$(date +%s)"
@@ -743,7 +780,10 @@ jobs:
             "$CACHE_SCOPE" \
             "$GIT_REF" \
             "$PLATFORM" \
-            "$RUN_PURPOSE" <<'NODE'
+            "$RUN_PURPOSE" \
+            "$NATIVE_PREREQUISITE_IDENTITY" \
+            "$NATIVE_PREREQUISITE_MODE" \
+            "$NATIVE_PREREQUISITE_SOURCE" <<'NODE'
           const fs = require('fs');
           const [
             cacheMode,
@@ -755,6 +795,9 @@ jobs:
             gitRef,
             platform,
             runPurpose,
+            nativePrerequisiteIdentity,
+            nativePrerequisiteMode,
+            nativePrerequisiteSource,
           ] = process.argv.slice(2);
           fs.writeFileSync('phpmicro-timing.json', `${JSON.stringify({
             schema: 'durable-workflow.cli.phpmicro-toolchain-timing/v2',
@@ -765,6 +808,11 @@ jobs:
             outcome,
             platform,
             run_purpose: runPurpose,
+            native_prerequisite: {
+              identity: nativePrerequisiteIdentity,
+              cache_mode: nativePrerequisiteMode,
+              source: nativePrerequisiteSource,
+            },
             elapsed_seconds: Number(elapsedSeconds),
             previous_uncached_baseline_seconds: Number(baselineSeconds),
           }, null, 2)}\n`);
@@ -776,6 +824,10 @@ jobs:
             printf '| --- | ---: |\n'
             printf '| Previous uncached baseline | %s |\n' "$PHPMICRO_UNCACHED_BASELINE_SECONDS"
             printf '| This run (%s) | %s |\n\n' "$cache_mode" "$elapsed_seconds"
+            printf 'Native prerequisite: `%s` (%s from `%s`).\n\n' \
+              "$NATIVE_PREREQUISITE_IDENTITY" \
+              "$NATIVE_PREREQUISITE_MODE" \
+              "$NATIVE_PREREQUISITE_SOURCE"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload spc build logs (always)
@@ -785,6 +837,7 @@ jobs:
           name: ${{ matrix.name }}-spc-logs
           path: |
             build/.tools/log/
+            build/.tools/native-prerequisite-evidence.json
             build/.tools/phpmicro-timing.json
           if-no-files-found: warn
 

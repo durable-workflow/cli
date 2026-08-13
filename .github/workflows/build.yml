@@ -38,6 +38,7 @@ jobs:
           sh -n scripts/ci/check-docs-release-audit.sh
           node --check scripts/ci/release-version.js
           bash -n scripts/ci/verify-release-tag-source.sh
+          bash -n scripts/ci/establish-native-prerequisites.sh
           bash -n scripts/verify-public-release-assets.sh
           bash -n scripts/verify-reproducible-build.sh
           pwsh -NoProfile -Command '$null = [scriptblock]::Create((Get-Content -Raw scripts/install.ps1))'
@@ -53,6 +54,7 @@ jobs:
             --contract scripts/ci/release-recovery-consumer-contract.json \
             --adapter scripts/ci/release-recovery-consumer-adapter.json \
             "${arguments[@]}"
+          python scripts/ci/test-native-prerequisites.py
           python scripts/ci/test-component-release-recovery.py ConsumerContractIdentityRegressionTest
           python scripts/ci/test-cli-publication-run.py
           python scripts/ci/test-publish-planned-tag.py

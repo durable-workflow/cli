@@ -25,15 +25,25 @@ Both `install.sh` and `install.ps1` download the matching `SHA256SUMS` manifest,
 verify the binary's checksum before writing it into the install directory,
 and refuse to proceed when the checksum does not match.
 
-For exact-version automation, set `VERSION` to the release tag:
+The default installer follows the qualified prerelease channel. To make that
+channel explicit in an installation command, set `VERSION` to `prerelease`:
 
 ```bash
-curl -fsSL https://durable-workflow.com/install.sh | VERSION=2.0.0-rc.14 sh
+curl -fsSL https://durable-workflow.com/install.sh | VERSION=prerelease sh
 ```
 
-Release `2.0.0-rc.14` is available from the GitHub release page at
-<https://github.com/durable-workflow/cli/releases/tag/2.0.0-rc.14>. Replace the
-tag when pinning a newer release.
+For reproducible automation that requires an exact version, read the CLI tag
+from the qualified artifact authority, store it in `QUALIFIED_CLI_TAG`, and
+pass that value to the same installer:
+
+```bash
+curl -fsSL https://durable-workflow.com/install.sh | VERSION="$QUALIFIED_CLI_TAG" sh
+```
+
+The qualified artifact authority is published at
+<https://durable-workflow.com/public-artifact-compatibility-evidence.json>.
+This keeps the selected release aligned with the supported cross-component
+tuple without maintaining a release-candidate sequence number in this guide.
 
 ## Provenance boundary
 

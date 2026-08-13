@@ -14,11 +14,15 @@ installer that detects your OS and arch:
 curl -fsSL https://durable-workflow.com/install.sh | sh
 ```
 
+The versionless installer follows the supported 2.0 prerelease channel. It
+resolves the CLI from the public passing compatibility authority instead of
+assuming the newest published GitHub prerelease is already qualified.
+
 Pin an exact release for CI, conformance, or reproducible automation:
 
 ```bash
 # Linux and macOS
-curl -fsSL https://durable-workflow.com/install.sh | VERSION=2.0.0-rc.14 sh
+curl -fsSL https://durable-workflow.com/install.sh | VERSION=<release-tag> sh
 ```
 
 ```powershell
@@ -28,7 +32,7 @@ irm https://durable-workflow.com/install.ps1 | iex
 
 ```powershell
 # Windows, exact release
-$env:VERSION = '2.0.0-rc.14'
+$env:VERSION = '<release-tag>'
 irm https://durable-workflow.com/install.ps1 | iex
 ```
 
@@ -43,9 +47,9 @@ installed to make the installer also verify artifact attestations for the
 downloaded binary and `SHA256SUMS` before installation.
 
 Or download a native binary directly from the [releases
-page](https://github.com/durable-workflow/cli/releases). The current
-supported exact release in these examples is
-[`2.0.0-rc.14`](https://github.com/durable-workflow/cli/releases/tag/2.0.0-rc.14).
+page](https://github.com/durable-workflow/cli/releases). Use the prerelease
+channel for onboarding, or select an exact tag when recording a reproducible
+build.
 Available assets:
 `dw-linux-x86_64`, `dw-linux-aarch64`,
 `dw-macos-aarch64`, `dw-windows-x86_64.exe`.
@@ -324,7 +328,7 @@ policy, worker status, search attribute type, and local dev database driver.
 
 ## Compatibility
 
-CLI version `2.0.0-rc.14` is compatible with servers that advertise
+The installed CLI is compatible with servers that advertise
 `control_plane.version: "2"`,
 `control_plane.request_contract.schema: durable-workflow.v2.control-plane-request.contract`
 version `1`, and a `client_compatibility.clients.cli.supported_versions`
@@ -341,7 +345,7 @@ names the CLI version, server version, compatibility window, and next step:
 
 ```bash
 $ dw workflow:list
-Server compatibility error: refusing before the requested operation because dw 2.0.0-rc.14 cannot safely interoperate with server 2.0.0-rc.12. Compatibility window: cli >=2.0.0-rc.1,<2.0.0; control-plane version 2; worker protocol same-major <= 1.0. Next step: Upgrade dw, pin dw to a supported release, or connect to a compatible server. Detail: Server compatibility error: missing control_plane.request_contract; expected durable-workflow.v2.control-plane-request.contract v1.
+Server compatibility error: refusing before the requested operation because the installed dw release cannot safely interoperate with the connected server. Compatibility window: <server-advertised-range>; control-plane version 2; worker protocol same-major <= 1.0. Next step: Upgrade dw, pin dw to a supported release, or connect to a compatible server. Detail: Server compatibility error: missing control_plane.request_contract; expected durable-workflow.v2.control-plane-request.contract v1.
 Next steps:
   - Upgrade dw, pin dw to a supported release, or connect to a compatible server.
     Try: dw doctor --output=json
@@ -354,9 +358,9 @@ object for automation:
 {
   "exit_code": 8,
   "compatibility": {
-    "cli_version": "2.0.0-rc.14",
-    "server_version": "2.0.0-rc.12",
-    "compatibility_window": "cli >=2.0.0-rc.1,<2.0.0; control-plane version 2; worker protocol same-major <= 1.0",
+    "cli_version": "<installed-cli-version>",
+    "server_version": "<connected-server-version>",
+    "compatibility_window": "<server-advertised-range>; control-plane version 2; worker protocol same-major <= 1.0",
     "next_step": "Upgrade dw, pin dw to a supported release, or connect to a compatible server.",
     "detail": "Server compatibility error: missing control_plane.request_contract; expected durable-workflow.v2.control-plane-request.contract v1."
   }

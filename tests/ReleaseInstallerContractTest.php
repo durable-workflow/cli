@@ -9,6 +9,161 @@ use Symfony\Component\Process\Process;
 
 final class ReleaseInstallerContractTest extends TestCase
 {
+    public function test_default_installers_resolve_the_qualified_prerelease_channel(): void
+    {
+        $shell = self::readRepoFile('scripts/install.sh');
+        $powershell = self::readRepoFile('scripts/install.ps1');
+
+        self::assertStringContainsString('VERSION="${VERSION:-prerelease}"', $shell);
+        self::assertStringContainsString('public-artifact-compatibility-evidence.json', $shell);
+        self::assertStringContainsString('/"qualified_artifact_versions"', $shell);
+        self::assertStringContainsString('/"cli"', $shell);
+        self::assertStringNotContainsString('api.github.com/repos/${REPO}/releases', $shell);
+        self::assertStringContainsString("else { 'prerelease' }", $powershell);
+        self::assertStringContainsString('public-artifact-compatibility-evidence.json', $powershell);
+        self::assertStringContainsString('$authority.qualified_artifact_versions.cli', $powershell);
+        self::assertStringNotContainsString('api.github.com/repos/$repo/releases', $powershell);
+    }
+
+    public function test_shell_installer_resolves_and_installs_from_the_prerelease_channel(): void
+    {
+        if (PHP_OS_FAMILY !== 'Linux') {
+            self::markTestSkipped('The shell installer fixture exercises the Linux artifact path.');
+        }
+
+        $architecture = match (php_uname('m')) {
+            'x86_64', 'amd64' => 'x86_64',
+            'aarch64', 'arm64' => 'aarch64',
+            default => null,
+        };
+        if ($architecture === null) {
+            self::markTestSkipped('The shell installer fixture requires a supported Linux architecture.');
+        }
+
+        $fixtureRoot = sys_get_temp_dir().'/dw-prerelease-installer-'.bin2hex(random_bytes(8));
+        $mockBin = $fixtureRoot.'/bin';
+        $installDir = $fixtureRoot.'/install';
+        $asset = "dw-linux-{$architecture}";
+        $assetPath = $fixtureRoot.'/'.$asset;
+        $sumsPath = $fixtureRoot.'/SHA256SUMS';
+        $authorityPath = $fixtureRoot.'/qualified-authority.json';
+        $curlLogPath = $fixtureRoot.'/curl.log';
+
+        self::assertTrue(mkdir($mockBin, 0o777, true));
+        self::assertTrue(mkdir($installDir, 0o777, true));
+
+        try {
+            self::assertIsInt(file_put_contents(
+                $assetPath,
+                "#!/usr/bin/env sh\nprintf '%s\\n' 'dw 2.0.0-rc.998'\n",
+            ));
+            self::assertIsInt(file_put_contents(
+                $sumsPath,
+                hash_file('sha256', $assetPath)."  {$asset}\n",
+            ));
+            self::assertIsInt(file_put_contents(
+                $authorityPath,
+                json_encode([
+                    'schema' => 'durable-workflow.docs.public-artifact-compatibility-evidence',
+                    'schema_version' => 2,
+                    'outcome' => 'pass',
+                    'qualified_artifact_versions' => ['cli' => '2.0.0-rc.998'],
+                ], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR),
+            ));
+
+            $mockCurl = <<<'SH'
+#!/usr/bin/env sh
+set -eu
+
+output=""
+url=""
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        -o) output="$2"; shift 2 ;;
+        -H|--retry) shift 2 ;;
+        -*) shift ;;
+        *) url="$1"; shift ;;
+    esac
+done
+
+printf '%s\n' "$url" >> "$MOCK_CURL_LOG"
+
+case "$url" in
+    "$MOCK_QUALIFIED_AUTHORITY_URL") source="$MOCK_QUALIFIED_AUTHORITY_FILE" ;;
+    "$MOCK_RELEASE_BASE_URL/download/2.0.0-rc.998/$MOCK_RELEASE_ASSET_NAME") source="$MOCK_RELEASE_ASSET_FILE" ;;
+    "$MOCK_RELEASE_BASE_URL/download/2.0.0-rc.998/SHA256SUMS") source="$MOCK_RELEASE_SUMS_FILE" ;;
+    "$MOCK_RELEASE_BASE_URL/download/2.0.0-rc.999/$MOCK_RELEASE_ASSET_NAME") source="$MOCK_RELEASE_ASSET_FILE" ;;
+    "$MOCK_RELEASE_BASE_URL/download/2.0.0-rc.999/SHA256SUMS") source="$MOCK_RELEASE_SUMS_FILE" ;;
+    *) exit 22 ;;
+esac
+
+if [ -n "$output" ]; then
+    cp "$source" "$output"
+else
+    cat "$source"
+fi
+SH;
+            $mockCurlPath = $mockBin.'/curl';
+            self::assertIsInt(file_put_contents($mockCurlPath, $mockCurl));
+            self::assertTrue(chmod($mockCurlPath, 0o755));
+
+            $qualifiedAuthorityUrl = 'https://releases.invalid/qualified-authority.json';
+            $releaseBaseUrl = 'https://releases.invalid/releases';
+            $environment = [
+                'PATH' => $mockBin.PATH_SEPARATOR.(getenv('PATH') ?: ''),
+                'DURABLE_WORKFLOW_INSTALL_DIR' => $installDir,
+                'DURABLE_WORKFLOW_QUALIFIED_AUTHORITY_URL' => $qualifiedAuthorityUrl,
+                'DURABLE_WORKFLOW_RELEASE_BASE_URL' => $releaseBaseUrl,
+                'MOCK_QUALIFIED_AUTHORITY_URL' => $qualifiedAuthorityUrl,
+                'MOCK_QUALIFIED_AUTHORITY_FILE' => $authorityPath,
+                'MOCK_RELEASE_BASE_URL' => $releaseBaseUrl,
+                'MOCK_RELEASE_ASSET_NAME' => $asset,
+                'MOCK_RELEASE_ASSET_FILE' => $assetPath,
+                'MOCK_RELEASE_SUMS_FILE' => $sumsPath,
+                'MOCK_CURL_LOG' => $curlLogPath,
+            ];
+            $process = new Process(
+                ['sh', dirname(__DIR__).'/scripts/install.sh'],
+                null,
+                $environment,
+            );
+            $process->mustRun();
+
+            self::assertTrue(is_executable($installDir.'/dw'));
+            self::assertStringContainsString('Resolving the qualified CLI prerelease', $process->getOutput());
+            self::assertStringContainsString('dw 2.0.0-rc.998', $process->getOutput());
+            self::assertStringContainsString($qualifiedAuthorityUrl, (string) file_get_contents($curlLogPath));
+
+            self::assertIsInt(file_put_contents(
+                $assetPath,
+                "#!/usr/bin/env sh\nprintf '%s\\n' 'dw 2.0.0-rc.999'\n",
+            ));
+            self::assertIsInt(file_put_contents(
+                $sumsPath,
+                hash_file('sha256', $assetPath)."  {$asset}\n",
+            ));
+            self::assertIsInt(file_put_contents($curlLogPath, ''));
+
+            $pinnedProcess = new Process(
+                ['sh', dirname(__DIR__).'/scripts/install.sh'],
+                null,
+                $environment + ['VERSION' => '2.0.0-rc.999'],
+            );
+            $pinnedProcess->mustRun();
+
+            self::assertStringNotContainsString('Resolving the qualified CLI prerelease', $pinnedProcess->getOutput());
+            self::assertStringContainsString('dw 2.0.0-rc.999', $pinnedProcess->getOutput());
+            $pinnedCurlLog = (string) file_get_contents($curlLogPath);
+            self::assertStringNotContainsString($qualifiedAuthorityUrl, $pinnedCurlLog);
+            self::assertStringContainsString(
+                "{$releaseBaseUrl}/download/2.0.0-rc.999/{$asset}",
+                $pinnedCurlLog,
+            );
+        } finally {
+            self::removeTree($fixtureRoot);
+        }
+    }
+
     public function test_installers_are_versioned_release_assets(): void
     {
         $releaseWorkflow = self::readRepoFile('.github/workflows/release.yml');
@@ -620,6 +775,26 @@ SH);
         self::assertIsString($contents, "{$path} must be readable.");
 
         return $contents;
+    }
+
+    private static function removeTree(string $path): void
+    {
+        if (!is_dir($path)) {
+            return;
+        }
+
+        $files = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($path, \FilesystemIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::CHILD_FIRST,
+        );
+        foreach ($files as $file) {
+            if ($file->isDir()) {
+                rmdir($file->getPathname());
+            } else {
+                unlink($file->getPathname());
+            }
+        }
+        rmdir($path);
     }
 
     private static function workflowJob(string $workflow, string $job, ?string $nextJob): string

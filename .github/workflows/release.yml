@@ -68,6 +68,8 @@ jobs:
       control_ref: ${{ steps.resolve.outputs.control_ref }}
       control_commit: ${{ steps.resolve.outputs.control_commit }}
       initiator: ${{ steps.resolve.outputs.initiator }}
+      prerelease: ${{ steps.resolve.outputs.prerelease }}
+      make_latest: ${{ steps.resolve.outputs.make_latest }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
         with:
@@ -95,6 +97,8 @@ jobs:
             cache_warm=true
             tag=""
             commit="$CONTROL_COMMIT"
+            prerelease="false"
+            make_latest="false"
           elif [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
             tag="$DISPATCH_TAG"
             commit="$DISPATCH_COMMIT"
@@ -118,6 +122,8 @@ jobs:
               echo "::error::Invalid release tag: $raw_tag"
               exit 1
             fi
+            release_metadata="$(node scripts/ci/release-version.js metadata "$tag")"
+            read -r prerelease make_latest <<< "$release_metadata"
           fi
           if ! printf '%s\n' "$commit" | grep -Eq '^[0-9a-f]{40}$'; then
             echo "::error::Source commit must be a full lowercase Git commit SHA"
@@ -130,6 +136,8 @@ jobs:
           echo "control_ref=$CONTROL_REF" >> "$GITHUB_OUTPUT"
           echo "control_commit=$CONTROL_COMMIT" >> "$GITHUB_OUTPUT"
           echo "initiator=$GITHUB_EVENT_NAME" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+          echo "make_latest=$make_latest" >> "$GITHUB_OUTPUT"
           if [ "$cache_warm" = "true" ]; then
             echo "Resolved trusted phpmicro cache warm at $commit"
           else
@@ -1534,6 +1542,8 @@ jobs:
             dist/*
           generate_release_notes: true
           fail_on_unmatched_files: true
+          prerelease: ${{ needs.resolve-release.outputs.prerelease }}
+          make_latest: ${{ needs.resolve-release.outputs.make_latest }}
 
       - name: Verify public release downloads
         env:

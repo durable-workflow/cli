@@ -58,6 +58,7 @@ jobs:
           python scripts/ci/test-component-release-recovery.py ConsumerContractIdentityRegressionTest
           python scripts/ci/test-cli-publication-run.py
           python scripts/ci/test-publish-planned-tag.py
+          node --test scripts/ci/test-release-workflow-metadata.js
       - run: composer test
 
   build-phar:

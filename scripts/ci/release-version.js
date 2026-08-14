@@ -29,6 +29,20 @@ function normalizeReleaseVersion(version) {
   return parseReleaseVersion(normalized) ? normalized : null;
 }
 
+function releaseMetadata(version) {
+  const parsed = parseReleaseVersion(version);
+  if (parsed === null) {
+    return null;
+  }
+
+  const prerelease = parsed.prerelease !== null;
+
+  return {
+    prerelease,
+    makeLatest: !prerelease,
+  };
+}
+
 function compareNumericIdentifiers(left, right) {
   if (left.length !== right.length) {
     return left.length < right.length ? -1 : 1;
@@ -102,13 +116,14 @@ module.exports = {
   compareReleaseVersions,
   normalizeReleaseVersion,
   parseReleaseVersion,
+  releaseMetadata,
 };
 
 if (require.main === module) {
   const [command, version] = process.argv.slice(2);
 
-  if (command !== 'normalize' || version === undefined) {
-    console.error('Usage: release-version.js normalize <version>');
+  if (!['metadata', 'normalize'].includes(command) || version === undefined) {
+    console.error('Usage: release-version.js <metadata|normalize> <version>');
     process.exit(2);
   }
 
@@ -118,5 +133,10 @@ if (require.main === module) {
     process.exit(1);
   }
 
-  process.stdout.write(`${normalized}\n`);
+  if (command === 'normalize') {
+    process.stdout.write(`${normalized}\n`);
+  } else {
+    const metadata = releaseMetadata(normalized);
+    process.stdout.write(`${metadata.prerelease} ${metadata.makeLatest}\n`);
+  }
 }

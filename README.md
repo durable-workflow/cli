@@ -30,6 +30,11 @@ curl -fsSL https://durable-workflow.com/install.sh | VERSION=<release-tag> sh
 irm https://durable-workflow.com/install.ps1 | iex
 ```
 
+Unpinned installs resolve the supported CLI release from the passing public
+artifact compatibility authority. During the 2.0 prerelease this keeps release
+candidates discoverable without classifying one as GitHub's stable Latest
+release.
+
 ```powershell
 # Windows, exact release
 $env:VERSION = '<release-tag>'
@@ -50,6 +55,7 @@ Or download a native binary directly from the [releases
 page](https://github.com/durable-workflow/cli/releases). Use the prerelease
 channel for onboarding, or select an exact tag when recording a reproducible
 build.
+
 Available assets:
 `dw-linux-x86_64`, `dw-linux-aarch64`,
 `dw-macos-aarch64`, `dw-windows-x86_64.exe`.

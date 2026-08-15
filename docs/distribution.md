@@ -23,10 +23,13 @@ CLI talks to the configured server and nothing else.
 The one-line installer is the recommended path on every supported platform.
 Both `install.sh` and `install.ps1` download the matching `SHA256SUMS` manifest,
 verify the binary's checksum before writing it into the install directory,
-and refuse to proceed when the checksum does not match.
+and refuse to proceed when the checksum does not match. An unpinned install
+resolves the passing public artifact compatibility authority. Before stable
+promotion it names the supported prerelease without relying on GitHub's stable
+Latest channel.
 
-The default installer follows the qualified prerelease channel. To make that
-channel explicit in an installation command, set `VERSION` to `prerelease`:
+The default installer follows the qualified supported release. To require that
+the authority still names a prerelease, set `VERSION` to `prerelease`:
 
 ```bash
 curl -fsSL https://durable-workflow.com/install.sh | VERSION=prerelease sh
@@ -179,12 +182,13 @@ as the rest of the binary.
 
 ## Auto-update
 
-`dw upgrade` performs an explicit, user-invoked self-update. It downloads
-the latest release asset for the current platform, verifies its SHA256
+`dw upgrade` performs an explicit, user-invoked self-update. By default it
+resolves the project's explicit supported CLI channel, downloads that exact
+release asset for the current platform, and verifies its SHA256
 against the release manifest, and atomically replaces the running
 binary. Behavior:
 
-- Defaults: `dw upgrade` upgrades to the newest release tag, refuses to
+- Defaults: `dw upgrade` upgrades to the supported channel version, refuses to
   proceed if checksum verification fails, and refuses to overwrite
   Composer-managed PHAR installs and Homebrew-managed binaries because
   the package manager owns those install paths. Composer package metadata

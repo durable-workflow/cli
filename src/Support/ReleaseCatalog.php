@@ -11,21 +11,21 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 /**
  * Resolves release metadata for the standalone `dw` binary.
  *
- * The catalog intentionally uses the unauthenticated
- * https://github.com/<repo>/releases redirect endpoints rather than the
- * GitHub REST API so CI runners without `GITHUB_TOKEN` do not hit the
- * 60-request/hour anonymous rate limit. The "latest" redirect resolves
- * to the exact tag; asset downloads and `SHA256SUMS` flow through the
- * same `github.com/<repo>/releases/download/<tag>/...` base URL.
+ * Default discovery follows the passing public artifact compatibility
+ * authority. Asset downloads and `SHA256SUMS` then use the exact qualified tag
+ * rather than GitHub's stable-only /releases/latest route.
  */
 final class ReleaseCatalog
 {
     public const DEFAULT_REPO = 'durable-workflow/cli';
 
+    public const DEFAULT_AUTHORITY_URL = 'https://durable-workflow.com/public-artifact-compatibility-evidence.json';
+
     public function __construct(
         private readonly HttpClientInterface $http,
         private readonly string $repo = self::DEFAULT_REPO,
         private readonly string $baseUrl = 'https://github.com',
+        private readonly string $authorityUrl = self::DEFAULT_AUTHORITY_URL,
     ) {
     }
 
@@ -33,7 +33,10 @@ final class ReleaseCatalog
         ?HttpClientInterface $http = null,
         ?string $repo = null,
         ?string $baseUrl = null,
+        ?string $authorityUrl = null,
     ): self {
+        $authorityUrl ??= getenv('DURABLE_WORKFLOW_QUALIFIED_AUTHORITY_URL') ?: self::DEFAULT_AUTHORITY_URL;
+
         return new self(
             http: $http ?? HttpClient::create([
                 'headers' => [
@@ -45,78 +48,49 @@ final class ReleaseCatalog
             ]),
             repo: $repo ?? self::DEFAULT_REPO,
             baseUrl: $baseUrl ?? 'https://github.com',
+            authorityUrl: $authorityUrl,
         );
     }
 
     /**
-     * Resolve the latest published tag by following the canonical
-     * /releases/latest redirect. Returns the bare tag (no leading "v").
+     * Resolve the supported release tag from the qualified artifact authority.
      */
-    public function latestTag(): string
+    public function supportedTag(): string
     {
-        $url = rtrim($this->baseUrl, '/')."/{$this->repo}/releases/latest";
-
         try {
-            $response = $this->http->request('HEAD', $url);
-            $status = $response->getStatusCode();
-        } catch (HttpExceptionInterface $e) {
-            throw new ReleaseCatalogException(
-                message: sprintf('could not reach GitHub releases: %s', $e->getMessage()),
-                previous: $e,
-            );
-        }
-
-        if ($status >= 300 && $status < 400) {
-            $location = $this->firstHeader($response->getHeaders(false), 'location');
-            if ($location === null) {
-                throw new ReleaseCatalogException('redirect from GitHub releases did not include a Location header');
-            }
-
-            $tag = basename(parse_url($location, PHP_URL_PATH) ?: $location);
-            if ($tag === '' || $tag === 'latest') {
-                throw new ReleaseCatalogException(sprintf('could not extract a release tag from %s', $location));
-            }
-
-            return ltrim($tag, 'v');
-        }
-
-        if ($status === 200) {
-            // Some proxies follow redirects silently; fall back to the
-            // GitHub API for a deterministic tag in that case.
-            return $this->latestTagViaApi();
-        }
-
-        if ($status === 404) {
-            throw new ReleaseCatalogException(sprintf('no published releases found for %s', $this->repo));
-        }
-
-        throw new ReleaseCatalogException(sprintf(
-            'unexpected HTTP %d from GitHub releases for %s',
-            $status,
-            $this->repo,
-        ));
-    }
-
-    private function latestTagViaApi(): string
-    {
-        $apiUrl = "https://api.github.com/repos/{$this->repo}/releases/latest";
-
-        try {
-            $response = $this->http->request('GET', $apiUrl);
+            $response = $this->http->request('GET', $this->authorityUrl);
             $data = $response->toArray();
         } catch (HttpExceptionInterface $e) {
             throw new ReleaseCatalogException(
-                message: sprintf('could not fetch release metadata from %s: %s', $apiUrl, $e->getMessage()),
+                message: sprintf(
+                    'could not fetch the qualified CLI release authority: %s',
+                    $e->getMessage(),
+                ),
                 previous: $e,
             );
         }
 
-        $tag = $data['tag_name'] ?? null;
+        if (
+            ($data['schema'] ?? null) !== 'durable-workflow.docs.public-artifact-compatibility-evidence'
+            || ($data['schema_version'] ?? null) !== 2
+            || ($data['outcome'] ?? null) !== 'pass'
+        ) {
+            throw new ReleaseCatalogException('qualified CLI release authority must be a passing schema-v2 document');
+        }
+        $tag = $data['qualified_artifact_versions']['cli'] ?? null;
         if (! is_string($tag) || $tag === '') {
-            throw new ReleaseCatalogException('release metadata response did not include a tag_name');
+            throw new ReleaseCatalogException('qualified CLI release authority must include a CLI version');
+        }
+        $tag = ltrim($tag, 'v');
+
+        $stablePattern = '/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/D';
+        $prereleasePattern = '/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)'.
+            '-(alpha|beta|rc)\.(0|[1-9][0-9]*)$/D';
+        if (preg_match($stablePattern, $tag) !== 1 && preg_match($prereleasePattern, $tag) !== 1) {
+            throw new ReleaseCatalogException('qualified CLI release must name a stable, alpha, beta, or rc version');
         }
 
-        return ltrim($tag, 'v');
+        return $tag;
     }
 
     public function downloadUrl(string $tag, string $asset): string
@@ -170,20 +144,5 @@ final class ReleaseCatalog
         }
 
         throw new ReleaseCatalogException(sprintf('checksum for %s not found in SHA256SUMS', $asset));
-    }
-
-    /**
-     * @param  array<string, array<int, string>>  $headers
-     */
-    private function firstHeader(array $headers, string $name): ?string
-    {
-        $name = strtolower($name);
-        foreach ($headers as $key => $values) {
-            if (strtolower((string) $key) === $name) {
-                return is_array($values) ? (string) ($values[0] ?? '') : (string) $values;
-            }
-        }
-
-        return null;
     }
 }

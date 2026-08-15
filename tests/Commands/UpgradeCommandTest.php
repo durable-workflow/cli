@@ -80,7 +80,7 @@ class UpgradeCommandTest extends TestCase
         self::assertSame('refused', $decoded['status']);
     }
 
-    public function test_noop_when_current_version_matches_latest(): void
+    public function test_noop_when_current_version_matches_supported_release(): void
     {
         $currentVersion = BuildInfo::version();
 
@@ -108,7 +108,7 @@ class UpgradeCommandTest extends TestCase
     public function test_dry_run_reports_asset_url_without_downloading(): void
     {
         $command = $this->command(
-            catalog: $this->catalog(['latest-tag' => '0.1.9']),
+            catalog: $this->catalog(['latest-tag' => '2.0.0-rc.31']),
             detector: fn () => new InstallationTarget(
                 kind: InstallationTarget::KIND_BINARY,
                 path: '/home/user/.local/bin/dw',
@@ -127,15 +127,40 @@ class UpgradeCommandTest extends TestCase
         self::assertSame(Command::SUCCESS, $exit);
         $decoded = $this->decode($tester->getDisplay());
         self::assertSame('dry-run', $decoded['status']);
-        self::assertSame('0.1.9', $decoded['target_version']);
-        self::assertStringContainsString('0.1.9/dw-linux-x86_64', $decoded['asset_url']);
-        self::assertStringContainsString('0.1.9/SHA256SUMS', $decoded['checksum_url']);
+        self::assertSame('2.0.0-rc.31', $decoded['target_version']);
+        self::assertStringContainsString('2.0.0-rc.31/dw-linux-x86_64', $decoded['asset_url']);
+        self::assertStringContainsString('2.0.0-rc.31/SHA256SUMS', $decoded['checksum_url']);
+    }
+
+    public function test_dry_run_accepts_qualified_stable_transition(): void
+    {
+        $command = $this->command(
+            catalog: $this->catalog(['latest-tag' => '2.0.0']),
+            detector: fn () => new InstallationTarget(
+                kind: InstallationTarget::KIND_BINARY,
+                path: '/home/user/.local/bin/dw',
+                upgradeable: true,
+                assetName: 'dw-linux-x86_64',
+            ),
+            replacer: $this->rejectingReplacer(),
+        );
+
+        $tester = new CommandTester($command);
+        $exit = $tester->execute([
+            '--dry-run' => true,
+            '--output' => 'json',
+        ]);
+
+        self::assertSame(Command::SUCCESS, $exit);
+        $decoded = $this->decode($tester->getDisplay());
+        self::assertSame('2.0.0', $decoded['target_version']);
+        self::assertStringContainsString('2.0.0/dw-linux-x86_64', $decoded['asset_url']);
     }
 
     public function test_pinned_version_is_used(): void
     {
         $command = $this->command(
-            catalog: $this->catalog(), // latestTag() never called
+            catalog: $this->catalog(), // supportedTag() never called
             detector: fn () => new InstallationTarget(
                 kind: InstallationTarget::KIND_BINARY,
                 path: '/home/user/.local/bin/dw',
@@ -438,11 +463,14 @@ class UpgradeCommandTest extends TestCase
         $responses = [];
         if (array_key_exists('latest-tag', $opts) && $opts['latest-tag'] !== null) {
             $tag = $opts['latest-tag'];
-            $responses[] = new MockResponse('', [
-                'http_code' => 302,
-                'response_headers' => [
-                    'Location: https://github.com/durable-workflow/cli/releases/tag/'.$tag,
-                ],
+            $responses[] = new MockResponse(json_encode([
+                'schema' => 'durable-workflow.docs.public-artifact-compatibility-evidence',
+                'schema_version' => 2,
+                'outcome' => 'pass',
+                'qualified_artifact_versions' => ['cli' => $tag],
+            ], JSON_THROW_ON_ERROR), [
+                'http_code' => 200,
+                'response_headers' => ['Content-Type: application/json'],
             ]);
         }
         if (array_key_exists('sums', $opts) && $opts['sums'] !== null) {

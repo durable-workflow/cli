@@ -9,17 +9,17 @@ use Symfony\Component\Process\Process;
 
 final class ReleaseInstallerContractTest extends TestCase
 {
-    public function test_default_installers_resolve_the_qualified_prerelease_channel(): void
+    public function test_default_installers_resolve_the_qualified_supported_release(): void
     {
         $shell = self::readRepoFile('scripts/install.sh');
         $powershell = self::readRepoFile('scripts/install.ps1');
 
-        self::assertStringContainsString('VERSION="${VERSION:-prerelease}"', $shell);
+        self::assertStringContainsString('VERSION="${VERSION:-supported}"', $shell);
         self::assertStringContainsString('public-artifact-compatibility-evidence.json', $shell);
         self::assertStringContainsString('/"qualified_artifact_versions"', $shell);
         self::assertStringContainsString('/"cli"', $shell);
         self::assertStringNotContainsString('api.github.com/repos/${REPO}/releases', $shell);
-        self::assertStringContainsString("else { 'prerelease' }", $powershell);
+        self::assertStringContainsString("else { 'supported' }", $powershell);
         self::assertStringContainsString('public-artifact-compatibility-evidence.json', $powershell);
         self::assertStringContainsString('$authority.qualified_artifact_versions.cli', $powershell);
         self::assertStringNotContainsString('api.github.com/repos/$repo/releases', $powershell);
@@ -94,6 +94,8 @@ case "$url" in
     "$MOCK_RELEASE_BASE_URL/download/2.0.0-rc.998/SHA256SUMS") source="$MOCK_RELEASE_SUMS_FILE" ;;
     "$MOCK_RELEASE_BASE_URL/download/2.0.0-rc.999/$MOCK_RELEASE_ASSET_NAME") source="$MOCK_RELEASE_ASSET_FILE" ;;
     "$MOCK_RELEASE_BASE_URL/download/2.0.0-rc.999/SHA256SUMS") source="$MOCK_RELEASE_SUMS_FILE" ;;
+    "$MOCK_RELEASE_BASE_URL/download/2.0.0/$MOCK_RELEASE_ASSET_NAME") source="$MOCK_RELEASE_ASSET_FILE" ;;
+    "$MOCK_RELEASE_BASE_URL/download/2.0.0/SHA256SUMS") source="$MOCK_RELEASE_SUMS_FILE" ;;
     *) exit 22 ;;
 esac
 
@@ -130,7 +132,7 @@ SH;
             $process->mustRun();
 
             self::assertTrue(is_executable($installDir.'/dw'));
-            self::assertStringContainsString('Resolving the qualified CLI prerelease', $process->getOutput());
+            self::assertStringContainsString('Resolving the qualified CLI release', $process->getOutput());
             self::assertStringContainsString('dw 2.0.0-rc.998', $process->getOutput());
             self::assertStringContainsString($qualifiedAuthorityUrl, (string) file_get_contents($curlLogPath));
 
@@ -151,13 +153,45 @@ SH;
             );
             $pinnedProcess->mustRun();
 
-            self::assertStringNotContainsString('Resolving the qualified CLI prerelease', $pinnedProcess->getOutput());
+            self::assertStringNotContainsString('Resolving the qualified CLI release', $pinnedProcess->getOutput());
             self::assertStringContainsString('dw 2.0.0-rc.999', $pinnedProcess->getOutput());
             $pinnedCurlLog = (string) file_get_contents($curlLogPath);
             self::assertStringNotContainsString($qualifiedAuthorityUrl, $pinnedCurlLog);
             self::assertStringContainsString(
                 "{$releaseBaseUrl}/download/2.0.0-rc.999/{$asset}",
                 $pinnedCurlLog,
+            );
+
+            self::assertIsInt(file_put_contents(
+                $assetPath,
+                "#!/usr/bin/env sh\nprintf '%s\\n' 'dw 2.0.0'\n",
+            ));
+            self::assertIsInt(file_put_contents(
+                $sumsPath,
+                hash_file('sha256', $assetPath)."  {$asset}\n",
+            ));
+            self::assertIsInt(file_put_contents(
+                $authorityPath,
+                json_encode([
+                    'schema' => 'durable-workflow.docs.public-artifact-compatibility-evidence',
+                    'schema_version' => 2,
+                    'outcome' => 'pass',
+                    'qualified_artifact_versions' => ['cli' => '2.0.0'],
+                ], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR),
+            ));
+            self::assertIsInt(file_put_contents($curlLogPath, ''));
+
+            $stableProcess = new Process(
+                ['sh', dirname(__DIR__).'/scripts/install.sh'],
+                null,
+                $environment,
+            );
+            $stableProcess->mustRun();
+
+            self::assertStringContainsString('dw 2.0.0', $stableProcess->getOutput());
+            self::assertStringContainsString(
+                "{$releaseBaseUrl}/download/2.0.0/{$asset}",
+                (string) file_get_contents($curlLogPath),
             );
         } finally {
             self::removeTree($fixtureRoot);
@@ -173,6 +207,15 @@ SH;
         self::assertStringContainsString('0.0.1-test or v0.0.1-test', $releaseWorkflow);
         self::assertStringContainsString('raw_tag="$tag"', $releaseWorkflow);
         self::assertStringContainsString('node scripts/ci/release-version.js normalize "$raw_tag"', $releaseWorkflow);
+        self::assertStringContainsString('node scripts/ci/release-version.js metadata "$tag"', $releaseWorkflow);
+        self::assertStringContainsString('prerelease: ${{ needs.resolve-release.outputs.prerelease }}', $releaseWorkflow);
+        self::assertStringContainsString('make_latest: ${{ needs.resolve-release.outputs.make_latest }}', $releaseWorkflow);
+        self::assertStringContainsString('Reconcile metadata without replacing the tag or assets', $releaseWorkflow);
+        self::assertStringContainsString('scripts/ci/reconcile-release-metadata.sh "$RELEASE_TAG"', $releaseWorkflow);
+        self::assertStringContainsString('stable_authorization:', $releaseWorkflow);
+        self::assertStringContainsString('Stable 2.0.0 publication requires a protected main-branch dispatch', $releaseWorkflow);
+        self::assertStringContainsString('repository: durable-workflow/.github', $releaseWorkflow);
+        self::assertStringContainsString('verify-stable-release-authorization.js', $releaseWorkflow);
         self::assertStringContainsString('ref: ${{ needs.resolve-release.outputs.commit }}', $releaseWorkflow);
         self::assertStringContainsString('DW_CLI_VERSION: ${{ needs.resolve-release.outputs.tag }}', $releaseWorkflow);
         self::assertStringContainsString('DW_CLI_COMMIT="$(git rev-parse HEAD)"', $releaseWorkflow);
@@ -320,7 +363,7 @@ SH;
             $releaseWorkflow,
             'Checkout qualified phpmicro toolchain policy',
         ));
-        self::assertSame(4, substr_count(
+        self::assertSame(5, substr_count(
             $releaseWorkflow,
             'ref: ${{ needs.resolve-release.outputs.control_commit }}',
         ));
@@ -469,6 +512,9 @@ SH;
         self::assertStringContainsString('bash -n scripts/verify-public-release-assets.sh', $buildWorkflow);
         self::assertStringContainsString('sh -n scripts/ci/check-docs-release-audit.sh', $buildWorkflow);
         self::assertStringContainsString('node --check scripts/ci/release-version.js', $buildWorkflow);
+        self::assertStringContainsString('node --check scripts/ci/verify-cli-release-channel.js', $buildWorkflow);
+        self::assertStringContainsString('node --check scripts/ci/verify-stable-release-authorization.js', $buildWorkflow);
+        self::assertStringContainsString('bash -n scripts/ci/reconcile-release-metadata.sh', $buildWorkflow);
         self::assertStringContainsString('bash -n scripts/ci/verify-release-tag-source.sh', $buildWorkflow);
         self::assertStringContainsString('scripts/install.ps1', $buildWorkflow);
     }
@@ -496,7 +542,7 @@ SH;
         self::assertSame(5, substr_count($releaseWorkflow, 'ref: ${{ needs.resolve-release.outputs.commit }}'));
         self::assertStringNotContainsString('|| github.ref }}', $releaseWorkflow);
         self::assertStringContainsString('EXPECTED_COMMIT: ${{ needs.resolve-release.outputs.commit }}', $releaseWorkflow);
-        self::assertSame(2, substr_count($releaseWorkflow, 'RELEASE_COMMIT: ${{ needs.resolve-release.outputs.commit }}'));
+        self::assertSame(3, substr_count($releaseWorkflow, 'RELEASE_COMMIT: ${{ needs.resolve-release.outputs.commit }}'));
         self::assertStringNotContainsString('return_run_details', $recoveryWorkflow);
         self::assertStringContainsString('"release_commit": commit', $recoveryWorkflow);
         self::assertStringContainsString('"ref": "main"', $recoveryWorkflow);
@@ -588,7 +634,7 @@ SH);
 
         self::assertStringContainsString('PUSH_COMMIT: ${{ github.sha }}', $releaseWorkflow);
         self::assertSame(5, substr_count($releaseWorkflow, 'ref: ${{ needs.resolve-release.outputs.commit }}'));
-        self::assertSame(2, substr_count($releaseWorkflow, 'RELEASE_COMMIT: ${{ needs.resolve-release.outputs.commit }}'));
+        self::assertSame(3, substr_count($releaseWorkflow, 'RELEASE_COMMIT: ${{ needs.resolve-release.outputs.commit }}'));
 
         $environment = [
             'GH_CLI' => $fakeGh,
@@ -702,6 +748,9 @@ SH);
         self::assertStringContainsString('checksum verification failed', $shellInstaller);
         self::assertStringContainsString('DURABLE_WORKFLOW_INSTALL_VERIFY_ATTESTATIONS', $shellInstaller);
         self::assertStringContainsString('release_version="${VERSION#v}"', $shellInstaller);
+        self::assertStringContainsString('DURABLE_WORKFLOW_QUALIFIED_AUTHORITY_URL', $shellInstaller);
+        self::assertStringContainsString('public-artifact-compatibility-evidence', $shellInstaller);
+        self::assertStringContainsString('VERSION="${VERSION:-supported}"', $shellInstaller);
         self::assertStringContainsString('gh attestation verify "$tmp" --repo "$REPO"', $shellInstaller);
         self::assertStringContainsString('gh attestation verify "$sums" --repo "$REPO"', $shellInstaller);
         self::assertStringContainsString('mv "$tmp" "$INSTALL_DIR/$BIN_NAME"', $shellInstaller);
@@ -709,7 +758,10 @@ SH);
         self::assertStringContainsString('SHA256SUMS', $powershellInstaller);
         self::assertStringContainsString('Checksum verification failed', $powershellInstaller);
         self::assertStringContainsString('DURABLE_WORKFLOW_INSTALL_VERIFY_ATTESTATIONS', $powershellInstaller);
-        self::assertStringContainsString('$releaseVersion = if ($version -ne \'latest\' -and $version.StartsWith(\'v\'))', $powershellInstaller);
+        self::assertStringContainsString('DURABLE_WORKFLOW_QUALIFIED_AUTHORITY_URL', $powershellInstaller);
+        self::assertStringContainsString('durable-workflow.docs.public-artifact-compatibility-evidence', $powershellInstaller);
+        self::assertStringContainsString("else { 'supported' }", $powershellInstaller);
+        self::assertStringContainsString('$version.StartsWith(\'v\')', $powershellInstaller);
         self::assertStringContainsString('gh attestation verify $tmp --repo $repo', $powershellInstaller);
         self::assertStringContainsString('gh attestation verify $sums --repo $repo', $powershellInstaller);
         self::assertStringContainsString('Move-Item -Force -Path $tmp -Destination $dest', $powershellInstaller);

@@ -42,7 +42,7 @@ class UpgradeCommand extends Command
     protected function configure(): void
     {
         $this->setName('upgrade')
-            ->setDescription('Upgrade the standalone dw binary to the latest (or a pinned) release')
+            ->setDescription('Upgrade the standalone dw binary to the supported (or a pinned) release')
             ->setHelp(<<<'HELP'
 Replace the currently running `dw` binary with a newer release from
 `durable-workflow/cli` on GitHub. The command verifies the downloaded
@@ -53,11 +53,11 @@ installs are refused with a pointer at the right managing tool.
 <comment>Examples:</comment>
 
   <info>dw upgrade</info>
-    <info>dw upgrade --tag=2.0.0-rc.14</info>
+  <info>dw upgrade --tag=\<release-tag\></info>
   <info>dw upgrade --dry-run</info>
   <info>dw upgrade --output=json</info>
 HELP)
-                        ->addOption('tag', null, InputOption::VALUE_REQUIRED, 'Release tag to install (defaults to the latest release)')
+            ->addOption('tag', null, InputOption::VALUE_REQUIRED, 'Release tag to install (defaults to the supported release)')
             ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Resolve the target release without downloading or replacing')
             ->addOption('force', null, InputOption::VALUE_NONE, 'Re-download and replace even when the current and target versions match')
             ->addOption(
@@ -133,7 +133,7 @@ HELP)
         $catalog = $this->catalog ?? ReleaseCatalog::create();
 
         try {
-            $targetVersion = $requestedTag ?? $catalog->latestTag();
+            $targetVersion = $requestedTag ?? $catalog->supportedTag();
         } catch (ReleaseCatalogException $e) {
             return $this->emit($output, $asJson, [
                 'status' => 'error',

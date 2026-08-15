@@ -67,8 +67,11 @@ jobs:
           sh -n scripts/verify-release.sh
           sh -n scripts/ci/check-docs-release-audit.sh
           node --check scripts/ci/release-version.js
+          node --check scripts/ci/verify-cli-release-channel.js
+          node --check scripts/ci/verify-stable-release-authorization.js
           bash -n scripts/ci/verify-release-tag-source.sh
           bash -n scripts/ci/establish-native-prerequisites.sh
+          bash -n scripts/ci/reconcile-release-metadata.sh
           bash -n scripts/verify-public-release-assets.sh
           bash -n scripts/verify-reproducible-build.sh
           pwsh -NoProfile -Command '$null = [scriptblock]::Create((Get-Content -Raw scripts/install.ps1))'
@@ -89,6 +92,9 @@ jobs:
           python scripts/ci/test-cli-publication-run.py
           python scripts/ci/test-publish-planned-tag.py
           node --test scripts/ci/test-release-workflow-metadata.js
+          node --test scripts/ci/test-cli-release-channel.js
+          node --test scripts/ci/test-release-metadata.js
+          node --test scripts/ci/test-stable-release-authorization.js
       - run: composer test
 
   build-phar:

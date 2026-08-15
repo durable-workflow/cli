@@ -39,6 +39,9 @@ on:
         description: 'Immutable release-plan tag initiating this recovery run'
         required: false
         default: 'direct'
+      stable_authorization:
+        description: 'Immutable stable-authorization tag required only for stable 2.0.0'
+        required: false
 
 permissions:
   contents: read
@@ -70,6 +73,8 @@ jobs:
       initiator: ${{ steps.resolve.outputs.initiator }}
       prerelease: ${{ steps.resolve.outputs.prerelease }}
       make_latest: ${{ steps.resolve.outputs.make_latest }}
+      requires_stable_authorization: ${{ steps.resolve.outputs.requires_stable_authorization }}
+      stable_authorization: ${{ steps.resolve.outputs.stable_authorization }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
         with:
@@ -80,6 +85,7 @@ jobs:
           DISPATCH_OPERATION: ${{ inputs.operation }}
           DISPATCH_TAG: ${{ inputs.tag }}
           DISPATCH_COMMIT: ${{ inputs.release_commit }}
+          DISPATCH_STABLE_AUTHORIZATION: ${{ inputs.stable_authorization }}
           PUSH_COMMIT: ${{ github.sha }}
           CONTROL_REF: ${{ github.ref }}
           CONTROL_COMMIT: ${{ github.sha }}
@@ -99,6 +105,8 @@ jobs:
             commit="$CONTROL_COMMIT"
             prerelease="false"
             make_latest="false"
+            requires_stable_authorization="false"
+            stable_authorization=""
           elif [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
             tag="$DISPATCH_TAG"
             commit="$DISPATCH_COMMIT"
@@ -124,6 +132,24 @@ jobs:
             fi
             release_metadata="$(node scripts/ci/release-version.js metadata "$tag")"
             read -r prerelease make_latest <<< "$release_metadata"
+            requires_stable_authorization="false"
+            stable_authorization=""
+
+            if [ "$tag" = "2.0.0" ]; then
+              if [ "$GITHUB_EVENT_NAME" != "workflow_dispatch" ]; then
+                echo "::error::Stable 2.0.0 publication requires a protected main-branch dispatch with immutable stable authorization"
+                exit 1
+              fi
+              if [[ ! "$DISPATCH_STABLE_AUTHORIZATION" =~ ^stable-authorization/2\.0\.0/[a-z0-9][a-z0-9._-]{0,55}$ ]]; then
+                echo "::error::Stable 2.0.0 publication requires an exact stable-authorization/2.0.0/<candidate> tag"
+                exit 1
+              fi
+              requires_stable_authorization="true"
+              stable_authorization="$DISPATCH_STABLE_AUTHORIZATION"
+            elif [ -n "$DISPATCH_STABLE_AUTHORIZATION" ]; then
+              echo "::error::stable_authorization can only be supplied for stable 2.0.0"
+              exit 1
+            fi
           fi
           if ! printf '%s\n' "$commit" | grep -Eq '^[0-9a-f]{40}$'; then
             echo "::error::Source commit must be a full lowercase Git commit SHA"
@@ -138,6 +164,8 @@ jobs:
           echo "initiator=$GITHUB_EVENT_NAME" >> "$GITHUB_OUTPUT"
           echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
           echo "make_latest=$make_latest" >> "$GITHUB_OUTPUT"
+          echo "requires_stable_authorization=$requires_stable_authorization" >> "$GITHUB_OUTPUT"
+          echo "stable_authorization=$stable_authorization" >> "$GITHUB_OUTPUT"
           if [ "$cache_warm" = "true" ]; then
             echo "Resolved trusted phpmicro cache warm at $commit"
           else
@@ -152,6 +180,8 @@ jobs:
           CONTROL_REF: ${{ steps.resolve.outputs.control_ref }}
           CONTROL_COMMIT: ${{ steps.resolve.outputs.control_commit }}
           INITIATOR: ${{ steps.resolve.outputs.initiator }}
+          RELEASE_PRERELEASE: ${{ steps.resolve.outputs.prerelease }}
+          STABLE_AUTHORIZATION: ${{ steps.resolve.outputs.stable_authorization }}
         run: |
           node - <<'NODE'
           const fs = require('fs');
@@ -161,6 +191,10 @@ jobs:
             initiator: process.env.INITIATOR,
             control: {ref: process.env.CONTROL_REF, commit: process.env.CONTROL_COMMIT},
             package: {tag: process.env.RELEASE_TAG, commit: process.env.RELEASE_COMMIT},
+            classification: {
+              prerelease: process.env.RELEASE_PRERELEASE === 'true',
+              stable_authorization: process.env.STABLE_AUTHORIZATION || null,
+            },
           }, null, 2)}\n`);
           NODE
 
@@ -190,6 +224,28 @@ jobs:
           ref: ${{ needs.resolve-release.outputs.control_commit }}
           path: release-control
           persist-credentials: false
+
+      - name: Checkout immutable stable release authorization
+        if: needs.resolve-release.outputs.requires_stable_authorization == 'true'
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
+        with:
+          repository: durable-workflow/.github
+          ref: ${{ needs.resolve-release.outputs.stable_authorization }}
+          path: stable-release-authorization
+          persist-credentials: false
+
+      - name: Verify stable release authorization
+        if: needs.resolve-release.outputs.requires_stable_authorization == 'true'
+        env:
+          RELEASE_TAG: ${{ needs.resolve-release.outputs.tag }}
+          RELEASE_COMMIT: ${{ needs.resolve-release.outputs.commit }}
+          STABLE_AUTHORIZATION: ${{ needs.resolve-release.outputs.stable_authorization }}
+        run: |
+          node release-control/scripts/ci/verify-stable-release-authorization.js \
+            stable-release-authorization \
+            "$RELEASE_TAG" \
+            "$RELEASE_COMMIT" \
+            "$STABLE_AUTHORIZATION"
 
       - name: Verify expected release source
         env:
@@ -294,6 +350,47 @@ jobs:
             docs-release-audit-evidence.json
             docs-release-audit-handoff.json
           if-no-files-found: warn
+
+  reconcile-existing-release-metadata:
+    name: Reconcile existing GitHub Release metadata
+    needs: [resolve-release, release-preflight]
+    if: >-
+      needs.resolve-release.outputs.cache_warm != 'true' &&
+      always() &&
+      needs.resolve-release.result == 'success' &&
+      needs.release-preflight.result == 'success' &&
+      needs.release-preflight.outputs.public_assets_present == 'true'
+    runs-on: ubuntu-latest
+    environment: github-release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
+        with:
+          ref: ${{ needs.resolve-release.outputs.control_commit }}
+          persist-credentials: false
+
+      - name: Reconcile metadata without replacing the tag or assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.resolve-release.outputs.tag }}
+        run: scripts/ci/reconcile-release-metadata.sh "$RELEASE_TAG"
+
+      - name: Verify reconciled public metadata
+        env:
+          EXPECTED_PRERELEASE: ${{ needs.resolve-release.outputs.prerelease }}
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.resolve-release.outputs.tag }}
+        run: |
+          observed="$(
+            gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" \
+              --jq '[.tag_name, (.draft | tostring), (.prerelease | tostring)] | @tsv'
+          )"
+          expected="${RELEASE_TAG}"$'\t'"false"$'\t'"${EXPECTED_PRERELEASE}"
+          if [ "$observed" != "$expected" ]; then
+            echo "::error::Public release metadata does not match ${expected}: ${observed}"
+            exit 1
+          fi
 
   build-phar:
     name: Build PHAR
@@ -1649,13 +1746,37 @@ jobs:
 
           installer="$(mktemp)"
           install_dir="$(mktemp -d)"
-          trap 'rm -rf "$installer" "$install_dir"' EXIT
+          default_install_dir="$(mktemp -d)"
+          channel_evidence="$(mktemp)"
+          trap 'rm -rf "$installer" "$install_dir" "$default_install_dir" "$channel_evidence"' EXIT
           curl -fsSL --retry 3 --retry-all-errors --connect-timeout 10 \
             -o "$installer" "$(public_asset_url install.sh)"
           VERSION="$tag" DURABLE_WORKFLOW_INSTALL_DIR="$install_dir" \
             DURABLE_WORKFLOW_RELEASE_BASE_URL="https://github.com/${release_repo}/releases" \
             DURABLE_WORKFLOW_BIN_NAME=dw-release-check sh "$installer"
           "$install_dir/dw-release-check" --version
+
+          node scripts/ci/verify-cli-release-channel.js --release-tag "$tag" \
+            | tee "$channel_evidence"
+          channel_version="$(jq -r '.channel_version' "$channel_evidence")"
+
+          DURABLE_WORKFLOW_INSTALL_DIR="$default_install_dir" \
+            DURABLE_WORKFLOW_RELEASE_BASE_URL="https://github.com/${release_repo}/releases" \
+            DURABLE_WORKFLOW_BIN_NAME=dw-channel-check sh scripts/install.sh
+          default_version="$("$default_install_dir/dw-channel-check" --version)"
+          case "$default_version" in
+            *"$channel_version"*) ;;
+            *)
+              echo "::error::Default installer resolved ${default_version}, expected channel ${channel_version}"
+              exit 1
+              ;;
+          esac
+
+          upgrade_evidence="$(dist/dw-linux-x86_64 upgrade --dry-run --output=json)"
+          if [ "$(jq -r '.target_version' <<< "$upgrade_evidence")" != "$channel_version" ]; then
+            echo "::error::dw upgrade did not resolve supported channel ${channel_version}: ${upgrade_evidence}"
+            exit 1
+          fi
 
       - name: Verify live docs release audit after public downloads
         env:

@@ -69,3 +69,19 @@ test('the release action consumes metadata from the resolved tag', () => {
   assert.match(releaseAction, /body_path: release-notes\.md/);
   assert.match(releaseAction, /files: \|\n\s+dist\/\*/);
 });
+
+test('metadata reconciliation can only write from the main branch', () => {
+  const workflow = fs.readFileSync(workflowPath, 'utf8');
+  const jobStart = workflow.indexOf('  reconcile-existing-release-metadata:');
+  const jobEnd = workflow.indexOf('\n  build-phar:', jobStart);
+
+  assert.notEqual(jobStart, -1);
+  assert.notEqual(jobEnd, -1);
+
+  const reconciliationJob = workflow.slice(jobStart, jobEnd);
+  assert.match(
+    reconciliationJob,
+    /if: >-\n\s+github\.ref == 'refs\/heads\/main' &&/,
+  );
+  assert.match(reconciliationJob, /permissions:\n\s+contents: write/);
+});

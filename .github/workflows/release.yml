@@ -355,6 +355,7 @@ jobs:
     name: Reconcile existing GitHub Release metadata
     needs: [resolve-release, release-preflight]
     if: >-
+      github.ref == 'refs/heads/main' &&
       needs.resolve-release.outputs.cache_warm != 'true' &&
       always() &&
       needs.resolve-release.result == 'success' &&

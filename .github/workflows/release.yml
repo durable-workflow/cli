@@ -1773,7 +1773,7 @@ jobs:
               ;;
           esac
 
-          upgrade_evidence="$(dist/dw-linux-x86_64 upgrade --dry-run --output=json)"
+          upgrade_evidence="$("$install_dir/dw-release-check" upgrade --dry-run --output=json)"
           if [ "$(jq -r '.target_version' <<< "$upgrade_evidence")" != "$channel_version" ]; then
             echo "::error::dw upgrade did not resolve supported channel ${channel_version}: ${upgrade_evidence}"
             exit 1

@@ -85,3 +85,22 @@ test('metadata reconciliation can only write from the main branch', () => {
   );
   assert.match(reconciliationJob, /permissions:\n\s+contents: write/);
 });
+
+test('upgrade channel verification uses the executable installed from the public release', () => {
+  const workflow = fs.readFileSync(workflowPath, 'utf8');
+  const verificationStart = workflow.indexOf('- name: Verify public release downloads');
+  const verificationEnd = workflow.indexOf(
+    '- name: Verify live docs release audit after public downloads',
+    verificationStart,
+  );
+
+  assert.notEqual(verificationStart, -1);
+  assert.notEqual(verificationEnd, -1);
+
+  const verification = workflow.slice(verificationStart, verificationEnd);
+  assert.match(
+    verification,
+    /upgrade_evidence="\$\("\$install_dir\/dw-release-check" upgrade --dry-run --output=json\)"/,
+  );
+  assert.doesNotMatch(verification, /dist\/dw-linux-x86_64 upgrade/);
+});

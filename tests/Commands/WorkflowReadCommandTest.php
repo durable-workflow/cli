@@ -468,11 +468,41 @@ class WorkflowReadCommandTest extends TestCase
                     'findings' => [
                         [
                             'severity' => 'warning',
+                            'code' => 'pending_workflow_type_unsupported',
+                            'message' => 'Workflow type [orders.process] is pending on task queue [orders], but no active poller on that queue advertises that exact workflow type. Workflow type matching is exact and case-sensitive; register and start a worker that advertises [orders.process] on [orders].',
+                            'task_id' => 'task-1',
+                            'task_queue' => 'orders',
+                            'workflow_type' => 'orders.process',
+                            'workflow_type_match' => 'exact_case_sensitive',
+                            'active_worker_count' => 1,
+                            'active_worker_limit' => 10,
+                            'active_workers_truncated' => false,
+                            'active_workers' => [[
+                                'worker_id' => 'other-workflow-worker',
+                                'runtime' => 'php',
+                                'supported_workflow_types' => ['orders.other'],
+                                'supported_workflow_type_count' => 1,
+                                'supported_workflow_type_limit' => 20,
+                                'supported_workflow_types_truncated' => false,
+                            ]],
+                        ],
+                        [
+                            'severity' => 'warning',
                             'code' => 'pending_activity_type_unsupported',
                             'message' => 'Activity [polyglot.python-to-php.echo] is pending on task queue [polyglot-python-to-php], but no active poller on that queue advertises that activity type.',
                             'task_queue' => 'polyglot-python-to-php',
                             'activity_type' => 'polyglot.python-to-php.echo',
                             'activity_execution_id' => 'act-1',
+                        ],
+                    ],
+                    'pending_workflow_tasks' => [
+                        [
+                            'task_id' => 'task-1',
+                            'task_type' => 'workflow',
+                            'status' => 'ready',
+                            'transport_state' => 'dispatch_overdue',
+                            'summary' => 'Workflow task is ready but dispatch is overdue.',
+                            'queue' => 'orders',
                         ],
                     ],
                     'pending_activities' => [
@@ -539,7 +569,21 @@ class WorkflowReadCommandTest extends TestCase
 
         self::assertSame('workflow_wait_diagnostic', $parsedStderr['event']);
         self::assertSame('wf-wait-json-diagnostics', $parsedStderr['workflow_id']);
-        self::assertSame('pending_activity_type_unsupported', $parsedStderr['findings'][0]['code']);
+        self::assertSame('pending_workflow_type_unsupported', $parsedStderr['findings'][0]['code']);
+        self::assertSame('orders.process', $parsedStderr['findings'][0]['workflow_type']);
+        self::assertSame('orders', $parsedStderr['findings'][0]['task_queue']);
+        self::assertSame('exact_case_sensitive', $parsedStderr['findings'][0]['workflow_type_match']);
+        self::assertSame(['orders.other'], $parsedStderr['findings'][0]['active_workers'][0]['supported_workflow_types']);
+        self::assertSame('pending_activity_type_unsupported', $parsedStderr['findings'][1]['code']);
+        self::assertStringContainsString('exact and case-sensitive', $parsedStderr['findings'][0]['message']);
+        self::assertSame(
+            'Workflow task is ready but dispatch is overdue.',
+            $parsedStderr['pending_workflow_tasks'][0]['summary'],
+        );
+        self::assertLessThan(
+            strpos($stderr, '"pending_workflow_tasks"'),
+            strpos($stderr, '"pending_workflow_type_unsupported"'),
+        );
         self::assertSame('polyglot-python-to-php', $parsedStderr['pending_activities'][0]['queue']);
         self::assertSame(
             ['polyglot.other.echo'],

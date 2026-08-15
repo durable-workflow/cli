@@ -6,7 +6,7 @@ namespace DurableWorkflow\Cli;
 
 final class BuildInfo
 {
-    private const FALLBACK_VERSION = '2.0.0-rc.33';
+    private const FALLBACK_VERSION = '2.0.0-rc.34';
 
     public static function consoleVersion(): string
     {

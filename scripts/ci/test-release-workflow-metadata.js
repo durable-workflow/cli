@@ -100,7 +100,19 @@ test('upgrade channel verification uses the executable installed from the public
   const verification = workflow.slice(verificationStart, verificationEnd);
   assert.match(
     verification,
-    /upgrade_evidence="\$\("\$install_dir\/dw-release-check" upgrade --dry-run --output=json\)"/,
+    /upgrade_dry_run_evidence="\$\("\$install_dir\/dw-release-check" upgrade --dry-run --output=json\)"/,
+  );
+  assert.match(
+    verification,
+    /upgrade_apply_evidence="\$\("\$install_dir\/dw-release-check" upgrade --output=json\)"/,
+  );
+  assert.match(
+    verification,
+    /verify-cli-upgrade-result\.js \\\n+\s+--mode dry-run --release-version "\$tag" --channel-version "\$channel_version"/,
+  );
+  assert.match(
+    verification,
+    /verify-cli-upgrade-result\.js \\\n+\s+--mode apply --release-version "\$tag" --channel-version "\$channel_version"/,
   );
   assert.doesNotMatch(verification, /dist\/dw-linux-x86_64 upgrade/);
 });

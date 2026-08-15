@@ -11,6 +11,7 @@ use DurableWorkflow\Cli\Support\InvalidOptionException;
 use DurableWorkflow\Cli\Support\OutputMode;
 use DurableWorkflow\Cli\Support\ReleaseCatalog;
 use DurableWorkflow\Cli\Support\ReleaseCatalogException;
+use DurableWorkflow\Cli\Support\ReleaseVersion;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -57,7 +58,7 @@ installs are refused with a pointer at the right managing tool.
   <info>dw upgrade --dry-run</info>
   <info>dw upgrade --output=json</info>
 HELP)
-            ->addOption('tag', null, InputOption::VALUE_REQUIRED, 'Release tag to install (defaults to the supported release)')
+            ->addOption('tag', null, InputOption::VALUE_REQUIRED, 'Explicit release tag to install, including an intentional downgrade (defaults to the supported release)')
             ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Resolve the target release without downloading or replacing')
             ->addOption('force', null, InputOption::VALUE_NONE, 'Re-download and replace even when the current and target versions match')
             ->addOption(
@@ -154,9 +155,19 @@ HELP)
             ], $failureExit);
         }
 
-        $sameVersion = $this->versionsMatch($currentVersion, $targetVersion);
+        try {
+            $versionComparison = ReleaseVersion::compare($currentVersion, $targetVersion);
+        } catch (\InvalidArgumentException $e) {
+            return $this->emit($output, $asJson, [
+                'status' => 'error',
+                'reason' => sprintf('cannot determine upgrade direction: %s', $e->getMessage()),
+                'installation' => $target->toArray(),
+                'current_version' => $currentVersion,
+                'target_version' => $targetVersion,
+            ], $failureExit);
+        }
 
-        if ($sameVersion && ! $force) {
+        if ($versionComparison === 0 && ! $force) {
             return $this->emit($output, $asJson, [
                 'status' => 'noop',
                 'reason' => sprintf('dw is already at %s', $currentVersion),
@@ -165,6 +176,23 @@ HELP)
                 'target_version' => $targetVersion,
             ], $successExit);
         }
+
+        $isDowngrade = $versionComparison > 0;
+        if ($isDowngrade && $requestedTag === null) {
+            return $this->emit($output, $asJson, [
+                'status' => 'newer',
+                'reason' => sprintf(
+                    'dw %s is newer than the supported release %s; no change was made',
+                    $currentVersion,
+                    $targetVersion,
+                ),
+                'installation' => $target->toArray(),
+                'current_version' => $currentVersion,
+                'target_version' => $targetVersion,
+            ], $successExit);
+        }
+
+        $direction = $isDowngrade ? 'downgrade' : ($versionComparison < 0 ? 'upgrade' : 'reinstall');
 
         $binaryUrl = $catalog->downloadUrl($targetVersion, $target->assetName);
         $sumsUrl = $catalog->downloadUrl($targetVersion, 'SHA256SUMS');
@@ -175,6 +203,7 @@ HELP)
                 'installation' => $target->toArray(),
                 'current_version' => $currentVersion,
                 'target_version' => $targetVersion,
+                'direction' => $direction,
                 'asset_url' => $binaryUrl,
                 'checksum_url' => $sumsUrl,
             ], $successExit);
@@ -238,10 +267,11 @@ HELP)
         }
 
         return $this->emit($output, $asJson, [
-            'status' => 'upgraded',
+            'status' => $isDowngrade ? 'downgraded' : 'upgraded',
             'installation' => $target->toArray(),
             'current_version' => $currentVersion,
             'target_version' => $targetVersion,
+            'direction' => $direction,
         ], $successExit);
     }
 
@@ -264,13 +294,21 @@ HELP)
             case 'noop':
                 $output->writeln(sprintf('<info>dw is already at %s</info>', (string) ($payload['current_version'] ?? 'unknown')));
                 break;
+            case 'newer':
+                $output->writeln(sprintf('<info>%s</info>', (string) ($payload['reason'] ?? 'The installed dw release is newer than the supported release; no change was made.')));
+                break;
             case 'dry-run':
-                $output->writeln(sprintf('<info>Would upgrade %s -> %s</info>', (string) ($payload['current_version'] ?? ''), (string) ($payload['target_version'] ?? '')));
+                $operation = ($payload['direction'] ?? null) === 'downgrade' ? 'downgrade' : 'upgrade';
+                $output->writeln(sprintf('<info>Would %s %s -> %s</info>', $operation, (string) ($payload['current_version'] ?? ''), (string) ($payload['target_version'] ?? '')));
                 $output->writeln(sprintf('  asset:    %s', (string) ($payload['asset_url'] ?? '')));
                 $output->writeln(sprintf('  checksum: %s', (string) ($payload['checksum_url'] ?? '')));
                 break;
             case 'upgraded':
                 $output->writeln(sprintf('<info>Upgraded dw to %s</info>', (string) ($payload['target_version'] ?? '')));
+                $output->writeln(sprintf('  path: %s', (string) ($payload['installation']['path'] ?? '')));
+                break;
+            case 'downgraded':
+                $output->writeln(sprintf('<info>Downgraded dw to %s</info>', (string) ($payload['target_version'] ?? '')));
                 $output->writeln(sprintf('  path: %s', (string) ($payload['installation']['path'] ?? '')));
                 break;
             case 'refused':
@@ -298,22 +336,6 @@ HELP)
         }
 
         return $mode;
-    }
-
-    private function versionsMatch(string $current, string $target): bool
-    {
-        $normalize = static function (string $value): string {
-            $value = trim($value);
-            // BuildInfo::version() may include a development suffix; compare
-            // only the core semver head for the noop check.
-            if (preg_match('/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?/', ltrim($value, 'v'), $m)) {
-                return $m[0];
-            }
-
-            return ltrim($value, 'v');
-        };
-
-        return $normalize($current) === $normalize($target);
     }
 
     private function permissionHint(string $path): string

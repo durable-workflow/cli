@@ -1773,11 +1773,13 @@ jobs:
               ;;
           esac
 
-          upgrade_evidence="$("$install_dir/dw-release-check" upgrade --dry-run --output=json)"
-          if [ "$(jq -r '.target_version' <<< "$upgrade_evidence")" != "$channel_version" ]; then
-            echo "::error::dw upgrade did not resolve supported channel ${channel_version}: ${upgrade_evidence}"
-            exit 1
-          fi
+          upgrade_dry_run_evidence="$("$install_dir/dw-release-check" upgrade --dry-run --output=json)"
+          printf '%s\n' "$upgrade_dry_run_evidence" | node scripts/ci/verify-cli-upgrade-result.js \
+            --mode dry-run --release-version "$tag" --channel-version "$channel_version"
+
+          upgrade_apply_evidence="$("$install_dir/dw-release-check" upgrade --output=json)"
+          printf '%s\n' "$upgrade_apply_evidence" | node scripts/ci/verify-cli-upgrade-result.js \
+            --mode apply --release-version "$tag" --channel-version "$channel_version"
 
       - name: Verify live docs release audit after public downloads
         env:

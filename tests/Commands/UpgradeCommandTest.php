@@ -127,6 +127,7 @@ class UpgradeCommandTest extends TestCase
         self::assertSame(Command::SUCCESS, $exit);
         $decoded = $this->decode($tester->getDisplay());
         self::assertSame('dry-run', $decoded['status']);
+        self::assertSame('upgrade', $decoded['direction']);
         self::assertSame('2.0.0-rc.31', $decoded['target_version']);
         self::assertStringContainsString('2.0.0-rc.31/dw-linux-x86_64', $decoded['asset_url']);
         self::assertStringContainsString('2.0.0-rc.31/SHA256SUMS', $decoded['checksum_url']);
@@ -157,6 +158,102 @@ class UpgradeCommandTest extends TestCase
         self::assertStringContainsString('2.0.0/dw-linux-x86_64', $decoded['asset_url']);
     }
 
+    public function test_default_dry_run_reports_that_current_release_is_newer_than_supported_channel(): void
+    {
+        putenv('DW_CLI_VERSION=2.0.0-rc.33');
+        $command = $this->command(
+            catalog: $this->catalog(['latest-tag' => '2.0.0-rc.12']),
+            detector: fn () => new InstallationTarget(
+                kind: InstallationTarget::KIND_BINARY,
+                path: '/home/user/.local/bin/dw',
+                upgradeable: true,
+                assetName: 'dw-linux-x86_64',
+            ),
+            replacer: $this->rejectingReplacer(),
+        );
+
+        $tester = new CommandTester($command);
+        $exit = $tester->execute([
+            '--dry-run' => true,
+            '--output' => 'json',
+        ]);
+
+        self::assertSame(Command::SUCCESS, $exit);
+        $decoded = $this->decode($tester->getDisplay());
+        self::assertSame('newer', $decoded['status']);
+        self::assertSame('2.0.0-rc.33', $decoded['current_version']);
+        self::assertSame('2.0.0-rc.12', $decoded['target_version']);
+        self::assertStringContainsString('newer than the supported release', $decoded['reason']);
+        self::assertArrayNotHasKey('asset_url', $decoded);
+    }
+
+    public function test_default_upgrade_does_not_replace_newer_current_release(): void
+    {
+        putenv('DW_CLI_VERSION=2.0.0-rc.33');
+        $command = $this->command(
+            catalog: $this->catalog(['latest-tag' => '2.0.0-rc.12']),
+            detector: fn () => new InstallationTarget(
+                kind: InstallationTarget::KIND_BINARY,
+                path: '/home/user/.local/bin/dw',
+                upgradeable: true,
+                assetName: 'dw-linux-x86_64',
+            ),
+            replacer: $this->rejectingReplacer(),
+        );
+
+        $tester = new CommandTester($command);
+        $exit = $tester->execute(['--output' => 'json']);
+
+        self::assertSame(Command::SUCCESS, $exit);
+        self::assertSame('newer', $this->decode($tester->getDisplay())['status']);
+    }
+
+    public function test_force_does_not_allow_an_unpinned_supported_channel_downgrade(): void
+    {
+        putenv('DW_CLI_VERSION=2.0.0-rc.33');
+        $command = $this->command(
+            catalog: $this->catalog(['latest-tag' => '2.0.0-rc.12']),
+            detector: fn () => new InstallationTarget(
+                kind: InstallationTarget::KIND_BINARY,
+                path: '/home/user/.local/bin/dw',
+                upgradeable: true,
+                assetName: 'dw-linux-x86_64',
+            ),
+            replacer: $this->rejectingReplacer(),
+        );
+
+        $tester = new CommandTester($command);
+        $exit = $tester->execute([
+            '--force' => true,
+            '--output' => 'json',
+        ]);
+
+        self::assertSame(Command::SUCCESS, $exit);
+        self::assertSame('newer', $this->decode($tester->getDisplay())['status']);
+    }
+
+    public function test_human_dry_run_does_not_advertise_downgrade_as_upgrade(): void
+    {
+        putenv('DW_CLI_VERSION=2.0.0-rc.33');
+        $command = $this->command(
+            catalog: $this->catalog(['latest-tag' => '2.0.0-rc.12']),
+            detector: fn () => new InstallationTarget(
+                kind: InstallationTarget::KIND_BINARY,
+                path: '/home/user/.local/bin/dw',
+                upgradeable: true,
+                assetName: 'dw-linux-x86_64',
+            ),
+            replacer: $this->rejectingReplacer(),
+        );
+
+        $tester = new CommandTester($command);
+        $exit = $tester->execute(['--dry-run' => true]);
+
+        self::assertSame(Command::SUCCESS, $exit);
+        self::assertStringContainsString('2.0.0-rc.33 is newer than the supported release 2.0.0-rc.12', $tester->getDisplay());
+        self::assertStringNotContainsString('Would upgrade', $tester->getDisplay());
+    }
+
     public function test_pinned_version_is_used(): void
     {
         $command = $this->command(
@@ -180,6 +277,67 @@ class UpgradeCommandTest extends TestCase
         self::assertSame(Command::SUCCESS, $exit);
         $decoded = $this->decode($tester->getDisplay());
         self::assertSame('0.1.3', $decoded['target_version']);
+        self::assertSame('downgrade', $decoded['direction']);
+    }
+
+    public function test_pinned_downgrade_is_explicitly_reported_and_replaces_binary(): void
+    {
+        $binary = 'pinned-older-binary';
+        $hash = hash('sha256', $binary);
+        $replaced = [];
+        $command = $this->command(
+            catalog: $this->catalog([
+                'sums' => "{$hash}  dw-linux-x86_64\n",
+                'asset' => $binary,
+            ]),
+            detector: fn () => new InstallationTarget(
+                kind: InstallationTarget::KIND_BINARY,
+                path: '/home/user/.local/bin/dw',
+                upgradeable: true,
+                assetName: 'dw-linux-x86_64',
+            ),
+            replacer: function (string $path, string $bytes, int $mode) use (&$replaced): void {
+                $replaced[] = compact('path', 'bytes', 'mode');
+            },
+        );
+
+        $tester = new CommandTester($command);
+        $exit = $tester->execute([
+            '--tag' => '0.1.3',
+            '--output' => 'json',
+        ]);
+
+        self::assertSame(Command::SUCCESS, $exit);
+        $decoded = $this->decode($tester->getDisplay());
+        self::assertSame('downgraded', $decoded['status']);
+        self::assertSame('downgrade', $decoded['direction']);
+        self::assertSame('0.1.3', $decoded['target_version']);
+        self::assertCount(1, $replaced);
+        self::assertSame($binary, $replaced[0]['bytes']);
+    }
+
+    public function test_human_pinned_dry_run_calls_the_operation_a_downgrade(): void
+    {
+        $command = $this->command(
+            catalog: $this->catalog(),
+            detector: fn () => new InstallationTarget(
+                kind: InstallationTarget::KIND_BINARY,
+                path: '/home/user/.local/bin/dw',
+                upgradeable: true,
+                assetName: 'dw-linux-x86_64',
+            ),
+            replacer: $this->rejectingReplacer(),
+        );
+
+        $tester = new CommandTester($command);
+        $exit = $tester->execute([
+            '--tag' => '0.1.3',
+            '--dry-run' => true,
+        ]);
+
+        self::assertSame(Command::SUCCESS, $exit);
+        self::assertStringContainsString('Would downgrade 0.1.5 -> 0.1.3', $tester->getDisplay());
+        self::assertStringNotContainsString('Would upgrade', $tester->getDisplay());
     }
 
     public function test_full_upgrade_downloads_and_replaces_when_checksum_matches(): void

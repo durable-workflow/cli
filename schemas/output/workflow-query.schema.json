@@ -13,7 +13,7 @@
     "result_envelope": {
       "type": ["object", "null"],
       "properties": {
-        "codec": { "type": "string" },
+        "codec": { "type": "string", "const": "avro" },
         "blob": { "type": "string" }
       },
       "required": ["codec", "blob"],

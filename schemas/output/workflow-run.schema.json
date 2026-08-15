@@ -18,7 +18,7 @@
     "is_terminal": { "type": ["boolean", "null"] },
     "task_queue": { "type": ["string", "null"] },
     "compatibility": { "type": ["string", "null"] },
-    "payload_codec": { "type": ["string", "null"] },
+    "payload_codec": { "type": "string", "const": "avro" },
     "execution_timeout_seconds": { "type": ["integer", "null"] },
     "run_timeout_seconds": { "type": ["integer", "null"] },
     "execution_deadline_at": { "type": ["string", "null"] },
@@ -127,6 +127,9 @@
         "additionalProperties": true
       }
     }
+  },
+  "dependentRequired": {
+    "input": ["payload_codec"]
   },
   "additionalProperties": true
 }

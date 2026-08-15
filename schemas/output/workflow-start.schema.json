@@ -14,12 +14,15 @@
     "workflow_id": { "type": "string" },
     "run_id": { "type": ["string", "null"] },
     "business_key": { "type": ["string", "null"] },
-    "payload_codec": { "type": ["string", "null"] },
+    "payload_codec": { "type": "string", "const": "avro" },
     "outcome": { "type": ["string", "null"] },
     "status": { "type": ["string", "null"] },
     "status_bucket": { "type": ["string", "null"] },
     "is_terminal": { "type": ["boolean", "null"] },
     "output": true
+  },
+  "dependentRequired": {
+    "input": ["payload_codec"]
   },
   "additionalProperties": true
 }

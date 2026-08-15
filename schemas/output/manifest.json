@@ -466,7 +466,7 @@
       "schema": "schemas/output/workflow-run.schema.json",
       "schema_id": "https://durable-workflow.github.io/cli-json-envelopes/v3/schemas/workflow-run.schema.json",
       "resolver_url": "https://durable-workflow.github.io/cli-json-envelopes/v3/schemas/workflow-run.schema.json",
-      "sha256": "sha256:0103ea68b95dcba592c02c84499e48bf683b0dcbd8def7342a3a5ee1ef0af391"
+      "sha256": "sha256:24855f50997edf40bd123339abdb450a6849d38cb8418bbcd66f81e5172781b7"
     },
     "workflow:history": {
       "output": "--json",
@@ -515,7 +515,7 @@
       "schema": "schemas/output/workflow-query.schema.json",
       "schema_id": "https://durable-workflow.github.io/cli-json-envelopes/v3/schemas/workflow-query.schema.json",
       "resolver_url": "https://durable-workflow.github.io/cli-json-envelopes/v3/schemas/workflow-query.schema.json",
-      "sha256": "sha256:6eb0f804ea03956fa688b74a956db83924c3bcdf4312fe0a3cc788a449690757"
+      "sha256": "sha256:172b88e7d36a713b42b8fe7b7944d535cabadc843d85cee78b034bdc7c397423"
     },
     "workflow:repair": {
       "output": "--json",
@@ -529,7 +529,7 @@
       "schema": "schemas/output/workflow-run.schema.json",
       "schema_id": "https://durable-workflow.github.io/cli-json-envelopes/v3/schemas/workflow-run.schema.json",
       "resolver_url": "https://durable-workflow.github.io/cli-json-envelopes/v3/schemas/workflow-run.schema.json",
-      "sha256": "sha256:0103ea68b95dcba592c02c84499e48bf683b0dcbd8def7342a3a5ee1ef0af391"
+      "sha256": "sha256:24855f50997edf40bd123339abdb450a6849d38cb8418bbcd66f81e5172781b7"
     },
     "workflow:signal": {
       "output": "--json",
@@ -543,7 +543,7 @@
       "schema": "schemas/output/workflow-start.schema.json",
       "schema_id": "https://durable-workflow.github.io/cli-json-envelopes/v3/schemas/workflow-start.schema.json",
       "resolver_url": "https://durable-workflow.github.io/cli-json-envelopes/v3/schemas/workflow-start.schema.json",
-      "sha256": "sha256:a5cf0a2b4b10b0c6a513a44dd2239d7682021f78347a58d090ddc3064bc11b91"
+      "sha256": "sha256:d5be971373f4e9477dcb4c5fb2c8405c5222ffc60066c317569c41e8be4875b0"
     },
     "workflow:terminate": {
       "output": "--json",
@@ -557,7 +557,7 @@
       "schema": "schemas/output/workflow-update.schema.json",
       "schema_id": "https://durable-workflow.github.io/cli-json-envelopes/v3/schemas/workflow-update.schema.json",
       "resolver_url": "https://durable-workflow.github.io/cli-json-envelopes/v3/schemas/workflow-update.schema.json",
-      "sha256": "sha256:854055865e25589407d5d2068904fd840f522250a9b13b7182b592be138720b1"
+      "sha256": "sha256:a3997a4b623d84b166ea3a124b0a33e5c400acc51694332186813b96aa389eb1"
     }
   },
   "jsonl_commands": {

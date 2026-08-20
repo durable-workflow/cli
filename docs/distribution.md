@@ -28,6 +28,15 @@ resolves the passing public artifact compatibility authority. Before stable
 promotion it names the supported prerelease without relying on GitHub's stable
 Latest channel.
 
+On Unix, installation is ready only when an ordinary `dw` invocation resolves
+to the installed path. The installer reports the installed and active paths
+and versions, and exits unsuccessfully with bounded current-shell and profile
+remediation when an earlier `PATH` entry shadows the new binary. If the
+invoking shell could still cache the path that was active before installation,
+the result requires a targeted `dw` cache refresh in that shell. Set
+`DURABLE_WORKFLOW_INSTALL_OUTPUT=json` to emit the final result as
+`durable-workflow.cli.install.v1` for release qualification.
+
 The default installer follows the qualified supported release. To require that
 the authority still names a prerelease, set `VERSION` to `prerelease`:
 
@@ -310,6 +319,8 @@ Before promoting `dw` into a production runbook:
 
 ## Change history
 
+- 2.0.0-rc.35 — Made Unix installs qualify the active `dw` path and version,
+  including bounded remediation for path shadowing and stale shell caches.
 - 2.0.0-rc.14 — Preserved stable workflow-update identifiers across shared
   control-plane response normalization.
 - 2.0.0-rc.13 — Preserved namespace-scoped managed runtime paths for discovery

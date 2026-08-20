@@ -112,7 +112,7 @@ SH;
             $qualifiedAuthorityUrl = 'https://releases.invalid/qualified-authority.json';
             $releaseBaseUrl = 'https://releases.invalid/releases';
             $environment = [
-                'PATH' => $mockBin.PATH_SEPARATOR.(getenv('PATH') ?: ''),
+                'PATH' => $installDir.PATH_SEPARATOR.$mockBin.PATH_SEPARATOR.(getenv('PATH') ?: ''),
                 'DURABLE_WORKFLOW_INSTALL_DIR' => $installDir,
                 'DURABLE_WORKFLOW_QUALIFIED_AUTHORITY_URL' => $qualifiedAuthorityUrl,
                 'DURABLE_WORKFLOW_RELEASE_BASE_URL' => $releaseBaseUrl,
@@ -747,6 +747,7 @@ SH);
         self::assertStringContainsString('SHA256SUMS', $shellInstaller);
         self::assertStringContainsString('checksum verification failed', $shellInstaller);
         self::assertStringContainsString('DURABLE_WORKFLOW_INSTALL_VERIFY_ATTESTATIONS', $shellInstaller);
+        self::assertStringContainsString('DURABLE_WORKFLOW_INSTALL_OUTPUT', $shellInstaller);
         self::assertStringContainsString('release_version="${VERSION#v}"', $shellInstaller);
         self::assertStringContainsString('DURABLE_WORKFLOW_QUALIFIED_AUTHORITY_URL', $shellInstaller);
         self::assertStringContainsString('public-artifact-compatibility-evidence', $shellInstaller);
@@ -754,6 +755,12 @@ SH);
         self::assertStringContainsString('gh attestation verify "$tmp" --repo "$REPO"', $shellInstaller);
         self::assertStringContainsString('gh attestation verify "$sums" --repo "$REPO"', $shellInstaller);
         self::assertStringContainsString('mv "$tmp" "$INSTALL_DIR/$BIN_NAME"', $shellInstaller);
+
+        $releaseWorkflow = self::readRepoFile('.github/workflows/release.yml');
+        self::assertStringContainsString('export PATH="$install_dir:$default_install_dir:$PATH"', $releaseWorkflow);
+        self::assertStringContainsString('DURABLE_WORKFLOW_INSTALL_OUTPUT=json', $releaseWorkflow);
+        self::assertStringContainsString('command -v dw-release-check', $releaseWorkflow);
+        self::assertStringContainsString('dw-release-check --version', $releaseWorkflow);
 
         self::assertStringContainsString('SHA256SUMS', $powershellInstaller);
         self::assertStringContainsString('Checksum verification failed', $powershellInstaller);

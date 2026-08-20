@@ -100,6 +100,14 @@ test('upgrade channel verification uses the executable installed from the public
   const verification = workflow.slice(verificationStart, verificationEnd);
   assert.match(
     verification,
+    /export PATH="\$install_dir:\$default_install_dir:\$PATH"/,
+  );
+  assert.match(
+    verification,
+    /DURABLE_WORKFLOW_INSTALL_DIR="\$default_install_dir" \\\n+\s+DURABLE_WORKFLOW_RELEASE_BASE_URL=.* \\\n+\s+DURABLE_WORKFLOW_BIN_NAME=dw-channel-check sh scripts\/install\.sh/,
+  );
+  assert.match(
+    verification,
     /upgrade_dry_run_evidence="\$\("\$install_dir\/dw-release-check" upgrade --dry-run --output=json\)"/,
   );
   assert.match(

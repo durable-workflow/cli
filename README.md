@@ -51,6 +51,21 @@ Set `DURABLE_WORKFLOW_INSTALL_VERIFY_ATTESTATIONS=1` when the GitHub CLI is
 installed to make the installer also verify artifact attestations for the
 downloaded binary and `SHA256SUMS` before installation.
 
+After installing, the Unix installer reports both the installed binary and
+the `dw` path selected by the current `PATH`, together with both versions. A
+shadowed install exits unsuccessfully and prints the exact current-shell and
+profile changes needed to put the user-owned binary first. When the invoking
+shell could still have the pre-install command path cached, the installer
+instead requires a targeted current-shell cache refresh before reporting the
+install as ready.
+
+Set `DURABLE_WORKFLOW_INSTALL_OUTPUT=json` for the same result as a stable
+machine-readable qualification record.
+
+Standalone installs update only when explicitly requested with `dw upgrade`;
+the CLI does not update in the background. `dw update` and `dw self-update`
+are not update aliases and receive the normal unknown-command diagnostic.
+
 Or download a native binary directly from the [releases
 page](https://github.com/durable-workflow/cli/releases). Use the prerelease
 channel for onboarding, or select an exact tag when recording a reproducible

@@ -75,6 +75,22 @@ class ApplicationSmokeTest extends TestCase
         );
     }
 
+    public function test_guessed_upgrade_commands_fail_with_actionable_diagnostics(): void
+    {
+        foreach (['update', 'self-update'] as $guessedCommand) {
+            $application = new Application();
+            $application->setAutoExit(false);
+            $application->setCatchExceptions(true);
+            $tester = new ApplicationTester($application);
+
+            self::assertNotSame(0, $tester->run([
+                'command' => $guessedCommand,
+            ]));
+            self::assertStringContainsString('not defined', $tester->getDisplay());
+            self::assertStringContainsString('dw upgrade', $tester->getDisplay());
+        }
+    }
+
     public function test_plural_grouped_workflow_list_command_maps_to_visibility_list_command(): void
     {
         $application = new Application();

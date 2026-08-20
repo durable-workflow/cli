@@ -1752,10 +1752,13 @@ jobs:
           trap 'rm -rf "$installer" "$install_dir" "$default_install_dir" "$channel_evidence"' EXIT
           curl -fsSL --retry 3 --retry-all-errors --connect-timeout 10 \
             -o "$installer" "$(public_asset_url install.sh)"
+          export PATH="$install_dir:$default_install_dir:$PATH"
           VERSION="$tag" DURABLE_WORKFLOW_INSTALL_DIR="$install_dir" \
+            DURABLE_WORKFLOW_INSTALL_OUTPUT=json \
             DURABLE_WORKFLOW_RELEASE_BASE_URL="https://github.com/${release_repo}/releases" \
             DURABLE_WORKFLOW_BIN_NAME=dw-release-check sh "$installer"
-          "$install_dir/dw-release-check" --version
+          command -v dw-release-check
+          dw-release-check --version
 
           node scripts/ci/verify-cli-release-channel.js --release-tag "$tag" \
             | tee "$channel_evidence"

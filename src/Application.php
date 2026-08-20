@@ -26,6 +26,7 @@ use DurableWorkflow\Cli\Commands\WorkerCommand;
 use DurableWorkflow\Cli\Commands\WorkflowCommand;
 use DurableWorkflow\Cli\Commands\WorkflowTaskCommand;
 use DurableWorkflow\Cli\Support\CompatibilityDiagnostics;
+use DurableWorkflow\Cli\Support\ExitCode;
 use DurableWorkflow\Cli\Support\ProfileResolver;
 use DurableWorkflow\Cli\Support\ProfileStore;
 use DurableWorkflow\Cli\Support\ResolvedConnection;
@@ -251,6 +252,15 @@ class Application extends ConsoleApplication
             $this->emitVersionCompatibilityWarning($input, $output);
 
             return 0;
+        }
+
+        $commandName = $input->getFirstArgument();
+        if (in_array($commandName, ['update', 'self-update'], true)) {
+            $diagnosticOutput = $output instanceof ConsoleOutputInterface ? $output->getErrorOutput() : $output;
+            $diagnosticOutput->writeln(sprintf('<error>Command "%s" is not defined.</error>', $commandName));
+            $diagnosticOutput->writeln('Use <info>dw upgrade</info> to explicitly update a standalone installation.');
+
+            return ExitCode::INVALID;
         }
 
         return parent::doRun($input, $output);

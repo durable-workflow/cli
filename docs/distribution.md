@@ -191,22 +191,81 @@ as the rest of the binary.
 
 ## Auto-update
 
-`dw upgrade` performs an explicit, user-invoked self-update. By default it
-resolves the project's explicit supported CLI channel, downloads that exact
-release asset for the current platform, and verifies its SHA256
-against the release manifest, and atomically replaces the running
-binary. Behavior:
+`dw upgrade` performs an explicit, user-invoked self-update for standalone
+release binaries. Without a tag, it resolves the project's supported CLI
+channel and compares that release with the running binary before downloading
+anything:
 
-- Defaults: `dw upgrade` upgrades to the supported channel version, refuses to
-  proceed if checksum verification fails, and refuses to overwrite
-  Composer-managed PHAR installs and Homebrew-managed binaries because
-  the package manager owns those install paths. Composer package metadata
-  is not a supported public CLI distribution channel for the 2.0 line;
-  use the exact-version installer or direct release assets for public,
-  source-free automation.
-- Flags: `--version=<tag>` for a specific release, `--dry-run` to print
-  the action without performing it, `--force` to override stale-binary
-  guards, and `--output=json` for scripted use.
+| Installed version compared with the supported release | Result |
+|--------------------------------------------------------|--------|
+| Older | Downloads the supported release, verifies its SHA256, and atomically replaces the running binary. |
+| Equal | Makes no change and reports `status=noop`. With `--force`, re-downloads and reinstalls the same release. |
+| Newer | Makes no change and reports `status=newer`, including when `--force` is present. |
+
+Use `--tag=<release>` to select an exact release instead of the supported
+channel. This is also the required path for an intentional downgrade. The
+other options are:
+
+- `--dry-run` resolves and reports the action without downloading or replacing
+  the binary.
+- `--force` re-downloads when the installed and selected versions are equal.
+  It does not allow an unpinned supported-channel lookup to downgrade a newer
+  installation.
+- `--output=json` emits the result for automation.
+
+The following independent examples show how the human-readable output
+distinguishes each channel decision, while an explicit tag labels a planned
+downgrade. The angle-bracketed release names stand for the versions resolved
+in each invocation:
+
+```console
+$ dw upgrade
+Upgraded dw to <supported-release>
+  path: /home/user/.local/bin/dw
+
+$ dw upgrade
+dw is already at <supported-release>
+
+$ dw upgrade --force
+Upgraded dw to <supported-release>
+  path: /home/user/.local/bin/dw
+
+$ dw upgrade
+dw <newer-release> is newer than the supported release <supported-release>; no change was made
+
+$ dw upgrade --tag="$OLDER_RELEASE" --dry-run
+Would downgrade <newer-release> -> <older-release>
+  asset:    https://github.com/durable-workflow/cli/releases/download/<older-release>/dw-linux-x86_64
+  checksum: https://github.com/durable-workflow/cli/releases/download/<older-release>/SHA256SUMS
+```
+
+JSON output uses the same decisions as stable status and direction values.
+These examples select the decision fields from the complete payload, which
+also contains the detected installation:
+
+```console
+$ dw upgrade --output=json | jq -c '{status,current_version,target_version,direction}'
+{"status":"upgraded","current_version":"<older-release>","target_version":"<supported-release>","direction":"upgrade"}
+
+$ dw upgrade --output=json | jq -c '{status,current_version,target_version}'
+{"status":"noop","current_version":"<supported-release>","target_version":"<supported-release>"}
+
+$ dw upgrade --force --output=json | jq -c '{status,current_version,target_version,direction}'
+{"status":"upgraded","current_version":"<supported-release>","target_version":"<supported-release>","direction":"reinstall"}
+
+$ dw upgrade --force --output=json | jq -c '{status,current_version,target_version}'
+{"status":"newer","current_version":"<newer-release>","target_version":"<supported-release>"}
+
+$ dw upgrade --tag="$OLDER_RELEASE" --dry-run --output=json | jq -c '{status,current_version,target_version,direction}'
+{"status":"dry-run","current_version":"<newer-release>","target_version":"<older-release>","direction":"downgrade"}
+```
+
+The command refuses to overwrite Composer-managed PHAR installs and
+Homebrew-managed binaries because the package manager owns those install
+paths. Composer package metadata is not a supported public CLI distribution
+channel for the 2.0 line; use the exact-version installer or direct release
+assets for public, source-free automation. Checksum verification remains
+mandatory for every download.
 
 There is no background update poll. The CLI never upgrades itself
 without an explicit `dw upgrade` invocation.
@@ -321,6 +380,8 @@ Before promoting `dw` into a production runbook:
 
 - 2.0.0-rc.35 — Made Unix installs qualify the active `dw` path and version,
   including bounded remediation for path shadowing and stale shell caches.
+- 2.0.0-rc.34 — Prevented the supported channel from implicitly downgrading a
+  newer standalone binary; intentional downgrades require `--tag=<release>`.
 - 2.0.0-rc.14 — Preserved stable workflow-update identifiers across shared
   control-plane response normalization.
 - 2.0.0-rc.13 — Preserved namespace-scoped managed runtime paths for discovery

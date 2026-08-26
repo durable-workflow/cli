@@ -166,13 +166,18 @@ rationale and the conditions under which that decision would be revisited.
 
 `dw` does not auto-update itself; the explicit `dw upgrade` command is the
 only update path for standalone binary installs, and it never runs
-unsolicited. The standalone installer and direct GitHub release assets are the
-public release channels for CI and conformance jobs that only need the `dw`
-binary. Composer package metadata is not a supported public CLI distribution
-channel for the 2.0 line. The CLI also does not collect telemetry — there is
-no background network traffic beyond commands that explicitly contact the
-configured Durable Workflow server. Telemetry is permanently out of scope for
-the 2.0 line.
+unsolicited. By default, the command upgrades an older binary to the supported
+channel, leaves an equal or newer binary unchanged, and will not downgrade a
+newer binary even with `--force`. Use `--force` to reinstall an equal version;
+an intentional downgrade requires an explicit `--tag=<release>`. See
+[`docs/distribution.md`](docs/distribution.md#auto-update) for the complete
+status and JSON contract. The standalone installer and direct GitHub release
+assets are the public release channels for CI and conformance jobs that only
+need the `dw` binary. Composer package metadata is not a supported public CLI
+distribution channel for the 2.0 line. The CLI also does not collect telemetry
+— there is no background network traffic beyond commands that explicitly
+contact the configured Durable Workflow server. Telemetry is permanently out
+of scope for the 2.0 line.
 
 The PHAR is a reproducible build: given the same tag and the
 `SOURCE_DATE_EPOCH` recorded by the release workflow, locally rebuilding from

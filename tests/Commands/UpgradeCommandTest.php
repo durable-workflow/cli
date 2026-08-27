@@ -133,6 +133,117 @@ class UpgradeCommandTest extends TestCase
         self::assertStringContainsString('2.0.0-rc.31/SHA256SUMS', $decoded['checksum_url']);
     }
 
+    /**
+     * Machine-owned mirror of the outbound upgrade sequence documented for
+     * egress review in docs/distribution.md.
+     */
+    public function test_unpinned_upgrade_request_sequence_matches_the_network_contract(): void
+    {
+        $binary = 'qualified-release-binary';
+        $hash = hash('sha256', $binary);
+        $requests = [];
+        $http = new MockHttpClient(
+            static function (string $method, string $url) use (&$requests, $binary, $hash): MockResponse {
+                $requests[] = [$method, $url];
+
+                return match ($url) {
+                    'https://durable-workflow.com/public-artifact-compatibility-evidence.json' => new MockResponse(json_encode([
+                        'schema' => 'durable-workflow.docs.public-artifact-compatibility-evidence',
+                        'schema_version' => 2,
+                        'outcome' => 'pass',
+                        'qualified_artifact_versions' => ['cli' => '0.1.9'],
+                    ], JSON_THROW_ON_ERROR), [
+                        'http_code' => 200,
+                        'response_headers' => ['Content-Type: application/json'],
+                    ]),
+                    'https://github.com/durable-workflow/cli/releases/download/0.1.9/SHA256SUMS' => new MockResponse(
+                        "{$hash}  dw-linux-x86_64\n",
+                        ['http_code' => 200],
+                    ),
+                    'https://github.com/durable-workflow/cli/releases/download/0.1.9/dw-linux-x86_64' => new MockResponse(
+                        $binary,
+                        ['http_code' => 200],
+                    ),
+                    default => throw new \AssertionError('unexpected upgrade request: '.$method.' '.$url),
+                };
+            },
+        );
+        $command = $this->command(
+            catalog: new ReleaseCatalog($http),
+            detector: fn () => new InstallationTarget(
+                kind: InstallationTarget::KIND_BINARY,
+                path: '/home/user/.local/bin/dw',
+                upgradeable: true,
+                assetName: 'dw-linux-x86_64',
+            ),
+            replacer: fn () => null,
+        );
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute(['--output' => 'json']));
+        self::assertSame('upgraded', $this->decode($tester->getDisplay())['status']);
+        self::assertSame([
+            ['GET', 'https://durable-workflow.com/public-artifact-compatibility-evidence.json'],
+            ['GET', 'https://github.com/durable-workflow/cli/releases/download/0.1.9/SHA256SUMS'],
+            ['GET', 'https://github.com/durable-workflow/cli/releases/download/0.1.9/dw-linux-x86_64'],
+        ], $requests);
+    }
+
+    public function test_unpinned_dry_run_requests_only_the_release_authority(): void
+    {
+        $requests = [];
+        $http = new MockHttpClient(
+            static function (string $method, string $url) use (&$requests): MockResponse {
+                $requests[] = [$method, $url];
+
+                if ($url !== 'https://durable-workflow.com/public-artifact-compatibility-evidence.json') {
+                    throw new \AssertionError('unexpected dry-run request: '.$method.' '.$url);
+                }
+
+                return new MockResponse(json_encode([
+                    'schema' => 'durable-workflow.docs.public-artifact-compatibility-evidence',
+                    'schema_version' => 2,
+                    'outcome' => 'pass',
+                    'qualified_artifact_versions' => ['cli' => '0.1.9'],
+                ], JSON_THROW_ON_ERROR), [
+                    'http_code' => 200,
+                    'response_headers' => ['Content-Type: application/json'],
+                ]);
+            },
+        );
+        $command = $this->command(
+            catalog: new ReleaseCatalog($http),
+            detector: fn () => new InstallationTarget(
+                kind: InstallationTarget::KIND_BINARY,
+                path: '/home/user/.local/bin/dw',
+                upgradeable: true,
+                assetName: 'dw-linux-x86_64',
+            ),
+            replacer: $this->rejectingReplacer(),
+        );
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            '--dry-run' => true,
+            '--output' => 'json',
+        ]));
+        $decoded = $this->decode($tester->getDisplay());
+        self::assertSame('dry-run', $decoded['status']);
+        self::assertSame(
+            'https://github.com/durable-workflow/cli/releases/download/0.1.9/SHA256SUMS',
+            $decoded['checksum_url'],
+        );
+        self::assertSame(
+            'https://github.com/durable-workflow/cli/releases/download/0.1.9/dw-linux-x86_64',
+            $decoded['asset_url'],
+        );
+        self::assertSame([
+            ['GET', 'https://durable-workflow.com/public-artifact-compatibility-evidence.json'],
+        ], $requests);
+    }
+
     public function test_dry_run_accepts_qualified_stable_transition(): void
     {
         $command = $this->command(

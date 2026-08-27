@@ -160,11 +160,25 @@ of an explicit command:
 
 - HTTP requests to the `--server` URL (`DURABLE_WORKFLOW_SERVER_URL`,
   the resolved profile, or built-in defaults) for user-issued commands.
-- HTTPS requests to GitHub's release API on `dw upgrade`, only when the
-  user runs that command.
+- The HTTPS requests in the `dw upgrade` sequence below, only when the user
+  runs that command.
 - HTTP/HTTPS requests issued by `dw bridge:webhook` and the external
   executor surfaces, only when the user invokes those commands and only
   to the targets the user supplies.
+
+For an ordinary unpinned `dw upgrade`, requests occur in this order:
+
+| Endpoint family | Purpose | When requested |
+|-----------------|---------|----------------|
+| `GET https://durable-workflow.com/public-artifact-compatibility-evidence.json` | Resolve the qualified, supported CLI release from the public compatibility authority. | Always, including `--dry-run` and outcomes where the installed version is equal to or newer than the supported release. An explicit `--tag` skips this lookup. |
+| `GET https://github.com/durable-workflow/cli/releases/download/<release>/SHA256SUMS` | Retrieve the checksum manifest for the selected release. | Only when the command will install; skipped by `--dry-run`, `status=noop`, and `status=newer`. |
+| `GET https://github.com/durable-workflow/cli/releases/download/<release>/<platform-asset>` | Download the selected standalone binary after obtaining its expected checksum. | Only when the command will install; skipped by `--dry-run`, `status=noop`, and `status=newer`. |
+
+The last two requests are GitHub release downloads, not GitHub release API
+requests. The client follows HTTPS redirects returned by GitHub for those
+assets, so an egress allowlist must also permit GitHub's release-asset delivery
+destination. A dry run performs the authority lookup and reports the two
+release URLs it would use, but does not request either download.
 
 There is no:
 

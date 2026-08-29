@@ -16,6 +16,24 @@ class RegisterCommand extends BaseCommand
 {
     private const DEFAULT_DIAGNOSTIC_RUNTIME = 'external';
 
+    private const DIAGNOSTIC_CAPABILITY_MANIFEST = [
+        'local_activities' => [
+            'supported' => false,
+            'minimum_protocol_version' => '1.18',
+            'reason' => 'external_diagnostic_worker_does_not_execute_record_local_activity',
+        ],
+        'worker_sessions' => [
+            'supported' => false,
+            'minimum_protocol_version' => '1.18',
+            'reason' => 'external_diagnostic_worker_has_no_session_lifecycle',
+        ],
+        'sticky_execution' => [
+            'supported' => false,
+            'minimum_protocol_version' => '1.18',
+            'reason' => 'external_diagnostic_worker_uses_complete_durable_history_replay',
+        ],
+    ];
+
     protected function configure(): void
     {
         parent::configure();
@@ -66,6 +84,7 @@ HELP)
             'runtime' => $this->runtimeOption($input),
             'sdk_version' => $input->getOption('sdk-version'),
             'build_id' => $input->getOption('build-id'),
+            'capability_manifest' => self::DIAGNOSTIC_CAPABILITY_MANIFEST,
             'supported_workflow_types' => $this->stringList($input->getOption('workflow-type')),
             'supported_activity_types' => $this->stringList($input->getOption('activity-type')),
             'max_concurrent_workflow_tasks' => $this->positiveIntOption($input, 'max-workflow-tasks'),

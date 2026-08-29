@@ -49,6 +49,23 @@ class WorkerCommandTest extends TestCase
         self::assertSame(['email.send'], $client->lastPostBody['supported_activity_types']);
         self::assertSame(5, $client->lastPostBody['max_concurrent_workflow_tasks']);
         self::assertSame(7, $client->lastPostBody['max_concurrent_activity_tasks']);
+        self::assertSame([
+            'local_activities' => [
+                'supported' => false,
+                'minimum_protocol_version' => '1.18',
+                'reason' => 'external_diagnostic_worker_does_not_execute_record_local_activity',
+            ],
+            'worker_sessions' => [
+                'supported' => false,
+                'minimum_protocol_version' => '1.18',
+                'reason' => 'external_diagnostic_worker_has_no_session_lifecycle',
+            ],
+            'sticky_execution' => [
+                'supported' => false,
+                'minimum_protocol_version' => '1.18',
+                'reason' => 'external_diagnostic_worker_uses_complete_durable_history_replay',
+            ],
+        ], $client->lastPostBody['capability_manifest']);
         self::assertStringContainsString('worker-a', $tester->getDisplay());
         self::assertStringContainsString('build-42', $tester->getDisplay());
     }

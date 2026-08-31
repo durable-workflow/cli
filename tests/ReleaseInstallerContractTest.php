@@ -212,10 +212,9 @@ SH;
         self::assertStringContainsString('make_latest: ${{ needs.resolve-release.outputs.make_latest }}', $releaseWorkflow);
         self::assertStringContainsString('Reconcile metadata without replacing the tag or assets', $releaseWorkflow);
         self::assertStringContainsString('scripts/ci/reconcile-release-metadata.sh "$RELEASE_TAG"', $releaseWorkflow);
-        self::assertStringContainsString('stable_authorization:', $releaseWorkflow);
         self::assertStringContainsString('Stable 2.0.0 publication requires a protected main-branch dispatch', $releaseWorkflow);
-        self::assertStringContainsString('repository: durable-workflow/.github', $releaseWorkflow);
-        self::assertStringContainsString('verify-stable-release-authorization.js', $releaseWorkflow);
+        self::assertStringNotContainsString('stable_authorization', $releaseWorkflow);
+        self::assertStringNotContainsString('verify-stable-release-authorization.js', $releaseWorkflow);
         self::assertStringContainsString('ref: ${{ needs.resolve-release.outputs.commit }}', $releaseWorkflow);
         self::assertStringContainsString('DW_CLI_VERSION: ${{ needs.resolve-release.outputs.tag }}', $releaseWorkflow);
         self::assertStringContainsString('DW_CLI_COMMIT="$(git rev-parse HEAD)"', $releaseWorkflow);
@@ -513,7 +512,7 @@ SH;
         self::assertStringContainsString('sh -n scripts/ci/check-docs-release-audit.sh', $buildWorkflow);
         self::assertStringContainsString('node --check scripts/ci/release-version.js', $buildWorkflow);
         self::assertStringContainsString('node --check scripts/ci/verify-cli-release-channel.js', $buildWorkflow);
-        self::assertStringContainsString('node --check scripts/ci/verify-stable-release-authorization.js', $buildWorkflow);
+        self::assertStringNotContainsString('verify-stable-release-authorization.js', $buildWorkflow);
         self::assertStringContainsString('bash -n scripts/ci/reconcile-release-metadata.sh', $buildWorkflow);
         self::assertStringContainsString('bash -n scripts/ci/verify-release-tag-source.sh', $buildWorkflow);
         self::assertStringContainsString('scripts/install.ps1', $buildWorkflow);
@@ -542,7 +541,7 @@ SH;
         self::assertSame(5, substr_count($releaseWorkflow, 'ref: ${{ needs.resolve-release.outputs.commit }}'));
         self::assertStringNotContainsString('|| github.ref }}', $releaseWorkflow);
         self::assertStringContainsString('EXPECTED_COMMIT: ${{ needs.resolve-release.outputs.commit }}', $releaseWorkflow);
-        self::assertSame(3, substr_count($releaseWorkflow, 'RELEASE_COMMIT: ${{ needs.resolve-release.outputs.commit }}'));
+        self::assertSame(2, substr_count($releaseWorkflow, 'RELEASE_COMMIT: ${{ needs.resolve-release.outputs.commit }}'));
         self::assertStringNotContainsString('return_run_details', $recoveryWorkflow);
         self::assertStringContainsString('"release_commit": commit', $recoveryWorkflow);
         self::assertStringContainsString('"ref": "main"', $recoveryWorkflow);
@@ -634,7 +633,7 @@ SH);
 
         self::assertStringContainsString('PUSH_COMMIT: ${{ github.sha }}', $releaseWorkflow);
         self::assertSame(5, substr_count($releaseWorkflow, 'ref: ${{ needs.resolve-release.outputs.commit }}'));
-        self::assertSame(3, substr_count($releaseWorkflow, 'RELEASE_COMMIT: ${{ needs.resolve-release.outputs.commit }}'));
+        self::assertSame(2, substr_count($releaseWorkflow, 'RELEASE_COMMIT: ${{ needs.resolve-release.outputs.commit }}'));
 
         $environment = [
             'GH_CLI' => $fakeGh,

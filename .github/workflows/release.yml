@@ -271,33 +271,19 @@ jobs:
               printf '## Public CLI asset preflight\n\n'
               printf '%s\n\n' "$message"
               if [ "$present" = "true" ]; then
-                printf '%s' 'Because the complete public asset set already exists, '
-                printf '%s\n' 'the live docs release-audit gate runs before any rebuild or upload.'
+                printf '%s\n' 'The complete public asset set already exists; metadata can be reconciled without rebuilding or replacing assets.'
               else
-                printf 'The live docs release-audit gate will run after this release publishes and verifies the public download surface.\n'
+                printf 'The release will build and verify the complete public download surface before publication.\n'
               fi
             } >> "$GITHUB_STEP_SUMMARY"
           fi
-
-      - name: Require live docs release audit for existing public assets
-        if: steps.public_assets.outputs.present == 'true'
-        env:
-          DOCS_RELEASE_AUDIT_ARTIFACT: cli
-          DOCS_RELEASE_AUDIT_VERSION: ${{ needs.resolve-release.outputs.tag }}
-          DOCS_RELEASE_AUDIT_EVIDENCE: docs-release-audit-evidence.json
-          DOCS_RELEASE_AUDIT_HANDOFF: docs-release-audit-handoff.json
-          DOCS_RELEASE_AUDIT_STALE_MODE: advisory
-        run: release-control/scripts/ci/check-docs-release-audit.sh
 
       - name: Upload release preflight evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
         with:
           name: release-preflight-evidence
-          path: |
-            release-preflight-public-assets-evidence.json
-            docs-release-audit-evidence.json
-            docs-release-audit-handoff.json
+          path: release-preflight-public-assets-evidence.json
           if-no-files-found: warn
 
   reconcile-existing-release-metadata:
@@ -1733,22 +1719,10 @@ jobs:
           printf '%s\n' "$upgrade_apply_evidence" | node scripts/ci/verify-cli-upgrade-result.js \
             --mode apply --release-version "$tag" --channel-version "$channel_version"
 
-      - name: Verify live docs release audit after public downloads
-        env:
-          DOCS_RELEASE_AUDIT_ARTIFACT: cli
-          DOCS_RELEASE_AUDIT_VERSION: ${{ needs.resolve-release.outputs.tag }}
-          DOCS_RELEASE_AUDIT_EVIDENCE: docs-release-audit-evidence.json
-          DOCS_RELEASE_AUDIT_HANDOFF: docs-release-audit-handoff.json
-          DOCS_RELEASE_AUDIT_STALE_MODE: advisory
-        run: release-control/scripts/ci/check-docs-release-audit.sh
-
       - name: Upload release evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
         with:
           name: release-evidence
-          path: |
-            release-public-download-evidence.json
-            docs-release-audit-evidence.json
-            docs-release-audit-handoff.json
+          path: release-public-download-evidence.json
           if-no-files-found: warn

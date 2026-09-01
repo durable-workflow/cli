@@ -90,7 +90,7 @@ test('upgrade channel verification uses the executable installed from the public
   const workflow = fs.readFileSync(workflowPath, 'utf8');
   const verificationStart = workflow.indexOf('- name: Verify public release downloads');
   const verificationEnd = workflow.indexOf(
-    '- name: Verify live docs release audit after public downloads',
+    '- name: Upload release evidence',
     verificationStart,
   );
 

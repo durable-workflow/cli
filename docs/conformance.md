@@ -1,4 +1,4 @@
-# Platform Conformance — `dw` CLI Claim
+# CLI Conformance
 
 The `dw` CLI participates in the public platform conformance suite
 specified by [`durable-workflow.github.io/static/platform-conformance-contract.json`](https://durable-workflow.github.io/platform-conformance-contract.json),
@@ -35,7 +35,7 @@ suite.
 
 | Category | Source path | Status |
 | --- | --- | --- |
-| `control_plane_request_response` | `tests/fixtures/control-plane/` | stable, parity-shared with `sdk-python` |
+| `control_plane_request_response` | `tests/fixtures/control-plane/` | stable, CLI-owned protocol fixtures |
 | `cli_json_envelopes` | `tests/fixtures/control-plane/`, `schemas/` | stable |
 | `worker_task_lifecycle` (CLI input side) | `tests/fixtures/external-task/`, `tests/fixtures/external-task-input/` | stable |
 
@@ -55,10 +55,9 @@ suite.
 | `skew_refusal_matrix_contract` | `durable-workflow.github.io/static/platform-conformance/skew-refusal-matrix-scenarios.json` (served at `/platform-conformance/skew-refusal-matrix-scenarios.json`) | stable, suite version `27`, manifest version `1` |
 | `principal_attribution_contract` | `durable-workflow.github.io/static/platform-conformance/principal-attribution-scenarios.json` (served at `/platform-conformance/principal-attribution-scenarios.json`) | stable, suite version `27`, manifest version `1` |
 
-The fixtures in this repo are exercised today by:
-
-- `scripts/check-sdk-python-parity.sh`
-- the `sdk-python-parity` job in `.github/workflows/build.yml`
+The fixtures in this repository are exercised by the command contract tests in
+`composer test`. Other clients qualify independently against the same public
+Server protocol instead of maintaining pairwise copies with the CLI.
 
 Local command tests also exercise CLI signal/query JSON behavior, but
 implementation tests are not stable fixture sources for
@@ -140,7 +139,7 @@ document before tag, with the conformance level at `full` or
 | --- | --- |
 | Required claimed targets | `cli_json_client` |
 | Required suite version | public docs-site manifest `durable-workflow.v2.platform-conformance.suite` version `27` |
-| CI job | `platform-conformance` (lands when the harness reference implementation publishes; until then `sdk-python-parity` covers CLI-owned fixture parity) |
+| CI job | CLI command contract tests in `composer test`; live runtime scenarios are recorded by the public platform conformance process |
 | Block on `nonconforming` | yes |
 | Artifact attached to release | harness result document, schema `durable-workflow.v2.platform-conformance.result` |
 
@@ -163,6 +162,3 @@ category emits a warning and does not block.
 - Principal attribution scenarios: <https://durable-workflow.github.io/platform-conformance/principal-attribution-scenarios.json>
 - Workflow update runtime scenarios: <https://durable-workflow.github.io/platform-conformance/workflow-update-runtime-scenarios.json>
 - Public docs page: <https://durable-workflow.github.io/docs/2.0/compatibility>
-- Polyglot parity doc:
-  <https://durable-workflow.github.io/docs/polyglot/cli-python-parity>
-- Existing per-repo gate: `scripts/check-sdk-python-parity.sh`.

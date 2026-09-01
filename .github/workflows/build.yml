@@ -65,7 +65,6 @@ jobs:
           sh -n scripts/install.sh
           sh -n scripts/generate-homebrew-formula.sh
           sh -n scripts/verify-release.sh
-          sh -n scripts/ci/check-docs-release-audit.sh
           node --check scripts/ci/release-version.js
           node --check scripts/ci/verify-cli-release-channel.js
           node --check scripts/ci/verify-cli-upgrade-result.js

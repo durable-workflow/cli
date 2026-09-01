@@ -24,9 +24,8 @@ The one-line installer is the recommended path on every supported platform.
 Both `install.sh` and `install.ps1` download the matching `SHA256SUMS` manifest,
 verify the binary's checksum before writing it into the install directory,
 and refuse to proceed when the checksum does not match. An unpinned install
-resolves the passing public artifact compatibility authority. Before stable
-promotion it names the supported prerelease without relying on GitHub's stable
-Latest channel.
+resolves the current stable release from the public artifact compatibility
+authority.
 
 On Unix, installation is ready only when an ordinary `dw` invocation resolves
 to the installed path. The installer reports the installed and active paths
@@ -37,8 +36,8 @@ the result requires a targeted `dw` cache refresh in that shell. Set
 `DURABLE_WORKFLOW_INSTALL_OUTPUT=json` to emit the final result as
 `durable-workflow.cli.install.v1` for release qualification.
 
-The default installer follows the qualified supported release. To require that
-the authority still names a prerelease, set `VERSION` to `prerelease`:
+The default installer follows the qualified supported release. Maintainers can
+explicitly require a prerelease channel during future preview programs:
 
 ```bash
 curl -fsSL https://durable-workflow.com/install.sh | VERSION=prerelease sh

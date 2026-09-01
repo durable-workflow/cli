@@ -224,13 +224,7 @@ SH;
         self::assertStringContainsString('existing-public-assets-rerun-gate', $releaseWorkflow);
         self::assertStringContainsString('pre-upload-public-asset-presence-check', $releaseWorkflow);
         self::assertStringContainsString('complete_public_asset_set: present === \'true\'', $releaseWorkflow);
-        self::assertStringContainsString('Require live docs release audit for existing public assets', $releaseWorkflow);
-        self::assertStringContainsString("if: steps.public_assets.outputs.present == 'true'", $releaseWorkflow);
-        self::assertStringContainsString('DOCS_RELEASE_AUDIT_EVIDENCE: docs-release-audit-evidence.json', $releaseWorkflow);
-        self::assertStringContainsString('DOCS_RELEASE_AUDIT_HANDOFF: docs-release-audit-handoff.json', $releaseWorkflow);
-        self::assertSame(2, substr_count($releaseWorkflow, 'DOCS_RELEASE_AUDIT_STALE_MODE: advisory'));
         self::assertStringContainsString('release-preflight-public-assets-evidence.json', $releaseWorkflow);
-        self::assertStringContainsString('docs-release-audit-handoff.json', $releaseWorkflow);
         self::assertStringContainsString('needs: [resolve-release, release-preflight]', $releaseWorkflow);
         self::assertStringContainsString("needs.release-preflight.result == 'success'", $releaseWorkflow);
         self::assertStringContainsString("needs.release-preflight.outputs.public_assets_present != 'true'", $releaseWorkflow);
@@ -253,7 +247,6 @@ SH;
         self::assertStringContainsString('release-public-download-evidence.json', $releaseWorkflow);
         self::assertStringContainsString('"artifact_versions": {"cli": "%s"}', $releaseWorkflow);
         self::assertStringContainsString('"installable_artifacts": {"verified_public_downloads": true, "version": "%s"}', $releaseWorkflow);
-        self::assertStringContainsString('Verify live docs release audit after public downloads', $releaseWorkflow);
         self::assertStringContainsString('name: release-evidence', $releaseWorkflow);
         self::assertStringNotContainsString('"docs_release_audit": {"artifact": "cli", "version": "%s", "checked_before_public_upload": true', $releaseWorkflow);
         self::assertStringContainsString('install.sh', $releaseWorkflow);
@@ -271,21 +264,17 @@ SH;
         self::assertStringContainsString('--without-suggestions --retry="${SPC_DOWNLOAD_RETRY}"', $releaseWorkflow);
         self::assertStringContainsString('--without-suggestions --retry="$env:SPC_DOWNLOAD_RETRY"', $releaseWorkflow);
         self::assertStringContainsString('name: ${{ matrix.name }}-spc-logs', $releaseWorkflow);
-        self::assertStringNotContainsString('Require live docs release audit refresh', $releaseWorkflow);
+        self::assertStringNotContainsString('docs release audit', strtolower($releaseWorkflow));
+        self::assertStringNotContainsString('docs-artifact-tuple-handoff', $releaseWorkflow);
 
-        $preflightDocsGatePosition = strpos($releaseWorkflow, 'Require live docs release audit for existing public assets');
         $buildPosition = strpos($releaseWorkflow, 'build-phar:');
         $uploadPosition = strpos($releaseWorkflow, 'Create GitHub Release');
         $publicDownloadPosition = strpos($releaseWorkflow, 'Verify public release downloads');
-        $postUploadDocsGatePosition = strpos($releaseWorkflow, 'Verify live docs release audit after public downloads');
-        self::assertIsInt($preflightDocsGatePosition);
         self::assertIsInt($buildPosition);
         self::assertIsInt($uploadPosition);
         self::assertIsInt($publicDownloadPosition);
-        self::assertIsInt($postUploadDocsGatePosition);
-        self::assertLessThan($buildPosition, $preflightDocsGatePosition);
-        self::assertLessThan($uploadPosition, $preflightDocsGatePosition);
-        self::assertLessThan($postUploadDocsGatePosition, $publicDownloadPosition);
+        self::assertLessThan($uploadPosition, $buildPosition);
+        self::assertLessThan($publicDownloadPosition, $uploadPosition);
     }
 
     public function test_release_phpmicro_toolchain_is_pinned_verified_and_trust_scoped(): void
@@ -509,7 +498,6 @@ SH;
         self::assertStringContainsString('sh -n scripts/generate-homebrew-formula.sh', $buildWorkflow);
         self::assertStringContainsString('sh -n scripts/verify-release.sh', $buildWorkflow);
         self::assertStringContainsString('bash -n scripts/verify-public-release-assets.sh', $buildWorkflow);
-        self::assertStringContainsString('sh -n scripts/ci/check-docs-release-audit.sh', $buildWorkflow);
         self::assertStringContainsString('node --check scripts/ci/release-version.js', $buildWorkflow);
         self::assertStringContainsString('node --check scripts/ci/verify-cli-release-channel.js', $buildWorkflow);
         self::assertStringNotContainsString('verify-stable-release-authorization.js', $buildWorkflow);
@@ -531,10 +519,8 @@ SH;
         self::assertStringContainsString('control_commit: ${{ steps.resolve.outputs.control_commit }}', $releaseWorkflow);
         self::assertStringContainsString('initiator: ${{ steps.resolve.outputs.initiator }}', $releaseWorkflow);
         self::assertSame(2, substr_count($releaseWorkflow, 'Checkout qualified release policy authority'));
-        self::assertSame(2, substr_count($releaseWorkflow, 'release-control/scripts/ci/check-docs-release-audit.sh'));
         self::assertSame(2, substr_count($releaseWorkflow, 'release-control/scripts/ci/verify-release-tag-source.sh'));
         self::assertStringContainsString('release-control/scripts/verify-public-release-assets.sh', $releaseWorkflow);
-        self::assertStringNotContainsString('run: scripts/ci/check-docs-release-audit.sh', $releaseWorkflow);
         self::assertStringContainsString('durable-workflow.cli.release-control-authority/v1', $releaseWorkflow);
         self::assertStringContainsString('"control": {"ref": "%s", "commit": "%s"}', $releaseWorkflow);
         self::assertSame(5, substr_count($releaseWorkflow, 'ref: ${{ needs.resolve-release.outputs.commit }}'));
@@ -620,30 +606,6 @@ SH);
         self::assertStringContainsString('releases/download/${tag}/${artifact}', $publicAssetVerifier);
         self::assertStringContainsString('curl -fsSLI --retry 3 --retry-all-errors', $publicAssetVerifier);
         self::assertStringContainsString('dw-windows-x86_64.exe', $publicAssetVerifier);
-    }
-
-    public function test_docs_release_audit_writes_preflight_evidence(): void
-    {
-        $auditor = self::readRepoFile('scripts/ci/check-docs-release-audit.sh');
-
-        self::assertStringContainsString('DOCS_RELEASE_AUDIT_EVIDENCE', $auditor);
-        self::assertStringContainsString('DOCS_RELEASE_AUDIT_HANDOFF', $auditor);
-        self::assertStringContainsString('durable-workflow.release.docs-release-audit-evidence', $auditor);
-        self::assertStringContainsString('durable-workflow.release.docs-artifact-tuple-handoff', $auditor);
-        self::assertStringContainsString('docs-page-release-audit-${artifact}-${expected}-$$.json', $auditor);
-        self::assertStringContainsString('trap \'rm -f "$audit_path"\' EXIT HUP INT TERM', $auditor);
-        self::assertStringContainsString("surface: 'public_docs_release_audit'", $auditor);
-        self::assertStringContainsString("outcome: 'unavailable'", $auditor);
-        self::assertStringContainsString("writeEvidence('stale'", $auditor);
-        self::assertStringContainsString("writeEvidence('pass'", $auditor);
-        self::assertStringContainsString('actual_version: actualVersion', $auditor);
-        self::assertStringContainsString("schema: 'durable-workflow.docs.refresh-request'", $auditor);
-        self::assertStringContainsString("repository: 'durable-workflow.github.io'", $auditor);
-        self::assertStringContainsString('refresh_command: refreshCommand', $auditor);
-        self::assertStringContainsString('refresh_files: refreshFiles', $auditor);
-        self::assertStringContainsString('observed_artifact_versions: versions', $auditor);
-        self::assertStringContainsString('docs_refresh_request: docsRefreshRequest', $auditor);
-        self::assertStringContainsString('docs_artifact_tuple_handoff: handoff', $auditor);
     }
 
     public function test_release_publishes_generated_homebrew_formula(): void

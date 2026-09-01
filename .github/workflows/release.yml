@@ -6,7 +6,7 @@ run-name: >-
      github.event_name == 'schedule' ||
      inputs.operation == 'phpmicro-cache-warm') &&
     'Warm phpmicro cache' ||
-    format('Release {0} for {1}', inputs.tag || github.ref_name, inputs.release_plan || 'direct')
+    format('Release {0}', inputs.tag || github.ref_name)
   }}
 
 on:
@@ -33,12 +33,8 @@ on:
         description: 'Release tag required for release (e.g. 0.0.1-test or v0.0.1-test)'
         required: false
       release_commit:
-        description: 'Exact source commit declared by the immutable release plan (required for release)'
+        description: 'Exact source commit to release'
         required: false
-      release_plan:
-        description: 'Immutable release-plan tag initiating this recovery run'
-        required: false
-        default: 'direct'
 permissions:
   contents: read
 

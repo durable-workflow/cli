@@ -75,22 +75,9 @@ jobs:
           bash -n scripts/verify-public-release-assets.sh
           bash -n scripts/verify-reproducible-build.sh
           pwsh -NoProfile -Command '$null = [scriptblock]::Create((Get-Content -Raw scripts/install.ps1))'
-      - name: Verify release recovery source contracts
-        env:
-          CONFORMANCE_BASE_REF: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+      - name: Verify release contracts
         run: |
-          arguments=()
-          if [ -n "$CONFORMANCE_BASE_REF" ]; then
-            arguments+=(--previous-ref "$CONFORMANCE_BASE_REF")
-          fi
-          python scripts/ci/release_recovery_consumer_conformance.py \
-            --contract scripts/ci/release-recovery-consumer-contract.json \
-            --adapter scripts/ci/release-recovery-consumer-adapter.json \
-            "${arguments[@]}"
           python scripts/ci/test-native-prerequisites.py
-          python scripts/ci/test-component-release-recovery.py ConsumerContractIdentityRegressionTest
-          python scripts/ci/test-cli-publication-run.py
-          python scripts/ci/test-publish-planned-tag.py
           node --test scripts/ci/test-release-workflow-metadata.js
           node --test scripts/ci/test-cli-release-channel.js
           node --test scripts/ci/test-cli-upgrade-result.js

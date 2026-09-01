@@ -518,10 +518,9 @@ SH;
         self::assertStringContainsString('scripts/install.ps1', $buildWorkflow);
     }
 
-    public function test_release_recovery_retains_the_planned_commit_at_publication(): void
+    public function test_release_binds_the_exact_source_at_publication(): void
     {
         $releaseWorkflow = self::readRepoFile('.github/workflows/release.yml');
-        $recoveryWorkflow = self::readRepoFile('.github/workflows/release-plan-recovery.yml');
 
         self::assertStringContainsString('release_commit:', $releaseWorkflow);
         self::assertStringContainsString('commit: ${{ steps.resolve.outputs.commit }}', $releaseWorkflow);
@@ -542,42 +541,9 @@ SH;
         self::assertStringNotContainsString('|| github.ref }}', $releaseWorkflow);
         self::assertStringContainsString('EXPECTED_COMMIT: ${{ needs.resolve-release.outputs.commit }}', $releaseWorkflow);
         self::assertSame(2, substr_count($releaseWorkflow, 'RELEASE_COMMIT: ${{ needs.resolve-release.outputs.commit }}'));
-        self::assertStringNotContainsString('return_run_details', $recoveryWorkflow);
-        self::assertStringContainsString('"release_commit": commit', $recoveryWorkflow);
-        self::assertStringContainsString('"ref": "main"', $recoveryWorkflow);
-        self::assertStringContainsString('--required-event workflow_dispatch', $recoveryWorkflow);
-        self::assertStringContainsString('--required-head-branch main', $recoveryWorkflow);
-        self::assertStringContainsString('select-tag-push-run', $recoveryWorkflow);
-        self::assertStringContainsString('gh run cancel "$run_id"', $recoveryWorkflow);
-        self::assertStringContainsString('retain-tag-push-run', $recoveryWorkflow);
-        self::assertStringContainsString('release-tag-push-quarantine-evidence.json', $recoveryWorkflow);
-        self::assertStringContainsString('verify-publication:', $recoveryWorkflow);
-        self::assertStringContainsString("needs: [discover, publish]", $recoveryWorkflow);
-        self::assertStringContainsString('persist-credentials: false', $recoveryWorkflow);
-        self::assertSame(1, substr_count($recoveryWorkflow, 'scripts/ci/verify-release-tag-source.sh'));
-        self::assertStringContainsString('CLI_RELEASE_DEPLOY_KEY: ${{ secrets.CLI_RELEASE_DEPLOY_KEY }}', $recoveryWorkflow);
-        self::assertStringContainsString('GH_TOKEN: ${{ github.token }}', $recoveryWorkflow);
         self::assertStringContainsString("tags:\n      - '[0-9]+.[0-9]+.[0-9]+*'", $releaseWorkflow);
         self::assertStringContainsString("workflow_dispatch:\n    inputs:", $releaseWorkflow);
-
-        $credentialCheck = strpos($recoveryWorkflow, 'Require repository publication credential');
-        $tagCreation = strpos($recoveryWorkflow, 'Create or verify the exact planned source tag');
-        $tagQuarantine = strpos($recoveryWorkflow, 'Quarantine the exact tag-triggered publication run');
-        $mainDispatch = strpos($recoveryWorkflow, 'Start or resume the exact repository-owned publication run');
-        $verificationJob = strpos($recoveryWorkflow, '  verify-publication:');
-        self::assertIsInt($credentialCheck);
-        self::assertIsInt($tagCreation);
-        self::assertIsInt($tagQuarantine);
-        self::assertIsInt($mainDispatch);
-        self::assertIsInt($verificationJob);
-        self::assertLessThan($tagCreation, $credentialCheck);
-        self::assertLessThan($tagQuarantine, $tagCreation);
-        self::assertLessThan($mainDispatch, $tagQuarantine);
-        self::assertLessThan($verificationJob, $mainDispatch);
-        self::assertStringNotContainsString(
-            '--component cli --plan',
-            substr($recoveryWorkflow, $tagCreation, $verificationJob - $tagCreation),
-        );
+        self::assertStringNotContainsString('release_plan:', $releaseWorkflow);
 
         $sourceCheck = strpos($releaseWorkflow, 'Resolve exact source identity');
         $boundaryCheck = strpos($releaseWorkflow, 'Verify immutable release tag at publication boundary');
@@ -592,44 +558,20 @@ SH;
         self::assertLessThan($publication, $boundaryCheck);
     }
 
-    public function test_recovery_ignores_push_run_and_rejects_tag_movement_before_publication(): void
+    public function test_release_rejects_tag_movement_before_publication(): void
     {
         $releaseWorkflow = self::readRepoFile('.github/workflows/release.yml');
         $plannedCommit = str_repeat('a', 40);
         $movedCommit = str_repeat('b', 40);
-        $controlCommit = str_repeat('c', 40);
         $temporary = sys_get_temp_dir().'/cli-release-tag-'.bin2hex(random_bytes(4));
         self::assertTrue(mkdir($temporary));
         $fakeGh = $temporary.'/gh';
-        $publicationRuns = $temporary.'/publication-runs.json';
         file_put_contents($fakeGh, <<<'SH'
 #!/usr/bin/env sh
 set -eu
 printf 'commit %s\n' "$FAKE_TAG_SHA"
 SH);
         self::assertTrue(chmod($fakeGh, 0755));
-        file_put_contents($publicationRuns, json_encode([
-            [
-                'databaseId' => 1234,
-                'displayTitle' => 'Release 1.2.3-alpha.4 for direct',
-                'event' => 'push',
-                'headBranch' => '1.2.3-alpha.4',
-                'headSha' => $plannedCommit,
-                'status' => 'in_progress',
-                'conclusion' => null,
-                'url' => 'https://github.com/durable-workflow/cli/actions/runs/1234',
-            ],
-            [
-                'databaseId' => 1235,
-                'displayTitle' => 'Release 1.2.3-alpha.4 for release-plan/recovery-test',
-                'event' => 'workflow_dispatch',
-                'headBranch' => 'main',
-                'headSha' => $controlCommit,
-                'status' => 'in_progress',
-                'conclusion' => null,
-                'url' => 'https://github.com/durable-workflow/cli/actions/runs/1235',
-            ],
-        ], JSON_THROW_ON_ERROR));
 
         self::assertStringContainsString('PUSH_COMMIT: ${{ github.sha }}', $releaseWorkflow);
         self::assertSame(5, substr_count($releaseWorkflow, 'ref: ${{ needs.resolve-release.outputs.commit }}'));
@@ -643,26 +585,6 @@ SH);
         ];
 
         try {
-            $selection = new Process([
-                'python3',
-                dirname(__DIR__).'/scripts/ci/component-release-recovery.py',
-                'select-publication-run',
-                '--release-tag',
-                '1.2.3-alpha.4',
-                '--release-commit',
-                $plannedCommit,
-                '--required-event',
-                'workflow_dispatch',
-                '--required-head-branch',
-                'main',
-                '--required-display-title',
-                'Release 1.2.3-alpha.4 for release-plan/recovery-test',
-                '--runs',
-                $publicationRuns,
-            ], dirname(__DIR__));
-            self::assertSame(0, $selection->run(), $selection->getErrorOutput());
-            self::assertSame("wait\t1235\tin_progress\t\n", $selection->getOutput());
-
             $exact = new Process(
                 [dirname(__DIR__).'/scripts/ci/verify-release-tag-source.sh'],
                 dirname(__DIR__),
@@ -680,7 +602,6 @@ SH);
             self::assertStringContainsString($plannedCommit, $moved->getErrorOutput());
         } finally {
             @unlink($fakeGh);
-            @unlink($publicationRuns);
             @rmdir($temporary);
         }
     }

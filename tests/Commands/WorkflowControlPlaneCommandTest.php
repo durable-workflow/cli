@@ -7,6 +7,7 @@ namespace Tests\Commands;
 use DurableWorkflow\Cli\Commands\WorkflowCommand\ArchiveCommand;
 use DurableWorkflow\Cli\Commands\WorkflowCommand\CancelCommand;
 use DurableWorkflow\Cli\Commands\WorkflowCommand\RepairCommand;
+use DurableWorkflow\Cli\Commands\WorkflowCommand\RedriveCommand;
 use DurableWorkflow\Cli\Commands\WorkflowCommand\SignalCommand;
 use DurableWorkflow\Cli\Commands\WorkflowCommand\TerminateCommand;
 use DurableWorkflow\Cli\Commands\WorkflowCommand\UpdateCommand;
@@ -395,6 +396,45 @@ class WorkflowControlPlaneCommandTest extends TestCase
         self::assertStringContainsString('Outcome: repair_requested', $display);
         self::assertStringContainsString('Command Status: accepted', $display);
         self::assertStringContainsString('Command ID: cmd-repair-1', $display);
+    }
+
+    public function test_redrive_command_targets_a_failed_run_with_an_optional_request_id(): void
+    {
+        $client = new FakeServerClient([
+            'workflow_id' => 'wf-redrive-1',
+            'run_id' => 'run-new',
+            'continued_from_run_id' => 'run-failed',
+            'resume_step_sequence' => 2,
+        ]);
+
+        $command = new RedriveCommand();
+        $command->setServerClient($client);
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            'workflow-id' => 'wf-redrive-1',
+            'run-id' => 'run-failed',
+            '--request-id' => 'incident-42',
+        ]));
+
+        self::assertSame('/workflows/wf-redrive-1/runs/run-failed/redrive', $client->lastPostPath);
+        self::assertSame(['request_id' => 'incident-42'], $client->lastPostBody);
+        self::assertStringContainsString('Source Run ID: run-failed', $tester->getDisplay());
+        self::assertStringContainsString('New Run ID: run-new', $tester->getDisplay());
+        self::assertStringContainsString('Resume Step: 2', $tester->getDisplay());
+    }
+
+    public function test_redrive_command_omits_request_id_when_not_provided(): void
+    {
+        $client = new FakeServerClient(['workflow_id' => 'wf-1', 'run_id' => 'run-new']);
+        $command = new RedriveCommand();
+        $command->setServerClient($client);
+
+        self::assertSame(Command::SUCCESS, (new CommandTester($command))->execute([
+            'workflow-id' => 'wf-1',
+            'run-id' => 'run-failed',
+        ]));
+        self::assertSame([], $client->lastPostBody);
     }
 
     public function test_archive_command_sends_reason_and_renders_outcome(): void

@@ -517,6 +517,13 @@
       "resolver_url": "https://durable-workflow.github.io/cli-json-envelopes/v3/schemas/workflow-query.schema.json",
       "sha256": "sha256:172b88e7d36a713b42b8fe7b7944d535cabadc843d85cee78b034bdc7c397423"
     },
+    "workflow:redrive": {
+      "output": "--json",
+      "schema": "schemas/output/workflow-operation.schema.json",
+      "schema_id": "https://durable-workflow.github.io/cli-json-envelopes/v3/schemas/workflow-operation.schema.json",
+      "resolver_url": "https://durable-workflow.github.io/cli-json-envelopes/v3/schemas/workflow-operation.schema.json",
+      "sha256": "sha256:93efb18f800af21ee4c6acf4d26aa17b84528645f7c7e45e4784d91cdeebf2eb"
+    },
     "workflow:repair": {
       "output": "--json",
       "schema": "schemas/output/workflow-operation.schema.json",

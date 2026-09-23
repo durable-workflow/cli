@@ -2,9 +2,9 @@
 
 const {parseReleaseVersion} = require('./release-version');
 
-const AUTHORITY_SCHEMA = 'durable-workflow.docs.public-artifact-compatibility-evidence';
+const AUTHORITY_SCHEMA = 'durable-workflow.docs.stable-releases';
 const DEFAULT_CHANNEL_URL =
-  'https://durable-workflow.com/public-artifact-compatibility-evidence.json';
+  'https://durable-workflow.com/stable-releases.json';
 const DEFAULT_API_BASE = 'https://api.github.com/repos/durable-workflow/cli';
 const REQUIRED_ASSETS = Object.freeze([
   'SHA256SUMS',
@@ -32,29 +32,18 @@ function validateChannel(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error('CLI release authority must be a JSON object');
   }
-  if (value.schema !== AUTHORITY_SCHEMA || value.schema_version !== 2 || value.outcome !== 'pass') {
-    throw new Error('CLI release authority must be a passing schema-v2 document');
+  if (value.schema !== AUTHORITY_SCHEMA || value.schema_version !== 1) {
+    throw new Error('CLI release authority must use the stable-releases schema v1');
   }
 
-  const version = value.qualified_artifact_versions?.cli;
+  const version = value.artifacts?.cli;
   const parsed = parseReleaseVersion(version);
-  if (parsed === null) {
-    throw new Error(`qualified CLI version is not valid SemVer: ${String(version)}`);
-  }
-
-  const channel = parsed.prerelease === null ? 'stable' : 'prerelease';
-  if (channel === 'prerelease') {
-    const [label, sequence, ...rest] = parsed.prerelease;
-    if (!['alpha', 'beta', 'rc'].includes(label)) {
-      throw new Error('qualified CLI prerelease must be an alpha, beta, or rc version');
-    }
-    if (rest.length > 0 || sequence === undefined || !/^(0|[1-9][0-9]*)$/.test(sequence)) {
-      throw new Error('qualified CLI prerelease must use a numeric sequence');
-    }
+  if (parsed === null || parsed.prerelease !== null || parsed.build !== null) {
+    throw new Error(`stable CLI version must be exact MAJOR.MINOR.PATCH: ${String(version)}`);
   }
 
   return Object.freeze({
-    channel,
+    channel: 'stable',
     schema: value.schema,
     version,
   });

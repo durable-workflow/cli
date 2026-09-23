@@ -72,6 +72,7 @@ class MutatingCommandJsonTest extends TestCase
         yield 'workflow:archive' => ['workflow:archive', ['workflow-id' => 'wf-1']];
         yield 'workflow:cancel' => ['workflow:cancel', ['workflow-id' => 'wf-1']];
         yield 'workflow:repair' => ['workflow:repair', ['workflow-id' => 'wf-1']];
+        yield 'workflow:redrive' => ['workflow:redrive', ['workflow-id' => 'wf-1', 'run-id' => 'run-failed']];
         yield 'workflow:signal' => ['workflow:signal', ['workflow-id' => 'wf-1', 'signal-name' => 'approve']];
         yield 'workflow:terminate' => ['workflow:terminate', ['workflow-id' => 'wf-1']];
         yield 'workflow:query' => ['workflow:query', ['workflow-id' => 'wf-1', 'query-name' => 'status']];

@@ -80,6 +80,7 @@ abstract class BaseCommand extends Command
         'workflow:list-runs',
         'workflow:migrate-v1',
         'workflow:query',
+        'workflow:redrive',
         'workflow:repair',
         'workflow:show-run',
         'workflow:signal',

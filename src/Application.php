@@ -140,6 +140,7 @@ class Application extends ConsoleApplication
             new WorkflowCommand\CancelCommand(),
             new WorkflowCommand\TerminateCommand(),
             new WorkflowCommand\RepairCommand(),
+            new WorkflowCommand\RedriveCommand(),
             new WorkflowCommand\ArchiveCommand(),
             new WorkflowCommand\ListRunsCommand(),
             new WorkflowCommand\ShowRunCommand(),

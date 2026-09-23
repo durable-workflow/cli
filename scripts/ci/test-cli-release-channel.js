@@ -47,46 +47,37 @@ test('a prerelease tag exposed as a stable GitHub Release fails closed', () => {
   );
 });
 
-test('channel classification supports prerelease and stable transition records', () => {
+test('channel classification reads the public stable release authority', () => {
   assert.deepEqual(
     validateChannel({
       schema: AUTHORITY_SCHEMA,
-      schema_version: 2,
-      outcome: 'pass',
-      qualified_artifact_versions: {cli: '2.0.0-rc.31'},
+      schema_version: 1,
+      artifacts: {cli: '2.0.0'},
     }),
     {
       schema: AUTHORITY_SCHEMA,
-      channel: 'prerelease',
-      version: '2.0.0-rc.31',
+      channel: 'stable',
+      version: '2.0.0',
     },
   );
-  assert.equal(validateChannel({
-    schema: AUTHORITY_SCHEMA,
-    schema_version: 2,
-    outcome: 'pass',
-    qualified_artifact_versions: {cli: '2.0.0'},
-  }).version, '2.0.0');
 
   assert.throws(
     () => validateChannel({
       schema: AUTHORITY_SCHEMA,
-      schema_version: 2,
-      outcome: 'pass',
-      qualified_artifact_versions: {cli: '2.0.0-preview.1'},
+      schema_version: 1,
+      artifacts: {cli: '2.0.0-rc.1'},
     }),
-    /must be an alpha, beta, or rc/,
+    /must be exact MAJOR.MINOR.PATCH/,
   );
 });
 
-test('the supported prerelease must remain publicly discoverable with complete assets', async () => {
+test('the current stable channel remains publicly discoverable with complete assets', async () => {
   const releaseTag = '2.0.0-rc.32';
-  const supportedTag = '2.0.0-rc.12';
+  const supportedTag = '2.0.0';
   const channel = {
     schema: AUTHORITY_SCHEMA,
-    schema_version: 2,
-    outcome: 'pass',
-    qualified_artifact_versions: {cli: supportedTag},
+    schema_version: 1,
+    artifacts: {cli: supportedTag},
   };
   const fetchImpl = async url => {
     if (url === 'https://example.test/channel.json') {
@@ -96,7 +87,7 @@ test('the supported prerelease must remain publicly discoverable with complete a
       return jsonResponse(release(releaseTag, true));
     }
     if (url.endsWith(`/releases/tags/${supportedTag}`)) {
-      return jsonResponse(release(supportedTag, true));
+      return jsonResponse(release(supportedTag, false));
     }
     return jsonResponse({}, 404);
   };
@@ -109,7 +100,7 @@ test('the supported prerelease must remain publicly discoverable with complete a
       releaseTag,
     }),
     {
-      channel: 'prerelease',
+      channel: 'stable',
       channel_version: supportedTag,
       release_prerelease: true,
       release_tag: releaseTag,
@@ -123,7 +114,7 @@ test('the supported prerelease must remain publicly discoverable with complete a
     if (url.endsWith(`/releases/tags/${releaseTag}`)) {
       return jsonResponse(release(releaseTag, true));
     }
-    const incompleteSupportedRelease = release(supportedTag, true);
+    const incompleteSupportedRelease = release(supportedTag, false);
     incompleteSupportedRelease.assets = incompleteSupportedRelease.assets.filter(
       asset => asset.name !== 'SHA256SUMS',
     );
@@ -155,7 +146,7 @@ test('the supported prerelease must remain publicly discoverable with complete a
       fetchImpl: unavailableFetch,
       releaseTag,
     }),
-    /HTTP 404 fetching .*2\.0\.0-rc\.12/,
+    /HTTP 404 fetching .*2\.0\.0/,
   );
 });
 
@@ -164,9 +155,8 @@ test('stable transition resolution requires stable public metadata', async () =>
     if (url === 'https://example.test/channel.json') {
       return jsonResponse({
         schema: AUTHORITY_SCHEMA,
-        schema_version: 2,
-        outcome: 'pass',
-        qualified_artifact_versions: {cli: '2.0.0'},
+        schema_version: 1,
+        artifacts: {cli: '2.0.0'},
       });
     }
     return jsonResponse(release('2.0.0', false));

@@ -11,15 +11,14 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 /**
  * Resolves release metadata for the standalone `dw` binary.
  *
- * Default discovery follows the passing public artifact compatibility
- * authority. Asset downloads and `SHA256SUMS` then use the exact qualified tag
- * rather than GitHub's stable-only /releases/latest route.
+ * Default discovery follows GitHub's latest published stable release.
+ * Asset downloads and `SHA256SUMS` use that exact tag.
  */
 final class ReleaseCatalog
 {
     public const DEFAULT_REPO = 'durable-workflow/cli';
 
-    public const DEFAULT_AUTHORITY_URL = 'https://durable-workflow.com/public-artifact-compatibility-evidence.json';
+    public const DEFAULT_AUTHORITY_URL = 'https://api.github.com/repos/durable-workflow/cli/releases/latest';
 
     public function __construct(
         private readonly HttpClientInterface $http,
@@ -35,7 +34,7 @@ final class ReleaseCatalog
         ?string $baseUrl = null,
         ?string $authorityUrl = null,
     ): self {
-        $authorityUrl ??= getenv('DURABLE_WORKFLOW_QUALIFIED_AUTHORITY_URL') ?: self::DEFAULT_AUTHORITY_URL;
+        $authorityUrl ??= getenv('DURABLE_WORKFLOW_RELEASE_API_URL') ?: self::DEFAULT_AUTHORITY_URL;
 
         return new self(
             http: $http ?? HttpClient::create([
@@ -53,7 +52,7 @@ final class ReleaseCatalog
     }
 
     /**
-     * Resolve the supported release tag from the qualified artifact authority.
+     * Resolve the latest published stable release tag.
      */
     public function supportedTag(): string
     {
@@ -63,31 +62,23 @@ final class ReleaseCatalog
         } catch (HttpExceptionInterface $e) {
             throw new ReleaseCatalogException(
                 message: sprintf(
-                    'could not fetch the qualified CLI release authority: %s',
+                    'could not fetch the latest stable CLI release: %s',
                     $e->getMessage(),
                 ),
                 previous: $e,
             );
         }
 
-        if (
-            ($data['schema'] ?? null) !== 'durable-workflow.docs.public-artifact-compatibility-evidence'
-            || ($data['schema_version'] ?? null) !== 2
-            || ($data['outcome'] ?? null) !== 'pass'
-        ) {
-            throw new ReleaseCatalogException('qualified CLI release authority must be a passing schema-v2 document');
-        }
-        $tag = $data['qualified_artifact_versions']['cli'] ?? null;
+        $tag = $data['tag_name'] ?? null;
         if (! is_string($tag) || $tag === '') {
-            throw new ReleaseCatalogException('qualified CLI release authority must include a CLI version');
+            throw new ReleaseCatalogException('latest stable CLI release must include a tag_name');
         }
         $tag = ltrim($tag, 'v');
 
         $stablePattern = '/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/D';
-        $prereleasePattern = '/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)'.
-            '-(alpha|beta|rc)\.(0|[1-9][0-9]*)$/D';
-        if (preg_match($stablePattern, $tag) !== 1 && preg_match($prereleasePattern, $tag) !== 1) {
-            throw new ReleaseCatalogException('qualified CLI release must name a stable, alpha, beta, or rc version');
+        if (($data['draft'] ?? null) !== false || ($data['prerelease'] ?? null) !== false
+            || preg_match($stablePattern, $tag) !== 1) {
+            throw new ReleaseCatalogException('latest CLI release must be a published stable version');
         }
 
         return $tag;

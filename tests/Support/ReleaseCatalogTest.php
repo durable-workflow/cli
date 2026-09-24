@@ -12,14 +12,13 @@ use Symfony\Component\HttpClient\Response\MockResponse;
 
 class ReleaseCatalogTest extends TestCase
 {
-    public function test_supported_tag_resolves_qualified_prerelease(): void
+    public function test_supported_tag_resolves_latest_stable_release(): void
     {
         $client = new MockHttpClient([
             new MockResponse(json_encode([
-                'schema' => 'durable-workflow.docs.public-artifact-compatibility-evidence',
-                'schema_version' => 2,
-                'outcome' => 'pass',
-                'qualified_artifact_versions' => ['cli' => '2.0.0-rc.31'],
+                'tag_name' => 'v2.1.1',
+                'draft' => false,
+                'prerelease' => false,
             ], JSON_THROW_ON_ERROR), [
                 'http_code' => 200,
                 'response_headers' => ['Content-Type: application/json'],
@@ -27,17 +26,16 @@ class ReleaseCatalogTest extends TestCase
         ]);
         $catalog = new ReleaseCatalog($client, 'durable-workflow/cli');
 
-        self::assertSame('2.0.0-rc.31', $catalog->supportedTag());
+        self::assertSame('2.1.1', $catalog->supportedTag());
     }
 
-    public function test_supported_tag_accepts_authorized_stable_transition(): void
+    public function test_supported_tag_accepts_unprefixed_version(): void
     {
         $client = new MockHttpClient([
             new MockResponse(json_encode([
-                'schema' => 'durable-workflow.docs.public-artifact-compatibility-evidence',
-                'schema_version' => 2,
-                'outcome' => 'pass',
-                'qualified_artifact_versions' => ['cli' => '2.0.0'],
+                'tag_name' => '2.0.0',
+                'draft' => false,
+                'prerelease' => false,
             ], JSON_THROW_ON_ERROR), [
                 'http_code' => 200,
                 'response_headers' => ['Content-Type: application/json'],
@@ -48,14 +46,13 @@ class ReleaseCatalogTest extends TestCase
         self::assertSame('2.0.0', $catalog->supportedTag());
     }
 
-    public function test_supported_tag_rejects_unqualified_version_shape(): void
+    public function test_supported_tag_rejects_prerelease(): void
     {
         $client = new MockHttpClient([
             new MockResponse(json_encode([
-                'schema' => 'durable-workflow.docs.public-artifact-compatibility-evidence',
-                'schema_version' => 2,
-                'outcome' => 'pass',
-                'qualified_artifact_versions' => ['cli' => '2.0.0-preview.1'],
+                'tag_name' => '2.1.1-rc.1',
+                'draft' => false,
+                'prerelease' => true,
             ], JSON_THROW_ON_ERROR), [
                 'http_code' => 200,
                 'response_headers' => ['Content-Type: application/json'],
@@ -64,8 +61,22 @@ class ReleaseCatalogTest extends TestCase
         $catalog = new ReleaseCatalog($client, 'durable-workflow/cli');
 
         $this->expectException(ReleaseCatalogException::class);
-        $this->expectExceptionMessage('must name a stable, alpha, beta, or rc version');
+        $this->expectExceptionMessage('must be a published stable version');
         $catalog->supportedTag();
+    }
+
+    public function test_supported_tag_requires_explicit_publication_flags(): void
+    {
+        $client = new MockHttpClient([
+            new MockResponse('{"tag_name":"2.1.1"}', [
+                'http_code' => 200,
+                'response_headers' => ['Content-Type: application/json'],
+            ]),
+        ]);
+
+        $this->expectException(ReleaseCatalogException::class);
+        $this->expectExceptionMessage('must be a published stable version');
+        (new ReleaseCatalog($client))->supportedTag();
     }
 
     public function test_supported_tag_throws_when_authority_is_unavailable(): void
@@ -76,7 +87,7 @@ class ReleaseCatalogTest extends TestCase
         $catalog = new ReleaseCatalog($client, 'durable-workflow/cli');
 
         $this->expectException(ReleaseCatalogException::class);
-        $this->expectExceptionMessage('could not fetch the qualified CLI release authority');
+        $this->expectExceptionMessage('could not fetch the latest stable CLI release');
         $catalog->supportedTag();
     }
 

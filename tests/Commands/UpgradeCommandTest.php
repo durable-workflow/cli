@@ -108,7 +108,7 @@ class UpgradeCommandTest extends TestCase
     public function test_dry_run_reports_asset_url_without_downloading(): void
     {
         $command = $this->command(
-            catalog: $this->catalog(['latest-tag' => '2.0.0-rc.31']),
+            catalog: $this->catalog(['latest-tag' => '2.0.0']),
             detector: fn () => new InstallationTarget(
                 kind: InstallationTarget::KIND_BINARY,
                 path: '/home/user/.local/bin/dw',
@@ -128,9 +128,9 @@ class UpgradeCommandTest extends TestCase
         $decoded = $this->decode($tester->getDisplay());
         self::assertSame('dry-run', $decoded['status']);
         self::assertSame('upgrade', $decoded['direction']);
-        self::assertSame('2.0.0-rc.31', $decoded['target_version']);
-        self::assertStringContainsString('2.0.0-rc.31/dw-linux-x86_64', $decoded['asset_url']);
-        self::assertStringContainsString('2.0.0-rc.31/SHA256SUMS', $decoded['checksum_url']);
+        self::assertSame('2.0.0', $decoded['target_version']);
+        self::assertStringContainsString('2.0.0/dw-linux-x86_64', $decoded['asset_url']);
+        self::assertStringContainsString('2.0.0/SHA256SUMS', $decoded['checksum_url']);
     }
 
     /**
@@ -147,11 +147,10 @@ class UpgradeCommandTest extends TestCase
                 $requests[] = [$method, $url];
 
                 return match ($url) {
-                    'https://durable-workflow.com/public-artifact-compatibility-evidence.json' => new MockResponse(json_encode([
-                        'schema' => 'durable-workflow.docs.public-artifact-compatibility-evidence',
-                        'schema_version' => 2,
-                        'outcome' => 'pass',
-                        'qualified_artifact_versions' => ['cli' => '0.1.9'],
+                    'https://api.github.com/repos/durable-workflow/cli/releases/latest' => new MockResponse(json_encode([
+                        'tag_name' => '0.1.9',
+                        'draft' => false,
+                        'prerelease' => false,
                     ], JSON_THROW_ON_ERROR), [
                         'http_code' => 200,
                         'response_headers' => ['Content-Type: application/json'],
@@ -184,7 +183,7 @@ class UpgradeCommandTest extends TestCase
         self::assertSame(Command::SUCCESS, $tester->execute(['--output' => 'json']));
         self::assertSame('upgraded', $this->decode($tester->getDisplay())['status']);
         self::assertSame([
-            ['GET', 'https://durable-workflow.com/public-artifact-compatibility-evidence.json'],
+            ['GET', 'https://api.github.com/repos/durable-workflow/cli/releases/latest'],
             ['GET', 'https://github.com/durable-workflow/cli/releases/download/0.1.9/SHA256SUMS'],
             ['GET', 'https://github.com/durable-workflow/cli/releases/download/0.1.9/dw-linux-x86_64'],
         ], $requests);
@@ -197,15 +196,14 @@ class UpgradeCommandTest extends TestCase
             static function (string $method, string $url) use (&$requests): MockResponse {
                 $requests[] = [$method, $url];
 
-                if ($url !== 'https://durable-workflow.com/public-artifact-compatibility-evidence.json') {
+                if ($url !== 'https://api.github.com/repos/durable-workflow/cli/releases/latest') {
                     throw new \AssertionError('unexpected dry-run request: '.$method.' '.$url);
                 }
 
                 return new MockResponse(json_encode([
-                    'schema' => 'durable-workflow.docs.public-artifact-compatibility-evidence',
-                    'schema_version' => 2,
-                    'outcome' => 'pass',
-                    'qualified_artifact_versions' => ['cli' => '0.1.9'],
+                    'tag_name' => '0.1.9',
+                    'draft' => false,
+                    'prerelease' => false,
                 ], JSON_THROW_ON_ERROR), [
                     'http_code' => 200,
                     'response_headers' => ['Content-Type: application/json'],
@@ -240,7 +238,7 @@ class UpgradeCommandTest extends TestCase
             $decoded['asset_url'],
         );
         self::assertSame([
-            ['GET', 'https://durable-workflow.com/public-artifact-compatibility-evidence.json'],
+            ['GET', 'https://api.github.com/repos/durable-workflow/cli/releases/latest'],
         ], $requests);
     }
 
@@ -271,9 +269,9 @@ class UpgradeCommandTest extends TestCase
 
     public function test_default_dry_run_reports_that_current_release_is_newer_than_supported_channel(): void
     {
-        putenv('DW_CLI_VERSION=2.0.0-rc.33');
+        putenv('DW_CLI_VERSION=2.2.0');
         $command = $this->command(
-            catalog: $this->catalog(['latest-tag' => '2.0.0-rc.12']),
+            catalog: $this->catalog(['latest-tag' => '2.1.1']),
             detector: fn () => new InstallationTarget(
                 kind: InstallationTarget::KIND_BINARY,
                 path: '/home/user/.local/bin/dw',
@@ -292,17 +290,17 @@ class UpgradeCommandTest extends TestCase
         self::assertSame(Command::SUCCESS, $exit);
         $decoded = $this->decode($tester->getDisplay());
         self::assertSame('newer', $decoded['status']);
-        self::assertSame('2.0.0-rc.33', $decoded['current_version']);
-        self::assertSame('2.0.0-rc.12', $decoded['target_version']);
-        self::assertStringContainsString('newer than the supported release', $decoded['reason']);
+        self::assertSame('2.2.0', $decoded['current_version']);
+        self::assertSame('2.1.1', $decoded['target_version']);
+        self::assertStringContainsString('newer than the latest stable release', $decoded['reason']);
         self::assertArrayNotHasKey('asset_url', $decoded);
     }
 
     public function test_default_upgrade_does_not_replace_newer_current_release(): void
     {
-        putenv('DW_CLI_VERSION=2.0.0-rc.33');
+        putenv('DW_CLI_VERSION=2.2.0');
         $command = $this->command(
-            catalog: $this->catalog(['latest-tag' => '2.0.0-rc.12']),
+            catalog: $this->catalog(['latest-tag' => '2.1.1']),
             detector: fn () => new InstallationTarget(
                 kind: InstallationTarget::KIND_BINARY,
                 path: '/home/user/.local/bin/dw',
@@ -321,9 +319,9 @@ class UpgradeCommandTest extends TestCase
 
     public function test_force_does_not_allow_an_unpinned_supported_channel_downgrade(): void
     {
-        putenv('DW_CLI_VERSION=2.0.0-rc.33');
+        putenv('DW_CLI_VERSION=2.2.0');
         $command = $this->command(
-            catalog: $this->catalog(['latest-tag' => '2.0.0-rc.12']),
+            catalog: $this->catalog(['latest-tag' => '2.1.1']),
             detector: fn () => new InstallationTarget(
                 kind: InstallationTarget::KIND_BINARY,
                 path: '/home/user/.local/bin/dw',
@@ -345,9 +343,9 @@ class UpgradeCommandTest extends TestCase
 
     public function test_human_dry_run_does_not_advertise_downgrade_as_upgrade(): void
     {
-        putenv('DW_CLI_VERSION=2.0.0-rc.33');
+        putenv('DW_CLI_VERSION=2.2.0');
         $command = $this->command(
-            catalog: $this->catalog(['latest-tag' => '2.0.0-rc.12']),
+            catalog: $this->catalog(['latest-tag' => '2.1.1']),
             detector: fn () => new InstallationTarget(
                 kind: InstallationTarget::KIND_BINARY,
                 path: '/home/user/.local/bin/dw',
@@ -361,7 +359,7 @@ class UpgradeCommandTest extends TestCase
         $exit = $tester->execute(['--dry-run' => true]);
 
         self::assertSame(Command::SUCCESS, $exit);
-        self::assertStringContainsString('2.0.0-rc.33 is newer than the supported release 2.0.0-rc.12', $tester->getDisplay());
+        self::assertStringContainsString('2.2.0 is newer than the latest stable release 2.1.1', $tester->getDisplay());
         self::assertStringNotContainsString('Would upgrade', $tester->getDisplay());
     }
 
@@ -733,10 +731,9 @@ class UpgradeCommandTest extends TestCase
         if (array_key_exists('latest-tag', $opts) && $opts['latest-tag'] !== null) {
             $tag = $opts['latest-tag'];
             $responses[] = new MockResponse(json_encode([
-                'schema' => 'durable-workflow.docs.public-artifact-compatibility-evidence',
-                'schema_version' => 2,
-                'outcome' => 'pass',
-                'qualified_artifact_versions' => ['cli' => $tag],
+                'tag_name' => $tag,
+                'draft' => false,
+                'prerelease' => false,
             ], JSON_THROW_ON_ERROR), [
                 'http_code' => 200,
                 'response_headers' => ['Content-Type: application/json'],

@@ -43,7 +43,7 @@ class UpgradeCommand extends Command
     protected function configure(): void
     {
         $this->setName('upgrade')
-            ->setDescription('Upgrade the standalone dw binary to the supported (or a pinned) release')
+            ->setDescription('Upgrade the standalone dw binary to the latest stable (or a pinned) release')
             ->setHelp(<<<'HELP'
 Replace the currently running `dw` binary with a newer release from
 `durable-workflow/cli` on GitHub. The command verifies the downloaded
@@ -58,7 +58,7 @@ installs are refused with a pointer at the right managing tool.
   <info>dw upgrade --dry-run</info>
   <info>dw upgrade --output=json</info>
 HELP)
-            ->addOption('tag', null, InputOption::VALUE_REQUIRED, 'Explicit release tag to install, including an intentional downgrade (defaults to the supported release)')
+            ->addOption('tag', null, InputOption::VALUE_REQUIRED, 'Explicit release tag to install, including an intentional downgrade (defaults to latest stable)')
             ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Resolve the target release without downloading or replacing')
             ->addOption('force', null, InputOption::VALUE_NONE, 'Re-download and replace even when the current and target versions match')
             ->addOption(
@@ -182,7 +182,7 @@ HELP)
             return $this->emit($output, $asJson, [
                 'status' => 'newer',
                 'reason' => sprintf(
-                    'dw %s is newer than the supported release %s; no change was made',
+                    'dw %s is newer than the latest stable release %s; no change was made',
                     $currentVersion,
                     $targetVersion,
                 ),
@@ -295,7 +295,7 @@ HELP)
                 $output->writeln(sprintf('<info>dw is already at %s</info>', (string) ($payload['current_version'] ?? 'unknown')));
                 break;
             case 'newer':
-                $output->writeln(sprintf('<info>%s</info>', (string) ($payload['reason'] ?? 'The installed dw release is newer than the supported release; no change was made.')));
+                $output->writeln(sprintf('<info>%s</info>', (string) ($payload['reason'] ?? 'The installed dw release is newer than the latest stable release; no change was made.')));
                 break;
             case 'dry-run':
                 $operation = ($payload['direction'] ?? null) === 'downgrade' ? 'downgrade' : 'upgrade';

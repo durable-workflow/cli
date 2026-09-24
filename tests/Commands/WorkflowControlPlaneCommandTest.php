@@ -210,7 +210,7 @@ class WorkflowControlPlaneCommandTest extends TestCase
 
         $display = $tester->getDisplay();
         self::assertStringContainsString('Cancel 2 workflows matching [customer-42]?', $display);
-        self::assertStringContainsString('Cancellation requested for 2 workflows.', $display);
+        self::assertStringContainsString('Cancelled 2 workflows.', $display);
         self::assertStringContainsString('Matched: 2', $display);
         self::assertStringContainsString('wf-1', $display);
         self::assertStringContainsString('wf-2', $display);

@@ -23,10 +23,11 @@ class CancelCommand extends BaseCommand
     {
         parent::configure();
         $this->setName('workflow:cancel')
-            ->setDescription('Request cancellation of a workflow')
+            ->setDescription('Close a workflow as cancelled')
             ->setHelp(<<<'HELP'
-Request cooperative cancellation. The workflow receives a cancellation
-signal and has a chance to run its cancellation handlers.
+Close the workflow run as cancelled immediately. Open tasks and timers are
+cancelled; workflow code does not resume to run cleanup. Arrange compensation
+before this command or use external reconciliation.
 
 <comment>Examples:</comment>
 
@@ -79,7 +80,7 @@ HELP)
             return $this->renderJson($output, $result);
         }
 
-        $output->writeln('<info>Cancellation requested</info>');
+        $output->writeln('<info>Workflow cancelled</info>');
         $output->writeln('  Workflow ID: '.$result['workflow_id']);
         $this->writeNamespaceLine($output, $result);
         $output->writeln('  Outcome: '.$result['outcome']);
@@ -178,7 +179,7 @@ HELP)
             return $this->renderBatchJson($output, $summary, $exitCode);
         }
 
-        $output->writeln(sprintf('<info>Cancellation requested for %d workflow%s.</info>', count($results), count($results) === 1 ? '' : 's'));
+        $output->writeln(sprintf('<info>Cancelled %d workflow%s.</info>', count($results), count($results) === 1 ? '' : 's'));
         $this->writeNamespaceLine($output, $summary);
         $output->writeln(sprintf('  Matched: %d', count($matches)));
         $output->writeln(sprintf('  Failed: %d', count($failures)));

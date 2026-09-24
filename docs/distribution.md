@@ -24,8 +24,7 @@ The one-line installer is the recommended path on every supported platform.
 Both `install.sh` and `install.ps1` download the matching `SHA256SUMS` manifest,
 verify the binary's checksum before writing it into the install directory,
 and refuse to proceed when the checksum does not match. An unpinned install
-resolves the current stable release from the public artifact compatibility
-authority.
+resolves GitHub's latest published stable release.
 
 On Unix, installation is ready only when an ordinary `dw` invocation resolves
 to the installed path. The installer reports the installed and active paths
@@ -36,25 +35,23 @@ the result requires a targeted `dw` cache refresh in that shell. Set
 `DURABLE_WORKFLOW_INSTALL_OUTPUT=json` to emit the final result as
 `durable-workflow.cli.install.v1` for release qualification.
 
-The default installer follows the qualified supported release. Maintainers can
-explicitly require a prerelease channel during future preview programs:
+The default installer follows the latest stable release. To install a
+prerelease, supply its exact tag:
 
 ```bash
-curl -fsSL https://durable-workflow.com/install.sh | VERSION=prerelease sh
+curl -fsSL https://durable-workflow.com/install.sh | VERSION="$PRERELEASE_TAG" sh
 ```
 
-For reproducible automation that requires an exact version, read the CLI tag
-from the qualified artifact authority, store it in `QUALIFIED_CLI_TAG`, and
-pass that value to the same installer:
+For reproducible automation, pin a published CLI release tag and pass it to
+the same installer:
 
 ```bash
-curl -fsSL https://durable-workflow.com/install.sh | VERSION="$QUALIFIED_CLI_TAG" sh
+curl -fsSL https://durable-workflow.com/install.sh | VERSION="$CLI_TAG" sh
 ```
 
-The qualified artifact authority is published at
-<https://durable-workflow.com/public-artifact-compatibility-evidence.json>.
-This keeps the selected release aligned with the supported cross-component
-tuple without maintaining a release-candidate sequence number in this guide.
+The installer verifies the matching release `SHA256SUMS`. It does not infer
+cross-component compatibility from the release version; check the Server and
+SDK compatibility documentation for your deployment.
 
 ## Provenance boundary
 
@@ -169,12 +166,12 @@ For an ordinary unpinned `dw upgrade`, requests occur in this order:
 
 | Endpoint family | Purpose | When requested |
 |-----------------|---------|----------------|
-| `GET https://durable-workflow.com/public-artifact-compatibility-evidence.json` | Resolve the qualified, supported CLI release from the public compatibility authority. | Always, including `--dry-run` and outcomes where the installed version is equal to or newer than the supported release. An explicit `--tag` skips this lookup. |
+| `GET https://api.github.com/repos/durable-workflow/cli/releases/latest` | Resolve GitHub's latest published stable CLI release. | Always for an unpinned upgrade, including `--dry-run` and no-op outcomes. An explicit `--tag` skips this lookup. |
 | `GET https://github.com/durable-workflow/cli/releases/download/<release>/SHA256SUMS` | Retrieve the checksum manifest for the selected release. | Only when the command will install; skipped by `--dry-run`, `status=noop`, and `status=newer`. |
 | `GET https://github.com/durable-workflow/cli/releases/download/<release>/<platform-asset>` | Download the selected standalone binary after obtaining its expected checksum. | Only when the command will install; skipped by `--dry-run`, `status=noop`, and `status=newer`. |
 
-The last two requests are GitHub release downloads, not GitHub release API
-requests. The client follows HTTPS redirects returned by GitHub for those
+The last two requests are GitHub release downloads, not GitHub API requests.
+The client follows HTTPS redirects returned by GitHub for those
 assets, so an egress allowlist must also permit GitHub's release-asset delivery
 destination. A dry run performs the authority lookup and reports the two
 release URLs it would use, but does not request either download.
@@ -205,24 +202,24 @@ as the rest of the binary.
 ## Auto-update
 
 `dw upgrade` performs an explicit, user-invoked self-update for standalone
-release binaries. Without a tag, it resolves the project's supported CLI
-channel and compares that release with the running binary before downloading
+release binaries. Without a tag, it resolves GitHub's latest stable CLI
+release and compares it with the running binary before downloading
 anything:
 
-| Installed version compared with the supported release | Result |
+| Installed version compared with the latest stable release | Result |
 |--------------------------------------------------------|--------|
-| Older | Downloads the supported release, verifies its SHA256, and atomically replaces the running binary. |
+| Older | Downloads the latest stable release, verifies its SHA256, and atomically replaces the running binary. |
 | Equal | Makes no change and reports `status=noop`. With `--force`, re-downloads and reinstalls the same release. |
 | Newer | Makes no change and reports `status=newer`, including when `--force` is present. |
 
-Use `--tag=<release>` to select an exact release instead of the supported
-channel. This is also the required path for an intentional downgrade. The
+Use `--tag=<release>` to select an exact release instead of latest stable.
+This is also the required path for an intentional downgrade. The
 other options are:
 
 - `--dry-run` resolves and reports the action without downloading or replacing
   the binary.
 - `--force` re-downloads when the installed and selected versions are equal.
-  It does not allow an unpinned supported-channel lookup to downgrade a newer
+  It does not allow an unpinned latest-stable lookup to downgrade a newer
   installation.
 - `--output=json` emits the result for automation.
 
@@ -233,18 +230,18 @@ in each invocation:
 
 ```console
 $ dw upgrade
-Upgraded dw to <supported-release>
+Upgraded dw to <stable-release>
   path: /home/user/.local/bin/dw
 
 $ dw upgrade
-dw is already at <supported-release>
+dw is already at <stable-release>
 
 $ dw upgrade --force
-Upgraded dw to <supported-release>
+Upgraded dw to <stable-release>
   path: /home/user/.local/bin/dw
 
 $ dw upgrade
-dw <newer-release> is newer than the supported release <supported-release>; no change was made
+dw <newer-release> is newer than the latest stable release <stable-release>; no change was made
 
 $ dw upgrade --tag="$OLDER_RELEASE" --dry-run
 Would downgrade <newer-release> -> <older-release>

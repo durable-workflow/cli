@@ -131,20 +131,47 @@ inspect update state after the original request has returned.
 
 ## Release gate
 
-A release of the `dw` CLI must produce a passing harness result
-document before tag, with the conformance level at `full` or
+### Maintenance releases
+
+Follow the organization [release follow-through guide](https://github.com/durable-workflow/.github/blob/main/AGENTS.md#cross-repository-release-follow-through).
+Before tagging, record the changed behavior, affected consumers and required
+experiments on the owning issue or release PR. Require normal command and
+schema fixture tests on every supported PHP version, PHAR build and
+reproducibility, and focused live Server checks for affected commands.
+
+Publish through the protected release workflow. Verify every supported
+distribution asset and exercise the changed behavior with the exact published
+CLI and Server tuple. Record versions, digests, runner revision, commands and
+scenario outcomes before closing the issue. A failed or incomplete required
+experiment remains unfinished delivery and must be resolved.
+
+These checks qualify the maintenance change. They do not establish full
+platform conformance or replace a missing runtime scenario with a source test.
+Do not label scoped evidence `full` or `provisional`, or add a platform
+compatibility claim from it.
+
+### Platform compatibility claims
+
+A release publishing a platform compatibility claim must additionally produce
+a passing harness result document before tag, with the conformance level at `full` or
 `provisional` (provisional categories enumerated in release notes).
+Use the suite version exposed by the exact Server build under test. The earlier
+suite versions referenced in the fixture inventory above describe that
+inventory's history and are not authority to omit newer required scenarios.
 
 | Field | Value |
 | --- | --- |
 | Required claimed targets | `cli_json_client` |
-| Required suite version | public docs-site manifest `durable-workflow.v2.platform-conformance.suite` version `27` |
+| Required suite version | public manifest `durable-workflow.v2.platform-conformance.suite`, matching the Server build under test |
 | CI job | CLI command contract tests in `composer test`; live runtime scenarios are recorded by the public platform conformance process |
 | Block on `nonconforming` | yes |
 | Artifact attached to release | harness result document, schema `durable-workflow.v2.platform-conformance.result` |
 
 A `nonconforming` result blocks the release. A failure in a provisional
 category emits a warning and does not block.
+Every stable required runtime scenario must pass. Smoke subsets, missing cells
+and runner failures cannot qualify a full platform claim. Attach the result
+document to the release rather than claiming a harness ran from command tests.
 
 ## Cross-references
 

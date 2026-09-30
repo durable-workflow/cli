@@ -23,16 +23,18 @@ class CompleteCommand extends BaseCommand
 Complete a leased workflow task through the worker protocol. By default the
 command emits a single <comment>complete_workflow</comment> command; pass
 <comment>--command</comment> for lower-level SDK command payloads.
+<comment>--complete-result</comment> accepts a JSON string containing base64 Avro
+single-object bytes or a JSON payload envelope produced by an SDK.
 
 <comment>Examples:</comment>
 
-  <info>dw workflow-task:complete task-123 1 --lease-owner=cli-worker --complete-result='{"ok":true}'</info>
+  <info>dw workflow-task:complete task-123 1 --lease-owner=cli-worker</info>
   <info>dw workflow-task:complete task-123 1 --command='{"type":"fail_workflow","message":"boom"}' --json</info>
 HELP)
             ->addArgument('task-id', InputArgument::REQUIRED, 'Workflow task ID')
             ->addArgument('attempt', InputArgument::REQUIRED, 'Workflow task attempt number')
             ->addOption('lease-owner', null, InputOption::VALUE_REQUIRED, 'Lease owner identity', 'cli')
-            ->addOption('complete-result', null, InputOption::VALUE_OPTIONAL, 'JSON result for a complete_workflow command')
+            ->addOption('complete-result', null, InputOption::VALUE_OPTIONAL, 'JSON Avro payload for a complete_workflow command')
             ->addOption('command', null, InputOption::VALUE_OPTIONAL | InputOption::VALUE_IS_ARRAY, 'Raw workflow task command JSON')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output the command response as JSON');
     }

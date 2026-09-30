@@ -7,6 +7,7 @@ namespace Tests\Support;
 use DurableWorkflow\Cli\Support\ControlPlaneRequestContract;
 use DurableWorkflow\Cli\Support\CompatibilityException;
 use DurableWorkflow\Cli\Support\ServerClient;
+use DurableWorkflow\Cli\Support\ServerHttpException;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
@@ -1144,7 +1145,7 @@ class ServerClientTest extends TestCase
         $client->post('/workflows/wf-123/signal/advance');
     }
 
-    public function test_it_rejects_control_plane_command_error_responses_without_the_shared_contract(): void
+    public function test_it_preserves_control_plane_command_errors_without_the_shared_contract(): void
     {
         $response = new MockResponse(json_encode([
             'message' => 'Workflow not found.',
@@ -1162,8 +1163,9 @@ class ServerClientTest extends TestCase
             http: new MockHttpClient($response, 'http://example.test'),
         );
 
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('missing the shared control-plane contract');
+        $this->expectException(ServerHttpException::class);
+        $this->expectExceptionCode(404);
+        $this->expectExceptionMessage('Server error: Workflow not found.');
 
         $client->post('/workflows/wf-123/signal/advance');
     }

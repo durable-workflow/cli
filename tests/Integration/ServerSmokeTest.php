@@ -145,7 +145,9 @@ final class ServerSmokeTest extends TestCase
             (string) $polledTask['task']['task_id'],
             (string) $polledTask['task']['workflow_task_attempt'],
             '--lease-owner='.$workerId,
-            '--complete-result={"status":"completed-by-cli-smoke"}',
+            // Encoded by the published PHP SDK's AvroPayloadCodec from
+            // {"status":"completed-by-cli-smoke"} using the fixed Value schema.
+            '--complete-result="wwHioz3/VYAiNw4CDHN0YXR1cwosY29tcGxldGVkLWJ5LWNsaS1zbW9rZQA="',
             '--json',
         ], $namespace, $this->workerToken);
 

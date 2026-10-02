@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DurableWorkflow\Cli\Commands;
 
+use DurableWorkflow\Cli\Support\CancellationCascadeRenderer;
 use DurableWorkflow\Cli\Support\InvalidOptionException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -21,8 +22,8 @@ class DebugCommand extends BaseCommand
             ->setDescription('Run one-shot diagnostics for a workflow')
             ->setHelp(<<<'HELP'
 Run a one-shot workflow diagnostic that combines execution state, pending
-workflow/activity work, task queue state, recent failures, and compatibility
-metadata from the server.
+workflow/activity work, task queue state, recent failures, compatibility and
+available cancellation cascade evidence from the server.
 
 <comment>Examples:</comment>
 
@@ -131,6 +132,7 @@ HELP)
         ));
         $output->writeln('');
 
+        (new CancellationCascadeRenderer())->render($output, $result);
         $this->renderWorkflowTasks($output, $result['pending_workflow_tasks'] ?? []);
         $this->renderActivities($output, $result['pending_activities'] ?? []);
         $this->renderFailures($output, $result['recent_failures'] ?? []);

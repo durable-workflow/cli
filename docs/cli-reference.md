@@ -324,6 +324,21 @@ setting, normalized auth-composition source names, TLS verification mode,
 server-advertised `auth_composition_contract` metadata, `/api/cluster/info`,
 and compatibility warnings derived from the protocol manifests and
 `client_compatibility` metadata.
+
+When Server supplies cancellation cascade diagnostics, `dw debug workflow`
+shows the original root identity and cleanup deadline, each run's request,
+delivery boundary and phase, child policy outcomes, activity stop receipts,
+cleanup recovery grants and recorded cleanup outcomes. Independent roots keep
+their own deadlines. A fence without a matching stop receipt keeps callback
+state `unknown`. Recovery grants alone do not identify the cause of worker loss.
+
+`Evidence: complete` describes retained inspection evidence, not whether every
+cleanup succeeded. Clipped or unavailable evidence is shown as partial with
+Server findings. `--run-id` preserves historical selection. `--output=json`
+retains the complete Server response, including fields this CLI does not
+recognize. This candidate view requires a Server runtime that supplies
+`durable-workflow.cancellation-cascade/v1` diagnostics.
+
 Use `dw debug workflow <id>` when support needs a single stuck-run capture:
 execution state, pending workflow/activity tasks, task queue backlog and
 pollers, recent failures, and compatibility metadata.

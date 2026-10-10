@@ -429,10 +429,25 @@ dw server:info
 dw doctor
 dw doctor --env=prod --output=json
 
-# Start a local development server
+# Serve an existing, configured Laravel project (requires PHP on PATH)
 dw server:start-dev
 dw server:start-dev --port=9090 --db=sqlite
 ```
+
+`server:start-dev` runs `php artisan serve` in the current directory and defaults
+to `127.0.0.1`. Use `--host=0.0.0.0` explicitly to bind to all interfaces. Install
+the project's dependencies, configure its database and run migrations first.
+The native CLI still requires a separate PHP executable for this command.
+The selected `--db` value is passed as `DB_CONNECTION`. Clear Laravel's cached
+configuration when changing drivers.
+
+MySQL and PostgreSQL modes require Docker Compose services named `mysql` or
+`pgsql`, respectively, and `redis` in that project. A failed dependency launch
+stops startup. Compose services remain running when the HTTP process ends.
+Run queue workers and the scheduler separately as your application requires.
+
+For a standalone Server using published images, follow the
+[service quickstart](https://durable-workflow.com/docs/quickstart/).
 
 ### Workflows
 

@@ -9,6 +9,8 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Process\Exception\ExceptionInterface;
+use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\Process;
 
 class StartDevCommand extends Command
@@ -16,12 +18,20 @@ class StartDevCommand extends Command
     protected function configure(): void
     {
         $this->setName('server:start-dev')
-            ->setDescription('Start a local development server with all dependencies')
+            ->setDescription('Serve an existing Laravel project for local development')
             ->setHelp(<<<'HELP'
-Boot a local development server for exploration. Uses SQLite by
-default so no external services are required; switch to
-<comment>mysql</comment> or <comment>pgsql</comment> to bring up
-Docker-backed dependencies.
+Run this command from an installed, configured Laravel project's directory.
+An external PHP executable is required, even when using the native dw binary.
+This launches Artisan's HTTP server. Configure the database and run migrations
+first, and run the project's queue worker and scheduler separately when needed.
+
+SQLite is the default database driver. For <comment>mysql</comment> or
+<comment>pgsql</comment>, your project's Docker Compose configuration must
+define that service and <comment>redis</comment>. Dependencies are left running
+when the HTTP process stops. The bind address defaults to loopback.
+
+For a standalone Durable Workflow Server, follow the Docker-backed quickstart:
+https://durable-workflow.com/docs/quickstart/
 
 <comment>Examples:</comment>
 
@@ -30,6 +40,7 @@ Docker-backed dependencies.
   <info>dw server:start-dev --db=mysql</info>
 HELP)
             ->addOption('port', 'p', InputOption::VALUE_OPTIONAL, 'Server port', '8080')
+            ->addOption('host', null, InputOption::VALUE_OPTIONAL, 'Bind address (IP address or localhost)', '127.0.0.1')
             ->addOption('db', null, InputOption::VALUE_OPTIONAL, 'Database driver (sqlite, mysql, pgsql)', 'sqlite', CompletionValues::DEV_DATABASES);
     }
 
@@ -37,44 +48,73 @@ HELP)
     {
         $port = $input->getOption('port');
         $db = $input->getOption('db');
+        $host = $input->getOption('host');
 
-        $output->writeln('<info>Starting Durable Workflow development server...</info>');
-        $output->writeln("  Port: {$port}");
-        $output->writeln("  Database: {$db}");
-        $output->writeln('');
-
-        if ($db === 'sqlite') {
-            $output->writeln('Using SQLite — no external database required.');
-            $output->writeln('');
-        } else {
-            $output->writeln("Make sure {$db} is running and configured in .env");
-            $output->writeln('');
+        if (!is_string($port) || !ctype_digit($port) || (int) $port < 1 || (int) $port > 65535) {
+            $output->writeln('<error>--port must be an integer between 1 and 65535.</error>');
+            return Command::INVALID;
+        }
+        if (!in_array($db, CompletionValues::DEV_DATABASES, true)) {
+            $output->writeln('<error>--db must be sqlite, mysql or pgsql.</error>');
+            return Command::INVALID;
+        }
+        if (!is_string($host) || ($host !== 'localhost' && filter_var($host, FILTER_VALIDATE_IP) === false)) {
+            $output->writeln('<error>--host must be an IP address or localhost.</error>');
+            return Command::INVALID;
         }
 
-        // Check if docker compose is available for non-sqlite
-        if ($db !== 'sqlite') {
-            $output->writeln('Starting dependencies with Docker Compose...');
-            $compose = new Process(['docker', 'compose', 'up', '-d', $db, 'redis']);
-            $compose->setTimeout(120);
-            $compose->run(function ($type, $buffer) use ($output) {
-                $output->write($buffer);
-            });
+        $directory = getcwd();
+        if ($directory === false || !is_file($directory.'/artisan') || !is_readable($directory.'/artisan')) {
+            $output->writeln('<error>No readable artisan file. Run this command from an installed, configured Laravel project.</error>');
+            $output->writeln('Standalone Server quickstart: https://durable-workflow.com/docs/quickstart/');
+            return Command::FAILURE;
         }
 
-        $output->writeln("<info>Server running at http://localhost:{$port}</info>");
-        $output->writeln('Press Ctrl+C to stop.');
-        $output->writeln('');
+        $finder = new ExecutableFinder();
+        $php = $finder->find('php');
+        if ($php === null) {
+            $output->writeln('<error>An external PHP executable is required on PATH to run artisan.</error>');
+            return Command::FAILURE;
+        }
 
-        // Start the PHP development server
-        $server = new Process([
-            'php', 'artisan', 'serve', '--port='.$port, '--host=0.0.0.0',
-        ]);
-        $server->setTimeout(null);
-        $server->setTty(Process::isTtySupported());
-        $server->run(function ($type, $buffer) use ($output) {
+        $stream = static function ($type, $buffer) use ($output): void {
             $output->write($buffer);
-        });
+        };
 
-        return Command::SUCCESS;
+        try {
+            if ($db !== 'sqlite') {
+                $docker = $finder->find('docker');
+                if ($docker === null) {
+                    $output->writeln('<error>Docker Compose is required for mysql or pgsql mode. Install Docker and configure the project services.</error>');
+                    return Command::FAILURE;
+                }
+                $output->writeln("Starting the project's {$db} and redis Compose services...");
+                $compose = new Process([$docker, 'compose', 'up', '-d', $db, 'redis'], $directory);
+                $compose->setTimeout(120);
+                $exitCode = $compose->run($stream);
+                if ($exitCode !== Command::SUCCESS) {
+                    $output->writeln('<error>Dependencies failed to start. Check the project Compose configuration and diagnostics above.</error>');
+                    return $exitCode;
+                }
+            }
+
+            $address = str_contains($host, ':') ? '['.$host.']' : $host;
+            $output->writeln("<info>Starting Laravel HTTP server at http://{$address}:{$port}</info>");
+            $output->writeln("Database driver: {$db}. Press Ctrl+C to stop the HTTP process.");
+            $server = new Process([
+                $php, 'artisan', 'serve', '--port='.$port, '--host='.$host,
+            ], $directory, ['DB_CONNECTION' => $db]);
+            $server->setTimeout(null);
+            $server->setTty(Process::isTtySupported());
+            $exitCode = $server->run($stream);
+            if ($exitCode !== Command::SUCCESS) {
+                $output->writeln('<error>Laravel HTTP process failed. Check the project configuration and diagnostics above.</error>');
+            }
+            return $exitCode;
+        } catch (ExceptionInterface $exception) {
+            $output->writeln('<error>Development startup failed.</error>');
+            $output->writeln($exception->getMessage(), OutputInterface::OUTPUT_RAW);
+            return Command::FAILURE;
+        }
     }
 }

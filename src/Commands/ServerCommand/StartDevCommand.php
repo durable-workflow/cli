@@ -59,8 +59,9 @@ class StartDevCommand extends Command implements SignalableCommandInterface
     private function childProcess(array $command, string $directory, array $environment = []): Process
     {
         if (SignalRegistry::isSupported() && function_exists('posix_setsid')) {
-            $launcher = PHP_SAPI === 'micro'
-                ? [PHP_BINARY]
+            // phpmicro provides its own absolute path because PHP_BINARY is empty.
+            $launcher = function_exists('micro_get_self_filename')
+                ? [micro_get_self_filename()]
                 : [PHP_BINARY, (class_exists(\Phar::class) ? \Phar::running(false) : '') ?: dirname(__DIR__, 3).'/bin/dw'];
             return new Process([...$launcher, ...$command], $directory, $environment + ['DW_CLI_EXEC_CHILD' => '1']);
         }

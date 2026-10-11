@@ -448,6 +448,11 @@ MySQL and PostgreSQL modes require Docker Compose services named `mysql` or
 stops startup. Compose services remain running when the HTTP process ends.
 Run queue workers and the scheduler separately as your application requires.
 
+POSIX native binaries forward SIGINT and SIGTERM to the active HTTP or Compose
+process and wait up to five seconds before stopping it. Source and PHAR installs
+use this forwarding when their PHP runtime provides `pcntl` and `posix`. Windows uses its
+console interruption behavior. Existing Compose services remain caller-owned.
+
 For a standalone Server using published images, follow the
 [service quickstart](https://durable-workflow.com/docs/quickstart/).
 

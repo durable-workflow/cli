@@ -6,15 +6,65 @@ namespace DurableWorkflow\Cli\Commands\ServerCommand;
 
 use DurableWorkflow\Cli\Support\CompletionValues;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Command\SignalableCommandInterface;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Console\SignalRegistry\SignalRegistry;
 use Symfony\Component\Process\Exception\ExceptionInterface;
 use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\Process;
 
-class StartDevCommand extends Command
+class StartDevCommand extends Command implements SignalableCommandInterface
 {
+    private ?Process $activeProcess = null;
+
+    public function getSubscribedSignals(): array
+    {
+        return SignalRegistry::isSupported() ? [SIGINT, SIGTERM] : [];
+    }
+
+    public function handleSignal(int $signal, int|false $previousExitCode = 0): int|false
+    {
+        if ($this->activeProcess?->isRunning()) {
+            $pid = $this->activeProcess->getPid();
+            $group = $pid !== null && function_exists('posix_getpgid') && posix_getpgid($pid) === $pid ? $pid : null;
+            if ($group !== null) {
+                posix_kill(-$group, $signal);
+            } else {
+                $this->activeProcess->signal($signal);
+            }
+            $deadline = hrtime(true) + 5_000_000_000;
+            while (hrtime(true) < $deadline) {
+                $running = $this->activeProcess->isRunning();
+                if (!$running && ($group === null || !posix_kill(-$group, 0))) {
+                    break;
+                }
+                usleep(10000);
+            }
+            if ($group !== null && posix_kill(-$group, 0)) {
+                posix_kill(-$group, SIGKILL);
+            }
+            if ($this->activeProcess->isRunning()) {
+                $this->activeProcess->stop(0);
+            }
+        }
+
+        return 128 + $signal;
+    }
+
+    private function childProcess(array $command, string $directory, array $environment = []): Process
+    {
+        if (SignalRegistry::isSupported() && function_exists('posix_setsid')) {
+            $launcher = PHP_SAPI === 'micro'
+                ? [PHP_BINARY]
+                : [PHP_BINARY, (class_exists(\Phar::class) ? \Phar::running(false) : '') ?: dirname(__DIR__, 3).'/bin/dw'];
+            return new Process([...$launcher, ...$command], $directory, $environment + ['DW_CLI_EXEC_CHILD' => '1']);
+        }
+
+        return new Process($command, $directory, $environment);
+    }
+
     protected function configure(): void
     {
         $this->setName('server:start-dev')
@@ -90,7 +140,8 @@ HELP)
                     return Command::FAILURE;
                 }
                 $output->writeln("Starting the project's {$db} and redis Compose services...");
-                $compose = new Process([$docker, 'compose', 'up', '-d', $db, 'redis'], $directory);
+                $compose = $this->childProcess([$docker, 'compose', 'up', '-d', $db, 'redis'], $directory);
+                $this->activeProcess = $compose;
                 $compose->setTimeout(120);
                 $exitCode = $compose->run($stream);
                 if ($exitCode !== Command::SUCCESS) {
@@ -102,10 +153,11 @@ HELP)
             $address = str_contains($host, ':') ? '['.$host.']' : $host;
             $output->writeln("<info>Starting Laravel HTTP server at http://{$address}:{$port}</info>");
             $output->writeln("Database driver: {$db}. Press Ctrl+C to stop the HTTP process.");
-            $server = new Process([
+            $server = $this->childProcess([
                 $php, 'artisan', 'serve', '--no-reload', '--port='.$port, '--host='.$host,
             ], $directory, ['DB_CONNECTION' => $db]);
             $server->setTimeout(null);
+            $this->activeProcess = $server;
             $server->setTty(Process::isTtySupported());
             $exitCode = $server->run($stream);
             if ($exitCode !== Command::SUCCESS) {

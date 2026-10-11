@@ -9,7 +9,7 @@ use Symfony\Component\Process\Process;
 
 final class StartDevSignalFixture
 {
-    public static function run(array $command, string $database, int $signal): array
+    public static function run(array $command, string $database, int $signal, bool $ignoreSignal = false): array
     {
         if (!function_exists('pcntl_signal') || !function_exists('posix_kill')) {
             throw new RuntimeException('Signal fixture requires external PHP with pcntl and posix.');
@@ -30,6 +30,11 @@ while (true) { usleep(100000); }
 PHP;
         file_put_contents($directory.'/artisan', $childCode);
         file_put_contents($directory.'/docker', '#!'.PHP_BINARY."\n".$childCode);
+        if ($ignoreSignal) {
+            $childCode = str_replace('file_put_contents(\'child.pid\'', 'pcntl_signal(SIGINT, SIG_IGN); pcntl_signal(SIGTERM, SIG_IGN); file_put_contents(\'child.pid\'', $childCode);
+            file_put_contents($directory.'/artisan', $childCode);
+            file_put_contents($directory.'/docker', '#!'.PHP_BINARY."\n".$childCode);
+        }
         chmod($directory.'/docker', 0755);
         $process = new Process([...$command, 'server:start-dev', '--db='.$database], $directory, [
             'PATH' => $directory.PATH_SEPARATOR.getenv('PATH'),
@@ -46,6 +51,7 @@ PHP;
                 usleep(10000);
             }
             $childPid = (int) file_get_contents($directory.'/child.pid');
+            $signaledAt = hrtime(true);
             $process->signal($signal);
             try {
                 $process->wait();
@@ -60,6 +66,7 @@ PHP;
                 'exit_code' => $process->getExitCode(),
                 'forwarded_signal' => is_file($directory.'/stopped.signal') ? (int) file_get_contents($directory.'/stopped.signal') : null,
                 'child_alive' => posix_kill($childPid, 0),
+                'stop_seconds' => (hrtime(true) - $signaledAt) / 1_000_000_000,
                 'output' => $process->getOutput().$process->getErrorOutput(),
             ];
         } finally {

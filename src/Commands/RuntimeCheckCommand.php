@@ -22,6 +22,8 @@ final class RuntimeCheckCommand extends Command
         'fileinfo',
         'iconv',
         'sockets',
+        'pcntl',
+        'posix',
     ];
 
     public const REQUIRED_EXTENSIONS_WINDOWS = [

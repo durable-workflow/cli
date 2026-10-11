@@ -438,10 +438,10 @@ jobs:
       PHPMICRO_UNCACHED_BASELINE_SECONDS: '480'
       SPC_DOWNLOAD_OUTER_ATTEMPTS: '4'
       SPC_DOWNLOAD_RETRY: '5'
-      SPC_EXTENSIONS: curl,mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets
+      SPC_EXTENSIONS: curl,mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets,pcntl,posix
       SPC_REVISION: 4318ef8fa32a02460ec1554746674a7bc42b49fa
       SPC_VERSION: '2.8.5'
-      STANDALONE_RUNTIME_EXTENSIONS: curl,mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets
+      STANDALONE_RUNTIME_EXTENSIONS: curl,mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets,pcntl,posix
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
         with:
@@ -889,6 +889,15 @@ jobs:
           ./spc micro:combine ../../build/dw.phar \
             --output=../../build/dw-${{ matrix.name }}
 
+      - name: Set up external PHP for native launcher qualification
+        if: needs.resolve-release.outputs.cache_warm != 'true'
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240  # v2
+        with:
+          php-version: '8.4'
+          extensions: pcntl, posix
+          tools: composer:v2
+          coverage: none
+
       - name: Smoke test binary
         if: needs.resolve-release.outputs.cache_warm != 'true'
         run: |
@@ -896,6 +905,12 @@ jobs:
           ./build/dw-${{ matrix.name }} --version
           ./build/dw-${{ matrix.name }} runtime:check
           ./build/dw-${{ matrix.name }} list
+
+      - name: Qualify direct signals in the packaged POSIX launcher
+        if: needs.resolve-release.outputs.cache_warm != 'true'
+        run: |
+          composer install --no-dev --prefer-dist --no-interaction
+          php scripts/ci/test-start-dev-signals.php "$GITHUB_WORKSPACE/build/dw-${{ matrix.name }}"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
         if: needs.resolve-release.outputs.cache_warm != 'true'

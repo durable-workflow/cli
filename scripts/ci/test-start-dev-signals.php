@@ -19,3 +19,8 @@ foreach (['sqlite', 'mysql'] as $database) {
         echo "PASS {$database} signal {$signal}: child stopped, exit ".(128 + $signal)."\n";
     }
 }
+$forced = StartDevSignalFixture::run([$binary], 'sqlite', 15, true);
+if ($forced['child_alive'] || $forced['exit_code'] !== 143 || $forced['stop_seconds'] >= 7) {
+    throw new RuntimeException('Ignored signal exceeded cleanup budget: '.json_encode($forced, JSON_THROW_ON_ERROR));
+}
+echo "PASS ignored SIGTERM: child stopped within the five-second budget\n";

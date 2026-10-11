@@ -29,4 +29,15 @@ final class StartDevSignalTest extends TestCase
         yield 'Compose SIGINT' => ['mysql', 2];
         yield 'Compose SIGTERM' => ['mysql', 15];
     }
+
+    public function test_an_ignored_signal_cannot_keep_the_child_alive_past_the_budget(): void
+    {
+        $result = StartDevSignalFixture::run([PHP_BINARY, dirname(__DIR__, 2).'/bin/dw'], 'sqlite', 15, true);
+
+        self::assertNull($result['forwarded_signal']);
+        self::assertFalse($result['child_alive']);
+        self::assertSame(143, $result['exit_code']);
+        self::assertGreaterThanOrEqual(5, $result['stop_seconds']);
+        self::assertLessThan(7, $result['stop_seconds']);
+    }
 }

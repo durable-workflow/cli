@@ -40,4 +40,15 @@ final class StartDevSignalTest extends TestCase
         self::assertGreaterThanOrEqual(5, $result['stop_seconds']);
         self::assertLessThan(7, $result['stop_seconds']);
     }
+
+    public function test_a_second_interrupt_preserves_the_original_cleanup_deadline(): void
+    {
+        $result = StartDevSignalFixture::run([PHP_BINARY, dirname(__DIR__, 2).'/bin/dw'], 'sqlite', 2, true, 15);
+
+        self::assertNull($result['forwarded_signal']);
+        self::assertFalse($result['child_alive']);
+        self::assertSame(143, $result['exit_code']);
+        self::assertGreaterThanOrEqual(5, $result['stop_seconds']);
+        self::assertLessThan(6.5, $result['stop_seconds']);
+    }
 }

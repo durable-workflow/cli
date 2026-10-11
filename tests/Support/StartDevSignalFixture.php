@@ -9,7 +9,7 @@ use Symfony\Component\Process\Process;
 
 final class StartDevSignalFixture
 {
-    public static function run(array $command, string $database, int $signal, bool $ignoreSignal = false): array
+    public static function run(array $command, string $database, int $signal, bool $ignoreSignal = false, ?int $secondSignal = null): array
     {
         if (!function_exists('pcntl_signal') || !function_exists('posix_kill')) {
             throw new RuntimeException('Signal fixture requires external PHP with pcntl and posix.');
@@ -53,6 +53,10 @@ PHP;
             $childPid = (int) file_get_contents($directory.'/child.pid');
             $signaledAt = hrtime(true);
             $process->signal($signal);
+            if ($secondSignal !== null) {
+                usleep(2000000);
+                $process->signal($secondSignal);
+            }
             try {
                 $process->wait();
             } catch (ProcessSignaledException) {

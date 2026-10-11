@@ -18,6 +18,7 @@ use Symfony\Component\Process\Process;
 class StartDevCommand extends Command implements SignalableCommandInterface
 {
     private ?Process $activeProcess = null;
+    private ?int $shutdownDeadline = null;
 
     public function getSubscribedSignals(): array
     {
@@ -34,7 +35,7 @@ class StartDevCommand extends Command implements SignalableCommandInterface
             } else {
                 $this->activeProcess->signal($signal);
             }
-            $deadline = hrtime(true) + 5_000_000_000;
+            $deadline = $this->shutdownDeadline ??= hrtime(true) + 5_000_000_000;
             while (hrtime(true) < $deadline) {
                 $running = $this->activeProcess->isRunning();
                 if (!$running && ($group === null || !posix_kill(-$group, 0))) {

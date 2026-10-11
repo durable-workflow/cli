@@ -19,6 +19,7 @@ class StartDevCommand extends Command implements SignalableCommandInterface
 {
     private ?Process $activeProcess = null;
     private ?int $shutdownDeadline = null;
+    private ?int $shutdownSignal = null;
 
     public function getSubscribedSignals(): array
     {
@@ -27,6 +28,7 @@ class StartDevCommand extends Command implements SignalableCommandInterface
 
     public function handleSignal(int $signal, int|false $previousExitCode = 0): int|false
     {
+        $this->shutdownSignal ??= $signal;
         if ($this->activeProcess?->isRunning()) {
             $pid = $this->activeProcess->getPid();
             $group = $pid !== null && function_exists('posix_getpgid') && posix_getpgid($pid) === $pid ? $pid : null;
@@ -51,7 +53,7 @@ class StartDevCommand extends Command implements SignalableCommandInterface
             }
         }
 
-        return 128 + $signal;
+        return 128 + $this->shutdownSignal;
     }
 
     private function childProcess(array $command, string $directory, array $environment = []): Process

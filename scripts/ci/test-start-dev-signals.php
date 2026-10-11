@@ -25,7 +25,7 @@ if ($forced['child_alive'] || $forced['exit_code'] !== 143 || $forced['stop_seco
 }
 echo "PASS ignored SIGTERM: child stopped within the five-second budget\n";
 $repeated = StartDevSignalFixture::run([$binary], 'sqlite', 2, true, 15);
-if ($repeated['child_alive'] || $repeated['exit_code'] !== 143 || $repeated['stop_seconds'] >= 6.5) {
+if ($repeated['child_alive'] || $repeated['exit_code'] !== 130 || $repeated['stop_seconds'] >= 6.5) {
     throw new RuntimeException('Second interrupt extended cleanup: '.json_encode($repeated, JSON_THROW_ON_ERROR));
 }
 echo "PASS repeated interrupt: original five-second deadline preserved\n";

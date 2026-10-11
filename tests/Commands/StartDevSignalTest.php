@@ -47,7 +47,7 @@ final class StartDevSignalTest extends TestCase
 
         self::assertNull($result['forwarded_signal']);
         self::assertFalse($result['child_alive']);
-        self::assertSame(143, $result['exit_code']);
+        self::assertSame(130, $result['exit_code']);
         self::assertGreaterThanOrEqual(5, $result['stop_seconds']);
         self::assertLessThan(6.5, $result['stop_seconds']);
     }

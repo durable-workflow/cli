@@ -96,7 +96,7 @@ class StartDevCommandTest extends TestCase
 
         self::assertSame(Command::SUCCESS, $tester->execute($options + ['--port' => '9090']));
         $launch = json_decode(file_get_contents($this->directory.'/launched.json'), true, flags: JSON_THROW_ON_ERROR);
-        self::assertSame(['artisan', 'serve', '--port=9090', '--host='.$host], $launch['arguments']);
+        self::assertSame(['artisan', 'serve', '--no-reload', '--port=9090', '--host='.$host], $launch['arguments']);
         self::assertSame('sqlite', $launch['database']);
         self::assertStringContainsString($url, $tester->getDisplay());
         self::assertStringNotContainsString('Server running', $tester->getDisplay());

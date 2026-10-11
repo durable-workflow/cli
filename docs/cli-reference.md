@@ -440,6 +440,8 @@ the project's dependencies, configure its database and run migrations first.
 The native CLI still requires a separate PHP executable for this command.
 The selected `--db` value is passed as `DB_CONNECTION`. Clear Laravel's cached
 configuration when changing drivers.
+Restart the command after editing `.env`. Artisan's automatic environment reload
+is disabled so the selected database driver stays applied to HTTP requests.
 
 MySQL and PostgreSQL modes require Docker Compose services named `mysql` or
 `pgsql`, respectively, and `redis` in that project. A failed dependency launch

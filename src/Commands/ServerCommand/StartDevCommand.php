@@ -24,6 +24,7 @@ Run this command from an installed, configured Laravel project's directory.
 An external PHP executable is required, even when using the native dw binary.
 This launches Artisan's HTTP server. Configure the database and run migrations
 first, and run the project's queue worker and scheduler separately when needed.
+Restart this command after editing the project's .env configuration.
 
 SQLite is the default database driver. For <comment>mysql</comment> or
 <comment>pgsql</comment>, your project's Docker Compose configuration must
@@ -102,7 +103,7 @@ HELP)
             $output->writeln("<info>Starting Laravel HTTP server at http://{$address}:{$port}</info>");
             $output->writeln("Database driver: {$db}. Press Ctrl+C to stop the HTTP process.");
             $server = new Process([
-                $php, 'artisan', 'serve', '--port='.$port, '--host='.$host,
+                $php, 'artisan', 'serve', '--no-reload', '--port='.$port, '--host='.$host,
             ], $directory, ['DB_CONNECTION' => $db]);
             $server->setTimeout(null);
             $server->setTty(Process::isTtySupported());

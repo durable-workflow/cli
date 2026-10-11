@@ -899,7 +899,18 @@ jobs:
           tools: composer:v2
           coverage: none
 
-      - name: Verify preinstalled macOS qualification tools
+      - name: Install macOS qualification tools
+        if: needs.resolve-release.outputs.cache_warm != 'true' && runner.os == 'macOS'
+        timeout-minutes: 10
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+          HOMEBREW_NO_INSTALL_CLEANUP: '1'
+        run: |
+          brew install php@8.4 composer
+          qualification_php_prefix="$(brew --prefix php@8.4)"
+          printf '%s/bin\n' "$qualification_php_prefix" >> "$GITHUB_PATH"
+
+      - name: Verify macOS qualification tools
         if: needs.resolve-release.outputs.cache_warm != 'true' && runner.os == 'macOS'
         timeout-minutes: 2
         run: |

@@ -890,18 +890,29 @@ jobs:
             --output=../../build/dw-${{ matrix.name }}
 
       - name: Set up external PHP for native launcher qualification
-        if: needs.resolve-release.outputs.cache_warm != 'true'
+        if: needs.resolve-release.outputs.cache_warm != 'true' && runner.os != 'macOS'
         timeout-minutes: 10
         uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240  # v2
-        env:
-          # The pinned macOS watchdog can leave FIFO readers blocked after cleanup.
-          # Keep the whole setup bounded by the step timeout above.
-          SETUP_PHP_BREW_WATCHDOG: ${{ runner.os == 'macOS' && 'false' || 'true' }}
         with:
           php-version: '8.4'
           extensions: pcntl, posix
           tools: composer:v2
           coverage: none
+
+      - name: Verify preinstalled macOS qualification tools
+        if: needs.resolve-release.outputs.cache_warm != 'true' && runner.os == 'macOS'
+        timeout-minutes: 2
+        run: |
+          command -v php
+          command -v composer
+          php --version
+          composer --version
+          php -r '
+            if (PHP_VERSION_ID < 80200 || !extension_loaded("pcntl") || !extension_loaded("posix")) {
+              fwrite(STDERR, "Native launcher qualification requires external PHP 8.2+ with pcntl and posix.\n");
+              exit(1);
+            }
+          '
 
       - name: Smoke test binary
         if: needs.resolve-release.outputs.cache_warm != 'true'
@@ -911,10 +922,16 @@ jobs:
           ./build/dw-${{ matrix.name }} runtime:check
           ./build/dw-${{ matrix.name }} list
 
-      - name: Qualify direct signals in the packaged POSIX launcher
+      - name: Install native launcher qualification dependencies
         if: needs.resolve-release.outputs.cache_warm != 'true'
+        timeout-minutes: 5
         run: |
           composer install --no-dev --prefer-dist --no-interaction
+
+      - name: Qualify direct signals in the packaged POSIX launcher
+        if: needs.resolve-release.outputs.cache_warm != 'true'
+        timeout-minutes: 3
+        run: |
           php scripts/ci/test-start-dev-signals.php "$GITHUB_WORKSPACE/build/dw-${{ matrix.name }}"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7

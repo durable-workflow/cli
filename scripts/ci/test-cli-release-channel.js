@@ -4,7 +4,6 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 
 const {
-  AUTHORITY_SCHEMA,
   REQUIRED_ASSETS,
   expectedPrerelease,
   validateChannel,
@@ -47,40 +46,29 @@ test('a prerelease tag exposed as a stable GitHub Release fails closed', () => {
   );
 });
 
-test('channel classification reads the public stable release authority', () => {
+test('channel classification validates GitHub latest stable metadata and assets', () => {
   assert.deepEqual(
-    validateChannel({
-      schema: AUTHORITY_SCHEMA,
-      schema_version: 1,
-      artifacts: {cli: '2.0.0'},
-    }),
+    validateChannel(release('2.0.0', false)),
     {
-      schema: AUTHORITY_SCHEMA,
       channel: 'stable',
       version: '2.0.0',
     },
   );
 
   assert.throws(
-    () => validateChannel({
-      schema: AUTHORITY_SCHEMA,
-      schema_version: 1,
-      artifacts: {cli: '2.0.0-rc.1'},
-    }),
+    () => validateChannel(release('2.0.0-rc.1', true)),
     /must be exact MAJOR.MINOR.PATCH/,
   );
+  assert.throws(() => validateChannel({...release('2.0.0', false), draft: true}), /still a draft/);
+  assert.throws(() => validateChannel(release('2.0.0', true)), /prerelease=true; expected false/);
 });
 
 test('the current stable channel remains publicly discoverable with complete assets', async () => {
   const releaseTag = '2.0.0-rc.32';
   const supportedTag = '2.0.0';
-  const channel = {
-    schema: AUTHORITY_SCHEMA,
-    schema_version: 1,
-    artifacts: {cli: supportedTag},
-  };
+  const channel = release(supportedTag, false);
   const fetchImpl = async url => {
-    if (url === 'https://example.test/channel.json') {
+    if (url.endsWith('/releases/latest')) {
       return jsonResponse(channel);
     }
     if (url.endsWith(`/releases/tags/${releaseTag}`)) {
@@ -95,7 +83,6 @@ test('the current stable channel remains publicly discoverable with complete ass
   assert.deepEqual(
     await verifyPublicReleaseChannel({
       apiBase: 'https://api.example.test/repos/durable-workflow/cli',
-      channelUrl: 'https://example.test/channel.json',
       fetchImpl,
       releaseTag,
     }),
@@ -108,9 +95,6 @@ test('the current stable channel remains publicly discoverable with complete ass
   );
 
   const incompleteFetch = async url => {
-    if (url === 'https://example.test/channel.json') {
-      return jsonResponse(channel);
-    }
     if (url.endsWith(`/releases/tags/${releaseTag}`)) {
       return jsonResponse(release(releaseTag, true));
     }
@@ -123,7 +107,6 @@ test('the current stable channel remains publicly discoverable with complete ass
   await assert.rejects(
     verifyPublicReleaseChannel({
       apiBase: 'https://api.example.test/repos/durable-workflow/cli',
-      channelUrl: 'https://example.test/channel.json',
       fetchImpl: incompleteFetch,
       releaseTag,
     }),
@@ -131,9 +114,6 @@ test('the current stable channel remains publicly discoverable with complete ass
   );
 
   const unavailableFetch = async url => {
-    if (url === 'https://example.test/channel.json') {
-      return jsonResponse(channel);
-    }
     if (url.endsWith(`/releases/tags/${releaseTag}`)) {
       return jsonResponse(release(releaseTag, true));
     }
@@ -142,32 +122,48 @@ test('the current stable channel remains publicly discoverable with complete ass
   await assert.rejects(
     verifyPublicReleaseChannel({
       apiBase: 'https://api.example.test/repos/durable-workflow/cli',
-      channelUrl: 'https://example.test/channel.json',
       fetchImpl: unavailableFetch,
       releaseTag,
     }),
-    /HTTP 404 fetching .*2\.0\.0/,
+    /HTTP 404 fetching .*releases\/latest/,
   );
 });
 
 test('stable transition resolution requires stable public metadata', async () => {
   const fetchImpl = async url => {
-    if (url === 'https://example.test/channel.json') {
-      return jsonResponse({
-        schema: AUTHORITY_SCHEMA,
-        schema_version: 1,
-        artifacts: {cli: '2.0.0'},
-      });
-    }
     return jsonResponse(release('2.0.0', false));
   };
 
   const evidence = await verifyPublicReleaseChannel({
     apiBase: 'https://api.example.test/repos/durable-workflow/cli',
-    channelUrl: 'https://example.test/channel.json',
     fetchImpl,
     releaseTag: '2.0.0',
   });
   assert.equal(evidence.channel, 'stable');
   assert.equal(evidence.release_prerelease, false);
+});
+
+test('a new stable patch uses GitHub latest while the documentation pointer is older', async () => {
+  const apiBase = 'https://api.example.test/repos/durable-workflow/cli';
+  const calls = [];
+  const fetchImpl = async url => {
+    calls.push(url);
+    if (url === `${apiBase}/releases/latest` || url === `${apiBase}/releases/tags/2.2.2`) {
+      return jsonResponse(release('2.2.2', false));
+    }
+    if (url === 'https://durable-workflow.com/stable-releases.json') {
+      return jsonResponse({schema: 'durable-workflow.docs.stable-releases', schema_version: 1, artifacts: {cli: '2.2.0'}});
+    }
+    return jsonResponse({}, 404);
+  };
+  const evidence = await verifyPublicReleaseChannel({apiBase, fetchImpl, releaseTag: '2.2.2'});
+  assert.equal(evidence.channel_version, '2.2.2');
+  assert.deepEqual(calls, [`${apiBase}/releases/latest`, `${apiBase}/releases/tags/2.2.2`]);
+});
+
+test('an explicitly older stable release validates against the newer actual stable channel', async () => {
+  const fetchImpl = async url => jsonResponse(release(url.endsWith('/latest') ? '2.2.2' : '2.2.0', false));
+  const evidence = await verifyPublicReleaseChannel({fetchImpl, releaseTag: '2.2.0'});
+  assert.equal(evidence.channel_version, '2.2.2');
+  assert.equal(evidence.release_tag, '2.2.0');
 });

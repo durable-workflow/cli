@@ -2,9 +2,6 @@
 
 const {parseReleaseVersion} = require('./release-version');
 
-const AUTHORITY_SCHEMA = 'durable-workflow.docs.stable-releases';
-const DEFAULT_CHANNEL_URL =
-  'https://durable-workflow.com/stable-releases.json';
 const DEFAULT_API_BASE = 'https://api.github.com/repos/durable-workflow/cli';
 const REQUIRED_ASSETS = Object.freeze([
   'SHA256SUMS',
@@ -30,21 +27,18 @@ function expectedPrerelease(tag) {
 
 function validateChannel(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw new Error('CLI release authority must be a JSON object');
-  }
-  if (value.schema !== AUTHORITY_SCHEMA || value.schema_version !== 1) {
-    throw new Error('CLI release authority must use the stable-releases schema v1');
+    throw new Error('GitHub latest stable release must be a JSON object');
   }
 
-  const version = value.artifacts?.cli;
+  const version = value.tag_name;
   const parsed = parseReleaseVersion(version);
   if (parsed === null || parsed.prerelease !== null || parsed.build !== null) {
     throw new Error(`stable CLI version must be exact MAJOR.MINOR.PATCH: ${String(version)}`);
   }
+  validateReleaseMetadata(value, version);
 
   return Object.freeze({
     channel: 'stable',
-    schema: value.schema,
     version,
   });
 }
@@ -99,8 +93,8 @@ async function fetchJson(url, fetchImpl = globalThis.fetch) {
 }
 
 async function verifyPublicReleaseChannel(options = {}) {
-  const channelUrl = options.channelUrl || DEFAULT_CHANNEL_URL;
   const apiBase = (options.apiBase || DEFAULT_API_BASE).replace(/\/$/, '');
+  const channelUrl = options.channelUrl || `${apiBase}/releases/latest`;
   const fetchImpl = options.fetchImpl || globalThis.fetch;
   const releaseTag = options.releaseTag;
 
@@ -114,19 +108,6 @@ async function verifyPublicReleaseChannel(options = {}) {
     await fetchJson(releaseUrl, fetchImpl),
     releaseTag,
   );
-  const channelReleaseUrl = `${apiBase}/releases/tags/${encodeURIComponent(channel.version)}`;
-  const channelRelease = channel.version === releaseTag
-    ? release
-    : validateReleaseMetadata(
-      await fetchJson(channelReleaseUrl, fetchImpl),
-      channel.version,
-    );
-
-  if ((channel.channel === 'prerelease') !== channelRelease.prerelease) {
-    throw new Error(
-      `CLI ${channel.channel} channel and GitHub metadata disagree for ${channel.version}`,
-    );
-  }
 
   return Object.freeze({
     channel: channel.channel,
@@ -159,8 +140,6 @@ function parseArguments(arguments_) {
 }
 
 module.exports = {
-  AUTHORITY_SCHEMA,
-  DEFAULT_CHANNEL_URL,
   REQUIRED_ASSETS,
   expectedPrerelease,
   validateChannel,

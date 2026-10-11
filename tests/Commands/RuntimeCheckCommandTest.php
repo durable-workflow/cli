@@ -55,5 +55,17 @@ final class RuntimeCheckCommandTest extends TestCase
         self::assertSame(Command::SUCCESS, $tester->execute([]));
         self::assertStringContainsString('Runtime extensions OK', $tester->getDisplay());
         self::assertStringNotContainsString('curl', $tester->getDisplay());
+        self::assertStringNotContainsString('pcntl', $tester->getDisplay());
+    }
+
+    public function test_posix_native_runtime_requires_signal_support(): void
+    {
+        $tester = new CommandTester(new RuntimeCheckCommand(
+            static fn (string $extension): bool => $extension !== 'pcntl',
+            osFamily: 'Linux',
+        ));
+
+        self::assertSame(Command::FAILURE, $tester->execute([]));
+        self::assertStringContainsString('Missing required runtime extensions: pcntl', $tester->getDisplay());
     }
 }

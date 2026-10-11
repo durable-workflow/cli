@@ -633,7 +633,7 @@ SH);
         $releaseWorkflow = self::readRepoFile('.github/workflows/release.yml');
         $runtimeCheck = self::readRepoFile('src/Commands/RuntimeCheckCommand.php');
 
-        self::assertStringContainsString('STANDALONE_RUNTIME_EXTENSIONS: curl,mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets', $releaseWorkflow);
+        self::assertStringContainsString('STANDALONE_RUNTIME_EXTENSIONS: curl,mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets,pcntl,posix', $releaseWorkflow);
         self::assertStringContainsString('STANDALONE_RUNTIME_EXTENSIONS_WINDOWS: mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets', $releaseWorkflow);
         self::assertStringContainsString('SPC_EXTENSIONS_WINDOWS: mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets', $releaseWorkflow);
         self::assertStringNotContainsString('SPC_EXTENSIONS_WINDOWS: curl', $releaseWorkflow);

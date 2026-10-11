@@ -19,7 +19,7 @@ PHAR_OUT="$BUILD_DIR/dw.phar"
 
 # Extensions required by the CLI at runtime. Keep this list in sync with the
 # CI matrix in .github/workflows/release.yml.
-SPC_EXTENSIONS="curl,mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets"
+SPC_EXTENSIONS="curl,mbstring,openssl,phar,tokenizer,ctype,filter,fileinfo,iconv,sockets,pcntl,posix"
 SPC_DOWNLOAD_RETRY="${SPC_DOWNLOAD_RETRY:-5}"
 SPC_DOWNLOAD_OUTER_ATTEMPTS="${SPC_DOWNLOAD_OUTER_ATTEMPTS:-4}"
 

@@ -1,5 +1,7 @@
 # Durable Workflow CLI
 
+[![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=durable-workflow_cli&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=durable-workflow_cli)
+
 <p align="center">
   <a href="https://github.com/durable-workflow/cli/actions/workflows/build.yml?query=branch%3Amain"><img src="https://github.com/durable-workflow/cli/actions/workflows/build.yml/badge.svg?branch=main" alt="Build status"></a>
   <a href="https://github.com/durable-workflow/cli/releases/latest"><img src="https://img.shields.io/github/v/release/durable-workflow/cli?sort=semver" alt="Latest release"></a>

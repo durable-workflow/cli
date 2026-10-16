@@ -352,7 +352,7 @@ SH;
         );
         self::assertStringContainsString('runner: ubuntu-24.04', $releaseWorkflow);
         self::assertStringContainsString('runner: ubuntu-24.04-arm', $releaseWorkflow);
-        self::assertStringContainsString('runner: macos-14', $releaseWorkflow);
+        self::assertStringContainsString('runner: macos-15', $releaseWorkflow);
         self::assertStringContainsString('runs-on: windows-2022', $releaseWorkflow);
         self::assertStringNotContainsString('runs-on: windows-latest', $releaseWorkflow);
         self::assertStringContainsString(

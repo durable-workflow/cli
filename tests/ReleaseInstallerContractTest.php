@@ -578,7 +578,7 @@ SH);
         self::assertStringContainsString('raw_tag="${1:-}"', $publicAssetVerifier);
         self::assertStringContainsString('release-version.js" normalize "$raw_tag"', $publicAssetVerifier);
         self::assertStringContainsString('releases/download/${tag}/${artifact}', $publicAssetVerifier);
-        self::assertStringContainsString('curl -fsSLI --retry 3 --retry-all-errors', $publicAssetVerifier);
+        self::assertStringContainsString('-fsSLI --retry 3 --retry-all-errors', $publicAssetVerifier);
         self::assertStringContainsString('dw-windows-x86_64.exe', $publicAssetVerifier);
     }
 

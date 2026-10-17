@@ -478,7 +478,7 @@ jobs:
           archive="build/.tools/${{ matrix.spc_asset }}"
           rm -f "$archive" build/.tools/spc
           for attempt in 1 2 3 4 5; do
-            if curl -fsSL --retry 3 --retry-all-errors --connect-timeout 10 \
+            if curl --proto '=https' --proto-redir '=https' -fsSL --retry 3 --retry-all-errors --connect-timeout 10 \
                 -o "$archive" \
                 "https://github.com/crazywhalecc/static-php-cli/releases/download/${SPC_VERSION}/${{ matrix.spc_asset }}"; then
               break

@@ -75,7 +75,7 @@ for artifact in "$@"; do
     attempt=1
 
     while [ "$attempt" -le "$ATTEMPTS" ]; do
-        if curl -fsSLI --retry 3 --retry-all-errors --connect-timeout 10 "$url" >/dev/null; then
+        if curl --proto '=https' --proto-redir '=https' -fsSLI --retry 3 --retry-all-errors --connect-timeout 10 "$url" >/dev/null; then
             ok=1
             break
         fi

@@ -45,7 +45,7 @@ ensure_tools() {
     mkdir -p "$TOOLS_DIR"
     if [[ ! -x "$TOOLS_DIR/box" ]]; then
         echo ">> Downloading Box ${BOX_VERSION}"
-        curl -fsSL -o "$TOOLS_DIR/box" "$BOX_URL"
+        curl --proto '=https' --proto-redir '=https' -fsSL -o "$TOOLS_DIR/box" "$BOX_URL"
         chmod +x "$TOOLS_DIR/box"
     fi
 }
@@ -55,7 +55,7 @@ ensure_spc() {
     platform="$(detect_platform)"
     if [[ ! -x "$TOOLS_DIR/spc" ]]; then
         echo ">> Downloading spc (static-php-cli) for ${platform}"
-        curl -fsSL -o "$TOOLS_DIR/spc" \
+        curl --proto '=https' --proto-redir '=https' -fsSL -o "$TOOLS_DIR/spc" \
             "https://dl.static-php.dev/static-php-cli/spc-bin/nightly/spc-${platform}"
         chmod +x "$TOOLS_DIR/spc"
     fi

@@ -22,8 +22,9 @@ final class DescribeCommand extends BaseCommand
             ->setHelp(<<<'HELP'
 Read one service call in the selected endpoint namespace. The JSON response
 preserves the server's outcome, attempt records, original caller and target,
-deadlines, typed failure and retained payload references. Inspection does not
-retry, cancel or otherwise change the call, and does not fetch external objects.
+deadlines, typed failure and retained payload references. The result remains its
+lossless Avro result_envelope. Only a GET is issued: no retry, cancellation or
+external-object fetch is requested.
 
   <info>dw service-call:describe billing invoices create call-42 --namespace=shared</info>
   <info>dw service-call:describe billing invoices create call-42 --json</info>
@@ -58,8 +59,9 @@ HELP)
             'Caller Run' => 'caller_workflow_run_id', 'Target Namespace' => 'target_namespace',
             'Target Workflow' => 'linked_workflow_instance_id', 'Target Run' => 'linked_workflow_run_id',
             'Target Update' => 'linked_workflow_update_id', 'Retry Attempts' => 'retry_attempt_count',
-            'Failure Type' => 'caller_observed_error_type', 'Failure Message' => 'typed_error_message',
-            'Output' => 'output', 'Output Reference' => 'output_payload_reference',
+            'Failure Type' => 'failure_type', 'Failure Message' => 'message',
+            'Caller Failure Type' => 'caller_observed_error_type',
+            'Result Envelope' => 'result_envelope', 'Output Reference' => 'output_payload_reference',
             'Failure Reference' => 'failure_payload_reference', 'Outcome Metadata' => 'outcome_metadata',
             'Attempts' => 'service_call_attempts',
         ] as $label => $field) {

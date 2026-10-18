@@ -525,7 +525,8 @@ dw service-call:describe <endpoint> <service> <operation> <call-id> --json
 The response preserves the original caller and target, outcome, deadline,
 attempt records, typed failure and retained payload references. The command
 does not retry or cancel the call, or fetch external objects. JSON output
-preserves the complete Server response, including result and outcome metadata.
+preserves the complete Server response, including the lossless Avro
+`result_envelope` and outcome metadata.
 
 ### Namespaces
 

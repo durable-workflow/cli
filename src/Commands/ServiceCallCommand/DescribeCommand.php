@@ -64,7 +64,10 @@ HELP)
             'Attempts' => 'service_call_attempts',
         ] as $label => $field) {
             $value = $result[$field] ?? null;
-            $text = ! array_key_exists($field, $result) ? '-' : (is_string($value) ? $value : json_encode($value, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE));
+            $text = '-';
+            if (array_key_exists($field, $result)) {
+                $text = is_string($value) ? $value : json_encode($value, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
+            }
             $output->writeln('  '.$label.': '.OutputFormatter::escape($text));
         }
 

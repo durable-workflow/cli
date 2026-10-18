@@ -74,8 +74,9 @@ final class ServiceCallDescribeCommandTest extends TestCase
         $command = new DescribeCommand();
         $command->setServerClient($client);
         $tester = new CommandTester($command);
-        self::assertSame(5, $tester->execute(['endpoint' => 'e', 'service' => 's', 'operation' => 'o', 'call-id' => 'wrong', '--json' => true]));
+        self::assertSame(5, $tester->execute(['endpoint' => 'e', 'service' => 's', 'operation' => 'o', 'call-id' => 'wrong', '--namespace' => '017', '--json' => true]));
         self::assertStringContainsString('service_call_not_found', $tester->getDisplay());
+        self::assertSame('017', json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR)['namespace']);
         self::assertCount(1, $client->reads);
     }
 }

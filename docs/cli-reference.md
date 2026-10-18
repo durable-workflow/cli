@@ -513,6 +513,21 @@ dw workflow:history order-123 01HXYZ
 dw workflow:history order-123 01HXYZ --follow
 ```
 
+### Nexus service calls
+
+Inspect one durable call in its endpoint namespace:
+
+```bash
+dw service-call:describe <endpoint> <service> <operation> <call-id> --namespace=shared
+dw service-call:describe <endpoint> <service> <operation> <call-id> --json
+```
+
+The response preserves the original caller and target, outcome, deadline,
+attempt records, typed failure and retained payload references. The command
+does not retry or cancel the call, or fetch external objects. JSON output
+preserves the complete Server response, including the lossless Avro
+`result_envelope` and outcome metadata.
+
 ### Namespaces
 
 ```bash

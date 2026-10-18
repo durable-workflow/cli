@@ -89,6 +89,7 @@ dw workflow:query <workflow-id> current-status --json
 dw workflow:update <workflow-id> approve --input='{"approver":"operator"}'
 dw workflow:cancel <workflow-id> --reason="Customer request"
 dw workflow:history <workflow-id> <run-id>
+dw service-call:describe <endpoint> <service> <operation> <call-id> --json
 ```
 
 ## Automation Contract

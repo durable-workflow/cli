@@ -6,6 +6,13 @@
   "json_schema_draft": "https://json-schema.org/draft/2020-12/schema",
   "stability": "patch-stable-additive",
   "commands": {
+    "service-call:describe": {
+      "output": "--json",
+      "schema": "schemas/output/service-call.schema.json",
+      "schema_id": "https://durable-workflow.github.io/cli-json-envelopes/v3/schemas/service-call.schema.json",
+      "resolver_url": "https://durable-workflow.github.io/cli-json-envelopes/v3/schemas/service-call.schema.json",
+      "sha256": "sha256:b9058cb4e958c8717676ec68aae46f0710751711249c32249bb021cacb344f3d"
+    },
     "debug": {
       "output": "--json",
       "schema": "schemas/output/workflow-debug.schema.json",

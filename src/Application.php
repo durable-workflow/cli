@@ -18,6 +18,7 @@ use DurableWorkflow\Cli\Commands\ScheduleCommand;
 use DurableWorkflow\Cli\Commands\SchemaCommand;
 use DurableWorkflow\Cli\Commands\SearchAttributeCommand;
 use DurableWorkflow\Cli\Commands\ServerCommand;
+use DurableWorkflow\Cli\Commands\ServiceCallCommand;
 use DurableWorkflow\Cli\Commands\StorageCommand;
 use DurableWorkflow\Cli\Commands\SystemCommand;
 use DurableWorkflow\Cli\Commands\TaskQueueCommand;
@@ -147,6 +148,9 @@ class Application extends ConsoleApplication
             new WorkflowCommand\HistoryCommand(),
             new WorkflowCommand\HistoryExportCommand(),
             new WorkflowCommand\MigrateV1Command(),
+
+            // Durable Nexus inspection
+            new ServiceCallCommand\DescribeCommand(),
 
             // Environment profiles (local config)
             new EnvCommand\ListCommand(),

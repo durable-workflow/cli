@@ -52,6 +52,7 @@ abstract class BaseCommand extends Command
         'search-attribute:create',
         'search-attribute:delete',
         'search-attribute:list',
+        'service-call:describe',
         'storage:test',
         'system:activity-timeout-pass',
         'system:activity-timeout-status',

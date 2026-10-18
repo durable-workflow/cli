@@ -385,6 +385,7 @@ class OutputContractTest extends TestCase
      */
     public static function namespaceScopedCommandNames(): iterable
     {
+        yield 'service call describe' => ['service-call:describe'];
         yield 'activity complete' => ['activity:complete'];
         yield 'activity describe' => ['activity:describe'];
         yield 'activity fail' => ['activity:fail'];

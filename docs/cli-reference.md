@@ -486,6 +486,7 @@ dw watch workflow order-123 --run-id=01HXYZ --interval=5 --max-polls=60
 
 # Send a signal
 dw workflow:signal order-123 payment-received --input='{"amount":99.99}'
+dw workflow:signal order-123 payment-received --input='{"amount":99.99}' --request-id=payment-order-123-2026-10-20
 dw workflow:signal counter-1 increment --input='["not-an-int"]' --output=json
 # {"error":"Server error: Signal argument validation failed.","exit_code":2,"status_code":422,"reason":"invalid_signal_arguments",...}
 
@@ -496,6 +497,7 @@ dw workflow:query counter-1 current-at --input='["not-an-int"]' --output=json
 
 # Send an update
 dw workflow:update order-123 approve --input='{"approver":"admin"}'
+dw workflow:update order-123 approve --input='{"approver":"admin"}' --wait=completed --request-id=approve-order-123-2026-10-20
 
 # Send an integration event through a bounded bridge adapter
 dw bridge:webhook stripe --action=start_workflow --idempotency-key=stripe-event-1001 --target='{"workflow_type":"orders.fulfillment","task_queue":"external-workflows","business_key":"order-1001"}' --input='{"order_id":"order-1001"}'
@@ -512,6 +514,22 @@ dw workflow:terminate order-123 --reason="Stuck workflow"
 dw workflow:history order-123 01HXYZ
 dw workflow:history order-123 01HXYZ --follow
 ```
+
+`workflow:signal` and `workflow:update` send a durable command key as the
+`request_id` body field. The CLI generates `cli-signal-<hex>` or
+`cli-update-<hex>` once per invocation unless `--request-id` (1-255 bytes,
+opaque, case-sensitive) is given, and prints the key it used as `Request ID`
+in human output and as `request_id` in `--json` output, including in error
+envelopes after a timeout or network failure. Retrying the same command with
+that key returns the original receipt instead of recording a second signal or
+update; the response then carries `retained: true`, and `intent_verified`
+reports whether the server could compare the retry against the retained
+intent. A retry that reuses the key with a different name, arguments or run
+target fails with HTTP 409 and `reason: request_id_conflict`; the error names
+the key, the retained command (`retained_command_id`, `retained_command_type`,
+`retained_outcome`) and the mismatched `conflict` parts. Servers that predate
+keyed signals accept the field and omit the `retained`/`intent_verified`
+flags.
 
 ### Nexus service calls
 

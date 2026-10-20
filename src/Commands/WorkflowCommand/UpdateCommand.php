@@ -25,16 +25,25 @@ Send a synchronous update to a workflow and wait for the outcome.
 validated the update; <comment>--wait=completed</comment> returns when
 the handler has finished and a result is available.
 
+Every update carries a durable command key (<comment>request_id</comment>).
+The CLI generates one per invocation unless <comment>--request-id</comment>
+is given, and prints the key it used. After a lost response, retry the same
+command with that key: the server returns the original receipt (same update
+id, status and result) instead of recording a second update, and refuses the
+key with HTTP 409 <comment>request_id_conflict</comment> if the retry carries
+a different update name, arguments or run target.
+
 <comment>Examples:</comment>
 
   <info>dw workflow:update chk-42 increase_quota -i '{"by":10}'</info>
   <info>dw workflow:update chk-42 increase_quota -i '{"by":10}' --wait=completed</info>
+  <info>dw workflow:update chk-42 increase_quota -i '{"by":10}' --request-id=quota-chk-42-2026-10-20 --json</info>
 HELP)
             ->addArgument('workflow-id', InputArgument::REQUIRED, 'Workflow ID')
             ->addArgument('update-name', InputArgument::REQUIRED, 'Update name')
             ->addOption('wait', null, InputOption::VALUE_OPTIONAL, 'Wait policy (accepted, completed)', 'accepted', CompletionValues::UPDATE_WAIT_POLICIES)
             ->addOption('run-id', null, InputOption::VALUE_OPTIONAL, 'Target a specific run ID')
-            ->addOption('request-id', null, InputOption::VALUE_OPTIONAL, 'Durable request identifier for retry/idempotency diagnostics')
+            ->addOption('request-id', null, InputOption::VALUE_OPTIONAL, 'Durable command key reused on retry (1-255 bytes); generated when omitted')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output the command response as JSON');
         $this->addInputOptions('Update input payload');
     }
@@ -60,11 +69,8 @@ HELP)
 
         $body = [
             'wait_for' => $waitFor,
+            'request_id' => $this->commandRequestId($input, 'update'),
         ];
-        $requestId = $this->optionalString($input->getOption('request-id'));
-        if ($requestId !== null) {
-            $body['request_id'] = $requestId;
-        }
 
         $parsedInput = $this->parseInputArgumentsOption($input);
         if ($parsedInput !== null) {
@@ -103,6 +109,7 @@ HELP)
         if (isset($result['wait_for'])) {
             $output->writeln('  Wait For: '.$result['wait_for']);
         }
+        $this->writeCommandReceiptLines($output, $result);
 
         return Command::SUCCESS;
     }

@@ -11,7 +11,10 @@
     "signal_name": { "type": "string" },
     "outcome": { "type": "string" },
     "command_status": { "type": ["string", "null"] },
-    "command_id": { "type": ["string", "null"] }
+    "command_id": { "type": ["string", "null"] },
+    "request_id": { "type": "string" },
+    "retained": { "type": ["boolean", "null"] },
+    "intent_verified": { "type": ["boolean", "null"] }
   },
   "additionalProperties": true
 }

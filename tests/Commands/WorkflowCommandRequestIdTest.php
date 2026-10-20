@@ -436,6 +436,17 @@ final class WorkflowCommandRequestIdTest extends TestCase
         self::assertSame($longest, $client->lastPostBody['request_id']);
     }
 
+    public function test_the_published_server_accepts_255_unicode_characters_as_one_key(): void
+    {
+        $key = str_repeat('é', 255);
+        $client = new CommandRequestIdFakeClient(self::signalReceipt());
+        $tester = $this->runSignal($client, [
+            'workflow-id' => 'wf-1', 'signal-name' => 'approve', '--request-id' => $key,
+        ]);
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode());
+        self::assertSame($key, $client->lastPostBody['request_id']);
+    }
+
     public function test_blank_request_id_is_treated_as_omitted(): void
     {
         $client = new CommandRequestIdFakeClient(self::signalReceipt());

@@ -411,7 +411,7 @@ final class WorkflowCommandRequestIdTest extends TestCase
         self::assertContains('request_id.retry', array_column($decoded['recommendations'], 'id'));
     }
 
-    public function test_request_id_longer_than_255_bytes_is_rejected_before_sending(): void
+    public function test_request_id_longer_than_255_characters_is_rejected_before_sending(): void
     {
         $client = new CommandRequestIdFakeClient(self::signalReceipt());
 
@@ -423,7 +423,7 @@ final class WorkflowCommandRequestIdTest extends TestCase
 
         self::assertSame(ExitCode::INVALID, $tester->getStatusCode());
         self::assertSame(0, $client->postCalls);
-        self::assertStringContainsString('--request-id must be 1 to 255 bytes; got 256 bytes.', $tester->getDisplay());
+        self::assertStringContainsString('--request-id must be 1 to 255 Unicode characters; got 256 characters.', $tester->getDisplay());
 
         $longest = str_repeat('k', 255);
         $tester = $this->runSignal($client, [

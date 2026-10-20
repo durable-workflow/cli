@@ -40,7 +40,7 @@ HELP)
             ->addArgument('workflow-id', InputArgument::REQUIRED, 'Workflow ID')
             ->addArgument('signal-name', InputArgument::REQUIRED, 'Signal name')
             ->addOption('run-id', null, InputOption::VALUE_OPTIONAL, 'Target a specific run ID')
-            ->addOption('request-id', null, InputOption::VALUE_OPTIONAL, 'Durable command key reused on retry (1-255 bytes); generated when omitted')
+            ->addOption('request-id', null, InputOption::VALUE_OPTIONAL, 'Durable command key reused on retry (1-255 Unicode characters); generated when omitted')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output the command response as JSON');
         $this->addInputOptions('Signal input payload');
     }

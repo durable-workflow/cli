@@ -29,7 +29,7 @@ abstract class BaseCommand extends Command
 {
     private const INPUT_ENCODINGS = ['json', 'raw', 'base64'];
 
-    private const COMMAND_REQUEST_ID_MAX_BYTES = 255;
+    private const COMMAND_REQUEST_ID_MAX_CHARACTERS = 255;
 
     private const REQUEST_ID_CONFLICT_REASON = 'request_id_conflict';
 
@@ -690,11 +690,15 @@ abstract class BaseCommand extends Command
         if (is_scalar($explicit) && trim((string) $explicit) !== '') {
             $explicit = (string) $explicit;
 
-            if (strlen($explicit) > self::COMMAND_REQUEST_ID_MAX_BYTES) {
+            $characters = preg_match_all('/./us', $explicit);
+            if ($characters === false) {
+                throw new InvalidOptionException('--request-id must be valid UTF-8.');
+            }
+            if ($characters > self::COMMAND_REQUEST_ID_MAX_CHARACTERS) {
                 throw new InvalidOptionException(sprintf(
-                    '--request-id must be 1 to %d bytes; got %d bytes.',
-                    self::COMMAND_REQUEST_ID_MAX_BYTES,
-                    strlen($explicit),
+                    '--request-id must be 1 to %d Unicode characters; got %d characters.',
+                    self::COMMAND_REQUEST_ID_MAX_CHARACTERS,
+                    $characters,
                 ));
             }
 

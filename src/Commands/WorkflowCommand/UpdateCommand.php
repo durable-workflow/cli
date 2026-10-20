@@ -43,7 +43,7 @@ HELP)
             ->addArgument('update-name', InputArgument::REQUIRED, 'Update name')
             ->addOption('wait', null, InputOption::VALUE_OPTIONAL, 'Wait policy (accepted, completed)', 'accepted', CompletionValues::UPDATE_WAIT_POLICIES)
             ->addOption('run-id', null, InputOption::VALUE_OPTIONAL, 'Target a specific run ID')
-            ->addOption('request-id', null, InputOption::VALUE_OPTIONAL, 'Durable command key reused on retry (1-255 bytes); generated when omitted')
+            ->addOption('request-id', null, InputOption::VALUE_OPTIONAL, 'Durable command key reused on retry (1-255 Unicode characters); generated when omitted')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output the command response as JSON');
         $this->addInputOptions('Update input payload');
     }

@@ -342,6 +342,7 @@ jobs:
       needs.release-preflight.outputs.public_assets_present != 'true'
     outputs:
       phar-name: dw.phar
+      launcher-vendor-id: ${{ steps.launcher_vendor.outputs.artifact-id }}
     env:
       BOX_VERSION: '4.6.6'
       GITHUB_TOKEN: ${{ github.token }}
@@ -352,11 +353,21 @@ jobs:
           fetch-depth: 0
           ref: ${{ needs.resolve-release.outputs.commit }}
 
+      - name: Set up Python for verified dependency trust
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6
+        with:
+          python-version: '3.13'
+
+      - name: Bootstrap verified dependency trust
+        uses: durable-workflow/.github/.github/actions/bootstrap-patched-pip@75587fc33ff40c34f32ef777293dad56bb6f48c7  # clean-trust
+        with:
+          clients: pip,python,composer,curl,git
+
       - name: Setup PHP
         uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240  # v2
         with:
           php-version: ${{ env.PHP_VERSION }}
-          tools: composer:v2, box:${{ env.BOX_VERSION }}
+          tools: composer:2.10.3, box:${{ env.BOX_VERSION }}
           coverage: none
           ini-values: phar.readonly=0
 
@@ -376,6 +387,9 @@ jobs:
           export DW_CLI_COMMIT="$(git rev-parse HEAD)"
           php scripts/generate-build-info.php
 
+      - name: Verify actual Composer dependency trust
+        uses: durable-workflow/.github/.github/actions/verify-composer-trust@75587fc33ff40c34f32ef777293dad56bb6f48c7  # clean-trust
+
       - name: Install dependencies
         run: composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
 
@@ -394,6 +408,15 @@ jobs:
         run: |
           php build/dw.phar --version || true
           box info build/dw.phar
+
+      - name: Retain locked launcher qualification dependencies
+        id: launcher_vendor
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
+        with:
+          name: launcher-vendor
+          path: vendor/
+          if-no-files-found: error
+          retention-days: 1
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
         with:
@@ -896,7 +919,7 @@ jobs:
         with:
           php-version: '8.4'
           extensions: pcntl, posix
-          tools: composer:v2
+          tools: none
           coverage: none
 
       - name: Install macOS qualification tools
@@ -906,7 +929,7 @@ jobs:
           HOMEBREW_NO_AUTO_UPDATE: '1'
           HOMEBREW_NO_INSTALL_CLEANUP: '1'
         run: |
-          brew install php@8.4 composer
+          brew install php@8.4
           qualification_php_prefix="$(brew --prefix php@8.4)"
           printf '%s/bin\n' "$qualification_php_prefix" >> "$GITHUB_PATH"
 
@@ -915,9 +938,7 @@ jobs:
         timeout-minutes: 2
         run: |
           command -v php
-          command -v composer
           php --version
-          composer --version
           php -r '
             if (PHP_VERSION_ID < 80200 || !extension_loaded("pcntl") || !extension_loaded("posix")) {
               fwrite(STDERR, "Native launcher qualification requires external PHP 8.2+ with pcntl and posix.\n");
@@ -933,11 +954,13 @@ jobs:
           ./build/dw-${{ matrix.name }} runtime:check
           ./build/dw-${{ matrix.name }} list
 
-      - name: Install native launcher qualification dependencies
+      - name: Restore locked launcher qualification dependencies
         if: needs.resolve-release.outputs.cache_warm != 'true'
-        timeout-minutes: 5
-        run: |
-          composer install --no-dev --prefer-dist --no-interaction
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8
+        with:
+          artifact-ids: ${{ needs.build-phar.outputs.launcher-vendor-id }}
+          path: vendor
+          digest-mismatch: error
 
       - name: Qualify direct signals in the packaged POSIX launcher
         if: needs.resolve-release.outputs.cache_warm != 'true'

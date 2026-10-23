@@ -10,6 +10,18 @@ const repository = path.resolve(__dirname, '../..');
 const resolver = path.join(__dirname, 'release-version.js');
 const workflowPath = path.join(repository, '.github/workflows/release.yml');
 
+test('native launcher qualification reuses the guarded PHAR dependency artifact', () => {
+  const workflow = fs.readFileSync(workflowPath, 'utf8');
+  const phar = workflow.slice(workflow.indexOf('\n  build-phar:'), workflow.indexOf('\n  build-binary:'));
+  const native = workflow.split('\n  build-binary:')[1].split(/\n {2}(?=\S)/)[0];
+
+  assert.match(phar, /launcher-vendor-id: \$\{\{ steps\.launcher_vendor\.outputs\.artifact-id \}\}/);
+  assert.match(phar, /id: launcher_vendor[\s\S]*?name: launcher-vendor\n\s+path: vendor\//);
+  assert.match(workflow, /artifact-ids: \$\{\{ needs\.build-phar\.outputs\.launcher-vendor-id \}\}\n\s+path: vendor\n\s+digest-mismatch: error/);
+  assert.match(native, /needs: \[resolve-release, release-preflight, build-phar\]/);
+  assert.doesNotMatch(native, /composer install/);
+});
+
 function resolveMetadata(tag) {
   const normalized = execFileSync(process.execPath, [resolver, 'normalize', tag], {
     encoding: 'utf8',

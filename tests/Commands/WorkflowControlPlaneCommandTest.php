@@ -66,14 +66,19 @@ class WorkflowControlPlaneCommandTest extends TestCase
             '--wait' => 'completed',
         ]));
 
-        self::assertSame([
-            'wait_for' => 'completed',
-        ], $client->lastPostBody);
+        self::assertSame('completed', $client->lastPostBody['wait_for'] ?? null);
+        self::assertMatchesRegularExpression(
+            '/\Acli-update-[0-9a-f]{32}\z/',
+            $client->lastPostBody['request_id'] ?? '',
+            'workflow:update must send a generated durable command key when --request-id is omitted.',
+        );
+        self::assertSame(['wait_for', 'request_id'], array_keys($client->lastPostBody));
 
         $display = $tester->getDisplay();
 
         self::assertStringContainsString('Update: approve', $display);
         self::assertStringContainsString('Wait For: completed', $display);
+        self::assertStringContainsString('Request ID: '.$client->lastPostBody['request_id'], $display);
     }
 
     public function test_update_command_rejects_invalid_wait_values_from_the_server_contract(): void

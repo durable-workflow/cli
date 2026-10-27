@@ -74,6 +74,8 @@ HELP);
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        $output->writeln(sprintf('PHP runtime: %s (%s)', PHP_VERSION, PHP_SAPI));
+
         $missing = [];
         $requiredExtensions = $this->requiredExtensions();
 

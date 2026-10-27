@@ -456,7 +456,7 @@ jobs:
       MUSL_SHA256: a9a118bbe84d8764da0ea0d28b3ab3fae8477fc7e4085d90102b8596fc7c75e4
       MUSL_VERSION: '1.2.5'
       NATIVE_PREREQUISITE_CACHE_SCHEMA: 'v1'
-      PHP_VERSION: '8.4.23'
+      PHP_VERSION: '8.4.27'
       PHPMICRO_CACHE_SCHEMA: 'v1'
       PHPMICRO_UNCACHED_BASELINE_SECONDS: '480'
       SPC_DOWNLOAD_OUTER_ATTEMPTS: '4'
@@ -479,6 +479,8 @@ jobs:
           sparse-checkout: |
             .github/workflows/release.yml
             scripts/ci/establish-native-prerequisites.sh
+            scripts/ci/probe-standalone-runtime.php
+            scripts/ci/verify-standalone-runtime.js
           sparse-checkout-cone-mode: false
 
       - name: Download PHAR artifact
@@ -804,6 +806,23 @@ jobs:
             "sha256=$micro_sha256" \
             > phpmicro-cache.manifest
 
+      - name: Verify produced standalone PHP runtime
+        id: runtime-policy
+        timeout-minutes: 2
+        shell: bash
+        working-directory: build/.tools
+        run: |
+          set -euo pipefail
+          policy="$GITHUB_WORKSPACE/release-toolchain-control/scripts/ci"
+          ./spc micro:combine "$policy/probe-standalone-runtime.php" \
+            --output=standalone-runtime-probe
+          chmod +x standalone-runtime-probe
+          ./standalone-runtime-probe > standalone-runtime.json
+          node "$policy/verify-standalone-runtime.js" --expected-version "$PHP_VERSION" \
+            < standalone-runtime.json > standalone-runtime-verification.json
+          cat standalone-runtime-verification.json
+          rm standalone-runtime-probe
+
       - name: Record phpmicro toolchain timing
         if: always()
         working-directory: build/.tools
@@ -820,6 +839,7 @@ jobs:
           NATIVE_PREREQUISITE_IDENTITY: ${{ steps.native-prerequisites.outputs.identity }}
           NATIVE_PREREQUISITE_MODE: ${{ steps.native-prerequisites.outputs.mode }}
           NATIVE_PREREQUISITE_SOURCE: ${{ steps.native-prerequisites.outputs.source }}
+          RUNTIME_POLICY_OUTCOME: ${{ steps.runtime-policy.outcome }}
         run: |
           set -euo pipefail
           finished_at="$(date +%s)"
@@ -831,7 +851,8 @@ jobs:
             cache_mode="cold-fallback"
           fi
           outcome="failure"
-          if [ -s buildroot/bin/micro.sfx ] && [ -s phpmicro-cache.manifest ]; then
+          if [ "$RUNTIME_POLICY_OUTCOME" = "success" ] &&
+              [ -s buildroot/bin/micro.sfx ] && [ -s phpmicro-cache.manifest ]; then
             outcome="success"
           fi
 
@@ -903,6 +924,8 @@ jobs:
             build/.tools/log/
             build/.tools/native-prerequisite-evidence.json
             build/.tools/phpmicro-timing.json
+            build/.tools/standalone-runtime.json
+            build/.tools/standalone-runtime-verification.json
           if-no-files-found: warn
 
       - name: Combine PHAR into standalone binary
@@ -988,7 +1011,7 @@ jobs:
     runs-on: windows-2022
     env:
       GITHUB_TOKEN: ${{ github.token }}
-      PHP_VERSION_WINDOWS: '8.4.23'
+      PHP_VERSION_WINDOWS: '8.4.27'
       PHPMICRO_CACHE_SCHEMA: 'v1'
       PHPMICRO_UNCACHED_BASELINE_SECONDS: '480'
       SPC_DOWNLOAD_OUTER_ATTEMPTS: '4'
@@ -1011,7 +1034,10 @@ jobs:
           ref: ${{ needs.resolve-release.outputs.control_commit }}
           path: release-toolchain-control
           persist-credentials: false
-          sparse-checkout: .github/workflows/release.yml
+          sparse-checkout: |
+            .github/workflows/release.yml
+            scripts/ci/probe-standalone-runtime.php
+            scripts/ci/verify-standalone-runtime.js
           sparse-checkout-cone-mode: false
 
       - name: Download PHAR artifact
@@ -1328,6 +1354,34 @@ jobs:
             "sha256=$microSha256"
           ) | Set-Content -Path phpmicro-cache.manifest -Encoding ascii
 
+      - name: Verify produced standalone PHP runtime
+        id: runtime-policy
+        timeout-minutes: 2
+        shell: pwsh
+        working-directory: build\.tools
+        run: |
+          $ErrorActionPreference = "Stop"
+          $policy = Join-Path $env:GITHUB_WORKSPACE "release-toolchain-control\scripts\ci"
+          $probe = Join-Path $policy "probe-standalone-runtime.php"
+          $verifier = Join-Path $policy "verify-standalone-runtime.js"
+          $runtimeProbe = Join-Path (Get-Location).Path "standalone-runtime-probe.exe"
+          .\spc.exe micro:combine $probe --output=$runtimeProbe
+          if ($LASTEXITCODE -ne 0) {
+            throw "Could not package the produced-runtime probe"
+          }
+          $evidence = & $runtimeProbe
+          if ($LASTEXITCODE -ne 0) {
+            throw "The produced-runtime probe failed"
+          }
+          $evidence | Set-Content -Path standalone-runtime.json -Encoding utf8
+          $evidence | node $verifier --expected-version "$env:PHP_VERSION_WINDOWS" `
+            > standalone-runtime-verification.json
+          if ($LASTEXITCODE -ne 0) {
+            throw "The produced runtime failed the PHP release policy"
+          }
+          Get-Content -Raw standalone-runtime-verification.json
+          Remove-Item -Force $runtimeProbe
+
       - name: Record phpmicro toolchain timing
         if: always()
         shell: pwsh
@@ -1341,6 +1395,7 @@ jobs:
           PLATFORM: windows-x86_64
           RUN_PURPOSE: ${{ needs.resolve-release.outputs.cache_warm == 'true' && 'cache-warm' || 'release' }}
           STARTED_AT: ${{ steps.phpmicro-timing-start.outputs.started_at }}
+          RUNTIME_POLICY_OUTCOME: ${{ steps.runtime-policy.outcome }}
         run: |
           $finishedAt = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
           $elapsedSeconds = $finishedAt - [long]$env:STARTED_AT
@@ -1351,7 +1406,8 @@ jobs:
             $cacheMode = "cold-fallback"
           }
           $outcome = if (
-            (Test-Path buildroot\bin\micro.sfx -PathType Leaf) `
+            $env:RUNTIME_POLICY_OUTCOME -eq "success" `
+              -and (Test-Path buildroot\bin\micro.sfx -PathType Leaf) `
               -and (Test-Path phpmicro-cache.manifest -PathType Leaf)
           ) { "success" } else { "failure" }
 
@@ -1386,6 +1442,8 @@ jobs:
           path: |
             build/.tools/log/
             build/.tools/phpmicro-timing.json
+            build/.tools/standalone-runtime.json
+            build/.tools/standalone-runtime-verification.json
           if-no-files-found: warn
 
       - name: Combine PHAR into standalone binary

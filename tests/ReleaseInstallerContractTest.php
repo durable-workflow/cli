@@ -260,8 +260,8 @@ SH;
             $releaseWorkflow,
             'SPC_REVISION: 4318ef8fa32a02460ec1554746674a7bc42b49fa',
         ));
-        self::assertSame(1, substr_count($releaseWorkflow, "PHP_VERSION: '8.4.23'"));
-        self::assertSame(1, substr_count($releaseWorkflow, "PHP_VERSION_WINDOWS: '8.4.23'"));
+        self::assertSame(1, substr_count($releaseWorkflow, "PHP_VERSION: '8.4.27'"));
+        self::assertSame(1, substr_count($releaseWorkflow, "PHP_VERSION_WINDOWS: '8.4.27'"));
         self::assertStringContainsString(
             'spc_sha256: 523ba4279c54c7a377156c0dd3a36adf92ee64b01e9a7f5e9e2ec084b8e458e5',
             $releaseWorkflow,
@@ -385,6 +385,35 @@ SH;
         ));
         self::assertSame(2, substr_count($releaseWorkflow, 'build/.tools/phpmicro-timing.json'));
         self::assertStringContainsString('previous_uncached_baseline_seconds', $releaseWorkflow);
+    }
+
+    public function test_release_checks_the_produced_runtime_before_combining_the_application(): void
+    {
+        $workflow = self::readRepoFile('.github/workflows/release.yml');
+        $unixStart = strpos($workflow, "\n  build-binary:");
+        $windowsStart = strpos($workflow, "\n  build-binary-windows:");
+        self::assertIsInt($unixStart);
+        self::assertIsInt($windowsStart);
+
+        foreach ([
+            substr($workflow, $unixStart, $windowsStart - $unixStart),
+            substr($workflow, $windowsStart),
+        ] as $platform) {
+            $guard = strpos($platform, '- name: Verify produced standalone PHP runtime');
+            $combine = strpos($platform, '- name: Combine PHAR into standalone binary');
+            self::assertIsInt($guard);
+            self::assertIsInt($combine);
+            self::assertLessThan($combine, $guard);
+            $stepEnd = strpos($platform, '- name: Record phpmicro toolchain timing', $guard);
+            self::assertIsInt($stepEnd);
+            $step = substr($platform, $guard, $stepEnd - $guard);
+            self::assertStringNotContainsString('if:', $step);
+            self::assertStringContainsString('release-toolchain-control', $step);
+            self::assertStringContainsString('probe-standalone-runtime.php', $step);
+            self::assertStringContainsString('verify-standalone-runtime.js', $step);
+            self::assertStringContainsString('--expected-version', $step);
+            self::assertStringContainsString('standalone-runtime-verification.json', $step);
+        }
     }
 
     public function test_release_phpmicro_cache_has_a_non_publishing_default_branch_warm_path(): void

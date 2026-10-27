@@ -82,6 +82,8 @@ jobs:
           node --check scripts/ci/release-version.js
           node --check scripts/ci/verify-cli-release-channel.js
           node --check scripts/ci/verify-cli-upgrade-result.js
+          node --check scripts/ci/verify-standalone-runtime.js
+          php -l scripts/ci/probe-standalone-runtime.php
           bash -n scripts/ci/verify-release-tag-source.sh
           bash -n scripts/ci/establish-native-prerequisites.sh
           bash -n scripts/ci/reconcile-release-metadata.sh
@@ -92,6 +94,7 @@ jobs:
         run: |
           python scripts/ci/test-native-prerequisites.py
           node --test scripts/ci/test-release-workflow-metadata.js
+          node --test scripts/ci/test-standalone-runtime.js
           node --test scripts/ci/test-cli-release-channel.js
           node --test scripts/ci/test-cli-upgrade-result.js
           node --test scripts/ci/test-release-metadata.js

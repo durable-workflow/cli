@@ -10,6 +10,7 @@ const verifier = path.join(__dirname, 'verify-standalone-runtime.js');
 const fixed = {
   php_version: '8.4.27', php_version_id: 80427, sapi: 'micro',
   os_family: 'Linux', openssl_version: 'OpenSSL 3.5.9 29 Sep 2026',
+  openssl_header_version: 'OpenSSL 3.5.9 29 Sep 2026',
   curl: {version: '8.23.0', ssl_version: 'OpenSSL/3.5.9'},
 };
 
@@ -86,4 +87,12 @@ test('retains Windows streams policy while checking its OpenSSL and dependency i
   assert.match(result.openssl.source.sha256, /^[a-f0-9]{64}$/);
   assert.throws(() => verifyStandaloneRuntime({...fixed, os_family: 'Windows'}, '8.4.27'), /streams transport/);
   assert.throws(() => verifyStandaloneRuntime({...fixed, os_family: 'unknown'}, '8.4.27'), /supported operating system/);
+});
+
+test('checks the loaded OpenSSL library separately from its compilation headers on every platform', () => {
+  for (const os_family of ['Linux', 'Darwin', 'Windows']) {
+    const evidence = {...fixed, os_family, curl: os_family === 'Windows' ? null : fixed.curl};
+    assert.throws(() => verifyStandaloneRuntime({...evidence, openssl_version: 'OpenSSL 3.6.5'}, '8.4.27'), /produced OpenSSL runtime/);
+    assert.throws(() => verifyStandaloneRuntime({...evidence, openssl_header_version: 'OpenSSL 3.6.5'}, '8.4.27'), /OpenSSL headers/);
+  }
 });

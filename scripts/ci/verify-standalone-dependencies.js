@@ -48,7 +48,7 @@ function dependencyPolicyIdentity() {
 function verifyOpenSslDownload(directory, policy = loadDependencyPolicy()) {
   const lock = JSON.parse(fs.readFileSync(path.join(directory, '.lock.json'), 'utf8'));
   const entry = lock.openssl;
-  if (!entry || entry.source_type !== 'archive' || entry.filename !== policy.openssl.filename) {
+  if (entry?.source_type !== 'archive' || entry.filename !== policy.openssl.filename) {
     throw new Error('SPC must use the pinned OpenSSL source archive, not a prebuilt library');
   }
   const archive = path.join(directory, entry.filename);

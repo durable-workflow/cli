@@ -119,11 +119,9 @@ jobs:
             fi
             release_metadata="$(node scripts/ci/release-version.js metadata "$tag")"
             read -r prerelease make_latest <<< "$release_metadata"
-            if [ "$tag" = "2.0.0" ]; then
-              if [ "$GITHUB_EVENT_NAME" != "workflow_dispatch" ]; then
-                echo "::error::Stable 2.0.0 publication requires a protected main-branch dispatch"
-                exit 1
-              fi
+            if [ "$tag" = "2.0.0" ] && [ "$GITHUB_EVENT_NAME" != "workflow_dispatch" ]; then
+              echo "::error::Stable 2.0.0 publication requires a protected main-branch dispatch"
+              exit 1
             fi
           fi
           if ! printf '%s\n' "$commit" | grep -Eq '^[0-9a-f]{40}$'; then
@@ -608,6 +606,10 @@ jobs:
             macOS)
               package_identity="$(brew list --versions | sort)"
               ;;
+            *)
+              echo "::error::Unsupported native build platform"
+              exit 1
+              ;;
           esac
           native_toolchain_id="$(
             {
@@ -626,10 +628,11 @@ jobs:
         run: |
           set -euo pipefail
           sha256_file() {
+            local file="$1"
             if command -v sha256sum >/dev/null 2>&1; then
-              sha256sum "$1" | awk '{print $1}'
+              sha256sum "$file" | awk '{print $1}'
             else
-              shasum -a 256 "$1" | awk '{print $1}'
+              shasum -a 256 "$file" | awk '{print $1}'
             fi
           }
           sha256_stdin() {
@@ -767,6 +770,7 @@ jobs:
               echo "::error::SPC_DOWNLOAD_OUTER_ATTEMPTS must be a positive integer"
               exit 1
               ;;
+            *) ;;
           esac
           if [ "$SPC_DOWNLOAD_OUTER_ATTEMPTS" -lt 1 ]; then
             echo "::error::SPC_DOWNLOAD_OUTER_ATTEMPTS must be at least 1"
@@ -1774,12 +1778,14 @@ jobs:
               echo "::error::DURABLE_WORKFLOW_RELEASE_ASSET_ATTEMPTS must be a positive integer"
               exit 1
               ;;
+            *) ;;
           esac
           case "$sleep_seconds" in
             ''|*[!0-9]*)
               echo "::error::DURABLE_WORKFLOW_RELEASE_ASSET_RETRY_SLEEP must be a non-negative integer"
               exit 1
               ;;
+            *) ;;
           esac
           if [ "$attempts" -lt 1 ]; then
             echo "::error::DURABLE_WORKFLOW_RELEASE_ASSET_ATTEMPTS must be at least 1"

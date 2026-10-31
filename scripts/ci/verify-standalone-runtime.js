@@ -6,32 +6,15 @@ const {loadDependencyPolicy, dependencyPolicyIdentity} = require('./verify-stand
 const MINIMUM_PHP_VERSION = '8.4.27';
 const MINIMUM_PHP_VERSION_ID = 80427;
 
-function verifyStandaloneRuntime(evidence, expectedVersion) {
-  const match = typeof expectedVersion === 'string' && /^8\.4\.(0|[1-9]\d*)$/.exec(expectedVersion);
-  if (!match) {
-    throw new Error('standalone PHP pin must be a stable 8.4 patch version');
-  }
-  const expectedVersionId = 80400 + Number(match[1]);
-  if (!Number.isSafeInteger(expectedVersionId) || expectedVersionId < MINIMUM_PHP_VERSION_ID) {
-    throw new Error(`standalone PHP pin must be at least ${MINIMUM_PHP_VERSION}`);
-  }
-  if (!evidence || typeof evidence !== 'object' || Array.isArray(evidence)) {
-    throw new Error('standalone runtime probe must return a JSON object');
-  }
-  if (evidence.sapi !== 'micro') {
-    throw new Error('standalone runtime probe must execute in the produced micro SAPI');
-  }
-  if (evidence.php_version !== expectedVersion) {
-    throw new Error('produced PHP runtime does not match the configured stable pin');
-  }
-  if (!Number.isInteger(evidence.php_version_id) || evidence.php_version_id !== expectedVersionId) {
-    throw new Error('produced PHP runtime version ID does not match the configured pin');
-  }
-
+function verifyRuntimeDependencies(evidence) {
   const policy = loadDependencyPolicy();
   const opensslVersion = /^OpenSSL (\d+\.\d+\.\d+)(?:\s|$)/.exec(evidence.openssl_version);
   if (!opensslVersion || opensslVersion[1] !== policy.openssl.version) {
     throw new Error('produced OpenSSL runtime does not match the supported exact source pin');
+  }
+  const headers = /^OpenSSL (\d+\.\d+\.\d+)(?:\s|$)/.exec(evidence.openssl_header_version);
+  if (!headers || headers[1] !== policy.openssl.version) {
+    throw new Error('produced OpenSSL headers do not match the selected runtime');
   }
   if (!['Linux', 'Darwin', 'Windows'].includes(evidence.os_family)) {
     throw new Error('standalone runtime must identify a supported operating system');
@@ -59,16 +42,11 @@ function verifyStandaloneRuntime(evidence, expectedVersion) {
     }
   }
 
-  return Object.freeze({
-    schema: 'durable-workflow.cli.standalone-runtime/v1',
-    minimum_php_version: MINIMUM_PHP_VERSION,
-    expected_php_version: expectedVersion,
-    php_version: evidence.php_version,
-    php_version_id: evidence.php_version_id,
-    sapi: evidence.sapi,
+  return {
     os_family: evidence.os_family,
     openssl: {
       version: opensslVersion[1],
+      header_version: headers[1],
       support_ends: policy.openssl.support_ends,
       source: policy.openssl,
     },
@@ -77,6 +55,39 @@ function verifyStandaloneRuntime(evidence, expectedVersion) {
     oniguruma_version: evidence.oniguruma_version ?? null,
     iconv_version: evidence.iconv_version ?? null,
     dependency_policy: dependencyPolicyIdentity(),
+  };
+}
+
+function verifyStandaloneRuntime(evidence, expectedVersion) {
+  const match = typeof expectedVersion === 'string' && /^8\.4\.(0|[1-9]\d*)$/.exec(expectedVersion);
+  if (!match) {
+    throw new Error('standalone PHP pin must be a stable 8.4 patch version');
+  }
+  const expectedVersionId = 80400 + Number(match[1]);
+  if (!Number.isSafeInteger(expectedVersionId) || expectedVersionId < MINIMUM_PHP_VERSION_ID) {
+    throw new Error(`standalone PHP pin must be at least ${MINIMUM_PHP_VERSION}`);
+  }
+  if (!evidence || typeof evidence !== 'object' || Array.isArray(evidence)) {
+    throw new Error('standalone runtime probe must return a JSON object');
+  }
+  if (evidence.sapi !== 'micro') {
+    throw new Error('standalone runtime probe must execute in the produced micro SAPI');
+  }
+  if (evidence.php_version !== expectedVersion) {
+    throw new Error('produced PHP runtime does not match the configured stable pin');
+  }
+  if (!Number.isInteger(evidence.php_version_id) || evidence.php_version_id !== expectedVersionId) {
+    throw new Error('produced PHP runtime version ID does not match the configured pin');
+  }
+
+  return Object.freeze({
+    schema: 'durable-workflow.cli.standalone-runtime/v1',
+    minimum_php_version: MINIMUM_PHP_VERSION,
+    expected_php_version: expectedVersion,
+    php_version: evidence.php_version,
+    php_version_id: evidence.php_version_id,
+    sapi: evidence.sapi,
+    ...verifyRuntimeDependencies(evidence),
     verified: true,
   });
 }

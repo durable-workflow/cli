@@ -991,6 +991,7 @@ jobs:
           ./build/dw-${{ matrix.name }} --version
           ./build/dw-${{ matrix.name }} runtime:check
           ./build/dw-${{ matrix.name }} list
+          ./build/dw-${{ matrix.name }} upgrade --dry-run --output=json
 
       - name: Restore locked launcher qualification dependencies
         if: needs.resolve-release.outputs.cache_warm != 'true'
@@ -1503,6 +1504,7 @@ jobs:
           .\build\dw-windows-x86_64.exe --version
           .\build\dw-windows-x86_64.exe runtime:check
           .\build\dw-windows-x86_64.exe list
+          .\build\dw-windows-x86_64.exe upgrade --dry-run --output=json
 
       - name: Retain the verified standalone dependency inventory
         if: needs.resolve-release.outputs.cache_warm != 'true'

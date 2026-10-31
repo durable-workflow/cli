@@ -1,9 +1,62 @@
 'use strict';
 
 const fs = require('node:fs');
+const {loadDependencyPolicy, dependencyPolicyIdentity} = require('./verify-standalone-dependencies');
 
 const MINIMUM_PHP_VERSION = '8.4.27';
 const MINIMUM_PHP_VERSION_ID = 80427;
+
+function verifyRuntimeDependencies(evidence) {
+  const policy = loadDependencyPolicy();
+  const opensslVersion = /^OpenSSL (\d+\.\d+\.\d+)(?:\s|$)/.exec(evidence.openssl_version);
+  if (!opensslVersion || opensslVersion[1] !== policy.openssl.version) {
+    throw new Error('produced OpenSSL runtime does not match the supported exact source pin');
+  }
+  const headers = /^OpenSSL (\d+\.\d+\.\d+)(?:\s|$)/.exec(evidence.openssl_header_version);
+  if (!headers || headers[1] !== policy.openssl.version) {
+    throw new Error('produced OpenSSL headers do not match the selected runtime');
+  }
+  if (!['Linux', 'Darwin', 'Windows'].includes(evidence.os_family)) {
+    throw new Error('standalone runtime must identify a supported operating system');
+  }
+  if (evidence.os_family === 'Windows') {
+    if (evidence.curl !== null) {
+      throw new Error('Windows standalone must retain its streams transport policy');
+    }
+  } else {
+    const curl = evidence.curl;
+    const version = typeof curl?.version === 'string' && /^\d+\.\d+\.\d+$/.test(curl.version);
+    const compareVersions = (a, b) => {
+      const left = a.split('.').map(Number);
+      const right = b.split('.').map(Number);
+      for (let i = 0; i < left.length; i++) {
+        if (left[i] !== right[i]) return left[i] - right[i];
+      }
+      return 0;
+    };
+    if (!version || compareVersions(curl.version, policy.curl.minimum_version) < 0) {
+      throw new Error('produced libcurl does not meet the supported minimum version');
+    }
+    if (curl.ssl_version !== `OpenSSL/${policy.openssl.version}`) {
+      throw new Error('libcurl must use the same pinned OpenSSL runtime');
+    }
+  }
+
+  return {
+    os_family: evidence.os_family,
+    openssl: {
+      version: opensslVersion[1],
+      header_version: headers[1],
+      support_ends: policy.openssl.support_ends,
+      source: policy.openssl,
+    },
+    curl: evidence.curl,
+    pcre_version: evidence.pcre_version ?? null,
+    oniguruma_version: evidence.oniguruma_version ?? null,
+    iconv_version: evidence.iconv_version ?? null,
+    dependency_policy: dependencyPolicyIdentity(),
+  };
+}
 
 function verifyStandaloneRuntime(evidence, expectedVersion) {
   const match = typeof expectedVersion === 'string' && /^8\.4\.(0|[1-9]\d*)$/.exec(expectedVersion);
@@ -34,6 +87,7 @@ function verifyStandaloneRuntime(evidence, expectedVersion) {
     php_version: evidence.php_version,
     php_version_id: evidence.php_version_id,
     sapi: evidence.sapi,
+    ...verifyRuntimeDependencies(evidence),
     verified: true,
   });
 }

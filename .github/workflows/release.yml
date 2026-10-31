@@ -119,11 +119,9 @@ jobs:
             fi
             release_metadata="$(node scripts/ci/release-version.js metadata "$tag")"
             read -r prerelease make_latest <<< "$release_metadata"
-            if [ "$tag" = "2.0.0" ]; then
-              if [ "$GITHUB_EVENT_NAME" != "workflow_dispatch" ]; then
-                echo "::error::Stable 2.0.0 publication requires a protected main-branch dispatch"
-                exit 1
-              fi
+            if [ "$tag" = "2.0.0" ] && [ "$GITHUB_EVENT_NAME" != "workflow_dispatch" ]; then
+              echo "::error::Stable 2.0.0 publication requires a protected main-branch dispatch"
+              exit 1
             fi
           fi
           if ! printf '%s\n' "$commit" | grep -Eq '^[0-9a-f]{40}$'; then
@@ -481,6 +479,8 @@ jobs:
             scripts/ci/establish-native-prerequisites.sh
             scripts/ci/probe-standalone-runtime.php
             scripts/ci/verify-standalone-runtime.js
+            scripts/ci/verify-standalone-dependencies.js
+            scripts/ci/standalone-dependencies.json
           sparse-checkout-cone-mode: false
 
       - name: Download PHAR artifact
@@ -606,6 +606,10 @@ jobs:
             macOS)
               package_identity="$(brew list --versions | sort)"
               ;;
+            *)
+              echo "::error::Unsupported native build platform"
+              exit 1
+              ;;
           esac
           native_toolchain_id="$(
             {
@@ -624,10 +628,11 @@ jobs:
         run: |
           set -euo pipefail
           sha256_file() {
+            local file="$1"
             if command -v sha256sum >/dev/null 2>&1; then
-              sha256sum "$1" | awk '{print $1}'
+              sha256sum "$file" | awk '{print $1}'
             else
-              shasum -a 256 "$1" | awk '{print $1}'
+              shasum -a 256 "$file" | awk '{print $1}'
             fi
           }
           sha256_stdin() {
@@ -648,6 +653,8 @@ jobs:
             sha256_file release-toolchain-control/scripts/ci/establish-native-prerequisites.sh
           )"
           extensions_sha="$(printf '%s' "$SPC_EXTENSIONS" | sha256_stdin)"
+          dependency_identity="$(node release-toolchain-control/scripts/ci/verify-standalone-dependencies.js identity)"
+          printf '%s\n' "$dependency_identity" > build/.tools/dependency-policy.json
           runner_image="${ImageOS}-${ImageVersion}"
           toolchain_id="$(
             printf '%s\n' \
@@ -656,6 +663,7 @@ jobs:
               "spc_revision=$SPC_REVISION" \
               "php_version=$PHP_VERSION" \
               "extensions=$SPC_EXTENSIONS" \
+              "dependency_policy=$dependency_identity" \
               "native_toolchain_id=${{ steps.native-prerequisites.outputs.toolchain_id }}" \
               "native_prerequisite_identity=${{ steps.native-prerequisites.outputs.identity }}" \
               "native_prerequisite_script_sha256=$native_prerequisite_script_sha" \
@@ -755,11 +763,14 @@ jobs:
           # Keep the SHA-256-verified musl archive and lock established above.
           # This remains the trusted input to spc download on a cold build.
           rm -rf source buildroot
+          dependency_policy="$GITHUB_WORKSPACE/release-toolchain-control/scripts/ci/verify-standalone-dependencies.js"
+          openssl_url="$(node "$dependency_policy" url)"
           case "$SPC_DOWNLOAD_OUTER_ATTEMPTS" in
             ''|*[!0-9]*)
               echo "::error::SPC_DOWNLOAD_OUTER_ATTEMPTS must be a positive integer"
               exit 1
               ;;
+            *) ;;
           esac
           if [ "$SPC_DOWNLOAD_OUTER_ATTEMPTS" -lt 1 ]; then
             echo "::error::SPC_DOWNLOAD_OUTER_ATTEMPTS must be at least 1"
@@ -770,7 +781,9 @@ jobs:
           while [ "$attempt" -le "$SPC_DOWNLOAD_OUTER_ATTEMPTS" ]; do
             if ./spc download --with-php=${{ env.PHP_VERSION }} \
                 --for-extensions="$SPC_EXTENSIONS" --prefer-pre-built \
+                --custom-url="openssl:$openssl_url" \
                 --without-suggestions --retry="${SPC_DOWNLOAD_RETRY}"; then
+              node "$dependency_policy" verify-download downloads > openssl-source-verification.json
               exit 0
             fi
 
@@ -926,6 +939,8 @@ jobs:
             build/.tools/phpmicro-timing.json
             build/.tools/standalone-runtime.json
             build/.tools/standalone-runtime-verification.json
+            build/.tools/dependency-policy.json
+            build/.tools/openssl-source-verification.json
           if-no-files-found: warn
 
       - name: Combine PHAR into standalone binary
@@ -991,11 +1006,17 @@ jobs:
         run: |
           php scripts/ci/test-start-dev-signals.php "$GITHUB_WORKSPACE/build/dw-${{ matrix.name }}"
 
+      - name: Retain the verified standalone dependency inventory
+        if: needs.resolve-release.outputs.cache_warm != 'true'
+        run: cp build/.tools/standalone-runtime-verification.json build/dw-${{ matrix.name }}.dependencies.json
+
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
         if: needs.resolve-release.outputs.cache_warm != 'true'
         with:
           name: dw-${{ matrix.name }}
-          path: build/dw-${{ matrix.name }}
+          path: |
+            build/dw-${{ matrix.name }}
+            build/dw-${{ matrix.name }}.dependencies.json
           if-no-files-found: error
 
   build-binary-windows:
@@ -1038,6 +1059,8 @@ jobs:
             .github/workflows/release.yml
             scripts/ci/probe-standalone-runtime.php
             scripts/ci/verify-standalone-runtime.js
+            scripts/ci/verify-standalone-dependencies.js
+            scripts/ci/standalone-dependencies.json
           sparse-checkout-cone-mode: false
 
       - name: Download PHAR artifact
@@ -1171,6 +1194,12 @@ jobs:
           $extensionsSha = [Convert]::ToHexString(
             [Security.Cryptography.SHA256]::HashData($extensionsBytes)
           ).ToLowerInvariant()
+          $dependencyPolicy = Join-Path $env:GITHUB_WORKSPACE "release-toolchain-control\scripts\ci\verify-standalone-dependencies.js"
+          $dependencyIdentity = & node $dependencyPolicy identity
+          if ($LASTEXITCODE -ne 0) {
+            throw "Could not resolve the pinned standalone dependency policy"
+          }
+          $dependencyIdentity | Set-Content -Path build\.tools\dependency-policy.json -Encoding utf8
           $runnerImage = "$env:ImageOS-$env:ImageVersion"
           $identity = @(
             "schema=$env:PHPMICRO_CACHE_SCHEMA"
@@ -1178,6 +1207,7 @@ jobs:
             "spc_revision=$env:SPC_REVISION"
             "php_version=$env:PHP_VERSION_WINDOWS"
             "extensions=$env:SPC_EXTENSIONS_WINDOWS"
+            "dependency_policy=$dependencyIdentity"
             "native_toolchain_id=${{ steps.native-prerequisites.outputs.toolchain_id }}"
             "workflow_sha256=$workflowSha"
             "runner_label=windows-2022"
@@ -1262,6 +1292,11 @@ jobs:
         working-directory: build\.tools
         run: |
           Remove-Item -Recurse -Force downloads,source,buildroot -ErrorAction SilentlyContinue
+          $dependencyPolicy = Join-Path $env:GITHUB_WORKSPACE "release-toolchain-control\scripts\ci\verify-standalone-dependencies.js"
+          $opensslUrl = & node $dependencyPolicy url
+          if ($LASTEXITCODE -ne 0) {
+            throw "Could not resolve the pinned OpenSSL source"
+          }
           $outerAttempts = [int]$env:SPC_DOWNLOAD_OUTER_ATTEMPTS
           if ($outerAttempts -lt 1) {
             Write-Error "SPC_DOWNLOAD_OUTER_ATTEMPTS must be at least 1"
@@ -1271,8 +1306,13 @@ jobs:
           for ($attempt = 1; $attempt -le $outerAttempts; $attempt++) {
             .\spc.exe download --with-php=${{ env.PHP_VERSION_WINDOWS }} `
               --for-extensions="$env:SPC_EXTENSIONS_WINDOWS" --prefer-pre-built `
+              --custom-url="openssl:$opensslUrl" `
               --without-suggestions --retry="$env:SPC_DOWNLOAD_RETRY"
             if ($LASTEXITCODE -eq 0) {
+              node $dependencyPolicy verify-download downloads > openssl-source-verification.json
+              if ($LASTEXITCODE -ne 0) {
+                throw "The OpenSSL source failed its pinned SHA-256 policy"
+              }
               break
             }
 
@@ -1444,6 +1484,8 @@ jobs:
             build/.tools/phpmicro-timing.json
             build/.tools/standalone-runtime.json
             build/.tools/standalone-runtime-verification.json
+            build/.tools/dependency-policy.json
+            build/.tools/openssl-source-verification.json
           if-no-files-found: warn
 
       - name: Combine PHAR into standalone binary
@@ -1462,11 +1504,18 @@ jobs:
           .\build\dw-windows-x86_64.exe runtime:check
           .\build\dw-windows-x86_64.exe list
 
+      - name: Retain the verified standalone dependency inventory
+        if: needs.resolve-release.outputs.cache_warm != 'true'
+        shell: pwsh
+        run: Copy-Item build\.tools\standalone-runtime-verification.json build\dw-windows-x86_64.dependencies.json
+
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
         if: needs.resolve-release.outputs.cache_warm != 'true'
         with:
           name: dw-windows-x86_64
-          path: build/dw-windows-x86_64.exe
+          path: |
+            build/dw-windows-x86_64.exe
+            build/dw-windows-x86_64.dependencies.json
           if-no-files-found: error
 
   bundle-release:
@@ -1643,6 +1692,10 @@ jobs:
             dw-linux-aarch64
             dw-macos-aarch64
             dw-windows-x86_64.exe
+            dw-linux-x86_64.dependencies.json
+            dw-linux-aarch64.dependencies.json
+            dw-macos-aarch64.dependencies.json
+            dw-windows-x86_64.dependencies.json
             install.sh
             install.ps1
             verify-release.sh
@@ -1725,12 +1778,14 @@ jobs:
               echo "::error::DURABLE_WORKFLOW_RELEASE_ASSET_ATTEMPTS must be a positive integer"
               exit 1
               ;;
+            *) ;;
           esac
           case "$sleep_seconds" in
             ''|*[!0-9]*)
               echo "::error::DURABLE_WORKFLOW_RELEASE_ASSET_RETRY_SLEEP must be a non-negative integer"
               exit 1
               ;;
+            *) ;;
           esac
           if [ "$attempts" -lt 1 ]; then
             echo "::error::DURABLE_WORKFLOW_RELEASE_ASSET_ATTEMPTS must be at least 1"

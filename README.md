@@ -127,6 +127,12 @@ make phar
 
 Run `make help` for the complete local development surface.
 
+Standalone release builds use the reviewed [dependency source policy](scripts/ci/standalone-dependencies.json).
+The workflow verifies the OpenSSL archive before compilation and checks the
+produced runtime after both cold builds and cache restores. Each release includes
+per-platform `.dependencies.json` inventories in the normal checksum and
+attestation set, recording PHP, OpenSSL, libcurl and available library versions.
+
 ## License
 
 MIT

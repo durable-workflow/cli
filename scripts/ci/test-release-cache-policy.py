@@ -93,6 +93,17 @@ class ReleaseCachePolicyTest(unittest.TestCase):
             self.assertNotIn("continue-on-error", job["steps"][guard_index])
             self.assertNotIn("if", job["steps"][guard_index])
 
+    def test_cache_writing_jobs_only_check_out_the_trusted_event_commit(self) -> None:
+        for job in self.native_jobs():
+            checkouts = [
+                step for step in job["steps"]
+                if step.get("uses", "").startswith("actions/checkout@")
+            ]
+            self.assertEqual(2, len(checkouts))
+            for checkout in checkouts:
+                self.assertEqual("${{ github.sha }}", checkout["with"]["ref"])
+                self.assertIs(False, checkout["with"]["persist-credentials"])
+
     def resolve(self, event, ref, operation="", commit="", tag=""):
         step = next(
             step

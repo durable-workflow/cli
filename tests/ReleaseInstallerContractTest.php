@@ -285,13 +285,13 @@ SH;
         self::assertStringNotContainsString('/nightly/', $releaseWorkflow);
         self::assertStringNotContainsString('git clone', $releaseWorkflow);
 
-        self::assertSame(3, substr_count($releaseWorkflow, "github.repository == 'durable-workflow/cli'"));
+        self::assertSame(6, substr_count($releaseWorkflow, "github.repository == 'durable-workflow/cli'"));
         self::assertSame(3, substr_count($releaseWorkflow, "github.event_name != 'pull_request'"));
         self::assertSame(3, substr_count(
             $releaseWorkflow,
             "(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')",
         ));
-        self::assertSame(2, substr_count(
+        self::assertSame(4, substr_count(
             $releaseWorkflow,
             'key: phpmicro-${{ env.PHPMICRO_CACHE_SCHEMA }}-${{ steps.phpmicro-toolchain.outputs.toolchain_id }}',
         ));
@@ -320,7 +320,7 @@ SH;
         ] as $cacheInput) {
             self::assertGreaterThanOrEqual(2, substr_count($releaseWorkflow, $cacheInput), $cacheInput);
         }
-        self::assertSame(2, substr_count($releaseWorkflow, 'build/.tools/buildroot/bin/micro.sfx'));
+        self::assertSame(4, substr_count($releaseWorkflow, 'build/.tools/buildroot/bin/micro.sfx'));
         self::assertSame(2, substr_count(
             $releaseWorkflow,
             'Checkout qualified phpmicro toolchain policy',
@@ -404,7 +404,7 @@ SH;
             self::assertIsInt($guard);
             self::assertIsInt($combine);
             self::assertLessThan($combine, $guard);
-            $stepEnd = strpos($platform, '- name: Record phpmicro toolchain timing', $guard);
+            $stepEnd = strpos($platform, "\n      - ", $guard);
             self::assertIsInt($stepEnd);
             $step = substr($platform, $guard, $stepEnd - $guard);
             self::assertStringNotContainsString('if:', $step);
@@ -451,7 +451,7 @@ SH;
             "needs.resolve-release.outputs.cache_warm != 'true' &&\n".
             "            ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/'))",
         ));
-        self::assertSame(2, substr_count(
+        self::assertSame(4, substr_count(
             $releaseWorkflow,
             'key: phpmicro-${{ env.PHPMICRO_CACHE_SCHEMA }}-${{ steps.phpmicro-toolchain.outputs.toolchain_id }}',
         ));

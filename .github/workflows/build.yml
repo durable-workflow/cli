@@ -93,6 +93,8 @@ jobs:
           pwsh -NoProfile -Command '$null = [scriptblock]::Create((Get-Content -Raw scripts/install.ps1))'
       - name: Verify release contracts
         run: |
+          python -m pip install --only-binary :all: PyYAML==6.0.2
+          python scripts/ci/test-release-cache-policy.py
           python scripts/ci/test-native-prerequisites.py
           node --test scripts/ci/test-release-workflow-metadata.js
           node --test scripts/ci/test-standalone-runtime.js

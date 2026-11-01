@@ -20,6 +20,7 @@ use DurableWorkflow\Cli\Support\ServerHttpException;
 use DurableWorkflow\Cli\Support\TimeoutException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Exception\ExceptionInterface as ConsoleException;
+use Symfony\Component\Console\Formatter\OutputFormatter;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\ConsoleOutputInterface;
@@ -592,7 +593,7 @@ abstract class BaseCommand extends Command
      */
     protected function renderJson(OutputInterface $output, array $data): int
     {
-        $output->writeln(json_encode($data, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+        $output->writeln(json_encode($data, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR), OutputInterface::OUTPUT_RAW);
 
         return Command::SUCCESS;
     }
@@ -617,7 +618,7 @@ abstract class BaseCommand extends Command
         if ($this->outputMode($input) === OutputMode::JSONL) {
             $items = $envelope[$itemsKey] ?? [];
             foreach ($items as $item) {
-                $output->writeln(json_encode($item, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+                $output->writeln(json_encode($item, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR), OutputInterface::OUTPUT_RAW);
             }
 
             return Command::SUCCESS;
@@ -717,7 +718,7 @@ abstract class BaseCommand extends Command
     protected function writeCommandReceiptLines(OutputInterface $output, array $result): void
     {
         if ($this->hasNonEmptyString($result['request_id'] ?? null)) {
-            $output->writeln('  Request ID: '.$result['request_id']);
+            $output->writeln('  Request ID: '.$this->humanOutputText($result['request_id']));
         }
 
         if (is_bool($result['retained'] ?? null)) {
@@ -1208,7 +1209,7 @@ abstract class BaseCommand extends Command
         }
 
         if ($jsonRequested) {
-            $output->writeln($this->encodeErrorEnvelope($e, $exitCode, $input));
+            $output->writeln($this->encodeErrorEnvelope($e, $exitCode, $input), OutputInterface::OUTPUT_RAW);
 
             return $exitCode;
         }
@@ -1374,7 +1375,12 @@ abstract class BaseCommand extends Command
     private function writeHumanError(OutputInterface $output, string $message): void
     {
         $target = $output instanceof ConsoleOutputInterface ? $output->getErrorOutput() : $output;
-        $target->writeln('<error>'.$message.'</error>');
+        $target->writeln('<error>'.$this->humanOutputText($message).'</error>');
+    }
+
+    private function humanOutputText(string $text): string
+    {
+        return OutputFormatter::escape(preg_replace('/[\x00-\x1F\x7F\x{80}-\x{9F}]/u', ' ', $text) ?? '-');
     }
 
     private function writeHumanErrorNamespaceContext(OutputInterface $output, InputInterface $input): void
@@ -1396,7 +1402,7 @@ abstract class BaseCommand extends Command
         }
 
         $target = $output instanceof ConsoleOutputInterface ? $output->getErrorOutput() : $output;
-        $target->writeln('Request ID: '.$requestId);
+        $target->writeln('Request ID: '.$this->humanOutputText($requestId));
     }
 
     private function writeHumanHttpErrorDetails(OutputInterface $output, \Throwable $e): void
@@ -1408,20 +1414,20 @@ abstract class BaseCommand extends Command
         $target = $output instanceof ConsoleOutputInterface ? $output->getErrorOutput() : $output;
 
         if ($e->reason() !== null) {
-            $target->writeln('Reason: '.$e->reason());
+            $target->writeln('Reason: '.$this->humanOutputText($e->reason()));
         }
 
         if ($e->body !== null) {
             foreach (['code', 'error_code', 'type', 'rejection_reason'] as $key) {
                 $value = $e->body[$key] ?? null;
                 if (is_string($value) && $value !== '') {
-                    $target->writeln(str_replace('_', ' ', ucfirst($key)).': '.$value);
+                    $target->writeln(str_replace('_', ' ', ucfirst($key)).': '.$this->humanOutputText($value));
                 }
             }
 
             if ($e->reason() === self::REQUEST_ID_CONFLICT_REASON) {
                 foreach ($this->requestIdConflictLines($e->body) as $line) {
-                    $target->writeln($line);
+                    $target->writeln($this->humanOutputText($line));
                 }
             }
         }
@@ -1432,7 +1438,7 @@ abstract class BaseCommand extends Command
         }
 
         foreach ($this->flattenValidationErrors($validationErrors) as $message) {
-            $target->writeln('Validation: '.$message);
+            $target->writeln('Validation: '.$this->humanOutputText($message));
         }
     }
 
@@ -1656,10 +1662,13 @@ abstract class BaseCommand extends Command
         $target->writeln('Next steps:');
 
         foreach ($recommendations as $recommendation) {
-            $target->writeln('  - '.$recommendation['message']);
+            $message = $recommendation['id'] === 'request_id.retry'
+                ? 'The outcome of this command is unknown. Retry it unchanged, passing the same exact request ID with --request-id. Use --json for an exact copy of the key.'
+                : $recommendation['message'];
+            $target->writeln('  - '.$this->humanOutputText($message));
 
             if (isset($recommendation['command'])) {
-                $target->writeln('    Try: '.$recommendation['command']);
+                $target->writeln('    Try: '.$this->humanOutputText($recommendation['command']));
             }
         }
     }

@@ -12,6 +12,7 @@ use DurableWorkflow\Cli\Support\NetworkException;
 use DurableWorkflow\Cli\Support\ServerClient;
 use DurableWorkflow\Cli\Support\ServerHttpException;
 use DurableWorkflow\Cli\Support\TimeoutException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -30,6 +31,85 @@ final class WorkflowCommandRequestIdTest extends TestCase
     private const SIGNAL_KEY_PATTERN = '/\Acli-signal-[0-9a-f]{32}\z/';
 
     private const UPDATE_KEY_PATTERN = '/\Acli-update-[0-9a-f]{32}\z/';
+
+    #[DataProvider('opaqueOutputCases')]
+    public function test_opaque_command_values_are_safe_in_human_output_and_exact_in_json(string $operation, string $scenario, string $value, bool $decorated): void
+    {
+        $receipt = $operation === 'signal'
+            ? self::signalReceipt(['request_id' => $value])
+            : self::updateReceipt(['request_id' => $value]);
+        $body = self::conflictBody($operation, $value, ['name', $value]);
+        foreach (['retained_command_id', 'retained_command_type', 'retained_outcome'] as $field) {
+            $body[$field] = $value;
+        }
+        $message = 'Request failed for '.$value;
+        foreach ([false, true] as $json) {
+            $exception = match ($scenario) {
+                'conflict' => new ServerHttpException($message, 409, body: $body),
+                'uncertain' => new NetworkException($message),
+                default => null,
+            };
+            $client = new CommandRequestIdFakeClient($receipt, exception: $exception, contract: self::requestContract());
+            $arguments = ['workflow-id' => 'wf-1', $operation.'-name' => 'approve', '--request-id' => $value];
+            if ($json) { $arguments['--json'] = true; }
+            $tester = $operation === 'signal'
+                ? $this->runSignal($client, $arguments, $decorated)
+                : $this->runUpdate($client, $arguments, $decorated);
+            self::assertSame($value, $client->lastPostBody['request_id']);
+            self::assertSame(match ($scenario) {
+                'conflict' => ExitCode::INVALID, 'uncertain' => ExitCode::NETWORK, default => Command::SUCCESS,
+            }, $tester->getStatusCode());
+            if ($json) {
+                $decoded = $this->json($tester);
+                self::assertSame($value, $decoded['request_id']);
+                if ($scenario === 'conflict') {
+                    self::assertSame($body, $decoded['server_response']);
+                    self::assertSame($value, $decoded['retained_command_id']);
+                    self::assertSame($value, $decoded['retained_command_type']);
+                    self::assertSame($value, $decoded['retained_outcome']);
+                }
+                if ($scenario !== 'success') { self::assertSame($message, $decoded['error']); }
+                if ($scenario === 'uncertain') {
+                    $retry = array_values(array_filter($decoded['recommendations'], static fn (array $item): bool => $item['id'] === 'request_id.retry'));
+                    self::assertStringContainsString('--request-id='.$value, $retry[0]['message']);
+                }
+                continue;
+            }
+            // Remove the CLI's own color styling, leaving injected OSC/C1/control bytes visible.
+            $display = preg_replace('/\x1B\[[0-9;]*m/', '', $tester->getDisplay());
+            self::assertIsString($display);
+            self::assertDoesNotMatchRegularExpression('/[\x00-\x09\x0B-\x1F\x7F\x{80}-\x{9F}]/u', $display);
+            $shown = str_replace(["\n", "\r", "\t", "\x1B", "\x07", "\u{009B}"], ' ', $value);
+            self::assertStringContainsString('Request ID: '.$shown, $display);
+            if ($scenario === 'conflict') {
+                self::assertStringContainsString('Retained command: id '.$shown, $display);
+                self::assertStringContainsString('Conflicting parts: name, '.$shown, $display);
+                self::assertStringContainsString('Request id ['.$shown.']', $display);
+            }
+            if ($scenario === 'uncertain') {
+                self::assertStringNotContainsString('--request-id=', $display);
+                self::assertStringContainsString('exact request ID', $display);
+            }
+        }
+    }
+
+    public static function opaqueOutputCases(): iterable
+    {
+        $values = [
+            'controls' => "key-\nFORGED\r\t\x1B]0;title\x07-\u{009B}31m-end",
+            'markup' => 'key-<error>red</error><href=https://example.invalid>link</>-end',
+            'shell' => "key-';$(id);`echo nope`\"\\-end",
+        ];
+        foreach (['signal', 'update'] as $operation) {
+            foreach (['success', 'conflict', 'uncertain'] as $scenario) {
+                foreach ($values as $name => $value) {
+                    foreach ([false, true] as $decorated) {
+                        yield $operation.' '.$scenario.' '.$name.' decorated='.(int) $decorated => [$operation, $scenario, $value, $decorated];
+                    }
+                }
+            }
+        }
+    }
 
     public function test_signal_generates_one_cli_signal_key_per_invocation_when_request_id_is_omitted(): void
     {
@@ -349,7 +429,8 @@ final class WorkflowCommandRequestIdTest extends TestCase
 
         self::assertStringContainsString('Server unreachable: connection reset', $display);
         self::assertStringContainsString('Request ID: '.$key, $display);
-        self::assertStringContainsString('--request-id='.$key, $display);
+        self::assertStringContainsString('exact request ID with --request-id', $display);
+        self::assertStringNotContainsString('--request-id=', $display);
     }
 
     public function test_update_timeout_json_error_includes_the_key_that_was_sent(): void
@@ -542,13 +623,13 @@ final class WorkflowCommandRequestIdTest extends TestCase
     /**
      * @param array<string, mixed> $arguments
      */
-    private function runSignal(ServerClient $client, array $arguments): CommandTester
+    private function runSignal(ServerClient $client, array $arguments, bool $decorated = false): CommandTester
     {
         $command = new SignalCommand();
         $command->setServerClient($client);
 
         $tester = new CommandTester($command);
-        $tester->execute($arguments);
+        $tester->execute($arguments, ['decorated' => $decorated]);
 
         return $tester;
     }
@@ -556,13 +637,13 @@ final class WorkflowCommandRequestIdTest extends TestCase
     /**
      * @param array<string, mixed> $arguments
      */
-    private function runUpdate(ServerClient $client, array $arguments): CommandTester
+    private function runUpdate(ServerClient $client, array $arguments, bool $decorated = false): CommandTester
     {
         $command = new UpdateCommand();
         $command->setServerClient($client);
 
         $tester = new CommandTester($command);
-        $tester->execute($arguments);
+        $tester->execute($arguments, ['decorated' => $decorated]);
 
         return $tester;
     }

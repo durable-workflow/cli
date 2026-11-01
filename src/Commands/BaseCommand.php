@@ -401,12 +401,18 @@ abstract class BaseCommand extends Command
             return true;
         }
 
-        $client->assertControlPlaneOptionValue(
-            operation: $operation,
-            field: $field,
-            value: $value,
-            optionName: $optionName,
-        );
+        try {
+            $client->assertControlPlaneOptionValue(
+                operation: $operation,
+                field: $field,
+                value: $value,
+                optionName: $optionName,
+            );
+        } catch (ServerException|InvalidOptionException $exception) {
+            throw $exception;
+        } catch (\RuntimeException $exception) {
+            throw new InvalidOptionException($exception->getMessage(), 0, $exception);
+        }
 
         return true;
     }

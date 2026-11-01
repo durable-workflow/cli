@@ -25,6 +25,7 @@ final class RuntimeCheckCommandTest extends TestCase
         $tester = new CommandTester($command);
 
         self::assertSame(Command::SUCCESS, $tester->execute([]));
+        self::assertStringContainsString(sprintf('PHP runtime: %s (%s)', PHP_VERSION, PHP_SAPI), $tester->getDisplay());
         self::assertStringContainsString('Runtime extensions OK', $tester->getDisplay());
     }
 
@@ -37,6 +38,7 @@ final class RuntimeCheckCommandTest extends TestCase
         $tester = new CommandTester($command);
 
         self::assertSame(Command::FAILURE, $tester->execute([]));
+        self::assertStringContainsString(sprintf('PHP runtime: %s (%s)', PHP_VERSION, PHP_SAPI), $tester->getDisplay());
         self::assertStringContainsString('Missing required runtime extensions: curl', $tester->getDisplay());
     }
 

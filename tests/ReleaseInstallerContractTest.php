@@ -260,8 +260,8 @@ SH;
             $releaseWorkflow,
             'SPC_REVISION: 4318ef8fa32a02460ec1554746674a7bc42b49fa',
         ));
-        self::assertSame(1, substr_count($releaseWorkflow, "PHP_VERSION: '8.4.23'"));
-        self::assertSame(1, substr_count($releaseWorkflow, "PHP_VERSION_WINDOWS: '8.4.23'"));
+        self::assertSame(1, substr_count($releaseWorkflow, "PHP_VERSION: '8.4.27'"));
+        self::assertSame(1, substr_count($releaseWorkflow, "PHP_VERSION_WINDOWS: '8.4.27'"));
         self::assertStringContainsString(
             'spc_sha256: 523ba4279c54c7a377156c0dd3a36adf92ee64b01e9a7f5e9e2ec084b8e458e5',
             $releaseWorkflow,
@@ -285,13 +285,13 @@ SH;
         self::assertStringNotContainsString('/nightly/', $releaseWorkflow);
         self::assertStringNotContainsString('git clone', $releaseWorkflow);
 
-        self::assertSame(3, substr_count($releaseWorkflow, "github.repository == 'durable-workflow/cli'"));
+        self::assertSame(6, substr_count($releaseWorkflow, "github.repository == 'durable-workflow/cli'"));
         self::assertSame(3, substr_count($releaseWorkflow, "github.event_name != 'pull_request'"));
         self::assertSame(3, substr_count(
             $releaseWorkflow,
             "(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')",
         ));
-        self::assertSame(2, substr_count(
+        self::assertSame(4, substr_count(
             $releaseWorkflow,
             'key: phpmicro-${{ env.PHPMICRO_CACHE_SCHEMA }}-${{ steps.phpmicro-toolchain.outputs.toolchain_id }}',
         ));
@@ -320,12 +320,12 @@ SH;
         ] as $cacheInput) {
             self::assertGreaterThanOrEqual(2, substr_count($releaseWorkflow, $cacheInput), $cacheInput);
         }
-        self::assertSame(2, substr_count($releaseWorkflow, 'build/.tools/buildroot/bin/micro.sfx'));
+        self::assertSame(4, substr_count($releaseWorkflow, 'build/.tools/buildroot/bin/micro.sfx'));
         self::assertSame(2, substr_count(
             $releaseWorkflow,
             'Checkout qualified phpmicro toolchain policy',
         ));
-        self::assertSame(5, substr_count(
+        self::assertSame(3, substr_count(
             $releaseWorkflow,
             'ref: ${{ needs.resolve-release.outputs.control_commit }}',
         ));
@@ -387,6 +387,35 @@ SH;
         self::assertStringContainsString('previous_uncached_baseline_seconds', $releaseWorkflow);
     }
 
+    public function test_release_checks_the_produced_runtime_before_combining_the_application(): void
+    {
+        $workflow = self::readRepoFile('.github/workflows/release.yml');
+        $unixStart = strpos($workflow, "\n  build-binary:");
+        $windowsStart = strpos($workflow, "\n  build-binary-windows:");
+        self::assertIsInt($unixStart);
+        self::assertIsInt($windowsStart);
+
+        foreach ([
+            substr($workflow, $unixStart, $windowsStart - $unixStart),
+            substr($workflow, $windowsStart),
+        ] as $platform) {
+            $guard = strpos($platform, '- name: Verify produced standalone PHP runtime');
+            $combine = strpos($platform, '- name: Combine PHAR into standalone binary');
+            self::assertIsInt($guard);
+            self::assertIsInt($combine);
+            self::assertLessThan($combine, $guard);
+            $stepEnd = strpos($platform, "\n      - ", $guard);
+            self::assertIsInt($stepEnd);
+            $step = substr($platform, $guard, $stepEnd - $guard);
+            self::assertStringNotContainsString('if:', $step);
+            self::assertStringContainsString('release-toolchain-control', $step);
+            self::assertStringContainsString('probe-standalone-runtime.php', $step);
+            self::assertStringContainsString('verify-standalone-runtime.js', $step);
+            self::assertStringContainsString('--expected-version', $step);
+            self::assertStringContainsString('standalone-runtime-verification.json', $step);
+        }
+    }
+
     public function test_release_phpmicro_cache_has_a_non_publishing_default_branch_warm_path(): void
     {
         $releaseWorkflow = self::readRepoFile('.github/workflows/release.yml');
@@ -422,7 +451,7 @@ SH;
             "needs.resolve-release.outputs.cache_warm != 'true' &&\n".
             "            ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/'))",
         ));
-        self::assertSame(2, substr_count(
+        self::assertSame(4, substr_count(
             $releaseWorkflow,
             'key: phpmicro-${{ env.PHPMICRO_CACHE_SCHEMA }}-${{ steps.phpmicro-toolchain.outputs.toolchain_id }}',
         ));
@@ -497,7 +526,7 @@ SH;
         self::assertStringContainsString('release-control/scripts/verify-public-release-assets.sh', $releaseWorkflow);
         self::assertStringContainsString('durable-workflow.cli.release-control-authority/v1', $releaseWorkflow);
         self::assertStringContainsString('"control": {"ref": "%s", "commit": "%s"}', $releaseWorkflow);
-        self::assertSame(5, substr_count($releaseWorkflow, 'ref: ${{ needs.resolve-release.outputs.commit }}'));
+        self::assertSame(3, substr_count($releaseWorkflow, 'ref: ${{ needs.resolve-release.outputs.commit }}'));
         self::assertStringNotContainsString('|| github.ref }}', $releaseWorkflow);
         self::assertStringContainsString('EXPECTED_COMMIT: ${{ needs.resolve-release.outputs.commit }}', $releaseWorkflow);
         self::assertSame(2, substr_count($releaseWorkflow, 'RELEASE_COMMIT: ${{ needs.resolve-release.outputs.commit }}'));
@@ -534,7 +563,7 @@ SH);
         self::assertTrue(chmod($fakeGh, 0755));
 
         self::assertStringContainsString('PUSH_COMMIT: ${{ github.sha }}', $releaseWorkflow);
-        self::assertSame(5, substr_count($releaseWorkflow, 'ref: ${{ needs.resolve-release.outputs.commit }}'));
+        self::assertSame(3, substr_count($releaseWorkflow, 'ref: ${{ needs.resolve-release.outputs.commit }}'));
         self::assertSame(2, substr_count($releaseWorkflow, 'RELEASE_COMMIT: ${{ needs.resolve-release.outputs.commit }}'));
 
         $environment = [

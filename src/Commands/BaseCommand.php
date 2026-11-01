@@ -401,18 +401,12 @@ abstract class BaseCommand extends Command
             return true;
         }
 
-        try {
-            $client->assertControlPlaneOptionValue(
-                operation: $operation,
-                field: $field,
-                value: $value,
-                optionName: $optionName,
-            );
-        } catch (\RuntimeException $exception) {
-            $this->writeHumanError($output, $exception->getMessage());
-
-            return false;
-        }
+        $client->assertControlPlaneOptionValue(
+            operation: $operation,
+            field: $field,
+            value: $value,
+            optionName: $optionName,
+        );
 
         return true;
     }
@@ -1498,9 +1492,9 @@ abstract class BaseCommand extends Command
             return null;
         }
 
-        $requestId = trim((string) $requestId);
+        $requestId = (string) $requestId;
 
-        return $requestId === '' ? null : $requestId;
+        return trim($requestId) === '' || preg_match('//u', $requestId) !== 1 ? null : $requestId;
     }
 
     /**

@@ -111,6 +111,35 @@ final class WorkflowCommandRequestIdTest extends TestCase
         }
     }
 
+    public function test_malformed_utf8_key_is_refused_as_json_without_sending(): void
+    {
+        foreach (['signal', 'update'] as $operation) {
+            $client = new CommandRequestIdFakeClient([], contract: self::requestContract());
+            $arguments = ['workflow-id' => 'wf-1', $operation.'-name' => 'approve', '--request-id' => "bad-\xC3\x28", '--json' => true];
+            $tester = $operation === 'signal'
+                ? $this->runSignal($client, $arguments)
+                : $this->runUpdate($client, $arguments);
+            self::assertSame(ExitCode::INVALID, $tester->getStatusCode());
+            self::assertSame(0, $client->postCalls);
+            $decoded = $this->json($tester);
+            self::assertStringContainsString('valid UTF-8', $decoded['error']);
+            self::assertNull($decoded['request_id'] ?? null);
+        }
+    }
+
+    public function test_a_valid_unattempted_key_keeps_its_exact_json_error_context(): void
+    {
+        $key = " \t<info>opaque</info> \t";
+        $client = new CommandRequestIdFakeClient([], contract: self::requestContract());
+        $tester = $this->runUpdate($client, [
+            'workflow-id' => 'wf-1', 'update-name' => 'approve',
+            '--request-id' => $key, '--wait' => 'not-a-wait', '--json' => true,
+        ]);
+        self::assertSame(ExitCode::INVALID, $tester->getStatusCode());
+        self::assertSame(0, $client->postCalls);
+        self::assertSame($key, $this->json($tester)['request_id']);
+    }
+
     public function test_signal_generates_one_cli_signal_key_per_invocation_when_request_id_is_omitted(): void
     {
         $client = new CommandRequestIdFakeClient(self::signalReceipt());

@@ -135,8 +135,8 @@ class ReleaseCachePolicyTest(unittest.TestCase):
             )
             values = {
                 key: value
-                for key, value in (
-                    line.split("=", 1) for line in output.read_text().splitlines()
+                for key, _, value in (
+                    line.partition("=") for line in output.read_text().splitlines()
                 )
             } if output.exists() else {}
             return result, values, sha

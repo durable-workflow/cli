@@ -133,10 +133,12 @@ class ReleaseCachePolicyTest(unittest.TestCase):
                 text=True,
                 timeout=10,
             )
-            values = dict(
-                line.split("=", 1)
-                for line in output.read_text().splitlines()
-            ) if output.exists() else {}
+            values = {
+                key: value
+                for key, value in (
+                    line.split("=", 1) for line in output.read_text().splitlines()
+                )
+            } if output.exists() else {}
             return result, values, sha
 
     def test_warm_events_use_the_same_protected_source_and_control(self) -> None:

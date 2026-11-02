@@ -1417,20 +1417,7 @@ abstract class BaseCommand extends Command
             $target->writeln('Reason: '.$this->humanOutputText($e->reason()));
         }
 
-        if ($e->body !== null) {
-            foreach (['code', 'error_code', 'type', 'rejection_reason'] as $key) {
-                $value = $e->body[$key] ?? null;
-                if (is_string($value) && $value !== '') {
-                    $target->writeln(str_replace('_', ' ', ucfirst($key)).': '.$this->humanOutputText($value));
-                }
-            }
-
-            if ($e->reason() === self::REQUEST_ID_CONFLICT_REASON) {
-                foreach ($this->requestIdConflictLines($e->body) as $line) {
-                    $target->writeln($this->humanOutputText($line));
-                }
-            }
-        }
+        $this->writeHumanHttpErrorBody($target, $e);
 
         $validationErrors = $e->validationErrors();
         if ($validationErrors === null) {
@@ -1439,6 +1426,26 @@ abstract class BaseCommand extends Command
 
         foreach ($this->flattenValidationErrors($validationErrors) as $message) {
             $target->writeln('Validation: '.$this->humanOutputText($message));
+        }
+    }
+
+    private function writeHumanHttpErrorBody(OutputInterface $output, ServerHttpException $e): void
+    {
+        if ($e->body === null) {
+            return;
+        }
+
+        foreach (['code', 'error_code', 'type', 'rejection_reason'] as $key) {
+            $value = $e->body[$key] ?? null;
+            if (is_string($value) && $value !== '') {
+                $output->writeln(str_replace('_', ' ', ucfirst($key)).': '.$this->humanOutputText($value));
+            }
+        }
+
+        if ($e->reason() === self::REQUEST_ID_CONFLICT_REASON) {
+            foreach ($this->requestIdConflictLines($e->body) as $line) {
+                $output->writeln($this->humanOutputText($line));
+            }
         }
     }
 
@@ -1488,11 +1495,7 @@ abstract class BaseCommand extends Command
             return $this->commandRequestId;
         }
 
-        if (! $input->hasOption('request-id')) {
-            return null;
-        }
-
-        $requestId = $input->getOption('request-id');
+        $requestId = $input->hasOption('request-id') ? $input->getOption('request-id') : null;
 
         if (! is_scalar($requestId)) {
             return null;
@@ -1782,47 +1785,34 @@ abstract class BaseCommand extends Command
      */
     private function baseErrorRecommendations(\Throwable $e, ?InputInterface $input): array
     {
-        if ($e instanceof NetworkException) {
-            return [[
+        return match (true) {
+            $e instanceof NetworkException => [[
                 'id' => 'server.unreachable',
                 'severity' => 'error',
                 'message' => 'Check the server URL, DNS, port, and TLS settings for the selected environment.',
                 'command' => $this->doctorCommand($input),
-            ]];
-        }
-
-        if ($e instanceof TimeoutException) {
-            return [[
+            ]],
+            $e instanceof TimeoutException => [[
                 'id' => 'server.timeout',
                 'severity' => 'error',
                 'message' => 'Check server load and network reachability, then retry with a smaller request or narrower query.',
                 'command' => $this->doctorCommand($input),
-            ]];
-        }
-
-        if ($e instanceof ServerHttpException) {
-            return $this->httpErrorRecommendations($e, $input);
-        }
-
-        if ($e instanceof CompatibilityException) {
-            return [[
+            ]],
+            $e instanceof ServerHttpException => $this->httpErrorRecommendations($e, $input),
+            $e instanceof CompatibilityException => [[
                 'id' => 'compatibility.unsupported',
                 'severity' => 'error',
                 'message' => $e->nextStep(),
                 'command' => $this->doctorCommand($input),
-            ]];
-        }
-
-        if ($e instanceof InvalidOptionException) {
-            return [[
+            ]],
+            $e instanceof InvalidOptionException => [[
                 'id' => 'input.invalid',
                 'severity' => 'error',
                 'message' => 'Review the command usage and option values before retrying.',
                 'command' => sprintf('dw %s --help', (string) $this->getName()),
-            ]];
-        }
-
-        return [];
+            ]],
+            default => [],
+        };
     }
 
     /**

@@ -1,0 +1,24 @@
+[package]
+name = "dw"
+version = "3.0.0-dev"
+edition = "2021"
+rust-version = "1.86"
+description = "Command-line interface for Durable Workflow Server and Cloud"
+license = "MIT"
+repository = "https://github.com/durable-workflow/cli"
+publish = false
+
+[[bin]]
+name = "dw"
+path = "src/main.rs"
+
+[dependencies]
+# Pinned to the latest qualified SDK release. Move only to a release that has
+# passed sdk-rust's pre-publication acceptance.
+durable-workflow = "=4.11.0"
+# preserve_order keeps Server response keys in their original order, matching
+# the PHP CLI's pass-through JSON.
+serde = "1"
+serde_json = { version = "1", features = ["preserve_order"] }
+tokio = { version = "1", features = ["rt", "macros"] }
+reqwest = { version = "0.12", default-features = false }

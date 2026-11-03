@@ -513,6 +513,16 @@ dw workflow:history order-123 01HXYZ
 dw workflow:history order-123 01HXYZ --follow
 ```
 
+Batch cancellation with `--all-matching` cancels the exact run each listed
+workflow had when it was selected. If that run has continued as new, been
+replaced or closed before the request reaches Server, the workflow is reported
+as a failure with Server's `reason` (for example
+`historical_run_command_rejected` or `run_not_active`). The current run is not
+cancelled in its place. The selection is not expanded while the command runs,
+and a workflow that appears on more than one list page is targeted once, at
+its first listed run. JSON output lists each selected `workflow_id`, `run_id`
+and `namespace` in `targets`, and each failure includes its `run_id`.
+
 ### Nexus service calls
 
 Inspect one durable call in its endpoint namespace:

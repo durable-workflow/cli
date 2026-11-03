@@ -12,7 +12,9 @@ use DurableWorkflow\Cli\Commands\WorkflowCommand\SignalCommand;
 use DurableWorkflow\Cli\Commands\WorkflowCommand\TerminateCommand;
 use DurableWorkflow\Cli\Commands\WorkflowCommand\UpdateCommand;
 use DurableWorkflow\Cli\Support\ControlPlaneRequestContract;
+use DurableWorkflow\Cli\Support\ExitCode;
 use DurableWorkflow\Cli\Support\ServerClient;
+use DurableWorkflow\Cli\Support\ServerHttpException;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -175,8 +177,8 @@ class WorkflowControlPlaneCommandTest extends TestCase
         $client = new BatchCancelFakeServerClient([
             [
                 'workflows' => [
-                    ['workflow_id' => 'wf-1'],
-                    ['workflow_id' => 'wf-2'],
+                    ['workflow_id' => 'wf-1', 'run_id' => 'run-1'],
+                    ['workflow_id' => 'wf-2', 'run_id' => 'run-2'],
                 ],
                 'next_page_token' => null,
             ],
@@ -204,7 +206,7 @@ class WorkflowControlPlaneCommandTest extends TestCase
             'page_size' => 2,
         ], $client->getCalls[0]['query']);
 
-        self::assertSame(['/workflows/wf-1/cancel', '/workflows/wf-2/cancel'], array_column($client->postCalls, 'path'));
+        self::assertSame(['/workflows/wf-1/runs/run-1/cancel', '/workflows/wf-2/runs/run-2/cancel'], array_column($client->postCalls, 'path'));
         self::assertSame(['reason' => 'customer request'], $client->postCalls[0]['body']);
         self::assertSame(['reason' => 'customer request'], $client->postCalls[1]['body']);
 
@@ -239,7 +241,7 @@ class WorkflowControlPlaneCommandTest extends TestCase
         $client = new BatchCancelFakeServerClient([
             [
                 'workflows' => [
-                    ['workflow_id' => 'wf-1'],
+                    ['workflow_id' => 'wf-1', 'run_id' => 'run-1'],
                 ],
                 'next_page_token' => null,
             ],
@@ -272,15 +274,15 @@ class WorkflowControlPlaneCommandTest extends TestCase
         $client = new BatchCancelFakeServerClient([
             [
                 'workflows' => [
-                    ['workflow_id' => 'wf-1'],
-                    ['workflow_id' => 'wf-2'],
+                    ['workflow_id' => 'wf-1', 'run_id' => 'run-1'],
+                    ['workflow_id' => 'wf-2', 'run_id' => 'run-2'],
                 ],
                 'next_page_token' => 'page-2',
             ],
             [
                 'workflows' => [
-                    ['workflow_id' => 'wf-3'],
-                    ['workflow_id' => 'wf-4'],
+                    ['workflow_id' => 'wf-3', 'run_id' => 'run-3'],
+                    ['workflow_id' => 'wf-4', 'run_id' => 'run-4'],
                 ],
                 'next_page_token' => null,
             ],
@@ -301,7 +303,7 @@ class WorkflowControlPlaneCommandTest extends TestCase
         self::assertSame(3, $client->getCalls[0]['query']['page_size']);
         self::assertSame('page-2', $client->getCalls[1]['query']['next_page_token']);
         self::assertSame(1, $client->getCalls[1]['query']['page_size']);
-        self::assertSame(['/workflows/wf-1/cancel', '/workflows/wf-2/cancel', '/workflows/wf-3/cancel'], array_column($client->postCalls, 'path'));
+        self::assertSame(['/workflows/wf-1/runs/run-1/cancel', '/workflows/wf-2/runs/run-2/cancel', '/workflows/wf-3/runs/run-3/cancel'], array_column($client->postCalls, 'path'));
     }
 
     public function test_cancel_command_batch_aborts_when_confirmation_is_declined(): void
@@ -309,7 +311,7 @@ class WorkflowControlPlaneCommandTest extends TestCase
         $client = new BatchCancelFakeServerClient([
             [
                 'workflows' => [
-                    ['workflow_id' => 'wf-1'],
+                    ['workflow_id' => 'wf-1', 'run_id' => 'run-1'],
                 ],
                 'next_page_token' => null,
             ],
@@ -327,6 +329,268 @@ class WorkflowControlPlaneCommandTest extends TestCase
 
         self::assertSame([], $client->postCalls);
         self::assertStringContainsString('Batch cancellation aborted.', $tester->getDisplay());
+    }
+
+    public function test_cancel_command_batch_targets_the_selected_run_not_the_current_run(): void
+    {
+        $client = new BatchCancelFakeServerClient([
+            [
+                'workflows' => [
+                    ['workflow_id' => 'order-7', 'run_id' => 'run-a'],
+                ],
+                'next_page_token' => null,
+            ],
+        ]);
+
+        $command = new CancelCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            '--all-matching' => 'customer-42',
+            '--yes' => true,
+            '--json' => true,
+        ]));
+
+        self::assertSame(['/workflows/order-7/runs/run-a/cancel'], array_column($client->postCalls, 'path'));
+
+        $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame([['workflow_id' => 'order-7', 'run_id' => 'run-a', 'namespace' => 'default']], $decoded['targets']);
+        self::assertSame('run-a', $decoded['results'][0]['run_id']);
+    }
+
+    public function test_cancel_command_batch_reports_a_replaced_run_without_cancelling_its_successor(): void
+    {
+        $client = new BatchCancelFakeServerClient(
+            [
+                [
+                    'workflows' => [
+                        ['workflow_id' => 'order-7', 'run_id' => 'run-a'],
+                        ['workflow_id' => 'order-8', 'run_id' => 'run-c'],
+                    ],
+                    'next_page_token' => null,
+                ],
+            ],
+            [
+                'run-a' => new ServerHttpException(
+                    'Server error: Commands cannot target historical runs.',
+                    409,
+                    body: [
+                        'workflow_id' => 'order-7',
+                        'run_id' => 'run-a',
+                        'reason' => 'historical_run_command_rejected',
+                        'target_scope' => 'run',
+                    ],
+                ),
+            ],
+        );
+
+        $command = new CancelCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::FAILURE, $tester->execute([
+            '--all-matching' => 'customer-42',
+            '--yes' => true,
+            '--json' => true,
+        ]));
+
+        // One request per selected run. The refused run is never retried
+        // against the instance endpoint, which would reach its successor.
+        self::assertSame(
+            ['/workflows/order-7/runs/run-a/cancel', '/workflows/order-8/runs/run-c/cancel'],
+            array_column($client->postCalls, 'path'),
+        );
+
+        $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame(2, $decoded['matched']);
+        self::assertSame(1, $decoded['cancelled']);
+        self::assertSame(1, $decoded['failed']);
+        self::assertSame('order-7', $decoded['failures'][0]['workflow_id']);
+        self::assertSame('run-a', $decoded['failures'][0]['run_id']);
+        self::assertSame('default', $decoded['failures'][0]['namespace']);
+        self::assertSame('historical_run_command_rejected', $decoded['failures'][0]['reason']);
+        self::assertSame(ExitCode::INVALID, $decoded['failures'][0]['exit_code']);
+        self::assertSame('run-c', $decoded['results'][0]['run_id']);
+    }
+
+    public function test_cancel_command_batch_does_not_cancel_a_workflow_without_a_listed_run_id(): void
+    {
+        $client = new BatchCancelFakeServerClient([
+            [
+                'workflows' => [
+                    ['workflow_id' => 'order-7'],
+                    ['workflow_id' => 'order-8', 'run_id' => ''],
+                ],
+                'next_page_token' => null,
+            ],
+        ]);
+
+        $command = new CancelCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::FAILURE, $tester->execute([
+            '--all-matching' => 'customer-42',
+            '--yes' => true,
+            '--json' => true,
+        ]));
+
+        self::assertSame([], $client->postCalls);
+
+        $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame(0, $decoded['cancelled']);
+        self::assertSame(['run_id_unavailable', 'run_id_unavailable'], array_column($decoded['failures'], 'reason'));
+        self::assertSame([null, null], array_column($decoded['failures'], 'run_id'));
+    }
+
+    public function test_cancel_command_batch_keeps_the_first_selected_run_when_pages_shift(): void
+    {
+        // The visibility list is not a snapshot. A workflow that continued as
+        // new between page requests can appear again with its successor run.
+        $client = new BatchCancelFakeServerClient([
+            [
+                'workflows' => [
+                    ['workflow_id' => 'order-7', 'run_id' => 'run-a'],
+                ],
+                'next_page_token' => 'page-2',
+            ],
+            [
+                'workflows' => [
+                    ['workflow_id' => 'order-7', 'run_id' => 'run-b'],
+                    ['workflow_id' => 'order-8', 'run_id' => 'run-c'],
+                    ['workflow_id' => 'order-9', 'run_id' => 'run-d'],
+                ],
+                'next_page_token' => null,
+            ],
+        ]);
+
+        $command = new CancelCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            '--all-matching' => 'customer-42',
+            '--yes' => true,
+            '--limit' => '2',
+            '--json' => true,
+        ]));
+
+        self::assertSame(
+            ['/workflows/order-7/runs/run-a/cancel', '/workflows/order-8/runs/run-c/cancel'],
+            array_column($client->postCalls, 'path'),
+        );
+
+        $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame(2, $decoded['matched']);
+        self::assertSame(['order-7', 'order-8'], $decoded['workflow_ids']);
+    }
+
+    public function test_cancel_command_batch_stops_when_a_page_adds_no_new_workflows(): void
+    {
+        // A stuck cursor: every page repeats the same workflow with a fresh
+        // token. Selection must stop instead of paging forever.
+        $pages = [];
+        for ($page = 1; $page <= 50; $page++) {
+            $pages[] = [
+                'workflows' => [['workflow_id' => 'order-7', 'run_id' => 'run-a']],
+                'next_page_token' => 'page-'.$page,
+            ];
+        }
+        $client = new BatchCancelFakeServerClient($pages);
+
+        $command = new CancelCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::FAILURE, $tester->execute([
+            '--all-matching' => 'customer-42',
+            '--yes' => true,
+            '--limit' => '2',
+            '--json' => true,
+        ]));
+
+        self::assertCount(2, $client->getCalls);
+        self::assertSame([], $client->postCalls);
+
+        $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertStringContainsString('a page added no new workflows', $decoded['error']);
+        self::assertSame(1, $decoded['exit_code']);
+    }
+
+    public function test_cancel_command_batch_stops_when_the_page_token_repeats(): void
+    {
+        $client = new BatchCancelFakeServerClient([
+            [
+                'workflows' => [['workflow_id' => 'order-7', 'run_id' => 'run-a']],
+                'next_page_token' => 'stuck',
+            ],
+            [
+                'workflows' => [['workflow_id' => 'order-8', 'run_id' => 'run-c']],
+                'next_page_token' => 'stuck',
+            ],
+            [
+                'workflows' => [['workflow_id' => 'order-9', 'run_id' => 'run-d']],
+                'next_page_token' => null,
+            ],
+        ]);
+
+        $command = new CancelCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::FAILURE, $tester->execute([
+            '--all-matching' => 'customer-42',
+            '--yes' => true,
+            '--limit' => '5',
+        ]));
+
+        self::assertCount(2, $client->getCalls);
+        self::assertSame([], $client->postCalls);
+        self::assertStringContainsString('the server returned the same page token twice', $tester->getDisplay());
+    }
+
+    public function test_cancel_command_batch_human_output_names_the_selected_runs(): void
+    {
+        $client = new BatchCancelFakeServerClient(
+            [
+                [
+                    'workflows' => [
+                        ['workflow_id' => 'order-7', 'run_id' => 'run-a'],
+                        ['workflow_id' => 'order-8', 'run_id' => 'run-c'],
+                    ],
+                    'next_page_token' => null,
+                ],
+            ],
+            [
+                'run-c' => new ServerHttpException(
+                    'Server error: Workflow run is not active.',
+                    409,
+                    body: ['reason' => 'run_not_active'],
+                ),
+            ],
+        );
+
+        $command = new CancelCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::FAILURE, $tester->execute([
+            '--all-matching' => 'customer-42',
+            '--yes' => true,
+        ]));
+
+        $display = $tester->getDisplay();
+        self::assertStringContainsString('Cancelled 1 workflow.', $display);
+        self::assertStringContainsString('- order-7 (run run-a)', $display);
+        self::assertStringContainsString('order-8 (run run-c): Server error: Workflow run is not active. [run_not_active]', $display);
     }
 
     public function test_cancel_command_rejects_missing_or_conflicting_batch_targets(): void
@@ -554,8 +818,9 @@ class BatchCancelFakeServerClient extends ServerClient
 
     /**
      * @param list<array<string, mixed>> $pages
+     * @param array<string, \Throwable> $refusals keyed by run ID
      */
-    public function __construct(array $pages)
+    public function __construct(array $pages, private readonly array $refusals = [])
     {
         $this->pages = $pages;
     }
@@ -574,12 +839,19 @@ class BatchCancelFakeServerClient extends ServerClient
     {
         $this->postCalls[] = ['path' => $path, 'body' => $body];
 
-        $workflowId = preg_match('#^/workflows/([^/]+)/cancel$#', $path, $matches) === 1
-            ? $matches[1]
-            : 'unknown';
+        if (preg_match('#^/workflows/([^/]+)/runs/([^/]+)/cancel$#', $path, $matches) !== 1) {
+            throw new \LogicException("Batch cancellation must target a selected run, got [{$path}].");
+        }
+
+        [, $workflowId, $runId] = $matches;
+
+        if (isset($this->refusals[$runId])) {
+            throw $this->refusals[$runId];
+        }
 
         return [
             'workflow_id' => $workflowId,
+            'run_id' => $runId,
             'outcome' => 'cancelled',
             'command_status' => 'accepted',
         ];

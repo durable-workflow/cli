@@ -136,3 +136,40 @@ test('upgrade channel verification uses the executable installed from the public
   );
   assert.doesNotMatch(verification, /dist\/dw-linux-x86_64 upgrade/);
 });
+
+function workflowJob(workflow, name) {
+  const start = workflow.indexOf(`\n  ${name}:\n`);
+  assert.notEqual(start, -1, `missing job ${name}`);
+  const rest = workflow.slice(start + 1);
+  const next = rest.slice(1).search(/\n {2}[a-z][a-z0-9-]*:\n/);
+  return next === -1 ? rest : rest.slice(0, next + 1);
+}
+
+test('the publishing job never runs installers or the published dw', () => {
+  const workflow = fs.readFileSync(workflowPath, 'utf8');
+  const publish = workflowJob(workflow, 'release');
+
+  // GitHub keeps every secret a job can use in memory and any step in an
+  // id-token job can mint tokens, so code from the release runs elsewhere.
+  assert.match(publish, /contents: write/);
+  assert.match(publish, /id-token: write/);
+  assert.doesNotMatch(publish, /Verify public release downloads/);
+  // Syntax checks (sh -n) and copies of the installer are fine; running it is not.
+  assert.doesNotMatch(publish, /sh "\$installer"|\bsh scripts\/install\.sh|DURABLE_WORKFLOW_BIN_NAME=/);
+  assert.doesNotMatch(publish, /dw-release-check|dw-channel-check|upgrade --/);
+});
+
+test('public release verification runs read-only after publication', () => {
+  const workflow = fs.readFileSync(workflowPath, 'utf8');
+  const verify = workflowJob(workflow, 'verify-release');
+
+  assert.match(verify, /needs: \[resolve-release, release\]/);
+  assert.match(verify, /needs\.release\.result == 'success'/);
+  assert.match(verify, /permissions:\n\s+contents: read\n/);
+  assert.doesNotMatch(verify, /contents: write|id-token|attestations|environment:|secrets\./);
+  assert.match(verify, /ref: \$\{\{ needs\.resolve-release\.outputs\.commit \}\}/);
+  assert.match(verify, /persist-credentials: false/);
+  assert.match(verify, /- name: Verify public release downloads/);
+  assert.match(verify, /dw-release-check" upgrade --output=json/);
+  assert.match(verify, /name: release-evidence/);
+});

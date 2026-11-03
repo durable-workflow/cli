@@ -1817,6 +1817,27 @@ jobs:
           prerelease: ${{ needs.resolve-release.outputs.prerelease }}
           make_latest: ${{ needs.resolve-release.outputs.make_latest }}
 
+  verify-release:
+    name: Verify published release
+    # Installs and runs the published dw, which bundles third-party code.
+    # This job only reads repository contents and has no release environment
+    # or OIDC permission, so nothing it runs can change the repository or
+    # mint attestation tokens (#75).
+    needs: [resolve-release, release]
+    if: >-
+      always() &&
+      needs.resolve-release.result == 'success' &&
+      needs.release.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the exact release source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
+        with:
+          persist-credentials: false
+          ref: ${{ needs.resolve-release.outputs.commit }}
+
       - name: Verify public release downloads
         env:
           RELEASE_CONTROL_REF: ${{ needs.resolve-release.outputs.control_ref }}

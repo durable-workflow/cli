@@ -214,10 +214,11 @@ HELP)
 
         foreach ($failures as $failure) {
             $output->writeln(sprintf(
-                '<error>  %s (run %s): %s</error>',
+                '<error>  %s (run %s): %s%s</error>',
                 $failure['workflow_id'],
                 $failure['run_id'] ?? 'unknown',
                 $failure['message'],
+                $failure['reason'] !== null ? sprintf(' [%s]', $failure['reason']) : '',
             ));
         }
 

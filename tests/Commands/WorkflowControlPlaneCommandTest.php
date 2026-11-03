@@ -524,7 +524,7 @@ class WorkflowControlPlaneCommandTest extends TestCase
         $display = $tester->getDisplay();
         self::assertStringContainsString('Cancelled 1 workflow.', $display);
         self::assertStringContainsString('- order-7 (run run-a)', $display);
-        self::assertStringContainsString('order-8 (run run-c): Server error: Workflow run is not active.', $display);
+        self::assertStringContainsString('order-8 (run run-c): Server error: Workflow run is not active. [run_not_active]', $display);
     }
 
     public function test_cancel_command_rejects_missing_or_conflicting_batch_targets(): void

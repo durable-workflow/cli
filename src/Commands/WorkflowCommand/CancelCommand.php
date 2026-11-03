@@ -231,6 +231,10 @@ HELP)
      * workflow seen again on a later page keeps its first selected run and is
      * not added twice.
      *
+     * Every page that continues must add a new workflow and a new token, so
+     * selection ends within $limit pages. A repeated token or a page with
+     * nothing new stops the command before anything is cancelled.
+     *
      * @return list<array{workflow_id: string, run_id: ?string}>
      */
     private function matchingWorkflows(
@@ -242,8 +246,10 @@ HELP)
     ): array {
         $matches = [];
         $nextPageToken = null;
+        $seenPageTokens = [];
 
         do {
+            $matchedBeforePage = count($matches);
             $remaining = $limit - count($matches);
             $params = array_filter([
                 'query' => $query,
@@ -279,6 +285,22 @@ HELP)
             $nextPageToken = $page['next_page_token'] ?? null;
             if (! is_string($nextPageToken) || $nextPageToken === '') {
                 $nextPageToken = null;
+            }
+
+            if ($nextPageToken !== null && count($matches) < $limit) {
+                if (isset($seenPageTokens[$nextPageToken])) {
+                    throw new ServerException(
+                        'Stopped selecting workflows: the server returned the same page token twice. No workflows were cancelled.',
+                    );
+                }
+
+                if (count($matches) === $matchedBeforePage) {
+                    throw new ServerException(
+                        'Stopped selecting workflows: a page added no new workflows but the server reported more pages. No workflows were cancelled.',
+                    );
+                }
+
+                $seenPageTokens[$nextPageToken] = true;
             }
         } while ($nextPageToken !== null && count($matches) < $limit);
 

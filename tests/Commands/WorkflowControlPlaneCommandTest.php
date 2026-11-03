@@ -490,6 +490,72 @@ class WorkflowControlPlaneCommandTest extends TestCase
         self::assertSame(['order-7', 'order-8'], $decoded['workflow_ids']);
     }
 
+    public function test_cancel_command_batch_stops_when_a_page_adds_no_new_workflows(): void
+    {
+        // A stuck cursor: every page repeats the same workflow with a fresh
+        // token. Selection must stop instead of paging forever.
+        $pages = [];
+        for ($page = 1; $page <= 50; $page++) {
+            $pages[] = [
+                'workflows' => [['workflow_id' => 'order-7', 'run_id' => 'run-a']],
+                'next_page_token' => 'page-'.$page,
+            ];
+        }
+        $client = new BatchCancelFakeServerClient($pages);
+
+        $command = new CancelCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::FAILURE, $tester->execute([
+            '--all-matching' => 'customer-42',
+            '--yes' => true,
+            '--limit' => '2',
+            '--json' => true,
+        ]));
+
+        self::assertCount(2, $client->getCalls);
+        self::assertSame([], $client->postCalls);
+
+        $decoded = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertStringContainsString('a page added no new workflows', $decoded['error']);
+        self::assertSame(1, $decoded['exit_code']);
+    }
+
+    public function test_cancel_command_batch_stops_when_the_page_token_repeats(): void
+    {
+        $client = new BatchCancelFakeServerClient([
+            [
+                'workflows' => [['workflow_id' => 'order-7', 'run_id' => 'run-a']],
+                'next_page_token' => 'stuck',
+            ],
+            [
+                'workflows' => [['workflow_id' => 'order-8', 'run_id' => 'run-c']],
+                'next_page_token' => 'stuck',
+            ],
+            [
+                'workflows' => [['workflow_id' => 'order-9', 'run_id' => 'run-d']],
+                'next_page_token' => null,
+            ],
+        ]);
+
+        $command = new CancelCommand();
+        $command->setServerClient($client);
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::FAILURE, $tester->execute([
+            '--all-matching' => 'customer-42',
+            '--yes' => true,
+            '--limit' => '5',
+        ]));
+
+        self::assertCount(2, $client->getCalls);
+        self::assertSame([], $client->postCalls);
+        self::assertStringContainsString('the server returned the same page token twice', $tester->getDisplay());
+    }
+
     public function test_cancel_command_batch_human_output_names_the_selected_runs(): void
     {
         $client = new BatchCancelFakeServerClient(

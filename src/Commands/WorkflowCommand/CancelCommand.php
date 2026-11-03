@@ -6,9 +6,11 @@ namespace DurableWorkflow\Cli\Commands\WorkflowCommand;
 
 use DurableWorkflow\Cli\Commands\BaseCommand;
 use DurableWorkflow\Cli\Support\CompletionValues;
+use DurableWorkflow\Cli\Support\ExitCode;
 use DurableWorkflow\Cli\Support\InvalidOptionException;
 use DurableWorkflow\Cli\Support\ServerClient;
 use DurableWorkflow\Cli\Support\ServerException;
+use DurableWorkflow\Cli\Support\ServerHttpException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Helper\QuestionHelper;
 use Symfony\Component\Console\Input\InputArgument;
@@ -159,13 +161,35 @@ HELP)
 
         foreach ($matches as $workflow) {
             $workflowId = $workflow['workflow_id'];
+            $runId = $workflow['run_id'];
+
+            // Cancel only the run that was selected. Posting to the instance
+            // endpoint would cancel whichever run is current at dispatch time,
+            // which may be a continue-as-new successor or a replacement.
+            if ($runId === null) {
+                $failures[] = [
+                    'workflow_id' => $workflowId,
+                    'run_id' => null,
+                    'namespace' => $namespace,
+                    'reason' => 'run_id_unavailable',
+                    'message' => 'The workflow list did not report a run ID, so this workflow was not cancelled.',
+                    'exit_code' => ExitCode::COMPATIBILITY,
+                ];
+
+                continue;
+            }
 
             try {
-                $results[] = $this->withNamespaceContext($namespace, $client->post("/workflows/{$workflowId}/cancel", $body));
+                $results[] = $this->withNamespaceContext(
+                    $namespace,
+                    $client->post("/workflows/{$workflowId}/runs/{$runId}/cancel", $body),
+                );
             } catch (ServerException $e) {
                 $failures[] = [
                     'workflow_id' => $workflowId,
+                    'run_id' => $runId,
                     'namespace' => $namespace,
+                    'reason' => $e instanceof ServerHttpException ? $e->reason() : null,
                     'message' => $e->getMessage(),
                     'exit_code' => $e->exitCode(),
                 ];
@@ -185,13 +209,14 @@ HELP)
         $output->writeln(sprintf('  Failed: %d', count($failures)));
 
         foreach ($matches as $workflow) {
-            $output->writeln(sprintf('  - %s', $workflow['workflow_id']));
+            $output->writeln(sprintf('  - %s (run %s)', $workflow['workflow_id'], $workflow['run_id'] ?? 'unknown'));
         }
 
         foreach ($failures as $failure) {
             $output->writeln(sprintf(
-                '<error>  %s: %s</error>',
+                '<error>  %s (run %s): %s</error>',
                 $failure['workflow_id'],
+                $failure['run_id'] ?? 'unknown',
                 $failure['message'],
             ));
         }
@@ -200,7 +225,12 @@ HELP)
     }
 
     /**
-     * @return list<array{workflow_id: string}>
+     * Selects at most $limit workflow instances, each pinned to the run the
+     * list reported. Visibility pages are not a transactional snapshot, so a
+     * workflow seen again on a later page keeps its first selected run and is
+     * not added twice.
+     *
+     * @return list<array{workflow_id: string, run_id: ?string}>
      */
     private function matchingWorkflows(
         ServerClient $client,
@@ -229,7 +259,16 @@ HELP)
                     continue;
                 }
 
-                $matches[] = ['workflow_id' => $workflow['workflow_id']];
+                $workflowId = $workflow['workflow_id'];
+                if (isset($matches[$workflowId])) {
+                    continue;
+                }
+
+                $runId = $workflow['run_id'] ?? null;
+                $matches[$workflowId] = [
+                    'workflow_id' => $workflowId,
+                    'run_id' => is_string($runId) && $runId !== '' ? $runId : null,
+                ];
 
                 if (count($matches) >= $limit) {
                     break;
@@ -242,7 +281,7 @@ HELP)
             }
         } while ($nextPageToken !== null && count($matches) < $limit);
 
-        return $matches;
+        return array_values($matches);
     }
 
     private function confirmBatchCancel(InputInterface $input, OutputInterface $output, int $count, string $query): bool
@@ -262,7 +301,7 @@ HELP)
     }
 
     /**
-     * @param list<array{workflow_id: string}> $matches
+     * @param list<array{workflow_id: string, run_id: ?string}> $matches
      * @param list<array<string, mixed>> $results
      * @param list<array<string, mixed>> $failures
      * @return array<string, mixed>
@@ -283,6 +322,7 @@ HELP)
             'cancelled' => count($results),
             'failed' => count($failures),
             'workflow_ids' => array_map(static fn (array $workflow): string => $workflow['workflow_id'], $matches),
+            'targets' => $matches,
             'results' => $results,
             'failures' => $failures,
         ];

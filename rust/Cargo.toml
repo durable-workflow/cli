@@ -23,3 +23,10 @@ sha2 = "0.10"
 # exact value PHP decodes, so re-encoded output and checksums match 2.x.
 serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
 tokio = { version = "1", features = ["rt", "macros"] }
+
+# Release binaries are the published standalone assets: one optimized,
+# symbol-stripped executable per platform.
+[profile.release]
+codegen-units = 1
+lto = true
+strip = "symbols"

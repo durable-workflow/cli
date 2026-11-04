@@ -1,0 +1,299 @@
+name: Rust release build
+
+# Read-only build of the Rust dw release assets: the only place the release
+# source is compiled and its binaries run before publication. Called by
+# release-rust.yml for a release and by release-rust-dry-run.yml for pull
+# requests. Builds and smoke tests each platform binary, compares the
+# linux-x86_64 binary with the pinned 2.x CLI, and assembles the complete
+# asset set with SHA256SUMS. It holds no secrets and no write or OIDC
+# permission.
+
+on:
+  workflow_call:
+    inputs:
+      mode:
+        description: 'release or dry-run'
+        required: true
+        type: string
+      version:
+        description: 'Release version; must equal rust/Cargo.toml'
+        required: true
+        type: string
+      commit:
+        description: 'Exact source commit to build'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.asset }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - asset: dw-linux-x86_64
+            target: x86_64-unknown-linux-musl
+            runner: ubuntu-24.04
+          - asset: dw-linux-aarch64
+            target: aarch64-unknown-linux-musl
+            runner: ubuntu-24.04-arm
+          - asset: dw-macos-aarch64
+            target: aarch64-apple-darwin
+            runner: macos-15
+          - asset: dw-windows-x86_64.exe
+            target: x86_64-pc-windows-msvc
+            runner: windows-2022
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out the release source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.commit }}
+
+      - name: Confirm the exact source commit
+        env:
+          EXPECTED_COMMIT: ${{ inputs.commit }}
+        run: |
+          set -euo pipefail
+          if [ "$(git rev-parse HEAD)" != "$EXPECTED_COMMIT" ]; then
+            echo "::error::Checked out $(git rev-parse HEAD), expected $EXPECTED_COMMIT"
+            exit 1
+          fi
+
+      - name: Require the crate version to equal the release version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          crate="$(sed -n 's/^version = "\(.*\)"$/\1/p' rust/Cargo.toml | head -n 1)"
+          if [ "$crate" != "$VERSION" ]; then
+            echo "::error::rust/Cargo.toml version $crate does not equal release version $VERSION"
+            exit 1
+          fi
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6
+        with:
+          python-version: '3.13'
+
+      - name: Bootstrap verified dependency trust
+        uses: durable-workflow/.github/.github/actions/bootstrap-patched-pip@75587fc33ff40c34f32ef777293dad56bb6f48c7  # clean-trust
+        with:
+          clients: pip,python,cargo,curl,git
+
+      - name: Install Rust 1.86
+        uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4  # stable
+        with:
+          toolchain: 1.86.0
+          targets: ${{ matrix.target }}
+
+      - name: Install the musl C toolchain
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends musl-tools
+
+      - name: Build the release binary
+        env:
+          TARGET: ${{ matrix.target }}
+          DW_CLI_VERSION: ${{ inputs.version }}
+          DW_CLI_COMMIT: ${{ inputs.commit }}
+          MACOSX_DEPLOYMENT_TARGET: '11.0'
+        run: |
+          set -euo pipefail
+          # The build date is the commit time, so a rebuild of the same tag
+          # reports the same identity.
+          epoch="$(git log -1 --pretty=%ct)"
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            DW_CLI_BUILD_DATE="$(date -u -r "$epoch" +%Y-%m-%dT%H:%M:%SZ)"
+          else
+            DW_CLI_BUILD_DATE="$(date -u -d "@$epoch" +%Y-%m-%dT%H:%M:%SZ)"
+          fi
+          export DW_CLI_BUILD_DATE SOURCE_DATE_EPOCH="$epoch"
+          # Keep runner paths out of the binary.
+          registry="${CARGO_HOME:-$HOME/.cargo}/registry/src"
+          workspace="$GITHUB_WORKSPACE"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            registry="$(cygpath -w "$registry")"
+            workspace="$(cygpath -w "$workspace")"
+          fi
+          flags="--remap-path-prefix=$registry=/cargo/registry/src --remap-path-prefix=$workspace=/build"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            flags="$flags -C target-feature=+crt-static"
+          fi
+          export RUSTFLAGS="$flags"
+          cargo build --release --locked --manifest-path rust/Cargo.toml --target "$TARGET"
+
+      - name: Stage and smoke test the binary
+        env:
+          ASSET: ${{ matrix.asset }}
+          TARGET: ${{ matrix.target }}
+          VERSION: ${{ inputs.version }}
+          COMMIT: ${{ inputs.commit }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          binary="rust/target/$TARGET/release/dw"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            binary="$binary.exe"
+          fi
+          cp "$binary" "dist/$ASSET"
+          line="$("dist/$ASSET" --version | tr -d '\r')"
+          case "$line" in
+            "dw $VERSION (commit ${COMMIT:0:12}, built "*")") echo "$line" ;;
+            *)
+              echo "::error::Unexpected version line: $line"
+              exit 1
+              ;;
+          esac
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            description="$(file -b "dist/$ASSET")"
+            echo "$description"
+            case "$description" in
+              *static*) ;;
+              *)
+                echo "::error::$ASSET is not statically linked"
+                exit 1
+                ;;
+            esac
+          fi
+          # No runner paths may remain in the binary.
+          if grep -a -E -q '/home/runner|/Users/runner|runneradmin' "dist/$ASSET"; then
+            echo "::error::$ASSET embeds a runner path"
+            exit 1
+          fi
+
+      - name: Write the dependency inventory
+        env:
+          ASSET: ${{ matrix.asset }}
+          TARGET: ${{ matrix.target }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          inventory="dist/${ASSET%.exe}.dependencies.json"
+          cargo metadata --format-version 1 --locked --filter-platform "$TARGET" \
+            --manifest-path rust/Cargo.toml > "$RUNNER_TEMP/cargo-metadata.json"
+          node scripts/ci/rust-dependency-inventory.js \
+            --metadata "$RUNNER_TEMP/cargo-metadata.json" \
+            --lock rust/Cargo.lock \
+            --asset "$ASSET" \
+            --target "$TARGET" \
+            --version "$VERSION" \
+            --rustc "$(rustc --version)" \
+            --output "$inventory"
+          node -e 'const i = require(process.argv[1]); if (!i.packages.length) process.exit(1); console.log(`${i.packages.length} packages`)' \
+            "$(pwd)/$inventory"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
+        with:
+          name: rust-${{ matrix.asset }}
+          path: dist/
+          if-no-files-found: error
+
+  verify:
+    name: Verify against the 2.x CLI
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out the release source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.commit }}
+
+      - name: Download the linux-x86_64 release binary
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8
+        with:
+          name: rust-dw-linux-x86_64
+          path: candidate
+
+      - name: Fetch the pinned 2.x reference CLI
+        run: rust/parity/fetch-reference.sh
+
+      - name: Compare the release binary with the 2.x CLI
+        run: |
+          set -euo pipefail
+          chmod +x candidate/dw-linux-x86_64
+          python3 -I rust/parity/parity.py --candidate candidate/dw-linux-x86_64 --verbose
+
+  assemble:
+    name: Assemble release assets
+    needs: [build, verify]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the release source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.commit }}
+
+      - name: Download the built binaries and inventories
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8
+        with:
+          pattern: rust-dw-*
+          path: release/assets
+          merge-multiple: true
+
+      - name: Add the installers, verifier and Homebrew formula
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          cp scripts/install.sh scripts/install.ps1 scripts/verify-release.sh release/assets/
+          sh -n release/assets/install.sh
+          sh -n release/assets/verify-release.sh
+          pwsh -NoProfile -Command '$null = [scriptblock]::Create((Get-Content -Raw release/assets/install.ps1))'
+          scripts/generate-homebrew-formula.sh release/assets "$VERSION"
+
+      - name: Require exactly the published asset set
+        working-directory: release/assets
+        run: |
+          set -euo pipefail
+          expected="$(printf '%s\n' \
+            dw-linux-x86_64 dw-linux-aarch64 dw-macos-aarch64 dw-windows-x86_64.exe \
+            dw-linux-x86_64.dependencies.json dw-linux-aarch64.dependencies.json \
+            dw-macos-aarch64.dependencies.json dw-windows-x86_64.dependencies.json \
+            dw.rb install.sh install.ps1 verify-release.sh | LC_ALL=C sort)"
+          actual="$(find . -mindepth 1 -maxdepth 1 -printf '%f\n' | LC_ALL=C sort)"
+          if [ "$expected" != "$actual" ]; then
+            echo "::error::Release assets differ from the published set"
+            diff <(echo "$expected") <(echo "$actual") || true
+            exit 1
+          fi
+          find . -mindepth 1 -maxdepth 1 ! -type f -print -quit | grep -q . && {
+            echo "::error::Release assets must be regular files"
+            exit 1
+          }
+          LC_ALL=C sha256sum -- $(echo "$expected") > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Write the release notes
+        env:
+          VERSION: ${{ inputs.version }}
+          MODE: ${{ inputs.mode }}
+        run: |
+          set -euo pipefail
+          core="${VERSION%%-*}"
+          notes="docs/release-notes/$core.md"
+          if [ -f "$notes" ]; then
+            cp "$notes" release/release-notes.md
+          elif [ "$MODE" = "dry-run" ]; then
+            printf 'Dry run of the Rust release build at %s.\n' "$VERSION" > release/release-notes.md
+          else
+            echo "::error::Missing $notes; every release needs reviewed release notes"
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
+        with:
+          name: rust-release-assets
+          path: release/
+          if-no-files-found: error

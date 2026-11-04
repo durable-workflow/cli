@@ -1,0 +1,512 @@
+name: Release (Rust)
+
+# Builds and publishes the Rust implementation of dw for release versions
+# 2.5.0 and later. release.yml keeps releasing earlier (PHP) versions; both
+# workflows read the same gate (scripts/ci/release-version.js implementation).
+#
+# Trust layout (#75, the sdk-python and sdk-rust publish pattern):
+# - rust-release-build.yml builds, verifies and assembles the assets with
+#   read-only access. It is the only place the release source is compiled
+#   and its binaries run before publication. On a tag push this workflow
+#   file and its control scripts (resolve, preflight, verify-release) also
+#   come from the tagged tree, read-only, as with any tag-triggered workflow.
+# - One publish job holds contents: write, attestations and id-token. It runs
+#   no repository code: only pinned actions, preinstalled system tools and the
+#   inline commands below, on one digest-checked handoff file.
+# - Post-publication checks install and run the published dw read-only.
+# - Pull requests run the same read-only build as a dry run, from
+#   release-rust-dry-run.yml; this workflow has no pull request trigger.
+# scripts/ci/test-release-rust-workflow.py pins these rules.
+
+run-name: ${{ format('Rust release {0}', inputs.tag || github.ref_name) }}
+
+on:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (2.5.0 or later, e.g. 2.5.0-rc.1)'
+        required: true
+      release_commit:
+        description: 'Exact source commit the tag points at'
+        required: true
+
+permissions:
+  contents: read
+
+# One Rust release runs at a time, whatever the tag spelling (v2.5.0 and
+# 2.5.0 are the same release); later runs queue.
+concurrency:
+  group: rust-release
+  cancel-in-progress: false
+
+jobs:
+  resolve:
+    name: Resolve release
+    runs-on: ubuntu-latest
+    outputs:
+      mode: ${{ steps.resolve.outputs.mode }}
+      tag: ${{ steps.resolve.outputs.tag }}
+      version: ${{ steps.resolve.outputs.version }}
+      commit: ${{ steps.resolve.outputs.commit }}
+      control_ref: ${{ steps.resolve.outputs.control_ref }}
+      control_commit: ${{ steps.resolve.outputs.control_commit }}
+      prerelease: ${{ steps.resolve.outputs.prerelease }}
+      make_latest: ${{ steps.resolve.outputs.make_latest }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+
+      - id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DISPATCH_TAG: ${{ inputs.tag }}
+          DISPATCH_COMMIT: ${{ inputs.release_commit }}
+          EVENT_SHA: ${{ github.sha }}
+          CONTROL_REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          case "$GITHUB_EVENT_NAME" in
+            workflow_dispatch)
+              if [ "$CONTROL_REF" != "refs/heads/main" ]; then
+                echo "::error::A release dispatch must run from refs/heads/main"
+                exit 1
+              fi
+              raw_tag="$DISPATCH_TAG"
+              commit="$DISPATCH_COMMIT"
+              ;;
+            push)
+              raw_tag="$GITHUB_REF_NAME"
+              commit="$EVENT_SHA"
+              ;;
+            *)
+              echo "::error::Unsupported event $GITHUB_EVENT_NAME"
+              exit 1
+              ;;
+          esac
+
+          if ! tag="$(node scripts/ci/release-version.js normalize "$raw_tag")"; then
+            echo "::error::Invalid release tag: $raw_tag"
+            exit 1
+          fi
+          implementation="$(node scripts/ci/release-version.js implementation "$tag")"
+          if [ "$implementation" != "rust" ]; then
+            # Versions before 2.5.0 belong to release.yml.
+            if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+              echo "::notice::$tag is released by release.yml; nothing to do here"
+              echo "mode=skip" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "::error::$tag is released by release.yml, not release-rust.yml"
+            exit 1
+          fi
+          if ! printf '%s\n' "$commit" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "::error::Source commit must be a full lowercase Git commit SHA"
+            exit 1
+          fi
+          # Never take GitHub's latest marker from a newer release.
+          current_latest="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq '.tag_name' 2>/dev/null || true)"
+          read -r prerelease make_latest <<< "$(node scripts/ci/release-version.js metadata "$tag" "$current_latest")"
+          {
+            echo "mode=release"
+            echo "tag=$tag"
+            echo "version=$tag"
+            echo "commit=$commit"
+            echo "control_ref=$CONTROL_REF"
+            echo "control_commit=$EVENT_SHA"
+            echo "prerelease=$prerelease"
+            echo "make_latest=$make_latest"
+          } >> "$GITHUB_OUTPUT"
+          echo "Resolved Rust release $tag at $commit"
+
+  preflight:
+    name: Release preflight
+    needs: resolve
+    if: needs.resolve.outputs.mode == 'release'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the release control source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+          path: release-control
+
+      - name: Verify the release tag points at the expected commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
+          RELEASE_COMMIT: ${{ needs.resolve.outputs.commit }}
+        run: release-control/scripts/ci/verify-release-tag-source.sh
+
+      - name: Refuse a tag that already has a GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::A GitHub Release for $RELEASE_TAG already exists; assets are never replaced"
+            exit 1
+          fi
+
+  build:
+    name: Build
+    needs: [resolve, preflight]
+    if: needs.resolve.outputs.mode == 'release' && needs.preflight.result == 'success'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/rust-release-build.yml  # local
+    with:
+      mode: ${{ needs.resolve.outputs.mode }}
+      version: ${{ needs.resolve.outputs.version }}
+      commit: ${{ needs.resolve.outputs.commit }}
+
+  bundle:
+    name: Bind release assets for publication
+    needs: [resolve, build]
+    if: needs.resolve.outputs.mode == 'release' && needs.build.result == 'success'
+    runs-on: ubuntu-latest
+    outputs:
+      artifact-digest: ${{ steps.privileged-handoff.outputs.artifact-digest }}
+      artifact-id: ${{ steps.privileged-handoff.outputs.artifact-id }}
+      source-run-attempt: ${{ github.run_attempt }}
+      source-run-id: ${{ github.run_id }}
+    steps:
+      - name: Restore the assembled release assets
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8
+        with:
+          name: rust-release-assets
+          path: release
+
+      - name: Package the privileged release handoff as one immutable file
+        run: tar -cf cli-release-handoff.tar -C release assets release-notes.md
+
+      - name: Bind the privileged release handoff identity and digest
+        id: privileged-handoff
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
+        with:
+          archive: false
+          if-no-files-found: error
+          path: cli-release-handoff.tar
+
+  publish:
+    name: Publish Release
+    needs: [resolve, preflight, build, bundle]
+    if: >-
+      (github.event_name != 'workflow_dispatch' ||
+       github.ref == 'refs/heads/main') &&
+      always() &&
+      needs.resolve.result == 'success' &&
+      needs.resolve.outputs.mode == 'release' &&
+      needs.preflight.result == 'success' &&
+      needs.build.result == 'success' &&
+      needs.bundle.result == 'success'
+    runs-on: ubuntu-latest
+    environment: github-release
+    permissions:
+      actions: read
+      attestations: write
+      contents: write
+      id-token: write
+    steps:
+      # Nothing from this checkout is executed; the central policy requires
+      # it before a privileged artifact download.
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.sha }}
+
+      - name: Download the exact release handoff
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8
+        with:
+          artifact-ids: ${{ needs.bundle.outputs.artifact-id }}
+          digest-mismatch: error
+          github-token: ${{ github.token }}
+          path: isolated-cli-release
+          repository: ${{ github.repository }}
+          run-id: ${{ needs.bundle.outputs.source-run-id }}
+
+      - name: Validate the exact producer artifact before use
+        env:
+          ARTIFACT_DIRECTORY: isolated-cli-release
+          EXPECTED_ARTIFACT_DIGEST: ${{ needs.bundle.outputs.artifact-digest }}
+          EXPECTED_ARTIFACT_ID: ${{ needs.bundle.outputs.artifact-id }}
+          EXPECTED_SOURCE_RUN_ATTEMPT: ${{ needs.bundle.outputs.source-run-attempt }}
+          EXPECTED_SOURCE_RUN_ID: ${{ needs.bundle.outputs.source-run-id }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$EXPECTED_ARTIFACT_DIGEST" =~ ^[0-9a-f]{64}$ ]]; then
+            printf 'producer artifact digest is not an exact SHA-256 digest\n' >&2
+            exit 1
+          fi
+          for identity in "$EXPECTED_ARTIFACT_ID" "$EXPECTED_SOURCE_RUN_ID" "$EXPECTED_SOURCE_RUN_ATTEMPT"; do
+            if [[ ! "$identity" =~ ^[1-9][0-9]*$ ]]; then
+              printf 'producer artifact identity is invalid\n' >&2
+              exit 1
+            fi
+          done
+          if [[ ! "$ARTIFACT_DIRECTORY" =~ ^isolated-[a-z0-9][a-z0-9._-]*$ ]]; then
+            printf 'artifact validation directory is unsafe\n' >&2
+            exit 1
+          fi
+          mapfile -d '' entries < <(
+            /usr/bin/find "$ARTIFACT_DIRECTORY" -mindepth 1 -maxdepth 1 -print0
+          )
+          if [ "${#entries[@]}" -ne 1 ] || [ ! -f "${entries[0]}" ] || [ -L "${entries[0]}" ]; then
+            printf 'artifact handoff must contain exactly one regular file\n' >&2
+            exit 1
+          fi
+          observed_digest="$(/usr/bin/sha256sum "${entries[0]}")"
+          observed_digest="${observed_digest%% *}"
+          if [ "$observed_digest" != "$EXPECTED_ARTIFACT_DIGEST" ]; then
+            printf 'artifact digest mismatch: expected %s, got %s\n' \
+              "$EXPECTED_ARTIFACT_DIGEST" "$observed_digest" >&2
+            exit 1
+          fi
+          printf 'validated artifact %s from run %s attempt %s\n' \
+            "$EXPECTED_ARTIFACT_ID" "$EXPECTED_SOURCE_RUN_ID" "$EXPECTED_SOURCE_RUN_ATTEMPT"
+
+      - name: Extract only the allowlisted release files
+        run: |
+          set -euo pipefail
+          allowed="$(printf '%s\n' assets/ release-notes.md \
+            assets/dw-linux-x86_64 assets/dw-linux-aarch64 assets/dw-macos-aarch64 assets/dw-windows-x86_64.exe \
+            assets/dw-linux-x86_64.dependencies.json assets/dw-linux-aarch64.dependencies.json \
+            assets/dw-macos-aarch64.dependencies.json assets/dw-windows-x86_64.dependencies.json \
+            assets/dw.rb assets/install.sh assets/install.ps1 assets/verify-release.sh assets/SHA256SUMS \
+            | LC_ALL=C sort)"
+          handoff=isolated-cli-release/cli-release-handoff.tar
+          members="$(/usr/bin/tar -tf "$handoff" | sed 's#^\./##' | LC_ALL=C sort)"
+          if [ "$members" != "$allowed" ]; then
+            echo "::error::The handoff holds files outside the release allowlist"
+            diff <(echo "$allowed") <(echo "$members") || true
+            exit 1
+          fi
+          # Only regular files and the one directory; no links or devices.
+          if /usr/bin/tar -tvf "$handoff" | grep -Ev '^[-d]' | grep -q .; then
+            echo "::error::The handoff holds a non-regular member"
+            exit 1
+          fi
+          mkdir release
+          /usr/bin/tar -xf "$handoff" -C release --no-same-owner --no-same-permissions
+          cd release/assets
+          /usr/bin/sha256sum --strict -c SHA256SUMS
+          listed="$(awk '{print $2}' SHA256SUMS | LC_ALL=C sort)"
+          present="$(ls -1 | grep -vx SHA256SUMS | LC_ALL=C sort)"
+          if [ "$listed" != "$present" ]; then
+            echo "::error::SHA256SUMS does not list exactly the release assets"
+            exit 1
+          fi
+
+      - name: Verify the immutable release tag at the publication boundary
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
+          RELEASE_COMMIT: ${{ needs.resolve.outputs.commit }}
+        run: |
+          set -euo pipefail
+          ref="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG")"
+          type="$(jq -r '.object.type' <<< "$ref")"
+          sha="$(jq -r '.object.sha' <<< "$ref")"
+          if [ "$type" = "tag" ]; then
+            sha="$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$sha" --jq '.object.sha')"
+          fi
+          if [ "$sha" != "$RELEASE_COMMIT" ]; then
+            echo "::error::Tag $RELEASE_TAG points at $sha, not the built commit $RELEASE_COMMIT"
+            exit 1
+          fi
+
+      - name: Attest release artifacts
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373  # v4
+        with:
+          subject-path: release/assets/*
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
+          PRERELEASE: ${{ needs.resolve.outputs.prerelease }}
+          MAKE_LATEST: ${{ needs.resolve.outputs.make_latest }}
+        run: |
+          set -euo pipefail
+          flags=(--verify-tag --title "$RELEASE_TAG" --notes-file release/release-notes.md "--latest=$MAKE_LATEST")
+          if [ "$PRERELEASE" = "true" ]; then
+            flags+=(--prerelease)
+          fi
+          gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" "${flags[@]}" release/assets/*
+
+  verify-release:
+    name: Verify published release
+    # Installs and runs the published dw. Read-only: it can neither change
+    # the repository nor mint attestation tokens (#75).
+    needs: [resolve, publish]
+    if: >-
+      always() &&
+      needs.resolve.outputs.mode == 'release' &&
+      needs.publish.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      attestations: read
+      contents: read
+    steps:
+      # Verification scripts come from the release control commit, never
+      # from the release under test.
+      - name: Check out the release control source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+
+      - name: Verify downloads, checksums and attestations
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CONTROL_REF: ${{ needs.resolve.outputs.control_ref }}
+          RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
+        run: |
+          set -euo pipefail
+          assets=(
+            dw-linux-x86_64 dw-linux-aarch64 dw-macos-aarch64 dw-windows-x86_64.exe
+            dw-linux-x86_64.dependencies.json dw-linux-aarch64.dependencies.json
+            dw-macos-aarch64.dependencies.json dw-windows-x86_64.dependencies.json
+            dw.rb install.sh install.ps1 verify-release.sh SHA256SUMS
+          )
+          DURABLE_WORKFLOW_RELEASE_ASSET_ATTEMPTS=12 DURABLE_WORKFLOW_RELEASE_ASSET_RETRY_SLEEP=10 \
+            scripts/verify-public-release-assets.sh "$RELEASE_TAG" "${assets[@]}"
+          mkdir downloaded
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir downloaded
+          (cd downloaded && sha256sum --strict -c SHA256SUMS)
+          if [ -e downloaded/dw.phar ]; then
+            echo "::error::2.5.0 and later publish no dw.phar"
+            exit 1
+          fi
+          for asset in "${assets[@]}"; do
+            gh attestation verify "downloaded/$asset" --repo "$GITHUB_REPOSITORY" \
+              --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release-rust.yml" \
+              --source-ref "$CONTROL_REF" --deny-self-hosted-runners >/dev/null
+            echo "$asset: attested"
+          done
+
+      - name: Install through the published installer and upgrade
+        env:
+          RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
+        run: |
+          set -euo pipefail
+          release_base="https://github.com/${GITHUB_REPOSITORY}/releases"
+          install_dir="$(mktemp -d)"
+          curl --proto '=https' --tlsv1.2 -fsSL --retry 3 --retry-all-errors -o "$RUNNER_TEMP/install.sh" \
+            "$release_base/download/$RELEASE_TAG/install.sh"
+          VERSION="$RELEASE_TAG" DURABLE_WORKFLOW_INSTALL_DIR="$install_dir" \
+            DURABLE_WORKFLOW_RELEASE_BASE_URL="$release_base" \
+            DURABLE_WORKFLOW_BIN_NAME=dw-release-check sh "$RUNNER_TEMP/install.sh"
+          "$install_dir/dw-release-check" --version
+
+          node scripts/ci/verify-cli-release-channel.js --release-tag "$RELEASE_TAG" \
+            | tee "$RUNNER_TEMP/channel.json"
+          channel_version="$(jq -r '.channel_version' "$RUNNER_TEMP/channel.json")"
+
+          "$install_dir/dw-release-check" upgrade --dry-run --output=json \
+            | node scripts/ci/verify-cli-upgrade-result.js \
+              --mode dry-run --release-version "$RELEASE_TAG" --channel-version "$channel_version"
+          "$install_dir/dw-release-check" upgrade --output=json \
+            | node scripts/ci/verify-cli-upgrade-result.js \
+              --mode apply --release-version "$RELEASE_TAG" --channel-version "$channel_version"
+
+  upgrade-from-2x:
+    name: Upgrade from 2.3.5 (${{ matrix.asset }}, ${{ matrix.install }})
+    # The published PHP 2.x upgrade code must find and verify the Rust
+    # binaries under the asset names it already uses. Read-only.
+    needs: [resolve, publish]
+    if: >-
+      always() &&
+      needs.resolve.outputs.mode == 'release' &&
+      needs.publish.result == 'success'
+    strategy:
+      fail-fast: false
+      matrix:
+        asset: [dw-linux-x86_64, dw-linux-aarch64, dw-macos-aarch64]
+        install: [binary, phar]
+        include:
+          - asset: dw-linux-x86_64
+            runner: ubuntu-24.04
+            legacy_sha256: 92638c2dc1be3f26fce240b9e0985373a3b54f52ac110b99adfae7477c3b8efd
+          - asset: dw-linux-aarch64
+            runner: ubuntu-24.04-arm
+            legacy_sha256: ffb89b63a8c633bdbdaea170f81fb42ff34cd6ae597ded580dcd9ebcd2cf01b3
+          - asset: dw-macos-aarch64
+            runner: macos-15
+            legacy_sha256: 97cb962e31a3e18e692df644f9aa595ad857ef72a77905e0d16fc8ba7eb513ee
+    runs-on: ${{ matrix.runner }}
+    env:
+      LEGACY_VERSION: 2.3.5
+      LEGACY_PHAR_SHA256: 67538671d44709312dd0ce77ec890094daf5c70d1e15eaa777c22231627d05a5
+    steps:
+      - name: Set up PHP for the PHAR install
+        if: matrix.install == 'phar'
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240  # v2
+        with:
+          php-version: '8.4'
+          tools: none
+          coverage: none
+
+      - name: Install the published 2.x CLI and upgrade it
+        env:
+          ASSET: ${{ matrix.asset }}
+          INSTALL: ${{ matrix.install }}
+          LEGACY_SHA256: ${{ matrix.legacy_sha256 }}
+          RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
+          RELEASE_COMMIT: ${{ needs.resolve.outputs.commit }}
+        run: |
+          set -euo pipefail
+          sha256() {
+            local file="$1"
+            if command -v sha256sum >/dev/null; then sha256sum "$file"; else shasum -a 256 "$file"; fi | awk '{print $1}'
+          }
+          base="https://github.com/${GITHUB_REPOSITORY}/releases/download"
+          work="$(mktemp -d)"
+          export HOME="$work" DW_CONFIG_HOME="$work/config"
+          curl --proto '=https' --tlsv1.2 -fsSL --retry 3 --retry-all-errors -o "$work/SHA256SUMS" "$base/$RELEASE_TAG/SHA256SUMS"
+          expected="$(awk -v a="$ASSET" '$2 == a {print $1}' "$work/SHA256SUMS")"
+          [ -n "$expected" ] || { echo "::error::$ASSET missing from $RELEASE_TAG SHA256SUMS"; exit 1; }
+
+          if [ "$INSTALL" = "binary" ]; then
+            curl --proto '=https' --tlsv1.2 -fsSL --retry 3 --retry-all-errors -o "$work/dw" "$base/$LEGACY_VERSION/$ASSET"
+            [ "$(sha256 "$work/dw")" = "$LEGACY_SHA256" ] || { echo "::error::$LEGACY_VERSION $ASSET checksum mismatch"; exit 1; }
+            chmod +x "$work/dw"
+            "$work/dw" --version
+            "$work/dw" upgrade --tag "$RELEASE_TAG" --output=json | tee "$work/upgrade.json"
+            jq -e --arg tag "$RELEASE_TAG" \
+              '.status == "upgraded" and .target_version == $tag and .direction == "upgrade" and .installation.kind == "binary"' \
+              "$work/upgrade.json" >/dev/null
+            [ "$(sha256 "$work/dw")" = "$expected" ] || { echo "::error::upgraded binary does not match $RELEASE_TAG SHA256SUMS"; exit 1; }
+            line="$("$work/dw" --version)"
+            case "$line" in
+              "dw $RELEASE_TAG (commit ${RELEASE_COMMIT:0:12}, built "*")") echo "$line" ;;
+              *) echo "::error::Upgraded binary reports: $line"; exit 1 ;;
+            esac
+          else
+            curl --proto '=https' --tlsv1.2 -fsSL --retry 3 --retry-all-errors -o "$work/dw.phar" "$base/$LEGACY_VERSION/dw.phar"
+            [ "$(sha256 "$work/dw.phar")" = "$LEGACY_PHAR_SHA256" ] || { echo "::error::$LEGACY_VERSION dw.phar checksum mismatch"; exit 1; }
+            php "$work/dw.phar" --version
+            # 2.x resolves the platform binary for a PHAR install but never
+            # replaces a PHAR; the release notes give the migration command.
+            php "$work/dw.phar" upgrade --tag "$RELEASE_TAG" --dry-run --output=json | tee "$work/dry-run.json"
+            asset_url="$(jq -r '.asset_url' "$work/dry-run.json")"
+            checksum_url="$(jq -r '.checksum_url' "$work/dry-run.json")"
+            [ "$asset_url" = "$base/$RELEASE_TAG/$ASSET" ] || { echo "::error::dry run resolved $asset_url"; exit 1; }
+            [ "$checksum_url" = "$base/$RELEASE_TAG/SHA256SUMS" ] || { echo "::error::dry run resolved $checksum_url"; exit 1; }
+            curl --proto '=https' --tlsv1.2 -fsSL --retry 3 --retry-all-errors -o "$work/resolved" "$asset_url"
+            [ "$(sha256 "$work/resolved")" = "$expected" ] || { echo "::error::resolved asset does not match SHA256SUMS"; exit 1; }
+            chmod +x "$work/resolved"
+            "$work/resolved" --version
+            status=0
+            php "$work/dw.phar" upgrade --tag "$RELEASE_TAG" --output=json > "$work/apply.json" || status=$?
+            cat "$work/apply.json"
+            [ "$status" -eq 1 ] || { echo "::error::PHAR upgrade exited $status, expected the published refusal (1)"; exit 1; }
+            jq -e '.status == "refused" and .installation.kind == "phar"' "$work/apply.json" >/dev/null
+          fi

@@ -307,15 +307,17 @@ def run_all(candidate_binary, servers, verbose):
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--build", choices=sorted(CANDIDATES), default="debug")
+    parser.add_argument("--candidate", help="compare this executable instead of a cargo build (a release asset)")
     parser.add_argument("--report", action="store_true", help="write target/parity-report.json")
     parser.add_argument("--verbose", action="store_true")
     options = parser.parse_args()
 
-    for binary in (REFERENCE, CANDIDATES[options.build]):
+    candidate = os.path.abspath(options.candidate) if options.candidate else CANDIDATES[options.build]
+    for binary in (REFERENCE, candidate):
         if not os.access(binary, os.X_OK):
             raise SystemExit(f"Missing executable {binary}. Run parity/fetch-reference.sh and cargo build first.")
 
-    results = run_all(CANDIDATES[options.build], configured_servers(), options.verbose)
+    results = run_all(candidate, configured_servers(), options.verbose)
     unexpected = sum(1 for result in results if result["differences"] and not result["intentional"])
     intentional = sum(1 for result in results if result["intentional"])
     print(f"\n{len(results) - unexpected - intentional}/{len(results)} cases match, "

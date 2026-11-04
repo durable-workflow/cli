@@ -97,8 +97,16 @@ try {
         }
 
         Write-Host '==> Verifying GitHub artifact attestations' -ForegroundColor Green
-        gh attestation verify $tmp --repo $repo
-        gh attestation verify $sums --repo $repo
+        # Only the repository's release workflows, run from main or a release
+        # tag on GitHub-hosted runners, can have signed a release asset.
+        $repoPattern = [regex]::Escape($repo)
+        $signer = "^https://github\.com/$repoPattern/\.github/workflows/(release|release-rust)\.yml@refs/(heads/main|tags/v?[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.+-]+)?)$"
+        foreach ($subject in @($tmp, $sums)) {
+            gh attestation verify $subject --repo $repo --cert-identity-regex $signer --deny-self-hosted-runners
+            if ($LASTEXITCODE -ne 0) {
+                throw "Attestation verification failed for $subject."
+            }
+        }
     }
 
     Move-Item -Force -Path $tmp -Destination $dest

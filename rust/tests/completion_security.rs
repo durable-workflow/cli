@@ -1,24 +1,43 @@
 #![cfg(unix)]
 
 use std::fs;
-use std::io::Read;
+use std::io::{self, Read};
 use std::os::unix::fs::{symlink, DirBuilderExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 struct Scratch(PathBuf);
 
 impl Scratch {
     fn new() -> Self {
-        let nonce = SystemTime::now()
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let path =
-            std::env::temp_dir().join(format!("dw-completion-test-{}-{nonce}", std::process::id()));
-        fs::DirBuilder::new().mode(0o700).create(&path).unwrap();
-        Self(path)
+        Self::create_in(&std::env::temp_dir(), timestamp, &NEXT)
+            .expect("cannot create private completion test directory")
+    }
+
+    fn create_in(root: &Path, timestamp: u128, next: &AtomicU64) -> io::Result<Self> {
+        for _ in 0..64 {
+            let count = next.fetch_add(1, Ordering::Relaxed);
+            let path = root.join(format!(
+                "dw-completion-test-{}-{timestamp}-{count}",
+                std::process::id()
+            ));
+            match fs::DirBuilder::new().mode(0o700).create(&path) {
+                Ok(()) => return Ok(Self(path)),
+                Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+                Err(error) => return Err(error),
+            }
+        }
+        Err(io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            "completion test directory collisions exceeded the retry limit",
+        ))
     }
 
     fn command(&self, binary: &Path) -> Command {
@@ -38,6 +57,84 @@ impl Drop for Scratch {
     fn drop(&mut self) {
         let _ = fs::remove_dir_all(&self.0);
     }
+}
+
+#[test]
+fn scratch_retries_collisions_without_reusing_existing_directories() {
+    let root = Scratch::new();
+    let next = AtomicU64::new(0);
+    let existing = Scratch::create_in(&root.0, 0, &next).unwrap();
+    fs::write(existing.0.join("sentinel"), "unchanged").unwrap();
+    next.store(0, Ordering::Relaxed);
+
+    let fresh = Scratch::create_in(&root.0, 0, &next).unwrap();
+    assert_ne!(fresh.0, existing.0);
+    assert_eq!(next.load(Ordering::Relaxed), 2);
+    assert_eq!(
+        fs::read_to_string(existing.0.join("sentinel")).unwrap(),
+        "unchanged"
+    );
+    assert_eq!(
+        fs::metadata(&fresh.0).unwrap().permissions().mode() & 0o777,
+        0o700
+    );
+}
+
+#[test]
+fn scratch_reports_other_allocation_errors_without_retrying() {
+    let root = Scratch::new();
+    let next = AtomicU64::new(0);
+    let error = Scratch::create_in(&root.0.join("missing"), 0, &next)
+        .err()
+        .unwrap();
+    assert_eq!(error.kind(), io::ErrorKind::NotFound);
+    assert_eq!(next.load(Ordering::Relaxed), 1);
+}
+
+#[test]
+fn scratch_collision_retries_are_bounded() {
+    let root = Scratch::new();
+    let next = AtomicU64::new(0);
+    let occupied: Vec<_> = (0..64)
+        .map(|_| Scratch::create_in(&root.0, 0, &next).unwrap())
+        .collect();
+    next.store(0, Ordering::Relaxed);
+
+    let error = Scratch::create_in(&root.0, 0, &next).err().unwrap();
+    assert_eq!(error.kind(), io::ErrorKind::AlreadyExists);
+    assert_eq!(next.load(Ordering::Relaxed), 64);
+    assert!(occupied.iter().all(|scratch| scratch.0.is_dir()));
+}
+
+#[test]
+fn scratch_directories_are_private_and_unique_across_threads() {
+    let root = Scratch::new();
+    let next = AtomicU64::new(0);
+    let scratches: Vec<_> = std::thread::scope(|scope| {
+        let create = || {
+            (0..16)
+                .map(|_| Scratch::create_in(&root.0, 0, &next).unwrap())
+                .collect::<Vec<_>>()
+        };
+        let first = scope.spawn(create);
+        let second = scope.spawn(create);
+        first
+            .join()
+            .unwrap()
+            .into_iter()
+            .chain(second.join().unwrap())
+            .collect()
+    });
+    let paths: std::collections::HashSet<_> = scratches.iter().map(|scratch| &scratch.0).collect();
+    assert_eq!(paths.len(), 32);
+    for path in paths {
+        assert_eq!(
+            fs::metadata(path).unwrap().permissions().mode() & 0o777,
+            0o700
+        );
+    }
+    drop(scratches);
+    assert_eq!(fs::read_dir(&root.0).unwrap().count(), 0);
 }
 
 fn binary() -> PathBuf {

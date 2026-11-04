@@ -192,9 +192,9 @@ jobs:
       - run: cargo test --locked
       - run: cargo build --locked
       - name: Fetch the pinned 2.x reference CLI
-        run: parity/fetch-reference.sh "$RUNNER_TEMP/dw-reference"
+        run: parity/fetch-reference.sh
       - name: Compare against the 2.x CLI
-        run: python3 parity/parity.py --reference "$RUNNER_TEMP/dw-reference" --candidate target/debug/dw --verbose
+        run: python3 parity/parity.py --verbose
 
   target-branch-qualification:
     name: Target branch qualification

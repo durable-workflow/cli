@@ -46,11 +46,13 @@ CLI and once with this build, each in a fresh config directory. It compares:
 - the config file each case leaves behind.
 
 ```bash
-parity/fetch-reference.sh /tmp/dw-reference
-python3 parity/parity.py --reference /tmp/dw-reference --candidate target/debug/dw
+parity/fetch-reference.sh      # pinned 2.x CLI, checksum-verified, into target/
+cargo build
+python3 parity/parity.py       # --build release, --report, --verbose
 ```
 
-Add `--server php=URL --server native=URL --token TOKEN` to also run the
-Server cases against running Servers. A case can record an intentional
+To also run the Server cases, set `DW_PARITY_SERVERS` to the running
+Servers (for example `php=http://127.0.0.1:18080,native=http://127.0.0.1:18081`)
+and `DW_PARITY_TOKEN` to their auth token. A case can record an intentional
 difference with a reason. One exists today: on native Server, `server:health`
 reports boolean checks correctly where 2.x does not (#74).

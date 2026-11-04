@@ -320,6 +320,60 @@ pub fn envelope(error: &CliError, context: &ErrorContext) -> Value {
     Value::Object(envelope)
 }
 
+/// The Server's error codes, as `Code: value` lines.
+fn body_code_lines(body: &Map<String, Value>) -> Vec<String> {
+    ["code", "error_code", "type", "rejection_reason"]
+        .into_iter()
+        .filter_map(|key| {
+            let value = body
+                .get(key)
+                .and_then(Value::as_str)
+                .filter(|value| !value.is_empty())?;
+            let mut label = key.replace('_', " ");
+            label[..1].make_ascii_uppercase();
+            Some(format!("{label}: {value}"))
+        })
+        .collect()
+}
+
+/// `Validation: field: message` lines from a validation error object.
+fn validation_lines(errors: &Value) -> Vec<String> {
+    let Value::Object(fields) = errors else {
+        return vec![];
+    };
+    fields
+        .iter()
+        .flat_map(|(field, messages)| {
+            let texts: Vec<&str> = match messages {
+                Value::Array(items) => items.iter().filter_map(Value::as_str).collect(),
+                Value::String(message) => vec![message.as_str()],
+                _ => vec![],
+            };
+            texts
+                .into_iter()
+                .filter(|text| !text.is_empty())
+                .map(move |text| format!("Validation: {field}: {text}"))
+        })
+        .collect()
+}
+
+fn next_step_lines(next: &[Value]) -> Vec<String> {
+    if next.is_empty() {
+        return vec![];
+    }
+    let mut lines = vec!["Next steps:".to_string()];
+    for item in next {
+        lines.push(format!(
+            "  - {}",
+            item["message"].as_str().unwrap_or_default()
+        ));
+        if let Some(command) = item["command"].as_str() {
+            lines.push(format!("    Try: {command}"));
+        }
+    }
+    lines
+}
+
 /// Human error text for stderr.
 pub fn human(error: &CliError, context: &ErrorContext) -> String {
     let mut lines = vec![error.message().to_string()];
@@ -330,52 +384,12 @@ pub fn human(error: &CliError, context: &ErrorContext) -> String {
         lines.push(format!("Reason: {reason}"));
     }
     if let Some(body) = error.body() {
-        for key in ["code", "error_code", "type", "rejection_reason"] {
-            if let Some(value) = body
-                .get(key)
-                .and_then(Value::as_str)
-                .filter(|value| !value.is_empty())
-            {
-                let mut label = key.replace('_', " ");
-                label[..1].make_ascii_uppercase();
-                lines.push(format!("{label}: {value}"));
-            }
-        }
+        lines.extend(body_code_lines(body));
     }
     if let Some(errors) = error.validation_errors() {
-        if let Value::Object(fields) = errors {
-            for (field, messages) in fields {
-                match messages {
-                    Value::Array(items) => {
-                        for message in items
-                            .iter()
-                            .filter_map(Value::as_str)
-                            .filter(|text| !text.is_empty())
-                        {
-                            lines.push(format!("Validation: {field}: {message}"));
-                        }
-                    }
-                    Value::String(message) if !message.is_empty() => {
-                        lines.push(format!("Validation: {field}: {message}"));
-                    }
-                    _ => {}
-                }
-            }
-        }
+        lines.extend(validation_lines(errors));
     }
-    let next = recommendations(error, context);
-    if !next.is_empty() {
-        lines.push("Next steps:".into());
-        for item in next {
-            lines.push(format!(
-                "  - {}",
-                item["message"].as_str().unwrap_or_default()
-            ));
-            if let Some(command) = item["command"].as_str() {
-                lines.push(format!("    Try: {command}"));
-            }
-        }
-    }
+    lines.extend(next_step_lines(&recommendations(error, context)));
     lines.join("\n")
 }
 
@@ -425,6 +439,18 @@ mod tests {
         assert_eq!(error.message(), "Server error: Rejected: x");
         let error = CliError::from_http(422, r#"{"errors":{"name":["Name is required."]}}"#);
         assert_eq!(error.message(), "Server error: Name is required.");
+    }
+
+    #[test]
+    fn human_error_lists_reason_codes_validation_and_next_steps() {
+        let error = CliError::from_http(
+            422,
+            r#"{"message":"Invalid.","reason":"bad_input","error_code":"E1","errors":{"name":["Required.",""],"type":"Unknown."}}"#,
+        );
+        assert_eq!(
+            human(&error, &context()),
+            "Server error: Invalid.\nNamespace: default\nReason: bad_input\nError code: E1\nValidation: name: Required.\nValidation: type: Unknown.\nNext steps:\n  - Inspect the request options and retry in JSON mode if support needs the exact error envelope.\n    Try: dw workflow:cancel --output=json"
+        );
     }
 
     #[test]

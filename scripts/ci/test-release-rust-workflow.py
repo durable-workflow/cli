@@ -15,6 +15,7 @@
 from pathlib import Path
 import re
 import hashlib
+import json
 import os
 import subprocess
 import tempfile
@@ -537,6 +538,40 @@ class ReleaseRustWorkflowTest(unittest.TestCase):
             upload["with"],
         )
         self.assertFalse(any(s.get("uses", "").startswith("actions/checkout@") for s in self.steps("bundle")))
+
+    def test_asset_constants_agree_everywhere(self):
+        """The Rust release's asset set is written in five places; they must agree."""
+        def js(name):
+            return set(json.loads(subprocess.run(
+                ["node", "-e", f"process.stdout.write(JSON.stringify(require(process.argv[1]).{name}))",
+                 str(ROOT / "scripts/ci/verify-cli-release-channel.js")],
+                check=True, capture_output=True, text=True,
+            ).stdout))
+
+        asset = re.compile(r"(?<![\w./-])(?:assets/)?((?:dw-[a-z0-9_.-]+|dw\.rb|install\.sh|install\.ps1|verify-release\.sh|SHA256SUMS))(?![\w.-])")
+
+        def names(script):
+            return {match.group(1) for match in asset.finditer(script)}
+
+        def step(job_steps, name):
+            [found] = [s["run"] for s in job_steps if s.get("name") == name]
+            return found
+
+        rust = js("RUST_REQUIRED_ASSETS")
+        published = names(step(self.steps("publish"), "Extract only the allowlisted release files"))
+        verified = names(step(self.steps("verify-release"), "Verify downloads, checksums and attestations"))
+        assembled = names(step(self.build["jobs"]["assemble"]["steps"], "Require exactly the published asset set"))
+        built = {e["asset"] for e in self.build["jobs"]["build"]["strategy"]["matrix"]["include"]}
+        self.assertEqual(rust, published)
+        self.assertEqual(rust, verified)
+        self.assertEqual(rust, assembled)  # it also writes SHA256SUMS
+        self.assertEqual({a for a in rust if a.startswith("dw-") and not a.endswith(".json")}, built)
+
+        # The PHP release's set, as release.yml and the public-asset checker use it.
+        php = js("REQUIRED_ASSETS")
+        checker = (ROOT / "scripts/verify-public-release-assets.sh").read_text(encoding="utf-8")
+        defaults = checker[checker.index('if [ "$#" -eq 0 ]; then'):checker.index("fi", checker.index('if [ "$#" -eq 0 ]; then'))]
+        self.assertEqual(php, names(defaults) | ({"dw.phar"} if "dw.phar" in defaults else set()))
 
     def test_every_asset_list_names_the_same_platforms(self):
         platforms = {"dw-linux-x86_64", "dw-linux-aarch64", "dw-macos-aarch64", "dw-macos-x86_64", "dw-windows-x86_64.exe"}

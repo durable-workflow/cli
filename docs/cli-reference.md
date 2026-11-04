@@ -75,10 +75,11 @@ Available assets:
 
 Tagged releases also include `dw.rb`, a generated Homebrew formula for the
 macOS arm64 binary, with the release URL and SHA256 baked in. Until a public
-tap is live, two install paths are supported: install from the bundled formula
-directly with `brew install --formula ./dw.rb` after downloading it from the
-release, or vendor the same formula into a self-hosted tap so users can run
-`brew install <org>/<tap>/dw`. See [`docs/distribution.md`](distribution.md)
+tap is live, two install paths are supported, both through a tap because
+Homebrew refuses a formula outside one: put the downloaded formula in a local
+tap (`brew tap-new --no-git "$USER/local"`, copy `dw.rb` into its `Formula/`
+directory, then `brew install "$USER/local/dw"`), or vendor the same formula
+into a self-hosted tap so users can run `brew install <org>/<tap>/dw`. See [`docs/distribution.md`](distribution.md)
 for the full Homebrew install runbook.
 
 macOS x86_64 standalone binaries are not currently produced because the

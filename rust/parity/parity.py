@@ -188,15 +188,31 @@ def patched_cluster_info(patches):
 
 
 class MockServer:
-    """A loopback Server answering /api/cluster/info and /api/health."""
+    """A loopback Server answering /api/cluster/info and /api/health, plus
+    any extra routes a case declares (such as a GitHub release API)."""
 
-    def __init__(self, cluster_info):
+    def __init__(self, cluster_info, routes=None):
         body = json.dumps(cluster_info).encode()
         health = json.dumps({"status": "serving", "timestamp": "2026-01-01T00:00:00+00:00", "checks": {"database": "ok"}}).encode()
+        extra = {}
+        for path, route in (routes or {}).items():
+            content = route.get("body", "")
+            content = content if isinstance(content, str) else json.dumps(content)
+            headers = {"Content-Type": route.get("content_type", "application/json"), **route.get("headers", {})}
+            extra[path] = (route.get("status", 200), headers, content.encode())
 
         class Handler(http.server.BaseHTTPRequestHandler):
             def do_GET(self):  # noqa: N802 (http.server API)
-                payload = {"/api/cluster/info": body, "/api/health": health}.get(self.path.split("?")[0])
+                path = self.path.split("?")[0]
+                if path in extra:
+                    status, headers, content = extra[path]
+                    self.send_response(status)
+                    for name, value in headers.items():
+                        self.send_header(name, value)
+                    self.end_headers()
+                    self.wfile.write(content)
+                    return
+                payload = {"/api/cluster/info": body, "/api/health": health}.get(path)
                 self.send_response(200 if payload else 404)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("X-Durable-Workflow-Control-Plane-Version", "2")
@@ -287,7 +303,8 @@ def run_all(candidate_binary, servers, verbose):
     versions = {reference_binary: own_version(reference_binary), candidate_binary: own_version(candidate_binary)}
     results = []
     for case in expand_cases(cases, servers):
-        mock = MockServer(patched_cluster_info(case["mock"])) if "mock" in case else None
+        uses_mock = "mock" in case or "mock_routes" in case
+        mock = MockServer(patched_cluster_info(case.get("mock", [])), case.get("mock_routes")) if uses_mock else None
         if mock:
             case = dict(case, vars={**case.get("vars", {}), "mock": mock.url})
         try:

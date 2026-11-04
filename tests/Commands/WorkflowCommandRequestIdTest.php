@@ -557,18 +557,87 @@ final class WorkflowCommandRequestIdTest extends TestCase
         self::assertSame($key, $client->lastPostBody['request_id']);
     }
 
-    public function test_blank_request_id_is_treated_as_omitted(): void
+    public function test_correction_explicit_blank_keys_refuse_before_posting(): void
     {
-        $client = new CommandRequestIdFakeClient(self::signalReceipt());
+        foreach ([null, '', '   ', "\t\r\n", "\u{00A0}\u{3000}"] as $key) {
+            foreach (['signal', 'update'] as $operation) {
+                foreach (['human', 'json', 'jsonl'] as $mode) {
+                    $receipt = $operation === 'signal' ? self::signalReceipt() : self::updateReceipt();
+                    $client = new CommandRequestIdFakeClient($receipt, contract: self::requestContract());
+                    $arguments = ['workflow-id' => 'wf-1', $operation.'-name' => 'approve', '--request-id' => $key];
+                    if ($mode !== 'human') { $arguments['--output'] = $mode; }
+                    $tester = $operation === 'signal'
+                        ? $this->runSignal($client, $arguments)
+                        : $this->runUpdate($client, $arguments);
+                    self::assertSame(ExitCode::INVALID, $tester->getStatusCode());
+                    self::assertSame(0, $client->postCalls);
+                    if ($mode !== 'human') {
+                        $result = $this->json($tester);
+                        self::assertNull($result['request_id'] ?? null);
+                        self::assertNotContains('request_id.retry', array_column($result['recommendations'], 'id'));
+                    }
+                }
+            }
+        }
+    }
 
-        $tester = $this->runSignal($client, [
-            'workflow-id' => 'wf-1',
-            'signal-name' => 'approve',
-            '--request-id' => '   ',
-        ]);
+    public function test_correction_unknown_admission_requires_inspection_before_retry(): void
+    {
+        foreach (['signal', 'update'] as $operation) {
+            foreach ([new NetworkException('lost response'), new TimeoutException('timeout'), new ServerHttpException('HTTP 502', 502)] as $error) {
+                foreach (['human', 'json', 'jsonl'] as $mode) {
+                    $key = "opaque-<info>key</info>\n";
+                    $client = new CommandRequestIdFakeClient([], exception: $error, contract: self::requestContract());
+                    $arguments = ['workflow-id' => 'wf-1', $operation.'-name' => 'approve', '--request-id' => $key];
+                    if ($mode !== 'human') { $arguments['--output'] = $mode; }
+                    $tester = $operation === 'signal'
+                        ? $this->runSignal($client, $arguments)
+                        : $this->runUpdate($client, $arguments);
+                    self::assertSame(1, $client->postCalls);
+                    self::assertSame($key, $client->lastPostBody['request_id']);
+                    $advice = $tester->getDisplay();
+                    if ($mode !== 'human') {
+                        $result = $this->json($tester);
+                        self::assertSame($key, $result['request_id']);
+                        $recommendation = array_values(array_filter($result['recommendations'], static fn (array $item): bool => $item['id'] === 'request_id.retry'));
+                        self::assertCount(1, $recommendation);
+                        self::assertArrayNotHasKey('command', $recommendation[0]);
+                        $advice = $recommendation[0]['message'];
+                    }
+                    self::assertMatchesRegularExpression('/inspect[^.]*before retry/i', $advice);
+                    self::assertStringNotContainsString('returns the original receipt', $advice);
+                    self::assertStringNotContainsString('--request-id=', $advice);
+                }
+            }
+        }
+    }
 
-        self::assertSame(Command::SUCCESS, $tester->getStatusCode());
-        self::assertMatchesRegularExpression(self::SIGNAL_KEY_PATTERN, $client->lastPostBody['request_id']);
+    public function test_correction_unicode_code_point_limits_keep_exact_wire_values(): void
+    {
+        $cases = [
+            [str_repeat('🦀', 255), true],
+            [str_repeat('🦀', 256), false],
+            [str_repeat("e\u{0301}", 127).'x', true],
+            [str_repeat("e\u{0301}", 128), false],
+            ['0', true],
+            [" \tkey-é \t", true],
+        ];
+        foreach ($cases as [$key, $accepted]) {
+            foreach (['signal', 'update'] as $operation) {
+                $receipt = $operation === 'signal' ? self::signalReceipt() : self::updateReceipt();
+                $client = new CommandRequestIdFakeClient($receipt, contract: self::requestContract());
+                $arguments = ['workflow-id' => 'wf-1', $operation.'-name' => 'approve', '--request-id' => $key, '--json' => true];
+                $tester = $operation === 'signal'
+                    ? $this->runSignal($client, $arguments)
+                    : $this->runUpdate($client, $arguments);
+                self::assertSame($accepted ? Command::SUCCESS : ExitCode::INVALID, $tester->getStatusCode());
+                self::assertSame($accepted ? 1 : 0, $client->postCalls);
+                if ($accepted) {
+                    self::assertSame($key, $client->lastPostBody['request_id']);
+                    self::assertSame($key, $this->json($tester)['request_id']);
+                }
+            }
+        }
     }
 
     public function test_signal_and_update_send_the_key_in_the_body_and_never_as_an_x_request_id_header(): void

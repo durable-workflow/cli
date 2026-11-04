@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Commands;
 
 use DurableWorkflow\Cli\Application;
+use DurableWorkflow\Cli\Support\ExitCode;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Tester\ApplicationTester;
 
@@ -97,15 +98,102 @@ class CompletionCommandTest extends TestCase
         );
     }
 
+    public function test_completion_refuses_unsafe_executable_names_before_emitting_shell_code(): void
+    {
+        foreach (['dw two', "dw'quote", 'dw;command', 'dw$(command)', '-dw', '2dw', ''] as $commandName) {
+            $tester = $this->runCliAs($commandName, [
+                'command' => $commandName === 'dw two' ? 'complet' : 'completion',
+                'shell' => 'bash',
+            ], ExitCode::INVALID, true);
+
+            self::assertSame('', $tester->getDisplay(), $commandName);
+            self::assertStringContainsString(
+                'Cannot generate shell completion for this executable name.',
+                $tester->getErrorOutput(),
+                $commandName,
+            );
+            self::assertStringNotContainsString('_complete', $tester->getErrorOutput(), $commandName);
+        }
+    }
+
+    public function test_completion_debug_never_opens_the_predictable_temporary_path(): void
+    {
+        if (DIRECTORY_SEPARATOR === '\\') {
+            self::markTestSkipped('The symlink sentinel is a Unix-only control.');
+        }
+
+        $commandName = 'dw_security_'.getmypid().'_'.bin2hex(random_bytes(4));
+        $debugPath = sys_get_temp_dir().'/sf_'.$commandName.'.log';
+        $sentinel = tempnam(sys_get_temp_dir(), 'dw-completion-sentinel-');
+        self::assertNotFalse($sentinel);
+        file_put_contents($sentinel, "unchanged\n");
+        self::assertFalse(file_exists($debugPath) || is_link($debugPath));
+        self::assertTrue(symlink($sentinel, $debugPath));
+
+        $originalDebug = getenv('SYMFONY_COMPLETION_DEBUG');
+        putenv('SYMFONY_COMPLETION_DEBUG=1');
+
+        try {
+            $complete = $this->runCliAs($commandName, [
+                'command' => '_complete',
+                '--shell' => 'bash',
+                '--api-version' => '1',
+                '--current' => '1',
+                '--input' => ['dw', 'workflow:l'],
+            ], 0, true);
+
+            self::assertStringContainsString('workflow:list', $complete->getDisplay());
+            self::assertSame('1', getenv('SYMFONY_COMPLETION_DEBUG'));
+            self::assertSame("unchanged\n", file_get_contents($sentinel));
+
+            $tail = $this->runCliAs($commandName, [
+                'command' => 'completion',
+                '--debug' => true,
+            ], ExitCode::INVALID, true);
+
+            self::assertSame('', $tail->getDisplay());
+            self::assertStringContainsString(
+                'Shell completion debug logging is disabled in this maintenance release.',
+                $tail->getErrorOutput(),
+            );
+            self::assertTrue(is_link($debugPath));
+            self::assertSame("unchanged\n", file_get_contents($sentinel));
+        } finally {
+            if ($originalDebug === false) {
+                putenv('SYMFONY_COMPLETION_DEBUG');
+            } else {
+                putenv('SYMFONY_COMPLETION_DEBUG='.$originalDebug);
+            }
+            if (is_link($debugPath)) {
+                unlink($debugPath);
+            }
+            if (is_file($sentinel)) {
+                unlink($sentinel);
+            }
+        }
+    }
+
     /**
      * @param array<string, mixed> $input
      */
     private function runCli(array $input): string
     {
+        return $this->runCliAs('dw', $input)->getDisplay();
+    }
+
+    /**
+     * @param array<string, mixed> $input
+     */
+    private function runCliAs(
+        string $executableName,
+        array $input,
+        int $expectedStatus = 0,
+        bool $captureStderrSeparately = false,
+    ): ApplicationTester {
         $originalArgv = $_SERVER['argv'] ?? null;
         $originalPhpSelf = $_SERVER['PHP_SELF'] ?? null;
-        $_SERVER['argv'] = ['dw'];
-        $_SERVER['PHP_SELF'] = '/usr/local/bin/dw';
+        $_SERVER['argv'] = [$executableName];
+        $_SERVER['PHP_SELF'] = '/usr/local/bin/'.$executableName;
 
         $application = new Application();
         $application->setAutoExit(false);
@@ -113,9 +201,11 @@ class CompletionCommandTest extends TestCase
         $tester = new ApplicationTester($application);
 
         try {
-            self::assertSame(0, $tester->run($input));
+            self::assertSame($expectedStatus, $tester->run($input, [
+                'capture_stderr_separately' => $captureStderrSeparately,
+            ]));
 
-            return $tester->getDisplay();
+            return $tester;
         } finally {
             if ($originalArgv === null) {
                 unset($_SERVER['argv']);

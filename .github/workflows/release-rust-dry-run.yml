@@ -1,0 +1,58 @@
+name: Rust release dry run
+
+# Runs the read-only Rust release build (rust-release-build.yml) for pull
+# requests that touch it, so every platform binary is built, smoke tested and
+# compared with the 2.x CLI before any release dispatch. It publishes nothing
+# and holds no secrets, environment or write permission.
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/release-rust.yml'
+      - '.github/workflows/release-rust-dry-run.yml'
+      - '.github/workflows/rust-release-build.yml'
+      - 'rust/**'
+      - 'docs/release-notes/**'
+      - 'scripts/ci/release-version.js'
+      - 'scripts/ci/rust-dependency-inventory.js'
+      - 'scripts/ci/test-release-rust-workflow.py'
+      - 'scripts/generate-homebrew-formula.sh'
+      - 'scripts/install.ps1'
+      - 'scripts/install.sh'
+      - 'scripts/verify-release.sh'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-release-dry-run-${{ github.event.number }}
+  cancel-in-progress: true
+
+jobs:
+  resolve:
+    name: Resolve dry run
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
+        with:
+          persist-credentials: false
+
+      - id: resolve
+        run: |
+          set -euo pipefail
+          version="$(sed -n 's/^version = "\(.*\)"$/\1/p' rust/Cargo.toml | head -n 1)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Dry run of the Rust release build at $version"
+
+  build:
+    name: Build
+    needs: resolve
+    permissions:
+      contents: read
+    uses: ./.github/workflows/rust-release-build.yml  # local
+    with:
+      mode: dry-run
+      version: ${{ needs.resolve.outputs.version }}
+      commit: ${{ github.sha }}

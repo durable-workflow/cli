@@ -65,6 +65,7 @@ jobs:
       initiator: ${{ steps.resolve.outputs.initiator }}
       prerelease: ${{ steps.resolve.outputs.prerelease }}
       make_latest: ${{ steps.resolve.outputs.make_latest }}
+      implementation: ${{ steps.resolve.outputs.implementation }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
         with:
@@ -117,6 +118,18 @@ jobs:
               echo "::error::Invalid release tag: $raw_tag"
               exit 1
             fi
+            # 2.5.0 and later are the Rust implementation, released by
+            # release-rust.yml. This PHP pipeline never builds them.
+            implementation="$(node scripts/ci/release-version.js implementation "$tag")"
+            if [ "$implementation" != "php" ]; then
+              if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+                echo "::notice::$tag is released by release-rust.yml; the PHP pipeline skips it"
+                echo "implementation=$implementation" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+              echo "::error::$tag is released by release-rust.yml, not the PHP release pipeline"
+              exit 1
+            fi
             release_metadata="$(node scripts/ci/release-version.js metadata "$tag")"
             read -r prerelease make_latest <<< "$release_metadata"
             if [ "$tag" = "2.0.0" ] && [ "$GITHUB_EVENT_NAME" != "workflow_dispatch" ]; then
@@ -137,6 +150,7 @@ jobs:
           echo "initiator=$GITHUB_EVENT_NAME" >> "$GITHUB_OUTPUT"
           echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
           echo "make_latest=$make_latest" >> "$GITHUB_OUTPUT"
+          echo "implementation=php" >> "$GITHUB_OUTPUT"
           if [ "$cache_warm" = "true" ]; then
             echo "Resolved trusted phpmicro cache warm at $commit"
           else
@@ -144,7 +158,7 @@ jobs:
           fi
 
       - name: Record release control and package authorities
-        if: steps.resolve.outputs.cache_warm != 'true'
+        if: steps.resolve.outputs.cache_warm != 'true' && steps.resolve.outputs.implementation == 'php'
         env:
           RELEASE_TAG: ${{ steps.resolve.outputs.tag }}
           RELEASE_COMMIT: ${{ steps.resolve.outputs.commit }}
@@ -168,7 +182,7 @@ jobs:
           NODE
 
       - name: Retain release control authority
-        if: steps.resolve.outputs.cache_warm != 'true'
+        if: steps.resolve.outputs.cache_warm != 'true' && steps.resolve.outputs.implementation == 'php'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
         with:
           name: release-control-authority
@@ -178,7 +192,9 @@ jobs:
   release-preflight:
     name: Release preflight
     needs: resolve-release
-    if: needs.resolve-release.outputs.cache_warm != 'true'
+    if: >-
+      needs.resolve-release.outputs.cache_warm != 'true' &&
+      needs.resolve-release.outputs.implementation == 'php'
     runs-on: ubuntu-latest
     outputs:
       public_assets_present: ${{ steps.public_assets.outputs.present }}

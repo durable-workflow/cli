@@ -112,18 +112,41 @@ function compareReleaseVersions(left, right) {
   return 0;
 }
 
+// The release version at which the Rust implementation takes over. Tags at
+// or above this core version (prereleases included) are built and published
+// by release-rust.yml; earlier tags by the PHP pipeline in release.yml.
+const RUST_IMPLEMENTATION_CORE = ['2', '5', '0'];
+
+function releaseImplementation(version) {
+  const parsed = parseReleaseVersion(version);
+  if (parsed === null) {
+    return null;
+  }
+
+  for (let index = 0; index < RUST_IMPLEMENTATION_CORE.length; index += 1) {
+    const difference = compareNumericIdentifiers(parsed.core[index], RUST_IMPLEMENTATION_CORE[index]);
+    if (difference !== 0) {
+      return difference > 0 ? 'rust' : 'php';
+    }
+  }
+
+  return 'rust';
+}
+
 module.exports = {
+  RUST_IMPLEMENTATION_CORE,
   compareReleaseVersions,
   normalizeReleaseVersion,
   parseReleaseVersion,
+  releaseImplementation,
   releaseMetadata,
 };
 
 if (require.main === module) {
   const [command, version] = process.argv.slice(2);
 
-  if (!['metadata', 'normalize'].includes(command) || version === undefined) {
-    console.error('Usage: release-version.js <metadata|normalize> <version>');
+  if (!['implementation', 'metadata', 'normalize'].includes(command) || version === undefined) {
+    console.error('Usage: release-version.js <implementation|metadata|normalize> <version>');
     process.exit(2);
   }
 
@@ -135,6 +158,8 @@ if (require.main === module) {
 
   if (command === 'normalize') {
     process.stdout.write(`${normalized}\n`);
+  } else if (command === 'implementation') {
+    process.stdout.write(`${releaseImplementation(normalized)}\n`);
   } else {
     const metadata = releaseMetadata(normalized);
     process.stdout.write(`${metadata.prerelease} ${metadata.makeLatest}\n`);

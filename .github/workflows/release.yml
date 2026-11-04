@@ -66,6 +66,7 @@ jobs:
       prerelease: ${{ steps.resolve.outputs.prerelease }}
       make_latest: ${{ steps.resolve.outputs.make_latest }}
       implementation: ${{ steps.resolve.outputs.implementation }}
+      observed_latest: ${{ steps.resolve.outputs.observed_latest }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
         with:
@@ -155,6 +156,7 @@ jobs:
           echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
           echo "make_latest=$make_latest" >> "$GITHUB_OUTPUT"
           echo "implementation=php" >> "$GITHUB_OUTPUT"
+          echo "observed_latest=${current_latest:-}" >> "$GITHUB_OUTPUT"
           if [ "$cache_warm" = "true" ]; then
             echo "Resolved trusted phpmicro cache warm at $commit"
           else
@@ -1833,8 +1835,18 @@ jobs:
           RELEASE_TAG: ${{ needs.resolve-release.outputs.tag }}
           PRERELEASE: ${{ needs.resolve-release.outputs.prerelease }}
           MAKE_LATEST: ${{ needs.resolve-release.outputs.make_latest }}
+          OBSERVED_LATEST: ${{ needs.resolve-release.outputs.observed_latest }}
         run: |
           set -euo pipefail
+          # Keep the latest marker where it is if another release became
+          # latest after this run decided.
+          if [ "$MAKE_LATEST" = "true" ]; then
+            latest_now="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq '.tag_name' 2>/dev/null || true)"
+            if [ "$latest_now" != "$OBSERVED_LATEST" ]; then
+              echo "::warning::Latest release changed from '${OBSERVED_LATEST}' to '${latest_now}' during this run; publishing without the latest marker"
+              MAKE_LATEST=false
+            fi
+          fi
           flags=(--verify-tag --title "$RELEASE_TAG" --notes-file release-notes.md --generate-notes "--latest=$MAKE_LATEST")
           if [ "$PRERELEASE" = "true" ]; then
             flags+=(--prerelease)

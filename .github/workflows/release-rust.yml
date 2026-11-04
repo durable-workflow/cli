@@ -49,6 +49,7 @@ jobs:
       control_commit: ${{ steps.resolve.outputs.control_commit }}
       prerelease: ${{ steps.resolve.outputs.prerelease }}
       make_latest: ${{ steps.resolve.outputs.make_latest }}
+      observed_latest: ${{ steps.resolve.outputs.observed_latest }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
         with:
@@ -114,6 +115,7 @@ jobs:
             echo "control_commit=$EVENT_SHA"
             echo "prerelease=$prerelease"
             echo "make_latest=$make_latest"
+            echo "observed_latest=$current_latest"
           } >> "$GITHUB_OUTPUT"
           echo "Resolved Rust release $tag at $commit"
 
@@ -271,6 +273,23 @@ jobs:
           printf 'validated artifact %s from run %s attempt %s\n' \
             "$EXPECTED_ARTIFACT_ID" "$EXPECTED_SOURCE_RUN_ID" "$EXPECTED_SOURCE_RUN_ATTEMPT"
 
+      - name: Refuse a tag that already has a GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
+        run: |
+          set -euo pipefail
+          # Checked again here: preflight ran before the build, and another
+          # run may have published since. Drafts count too. The listing runs
+          # outside any condition so an API error stops the job (fail closed).
+          tags="$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --paginate --jq '.[].tag_name')"
+          # A here-string, not a pipe: grep -q can exit early and SIGPIPE the
+          # writer, which pipefail would turn into a false "absent".
+          if grep -Fxq -- "$RELEASE_TAG" <<< "$tags"; then
+            echo "::error::A GitHub Release for $RELEASE_TAG already exists; assets are never replaced"
+            exit 1
+          fi
+
       - name: Extract only the allowlisted release files
         run: |
           set -euo pipefail
@@ -332,8 +351,19 @@ jobs:
           RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
           PRERELEASE: ${{ needs.resolve.outputs.prerelease }}
           MAKE_LATEST: ${{ needs.resolve.outputs.make_latest }}
+          OBSERVED_LATEST: ${{ needs.resolve.outputs.observed_latest }}
         run: |
           set -euo pipefail
+          # The latest marker was decided against the release that was latest
+          # at resolve time. If another release became latest since, keep the
+          # marker where it is rather than guess.
+          if [ "$MAKE_LATEST" = "true" ]; then
+            latest_now="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq '.tag_name' 2>/dev/null || true)"
+            if [ "$latest_now" != "$OBSERVED_LATEST" ]; then
+              echo "::warning::Latest release changed from '${OBSERVED_LATEST}' to '${latest_now}' during this run; publishing without the latest marker"
+              MAKE_LATEST=false
+            fi
+          fi
           flags=(--verify-tag --title "$RELEASE_TAG" --notes-file release/release-notes.md "--latest=$MAKE_LATEST")
           if [ "$PRERELEASE" = "true" ]; then
             flags+=(--prerelease)

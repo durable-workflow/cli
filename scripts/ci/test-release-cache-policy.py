@@ -194,6 +194,7 @@ class ReleaseCachePolicyTest(unittest.TestCase):
                 result, values, _ = self.resolve("push", "refs/tags/2.3.3", latest=latest)
                 self.assertEqual(0, result.returncode, result.stderr)
                 self.assertEqual(expected, values["make_latest"])
+                self.assertEqual(latest, values["observed_latest"])
 
     def test_rust_versions_never_enter_the_php_pipeline(self) -> None:
         result, values, _ = self.resolve("push", "refs/tags/2.5.0")

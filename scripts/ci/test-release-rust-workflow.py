@@ -15,7 +15,9 @@
 from pathlib import Path
 import re
 import hashlib
+import os
 import subprocess
+import tempfile
 import unittest
 
 import yaml
@@ -79,9 +81,10 @@ ALLOWED_ACTIONS = {
 # path, a tar option, a gh extension) fails until reviewed and re-pinned.
 PUBLISH_RUN_DIGESTS = {
     "Validate the exact producer artifact before use": "ce06e15b0e2592c8deb55ae4f410e020afb89a6d675d140b0c5b9b4280bf9eaa",
+    "Refuse a tag that already has a GitHub Release": "cd035d1140208c847586f081760b4692c65ce3572a373ccbbc7affdaa362433a",
     "Extract only the allowlisted release files": "1074e3bcd19c91075f4c586cb2871af15135af3ff97bcde516cbdd34e64a8b1e",
     "Verify the immutable release tag at the publication boundary": "21a53cce4259e3fb724a0d8e3c893a2b6252eaec8b76f043da750f4a110b3cf2",
-    "Create GitHub Release": "a7af1c40b14c06ed73df30b16ea36ce6e5ee0e0a0d445394b762785ff1213c11",
+    "Create GitHub Release": "3f23a661b3debee7ed13aa9c519c880eb7959b6898d7d9670fd713bfc6d82419",
 }
 
 # Commands that would execute repository code: interpreters, build tools,
@@ -103,6 +106,13 @@ JOB_PERMISSIONS = {
 }
 TAGGED_TREE_JOBS = {"build", "verify", "assemble"}
 RELEASE_ONLY_JOBS = {"preflight", "build", "bundle", "publish", "verify-release", "upgrade-from-2x"}
+
+
+ASSET_MUTATION = re.compile(r"gh release (upload|edit)|releases/(.*/)?assets|uploads\.github\.com")
+
+
+def json_text(value):
+    return yaml.safe_dump(value)
 
 
 def compact(expression):
@@ -226,7 +236,7 @@ class ReleaseRustWorkflowTest(unittest.TestCase):
 
     def test_publish_runs_no_repository_code(self):
         runs = [step["run"] for step in self.steps("publish") if "run" in step]
-        self.assertEqual(4, len(runs))
+        self.assertEqual(5, len(runs))
         for script in runs:
             self.assertIsNone(PROJECT_CODE.search(script), script)
         for step in self.steps("publish"):
@@ -397,10 +407,98 @@ class ReleaseRustWorkflowTest(unittest.TestCase):
         self.assertIn('gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" "${flags[@]}" dist/*', create["run"])
         self.assertIn("--verify-tag", create["run"])
         self.assertNotIn("--draft", create["run"])
-        for document in (php, self.workflow):
+        for document in (php, self.workflow, self.build, self.dry_run):
             for job in document["jobs"].values():
                 for step in job.get("steps", []):
-                    self.assertNotRegex(step.get("run", ""), r"gh release (upload|edit)|releases/[^ ]*/assets", step.get("name"))
+                    self.assertNotRegex(json_text(step), ASSET_MUTATION, step.get("name"))
+        for script in sorted((ROOT / "scripts").rglob("*")):
+            if script.is_file() and not script.name.startswith("test-") and script.suffix in {".sh", ".ps1", ".js", ".py", ""}:
+                self.assertNotRegex(script.read_text(encoding="utf-8", errors="replace"), ASSET_MUTATION, str(script))
+
+    def test_asset_mutation_pattern_catches_every_upload_path(self):
+        for planted in (
+            "gh release upload 2.5.0 x", "gh release edit 2.5.0 --draft", "gh api repos/o/r/releases/1/assets",
+            "curl -X POST https://uploads.github.com/repos/o/r/releases/1/assets?name=x",
+            "gh api repos/o/r/releases/assets/7 -X PATCH", "gh api -X DELETE /repos/o/r/releases/assets/7",
+        ):
+            self.assertRegex(planted, ASSET_MUTATION, planted)
+
+    def test_publish_refuses_an_existing_release_before_any_work(self):
+        names = [step.get("name") for step in self.steps("publish")]
+        # The first step after the policy-mandated checkout, download and validation.
+        self.assertEqual(3, names.index("Refuse a tag that already has a GitHub Release"))
+
+    def run_publish_step(self, name, gh_script, env, steps=None):
+        [step] = [s for s in (steps or self.steps("publish")) if s.get("name") == name]
+        with tempfile.TemporaryDirectory(prefix="cli-publish-step-") as directory:
+            gh = Path(directory) / "gh"
+            gh.write_text("#!/bin/sh\n" + gh_script, encoding="utf-8")
+            gh.chmod(0o755)
+            calls = Path(directory) / "calls"
+            full_env = dict(os.environ, PATH=f"{directory}{os.pathsep}{os.environ['PATH']}",
+                            GITHUB_REPOSITORY="o/r", GH_CALLS=str(calls), **env)
+            result = subprocess.run(["bash", "-euo", "pipefail", "-c", step["run"]], env=full_env,
+                                    capture_output=True, text=True, timeout=10, cwd=directory)
+            return result, calls.read_text() if calls.exists() else ""
+
+    def test_existing_release_check_fails_closed(self):
+        name = "Refuse a tag that already has a GitHub Release"
+        cases = {
+            'echo "HTTP 502" >&2; exit 1\n': 1,     # API error: stop
+            "printf '2.4.0\\n2.5.0\\n'\n": 1,     # release exists (or a draft): stop
+            "printf '2.4.0\\n2.5.0-rc.1\\n'\n": 0,  # absent: continue
+            "exit 0\n": 0,                          # no releases at all: continue
+        }
+        for gh_script, code in cases.items():
+            result, _ = self.run_publish_step(name, gh_script, {"RELEASE_TAG": "2.5.0"})
+            self.assertEqual(code, result.returncode, f"{gh_script!r}: {result.stderr}")
+
+    def test_existing_release_check_survives_a_long_listing(self):
+        # Thousands of tags with the match first: a pipe into grep -q would
+        # SIGPIPE the writer and read as "absent".
+        gh_script = "printf '2.5.0\\n'; i=0; while [ $i -lt 20000 ]; do printf '1.%s.0\\n' $i; i=$((i+1)); done\n"
+        result, _ = self.run_publish_step(
+            "Refuse a tag that already has a GitHub Release", gh_script, {"RELEASE_TAG": "2.5.0"},
+        )
+        self.assertEqual(1, result.returncode, result.stderr)
+
+    def assert_latest_recheck(self, steps):
+        record = 'echo "$*" >> "$GH_CALLS"\n'
+        name = "Create GitHub Release"
+        base = {"RELEASE_TAG": "2.5.0", "PRERELEASE": "false", "MAKE_LATEST": "true"}
+        for latest_reply, observed, expected in (
+            ("printf '2.4.0\\n'", "2.4.0", "--latest=true"),   # unchanged: keep the decision
+            ("printf '2.6.0\\n'", "2.4.0", "--latest=false"),  # changed during the run
+            ("exit 1", "2.4.0", "--latest=false"),            # API error: no marker
+        ):
+            gh_script = (
+                'if [ "$1" = "api" ]; then ' + latest_reply + '; exit $?; fi\n' + record
+            )
+            result, calls = self.run_publish_step(name, gh_script, dict(base, OBSERVED_LATEST=observed), steps)
+            self.assertEqual(0, result.returncode, result.stderr)
+            self.assertIn(expected, calls, (latest_reply, calls))
+            self.assertIn("release create 2.5.0", calls)
+        result, calls = self.run_publish_step(name, record, dict(base, MAKE_LATEST="false", OBSERVED_LATEST=""), steps)
+        self.assertIn("--latest=false", calls)
+        self.assertNotIn("api", calls)
+
+    def test_latest_recheck_never_takes_the_marker_on_doubt(self):
+        self.assert_latest_recheck(None)
+
+    def test_php_latest_recheck_never_takes_the_marker_on_doubt(self):
+        php = yaml.safe_load(PHP.read_text(encoding="utf-8"))
+        self.assert_latest_recheck(php["jobs"]["release"]["steps"])
+
+    def test_latest_marker_is_rechecked_at_publication(self):
+        php = yaml.safe_load(PHP.read_text(encoding="utf-8"))
+        [php_create] = [s for s in php["jobs"]["release"]["steps"] if s.get("name") == "Create GitHub Release"]
+        [rust_create] = [s for s in self.steps("publish") if s.get("name") == "Create GitHub Release"]
+        for step, outputs in ((php_create, "resolve-release"), (rust_create, "resolve")):
+            self.assertEqual(f"${{{{ needs.{outputs}.outputs.observed_latest }}}}", step["env"]["OBSERVED_LATEST"])
+            self.assertIn('if [ "$latest_now" != "$OBSERVED_LATEST" ]; then', step["run"])
+            self.assertIn("MAKE_LATEST=false", step["run"])
+        self.assertIn('echo "observed_latest=$current_latest"', self.steps("resolve")[1]["run"])
+        self.assertIn('echo "observed_latest=${current_latest:-}" >> "$GITHUB_OUTPUT"', php["jobs"]["resolve-release"]["steps"][1]["run"])
 
     # Version gates.
 

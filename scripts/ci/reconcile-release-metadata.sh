@@ -17,10 +17,18 @@ tag="$(node "$script_dir/release-version.js" normalize "$raw_tag" 2>/dev/null)" 
 [[ "$repository" =~ ^[0-9A-Za-z_.-]+/[0-9A-Za-z_.-]+$ ]] \
     || fail 'GITHUB_REPOSITORY must identify the release repository'
 # A release never takes the latest marker from a newer one.
-current_latest="$("$gh_cli" api "repos/$repository/releases/latest" --jq '.tag_name' 2>/dev/null || true)"
+latest_known=false
+if current_latest="$("$gh_cli" api "repos/$repository/releases/latest" --jq '.tag_name' 2>/dev/null)" &&
+    latest_metadata="$(node "$script_dir/release-version.js" metadata "$current_latest" 2>/dev/null)" &&
+    [ "$latest_metadata" = "false true" ]; then
+    latest_known=true
+fi
 metadata="$(node "$script_dir/release-version.js" metadata "$tag" "$current_latest")" \
     || fail 'release metadata could not be derived from the tag'
 read -r prerelease make_latest <<< "$metadata"
+if [ "$latest_known" != "true" ]; then
+    make_latest=false
+fi
 
 release_id="$(
     "$gh_cli" api "repos/$repository/releases/tags/$tag" --jq '.id' 2>/dev/null

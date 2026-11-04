@@ -9,23 +9,30 @@ const test = require('node:test');
 
 const script = path.join(__dirname, 'reconcile-release-metadata.sh');
 
-function reconcile(tag) {
+function reconcile(tag, latestTag = '1.9.0', latestStatus = 0) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'dw-release-metadata-'));
   const gh = path.join(directory, 'gh');
   const calls = path.join(directory, 'calls');
   fs.writeFileSync(gh, `#!/usr/bin/env bash
 set -eu
 printf '%s\\n' "$*" >> "${calls}"
+if [ "$1" = api ] && [ "$2" = repos/durable-workflow/cli/releases/latest ]; then
+  printf '%s\\n' "$FAKE_LATEST"
+  exit "$FAKE_STATUS"
+fi
 case "$*" in
   *releases/tags*) printf '91\\n' ;;
 esac
 `);
   fs.chmodSync(gh, 0o755);
+  fs.symlinkSync(process.execPath, path.join(directory, 'node'));
   const result = spawnSync('bash', [script, tag], {
     cwd: path.resolve(__dirname, '../..'),
     encoding: 'utf8',
     env: {
-      ...process.env,
+      PATH: `${directory}:/usr/bin:/bin`,
+      FAKE_LATEST: latestTag,
+      FAKE_STATUS: String(latestStatus),
       GH_CLI: gh,
       GITHUB_REPOSITORY: 'durable-workflow/cli',
     },
@@ -59,3 +66,22 @@ test('stable releases are reconciled into the stable latest channel', () => {
   assert.match(calls, /-F prerelease=false/);
   assert.match(calls, /-f make_latest=true/);
 });
+
+for (const [name, latest, status, expected] of [
+  ['failed read', '', 1, false],
+  ['failure with output', '2.3.6', 1, false],
+  ['empty success', '', 0, false],
+  ['malformed', 'null', 0, false],
+  ['multiline', '2.3.6\nmake_latest=true', 0, false],
+  ['prerelease', '2.3.6-rc.1', 0, false],
+  ['valid older', '2.3.6', 0, true],
+  ['valid newer', '2.5.0', 0, false],
+]) {
+  test(`metadata reconciliation fails closed: ${name}`, () => {
+    const calls = reconcile('2.3.7', latest, status);
+    assert.match(calls, new RegExp(`-f make_latest=${expected}`));
+    assert.equal(calls.split('\n').filter(line => line.includes('/releases/latest')).length, 1);
+    assert.match(calls, /-F prerelease=false/);
+    assert.doesNotMatch(calls, /upload|delete|assets/);
+  });
+}

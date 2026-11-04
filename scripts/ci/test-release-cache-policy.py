@@ -189,7 +189,7 @@ class ReleaseCachePolicyTest(unittest.TestCase):
                 self.assertEqual("2.3.3", values["tag"])
 
     def test_older_patches_never_take_the_latest_marker(self) -> None:
-        for latest, expected in (("", "true"), ("2.3.2", "true"), ("2.3.3", "true"), ("2.5.0", "false"), ("v2.5.0", "false")):
+        for latest, expected in (("", "false"), ("2.3.2", "true"), ("2.3.3", "true"), ("2.5.0", "false"), ("v2.5.0", "false")):
             with self.subTest(latest=latest):
                 result, values, _ = self.resolve("push", "refs/tags/2.3.3", latest=latest)
                 self.assertEqual(0, result.returncode, result.stderr)

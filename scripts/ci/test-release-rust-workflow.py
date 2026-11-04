@@ -85,7 +85,7 @@ PUBLISH_RUN_DIGESTS = {
     "Refuse a tag that already has a GitHub Release": "cd035d1140208c847586f081760b4692c65ce3572a373ccbbc7affdaa362433a",
     "Extract only the allowlisted release files": "e7e987063b8155bd594ab9be5311540d73ec5a9f3990287753621d491107a84b",
     "Verify the immutable release tag at the publication boundary": "21a53cce4259e3fb724a0d8e3c893a2b6252eaec8b76f043da750f4a110b3cf2",
-    "Create GitHub Release": "3f23a661b3debee7ed13aa9c519c880eb7959b6898d7d9670fd713bfc6d82419",
+    "Create GitHub Release": "da0ca017711cff769a7a3382283b7d81e1d485c0561cd7af9b4edf50f16d55df",
 }
 
 # Commands that would execute repository code: interpreters, build tools,
@@ -432,6 +432,9 @@ class ReleaseRustWorkflowTest(unittest.TestCase):
     def run_publish_step(self, name, gh_script, env, steps=None):
         [step] = [s for s in (steps or self.steps("publish")) if s.get("name") == name]
         with tempfile.TemporaryDirectory(prefix="cli-publish-step-") as directory:
+            authority = Path(directory) / "release-control/scripts/ci"
+            authority.mkdir(parents=True)
+            (authority / "release-version.js").write_bytes(VERSION_SCRIPT.read_bytes())
             gh = Path(directory) / "gh"
             gh.write_text("#!/bin/sh\n" + gh_script, encoding="utf-8")
             gh.chmod(0o755)
@@ -466,7 +469,7 @@ class ReleaseRustWorkflowTest(unittest.TestCase):
     def assert_latest_recheck(self, steps):
         record = 'echo "$*" >> "$GH_CALLS"\n'
         name = "Create GitHub Release"
-        base = {"RELEASE_TAG": "2.5.0", "PRERELEASE": "false", "MAKE_LATEST": "true"}
+        base = {"RELEASE_TAG": "2.5.0", "PRERELEASE": "false", "MAKE_LATEST": "true", "RECHECK_LATEST": "true"}
         for latest_reply, observed, expected in (
             ("printf '2.4.0\\n'", "2.4.0", "--latest=true"),   # unchanged: keep the decision
             ("printf '2.6.0\\n'", "2.4.0", "--latest=false"),  # changed during the run
@@ -479,7 +482,7 @@ class ReleaseRustWorkflowTest(unittest.TestCase):
             self.assertEqual(0, result.returncode, result.stderr)
             self.assertIn(expected, calls, (latest_reply, calls))
             self.assertIn("release create 2.5.0", calls)
-        result, calls = self.run_publish_step(name, record, dict(base, MAKE_LATEST="false", OBSERVED_LATEST=""), steps)
+        result, calls = self.run_publish_step(name, record, dict(base, MAKE_LATEST="false", RECHECK_LATEST="false", OBSERVED_LATEST=""), steps)
         self.assertIn("--latest=false", calls)
         self.assertNotIn("api", calls)
 
@@ -496,7 +499,8 @@ class ReleaseRustWorkflowTest(unittest.TestCase):
         [rust_create] = [s for s in self.steps("publish") if s.get("name") == "Create GitHub Release"]
         for step, outputs in ((php_create, "resolve-release"), (rust_create, "resolve")):
             self.assertEqual(f"${{{{ needs.{outputs}.outputs.observed_latest }}}}", step["env"]["OBSERVED_LATEST"])
-            self.assertIn('if [ "$latest_now" != "$OBSERVED_LATEST" ]; then', step["run"])
+            self.assertEqual(f"${{{{ needs.{outputs}.outputs.recheck_latest }}}}", step["env"]["RECHECK_LATEST"])
+            self.assertIn('elif [ "$latest_now" != "$OBSERVED_LATEST" ]; then', step["run"])
             self.assertIn("MAKE_LATEST=false", step["run"])
         self.assertIn('echo "observed_latest=$current_latest"', self.steps("resolve")[1]["run"])
         self.assertIn('echo "observed_latest=${current_latest:-}" >> "$GITHUB_OUTPUT"', php["jobs"]["resolve-release"]["steps"][1]["run"])

@@ -294,9 +294,11 @@ jobs:
         run: |
           set -euo pipefail
           allowed="$(printf '%s\n' assets/ release-notes.md \
-            assets/dw-linux-x86_64 assets/dw-linux-aarch64 assets/dw-macos-aarch64 assets/dw-windows-x86_64.exe \
+            assets/dw-linux-x86_64 assets/dw-linux-aarch64 assets/dw-macos-aarch64 assets/dw-macos-x86_64 \
+            assets/dw-windows-x86_64.exe \
             assets/dw-linux-x86_64.dependencies.json assets/dw-linux-aarch64.dependencies.json \
-            assets/dw-macos-aarch64.dependencies.json assets/dw-windows-x86_64.dependencies.json \
+            assets/dw-macos-aarch64.dependencies.json assets/dw-macos-x86_64.dependencies.json \
+            assets/dw-windows-x86_64.dependencies.json \
             assets/dw.rb assets/install.sh assets/install.ps1 assets/verify-release.sh assets/SHA256SUMS \
             | LC_ALL=C sort)"
           handoff=isolated-cli-release/cli-release-handoff.tar
@@ -400,9 +402,10 @@ jobs:
         run: |
           set -euo pipefail
           assets=(
-            dw-linux-x86_64 dw-linux-aarch64 dw-macos-aarch64 dw-windows-x86_64.exe
+            dw-linux-x86_64 dw-linux-aarch64 dw-macos-aarch64 dw-macos-x86_64 dw-windows-x86_64.exe
             dw-linux-x86_64.dependencies.json dw-linux-aarch64.dependencies.json
-            dw-macos-aarch64.dependencies.json dw-windows-x86_64.dependencies.json
+            dw-macos-aarch64.dependencies.json dw-macos-x86_64.dependencies.json
+            dw-windows-x86_64.dependencies.json
             dw.rb install.sh install.ps1 verify-release.sh SHA256SUMS
           )
           DURABLE_WORKFLOW_RELEASE_ASSET_ATTEMPTS=12 DURABLE_WORKFLOW_RELEASE_ASSET_RETRY_SLEEP=10 \

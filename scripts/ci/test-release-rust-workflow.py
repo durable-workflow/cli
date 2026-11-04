@@ -82,7 +82,7 @@ ALLOWED_ACTIONS = {
 PUBLISH_RUN_DIGESTS = {
     "Validate the exact producer artifact before use": "ce06e15b0e2592c8deb55ae4f410e020afb89a6d675d140b0c5b9b4280bf9eaa",
     "Refuse a tag that already has a GitHub Release": "cd035d1140208c847586f081760b4692c65ce3572a373ccbbc7affdaa362433a",
-    "Extract only the allowlisted release files": "1074e3bcd19c91075f4c586cb2871af15135af3ff97bcde516cbdd34e64a8b1e",
+    "Extract only the allowlisted release files": "e7e987063b8155bd594ab9be5311540d73ec5a9f3990287753621d491107a84b",
     "Verify the immutable release tag at the publication boundary": "21a53cce4259e3fb724a0d8e3c893a2b6252eaec8b76f043da750f4a110b3cf2",
     "Create GitHub Release": "3f23a661b3debee7ed13aa9c519c880eb7959b6898d7d9670fd713bfc6d82419",
 }
@@ -537,6 +537,31 @@ class ReleaseRustWorkflowTest(unittest.TestCase):
             upload["with"],
         )
         self.assertFalse(any(s.get("uses", "").startswith("actions/checkout@") for s in self.steps("bundle")))
+
+    def test_every_asset_list_names_the_same_platforms(self):
+        platforms = {"dw-linux-x86_64", "dw-linux-aarch64", "dw-macos-aarch64", "dw-macos-x86_64", "dw-windows-x86_64.exe"}
+        matrix = {entry["asset"] for entry in self.build["jobs"]["build"]["strategy"]["matrix"]["include"]}
+        self.assertEqual(platforms, matrix)
+        assemble = "\n".join(s.get("run", "") for s in self.build["jobs"]["assemble"]["steps"])
+        extract = "\n".join(s.get("run", "") for s in self.steps("publish"))
+        verify = "\n".join(s.get("run", "") for s in self.steps("verify-release"))
+        for asset in platforms:
+            inventory = asset.removesuffix(".exe") + ".dependencies.json"
+            for label, script, prefix in (("assemble", assemble, ""), ("publish", extract, "assets/"), ("verify-release", verify, "")):
+                self.assertRegex(script, rf"(?<![\w.-]){re.escape(prefix + asset)}(?![\w.-])", f"{label}: {asset}")
+                self.assertIn(prefix + inventory, script, f"{label}: {inventory}")
+
+    def test_intel_macs_are_built_and_in_the_formula(self):
+        [intel] = [e for e in self.build["jobs"]["build"]["strategy"]["matrix"]["include"] if e["asset"] == "dw-macos-x86_64"]
+        self.assertEqual({"target": "x86_64-apple-darwin", "runner": "macos-15"}, {k: intel[k] for k in ("target", "runner")})
+        with tempfile.TemporaryDirectory(prefix="cli-formula-") as directory:
+            for asset in ("dw-macos-aarch64", "dw-macos-x86_64"):
+                (Path(directory) / asset).write_bytes(asset.encode())
+            subprocess.run(["sh", str(ROOT / "scripts/generate-homebrew-formula.sh"), directory, "2.5.0"], check=True)
+            formula = (Path(directory) / "dw.rb").read_text(encoding="utf-8")
+        self.assertIn("on_intel do", formula)
+        self.assertIn("releases/download/2.5.0/dw-macos-x86_64", formula)
+        self.assertIn(hashlib.sha256(b"dw-macos-x86_64").hexdigest(), formula)
 
     def test_no_phar_is_published(self):
         assemble = "\n".join(s.get("run", "") for s in self.build["jobs"]["assemble"]["steps"])

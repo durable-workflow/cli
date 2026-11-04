@@ -11,6 +11,106 @@ const resolver = path.join(__dirname, 'release-version.js');
 const workflowPath = path.join(repository, '.github/workflows/release.yml');
 const {releaseImplementation, releaseMetadata} = require('./release-version');
 
+function workflowShell(marker) {
+  const source = fs.readFileSync(workflowPath, 'utf8').split(marker)[1];
+  const lines = source.split('\n        run: |\n')[1].split('\n');
+  const shell = [];
+  for (const line of lines) {
+    if (line.trim() && !line.startsWith('          ')) break;
+    shell.push(line.slice(10));
+  }
+  return shell.join('\n');
+}
+
+const latestCases = [
+  ['unchanged valid', [0, '2.3.6'], [0, '2.3.6'], true, true, 2],
+  ['newer initial', [0, '2.5.0'], [0, '2.5.0'], false, false, 1],
+  ['changed final', [0, '2.3.6'], [0, '2.5.0'], true, false, 2],
+  ['first failure', [1, ''], [0, '2.3.6'], false, false, 2],
+  ['second failure', [0, '2.3.6'], [1, ''], true, false, 2],
+  ['both failures', [1, ''], [1, ''], false, false, 2],
+  ['failed first with output', [1, '2.3.6'], [0, '2.3.6'], false, false, 2],
+  ['failed second with output', [0, '2.3.6'], [1, '2.3.6'], true, false, 2],
+  ['malformed first', [0, 'null'], [0, '2.3.6'], false, false, 2],
+  ['malformed second', [0, '2.3.6'], [0, 'null'], true, false, 2],
+  ['empty success', [0, ''], [0, '2.3.6'], false, false, 2],
+  ['prerelease as latest', [0, '2.3.6-rc.1'], [0, '2.3.6'], false, false, 2],
+  ['multiline metadata', [0, '2.3.6\nmake_latest=true'], [0, '2.3.6'], false, false, 2],
+];
+
+for (const [label, first, second, initial, final, count] of latestCases) {
+  test(`latest observations fail closed: ${label}`, () => {
+    const os = require('node:os');
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'dw-latest-observations-'));
+    try {
+      const output = path.join(directory, 'outputs');
+      const calls = path.join(directory, 'calls');
+      const counter = path.join(directory, 'counter');
+      fs.writeFileSync(counter, '0\n');
+      for (const prefix of ['scripts/ci', 'release-control/scripts/ci']) {
+        fs.mkdirSync(path.join(directory, prefix), {recursive: true});
+        fs.copyFileSync(resolver, path.join(directory, prefix, 'release-version.js'));
+      }
+      fs.mkdirSync(path.join(directory, 'dist'));
+      fs.writeFileSync(path.join(directory, 'dist/synthetic'), 'fixture only\n');
+      fs.symlinkSync(process.execPath, path.join(directory, 'node'));
+      fs.writeFileSync(path.join(directory, 'gh'), `#!/bin/sh
+set -eu
+if [ "$1" = api ] && [ "$2" = repos/durable-workflow/cli/releases/latest ]; then
+  read -r count < "$FAKE_COUNTER"
+  count=$((count + 1))
+  printf '%s\\n' "$count" > "$FAKE_COUNTER"
+  if [ "$count" -eq 1 ]; then printf '%s\\n' "$FIRST_TAG"; exit "$FIRST_STATUS";
+  elif [ "$count" -eq 2 ]; then printf '%s\\n' "$SECOND_TAG"; exit "$SECOND_STATUS";
+  else exit 99; fi
+elif [ "$1" = release ] && [ "$2" = create ]; then printf '%s\\n' "$@" > "$FAKE_CALLS";
+else exit 99; fi
+`, {mode: 0o700});
+      const env = {
+        PATH: `${directory}:/usr/bin:/bin`,
+        FAKE_COUNTER: counter, FAKE_CALLS: calls,
+        FIRST_STATUS: String(first[0]), FIRST_TAG: first[1],
+        SECOND_STATUS: String(second[0]), SECOND_TAG: second[1],
+        GITHUB_REPOSITORY: 'durable-workflow/cli', GITHUB_OUTPUT: output,
+        GITHUB_EVENT_NAME: 'workflow_dispatch', DISPATCH_OPERATION: 'release',
+        DISPATCH_TAG: '2.3.7', DISPATCH_COMMIT: 'a'.repeat(40),
+        CONTROL_REF: 'refs/heads/main', CONTROL_COMMIT: 'b'.repeat(40),
+      };
+      execFileSync('/bin/bash', ['-c', workflowShell('- id: resolve\n')], {
+        cwd: directory, env, timeout: 10000, stdio: 'pipe',
+      });
+      const entries = fs.readFileSync(output, 'utf8').trim().split('\n').map(line => {
+        const index = line.indexOf('=');
+        return [line.slice(0, index), line.slice(index + 1)];
+      });
+      assert.equal(new Set(entries.map(([key]) => key)).size, entries.length);
+      const resolved = Object.fromEntries(entries);
+      assert.equal(resolved.make_latest, String(initial));
+      assert.equal(resolved.tag, '2.3.7');
+      assert.equal(resolved.commit, 'a'.repeat(40));
+      if (!first[0] && first[1] === '2.3.6') assert.equal(resolved.observed_latest, first[1]);
+      else if (first[0] || first[1] !== '2.5.0') assert.equal(resolved.observed_latest, '');
+
+      // The privileged step must use the workflow's policy authority, never
+      // the package checkout's helper (the two authorities can differ).
+      fs.writeFileSync(path.join(directory, 'scripts/ci/release-version.js'), 'process.exit(99);\n');
+      execFileSync('/bin/bash', ['-c', workflowShell('- name: Create GitHub Release\n')], {
+        cwd: directory,
+        env: {...env, RELEASE_TAG: resolved.tag, PRERELEASE: resolved.prerelease,
+          MAKE_LATEST: resolved.make_latest, RECHECK_LATEST: resolved.recheck_latest || resolved.make_latest,
+          OBSERVED_LATEST: resolved.observed_latest},
+        timeout: 10000, stdio: 'pipe',
+      });
+      const args = fs.readFileSync(calls, 'utf8').trim().split('\n');
+      assert.ok(args.includes(`--latest=${final}`));
+      assert.ok(args.includes('--verify-tag'));
+      assert.equal(Number(fs.readFileSync(counter, 'utf8')), count);
+    } finally {
+      fs.rmSync(directory, {force: true, recursive: true});
+    }
+  });
+}
+
 test('the maintenance release stays on PHP while the Rust version boundary is preserved', () => {
   for (const [version, implementation] of [
     ['2.3.7', 'php'], ['2.4.99', 'php'], ['2.5.0-rc.1', 'rust'],
@@ -39,15 +139,22 @@ test('the actual publication step drops latest when the observed channel changes
     shell.push(line.slice(10));
   }
   assert.ok(shell.some(line => line.includes('gh release create')));
-  for (const [latest, expected] of [['2.3.6', 'true'], ['2.5.0', 'false']]) {
+  for (const [latest, observed, status, expected] of [
+    ['2.3.6', '2.3.6', '0', 'true'], ['2.5.0', '2.3.6', '0', 'false'],
+    ['2.3.6', '2.3.6', '1', 'false'], ['', '', '1', 'false'],
+    ['null', 'null', '0', 'false'], ['', '', '0', 'false'],
+  ]) {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'dw-maintenance-control-'));
     try {
       const calls = path.join(directory, 'calls');
       fs.mkdirSync(path.join(directory, 'dist'));
       fs.writeFileSync(path.join(directory, 'dist', 'synthetic'), 'fixture only\n');
+      fs.mkdirSync(path.join(directory, 'release-control/scripts/ci'), {recursive: true});
+      fs.copyFileSync(resolver, path.join(directory, 'release-control/scripts/ci/release-version.js'));
+      fs.symlinkSync(process.execPath, path.join(directory, 'node'));
       fs.writeFileSync(path.join(directory, 'gh'), `#!/bin/sh
 set -eu
-if [ "$1" = api ]; then printf '%s\\n' "$FAKE_LATEST";
+if [ "$1" = api ]; then printf '%s\\n' "$FAKE_LATEST"; exit "$FAKE_STATUS";
 elif [ "$1" = release ] && [ "$2" = create ]; then printf '%s\\n' "$@" > "$FAKE_CALLS";
 else exit 99; fi
 `, {mode: 0o700});
@@ -55,9 +162,9 @@ else exit 99; fi
         cwd: directory,
         env: {
           PATH: `${directory}:/usr/bin:/bin`,
-          FAKE_LATEST: latest, FAKE_CALLS: calls,
+          FAKE_LATEST: latest, FAKE_STATUS: status, FAKE_CALLS: calls,
           GITHUB_REPOSITORY: 'durable-workflow/cli',
-          RELEASE_TAG: '2.3.7', PRERELEASE: 'false', MAKE_LATEST: 'true', OBSERVED_LATEST: '2.3.6',
+          RELEASE_TAG: '2.3.7', PRERELEASE: 'false', MAKE_LATEST: 'true', RECHECK_LATEST: 'true', OBSERVED_LATEST: observed,
         },
         timeout: 10000,
         stdio: 'pipe',

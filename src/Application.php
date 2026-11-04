@@ -34,6 +34,7 @@ use DurableWorkflow\Cli\Support\ResolvedConnection;
 use DurableWorkflow\Cli\Support\ServerClient;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Application as ConsoleApplication;
+use Symfony\Component\Console\Exception\CommandNotFoundException;
 use Symfony\Component\Console\Input\ArgvInput;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\ConsoleOutputInterface;
@@ -252,6 +253,22 @@ class Application extends ConsoleApplication
     {
         $input = $this->normalizeGroupedCommandInput($input);
 
+        $completionCommand = $this->completionCommandName($input);
+        if ($completionCommand !== null && ! $this->hasSafeCompletionExecutableName()) {
+            $diagnosticOutput = $output instanceof ConsoleOutputInterface ? $output->getErrorOutput() : $output;
+            $diagnosticOutput->writeln('<error>Cannot generate shell completion for this executable name.</error>');
+            $diagnosticOutput->writeln('Invoke the CLI as dw, or use ASCII letters, digits, dots, underscores and hyphens starting with a letter or underscore.');
+
+            return ExitCode::INVALID;
+        }
+
+        if ($completionCommand === 'completion' && $input->hasParameterOption('--debug', true)) {
+            $diagnosticOutput = $output instanceof ConsoleOutputInterface ? $output->getErrorOutput() : $output;
+            $diagnosticOutput->writeln('<error>Shell completion debug logging is disabled in this maintenance release.</error>');
+
+            return ExitCode::INVALID;
+        }
+
         if (true === $input->hasParameterOption(['--version', '-V'], true)) {
             $output->writeln($this->getLongVersion());
             $this->emitVersionCompatibilityWarning($input, $output);
@@ -268,7 +285,45 @@ class Application extends ConsoleApplication
             return ExitCode::INVALID;
         }
 
-        return parent::doRun($input, $output);
+        if ($completionCommand !== '_complete') {
+            return parent::doRun($input, $output);
+        }
+
+        $completionDebug = getenv('SYMFONY_COMPLETION_DEBUG');
+        putenv('SYMFONY_COMPLETION_DEBUG=0');
+
+        try {
+            return parent::doRun($input, $output);
+        } finally {
+            if ($completionDebug === false) {
+                putenv('SYMFONY_COMPLETION_DEBUG');
+            } else {
+                putenv('SYMFONY_COMPLETION_DEBUG='.$completionDebug);
+            }
+        }
+    }
+
+    private function completionCommandName(InputInterface $input): ?string
+    {
+        $requested = $input->getFirstArgument();
+        if (! is_string($requested) || $requested === '') {
+            return null;
+        }
+
+        try {
+            $resolved = $this->find($requested)->getName();
+        } catch (CommandNotFoundException) {
+            return null;
+        }
+
+        return in_array($resolved, ['completion', '_complete'], true) ? $resolved : null;
+    }
+
+    private function hasSafeCompletionExecutableName(): bool
+    {
+        $commandName = basename((string) ($_SERVER['argv'][0] ?? ''));
+
+        return preg_match('/\A[A-Za-z_][A-Za-z0-9_.-]*\z/', $commandName) === 1;
     }
 
     private function normalizeGroupedCommandInput(InputInterface $input): InputInterface

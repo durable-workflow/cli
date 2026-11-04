@@ -80,8 +80,34 @@ ensure_source_date_epoch() {
         fi
     fi
     if [[ -n "${SOURCE_DATE_EPOCH:-}" ]]; then
+        if [[ ! "$SOURCE_DATE_EPOCH" =~ ^[0-9]+$ ]]; then
+            echo "SOURCE_DATE_EPOCH must be an unsigned integer" >&2
+            exit 1
+        fi
         echo ">> SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"
     fi
+}
+
+generate_box_config() {
+    local config="$BUILD_DIR/box.reproducible.json"
+
+    [[ -n "${SOURCE_DATE_EPOCH:-}" ]] || {
+        printf '%s\n' "$ROOT/box.json.dist"
+        return 0
+    }
+
+    php -r '
+        $source = json_decode(file_get_contents($argv[1]), false, 512, JSON_THROW_ON_ERROR);
+        $source->{"base-path"} = $argv[3];
+        $source->output = $argv[4];
+        $source->timestamp = "@".$argv[5];
+        $json = json_encode($source, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR).PHP_EOL;
+        if (file_put_contents($argv[2], $json) === false) {
+            throw new RuntimeException("Cannot write the reproducible Box configuration.");
+        }
+    ' "$ROOT/box.json.dist" "$config" "$ROOT" "$PHAR_OUT" "$SOURCE_DATE_EPOCH"
+
+    printf '%s\n' "$config"
 }
 
 normalize_mtimes() {
@@ -127,14 +153,17 @@ spc_download_with_retry() {
 }
 
 build_phar() {
+    local box_config
     ensure_tools
     ensure_source_date_epoch
     php scripts/generate-build-info.php
     install_composer_deps
     mkdir -p "$BUILD_DIR"
     normalize_mtimes
+    box_config="$(generate_box_config)"
     echo ">> Building PHAR via Box"
-    php -d phar.readonly=0 "$TOOLS_DIR/box" compile --no-parallel
+    php -d phar.readonly=0 "$TOOLS_DIR/box" compile --no-parallel --config "$box_config"
+    [[ "$box_config" = "$ROOT/box.json.dist" ]] || rm -f "$box_config"
     echo ">> PHAR built: $PHAR_OUT"
 }
 

@@ -360,9 +360,10 @@ fn raw_option(tokens: &[String], long: &str, short: Option<char>) -> Option<Stri
         }
         let is_short = short_flag.as_deref() == Some(token.as_str());
         if *token == long_flag || is_short {
+            // Symfony takes the next token as the value, whatever it is.
             return iter
                 .peek()
-                .filter(|next| !next.is_empty() && !next.starts_with('-'))
+                .filter(|next| !next.is_empty())
                 .map(|next| (*next).clone());
         }
         if let Some(value) = short_flag
@@ -425,7 +426,9 @@ fn run(raw: Vec<String>) -> i32 {
     if tokens
         .iter()
         .take_while(|token| token.as_str() != "--")
-        .any(|token| token == "--version" || token == "-V")
+        .any(|token| {
+            token == "--version" || token.starts_with("--version=") || token.starts_with("-V")
+        })
     {
         print_version(&tokens);
         return exit::SUCCESS;
@@ -491,7 +494,10 @@ fn run(raw: Vec<String>) -> i32 {
     let result = match handler {
         Handler::Local(run) => run(&input),
         Handler::Server(run) => client::Context::new(&input).and_then(|context| {
-            context.warn_if_incompatible(client::uses_worker_protocol(&command));
+            // doctor and server:start-dev opt out of the session warning in 2.x.
+            if !matches!(command.as_str(), "doctor" | "server:start-dev") {
+                context.warn_if_incompatible(client::uses_worker_protocol(&command));
+            }
             run(&context)
         }),
     };
@@ -515,7 +521,7 @@ mod tests {
     }
 
     #[test]
-    fn raw_options_follow_symfony_parameter_rules() {
+    fn raw_options_follow_symfony_get_parameter_option() {
         let t = tokens(&[
             "--version",
             "-shttp://a",
@@ -533,8 +539,8 @@ mod tests {
         assert_eq!(raw_option(&t, "namespace", None), None);
         assert_eq!(raw_option(&t, "token", None), None);
         assert_eq!(
-            raw_option(&tokens(&["--server", "--env"]), "server", Some('s')),
-            None
+            raw_option(&tokens(&["--server", "--env"]), "server", Some('s')).as_deref(),
+            Some("--env")
         );
     }
 

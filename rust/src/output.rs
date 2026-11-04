@@ -174,6 +174,18 @@ mod tests {
     }
 
     #[test]
+    fn parsed_floats_reencode_exactly() {
+        for raw in [
+            "[1.4820142857142857]",
+            "[124435.71428571429]",
+            "[0.7071067811865476]",
+        ] {
+            let value: Value = serde_json::from_str(raw).unwrap();
+            assert_eq!(encode(&value), raw);
+        }
+    }
+
+    #[test]
     fn pretty_json_uses_four_spaces() {
         assert_eq!(
             encode_pretty(&json!({"a": [1]})),

@@ -271,9 +271,7 @@ const HISTORY_REFERENCE_FIELDS: &[&str] = &[
 ];
 
 /// The Server's non-empty error code fields, in envelope order.
-fn body_codes<'a>(
-    body: &'a Map<String, Value>,
-) -> impl Iterator<Item = (&'static str, &'a str)> + 'a {
+fn body_codes(body: &Map<String, Value>) -> impl Iterator<Item = (&'static str, &str)> + '_ {
     ["code", "error_code", "type", "rejection_reason"]
         .into_iter()
         .filter_map(|key| {

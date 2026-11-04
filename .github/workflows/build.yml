@@ -164,10 +164,42 @@ jobs:
       - name: Verify dw.phar reproduces bit-for-bit
         run: scripts/verify-reproducible-build.sh
 
+  rust:
+    name: Rust CLI (unit tests and 2.x parity)
+    if: ${{ github.server_url == 'https://github.com' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6
+        with:
+          python-version: '3.13'
+      - name: Bootstrap verified dependency trust
+        uses: durable-workflow/.github/.github/actions/bootstrap-patched-pip@75587fc33ff40c34f32ef777293dad56bb6f48c7  # clean-trust
+        with:
+          clients: pip,python,cargo,curl,git
+      - name: Install Rust 1.86
+        uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4  # stable
+        with:
+          toolchain: 1.86.0
+          components: rustfmt
+      - run: cargo fmt --check
+      - run: cargo test --locked
+      - run: cargo build --locked
+      - name: Fetch the pinned 2.x reference CLI
+        run: parity/fetch-reference.sh
+      - name: Compare against the 2.x CLI
+        run: python3 parity/parity.py --verbose
+
   target-branch-qualification:
     name: Target branch qualification
     if: ${{ always() && github.server_url == 'https://github.com' }}
-    needs: [action-policy, test, build-phar, reproducible-build]
+    needs: [action-policy, test, build-phar, reproducible-build, rust]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
@@ -182,7 +214,9 @@ jobs:
           TEST_RESULT: ${{ needs.test.result }}
           PHAR_RESULT: ${{ needs.build-phar.result }}
           REPRODUCIBLE_RESULT: ${{ needs.reproducible-build.result }}
+          RUST_RESULT: ${{ needs.rust.result }}
         run: |
           test "$TEST_RESULT" = success
           test "$PHAR_RESULT" = success
           test "$REPRODUCIBLE_RESULT" = success
+          test "$RUST_RESULT" = success

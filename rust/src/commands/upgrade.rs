@@ -227,23 +227,6 @@ fn access(path: &str, mode: libc::c_int) -> bool {
     unsafe { libc::access(path.as_ptr(), mode) == 0 }
 }
 
-/// PHP `is_executable`.
-fn is_executable(path: &str) -> bool {
-    #[cfg(unix)]
-    {
-        access(path, libc::X_OK)
-    }
-    #[cfg(not(unix))]
-    {
-        Path::new(path)
-            .extension()
-            .and_then(|extension| extension.to_str())
-            .is_some_and(|extension| {
-                ["exe", "com", "bat", "cmd"].contains(&extension.to_ascii_lowercase().as_str())
-            })
-    }
-}
-
 /// PHP `is_writable`.
 fn is_writable(path: &str) -> bool {
     #[cfg(unix)]
@@ -256,61 +239,16 @@ fn is_writable(path: &str) -> bool {
     }
 }
 
-fn path_lookup_candidates(argv0: &str, os_family: &str) -> Vec<String> {
-    let path = std::env::var("PATH").unwrap_or_default();
-    if crate::php::trim(&path).is_empty() {
-        return vec![];
-    }
-    let windows = matches!(os_family, "Windows" | "WINNT");
-    let mut extensions = vec![String::new()];
-    if windows {
-        let path_ext = std::env::var("PATHEXT").unwrap_or_default();
-        extensions = if crate::php::trim(&path_ext).is_empty() {
-            [".exe", ".bat", ".cmd", ".com"]
-                .iter()
-                .map(ToString::to_string)
-                .collect()
-        } else {
-            path_ext
-                .split(';')
-                .map(|ext| crate::php::trim(ext).to_string())
-                .filter(|ext| !ext.is_empty())
-                .collect()
-        };
-        if Path::new(argv0).extension().is_some() {
-            extensions = vec![String::new()];
-        }
-    }
-    let separator = if cfg!(windows) { ';' } else { ':' };
-    let directory_separator = if cfg!(windows) { '\\' } else { '/' };
-    let mut candidates = vec![];
-    for dir in path.split(separator).filter(|dir| !dir.is_empty()) {
-        for extension in &extensions {
-            candidates.push(format!(
-                "{}/{argv0}{extension}",
-                dir.trim_end_matches(directory_separator)
-            ));
-        }
-    }
-    candidates
-}
-
-fn resolve_executable_path(argv0: &str, os_family: &str) -> String {
-    if argv0.is_empty() {
-        return String::new();
-    }
-    if let Some(resolved) = realpath(argv0) {
-        return resolved;
-    }
+/// The fallback when the running executable cannot be resolved. Only an
+/// explicit path in argv[0] (one containing a separator) is trusted; a bare
+/// name would resolve against the current directory, so the install is
+/// treated as unresolvable and refused.
+fn resolve_fallback(argv0: &str) -> String {
     if looks_like_path(argv0) {
-        return argv0.to_string();
+        realpath(argv0).unwrap_or_default()
+    } else {
+        String::new()
     }
-    for candidate in path_lookup_candidates(argv0, os_family) {
-        if Path::new(&candidate).is_file() && is_executable(&candidate) {
-            return realpath(&candidate).unwrap_or(candidate);
-        }
-    }
-    argv0.to_string()
 }
 
 fn inside_vendor(path: &str) -> bool {
@@ -323,15 +261,15 @@ fn inside_homebrew(path: &str) -> bool {
 }
 
 /// `InstallationTarget::detect`. The binary to replace is the running
-/// executable (`executable`, canonicalized); argv[0] is only a fallback when
-/// the platform cannot report it. 2.x resolved argv[0] first, which made a
+/// executable (`executable`, canonicalized); an explicit argv[0] path is
+/// only a fallback when the platform cannot report it. 2.x resolved argv[0] first, which made a
 /// `dw` entry in the current directory the target. This build is never a
 /// PHAR, so the PHAR branches of 2.x cannot apply.
 pub fn detect_target(executable: Option<&str>, argv0: &str, os_family: &str, arch: &str) -> Target {
     let asset = map_asset(os_family, arch);
     let resolved = executable
         .and_then(realpath)
-        .unwrap_or_else(|| resolve_executable_path(argv0, os_family));
+        .unwrap_or_else(|| resolve_fallback(argv0));
     let target = |kind, path: String, upgradeable, asset: Option<String>, reason: &str| Target {
         kind,
         path,
@@ -791,20 +729,35 @@ pub fn default_replacer(destination: &str, bytes: &[u8]) -> Result<(), ReplaceEr
     Ok(())
 }
 
-/// Removes `<binary>.old-*` files an earlier Windows upgrade left behind
-/// while the old executable was still running.
+/// Whether `file_name` is an aside an earlier Windows upgrade of
+/// `binary_name` left behind: exactly `<binary>.old-<12 lowercase hex>`.
+#[cfg(any(windows, test))]
+fn is_stale_aside(file_name: &str, binary_name: &str) -> bool {
+    file_name
+        .strip_prefix(binary_name)
+        .and_then(|rest| rest.strip_prefix(".old-"))
+        .is_some_and(|suffix| {
+            suffix.len() == 12
+                && suffix
+                    .bytes()
+                    .all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
+        })
+}
+
+/// Removes asides an earlier Windows upgrade left behind while the old
+/// executable was still running.
 #[cfg(windows)]
 fn remove_stale_asides(destination: &str) {
     let path = Path::new(destination);
     let (Some(dir), Some(name)) = (path.parent(), path.file_name()) else {
         return;
     };
-    let prefix = format!("{}.old-", name.to_string_lossy());
+    let name = name.to_string_lossy();
     let Ok(entries) = std::fs::read_dir(dir) else {
         return;
     };
     for entry in entries.flatten() {
-        if entry.file_name().to_string_lossy().starts_with(&prefix) {
+        if is_stale_aside(&entry.file_name().to_string_lossy(), &name) {
             let _ = std::fs::remove_file(entry.path());
         }
     }
@@ -1179,20 +1132,54 @@ mod tests {
         let expected = realpath(&real.to_string_lossy()).unwrap();
         let target = detect_target(Some(&real.to_string_lossy()), "dw", "Linux", "x86_64");
         assert_eq!(target.path, expected);
-        // Without a reportable executable, argv[0] is the fallback.
+        // Without a reportable executable, only an explicit argv[0] path is
+        // trusted; a bare name is refused rather than resolved in the cwd.
         let fallback = detect_target(None, &real.to_string_lossy(), "Linux", "x86_64");
         assert_eq!(fallback.path, expected);
+        let bare = detect_target(None, "dw", "Linux", "x86_64");
+        assert_eq!(
+            (bare.kind, bare.upgradeable, bare.path.as_str()),
+            ("unknown", false, "")
+        );
+        let unresolvable = detect_target(Some("/nonexistent/dw"), "dw", "Linux", "x86_64");
+        assert_eq!(unresolvable.kind, "unknown");
+        let missing = detect_target(None, "/nonexistent/dw", "Linux", "x86_64");
+        assert_eq!(missing.kind, "unknown");
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]
+    fn only_exact_asides_are_stale() {
+        assert!(is_stale_aside("dw.exe.old-0123456789ab", "dw.exe"));
+        for other in [
+            "dw.exe.old-0123456789AB",
+            "dw.exe.old-0123456789a",
+            "dw.exe.old-0123456789abc",
+            "dw.exe.old-backup",
+            "dw.exe.old-",
+            "dw.exe",
+            "other.exe.old-0123456789ab",
+            "dw.exe.old-0123456789ab.keep",
+        ] {
+            assert!(!is_stale_aside(other, "dw.exe"), "{other}");
+        }
+    }
+
+    #[test]
     fn managed_installs_are_refused() {
-        let vendor = detect_target(None, "/app/vendor/bin/dw", "Linux", "x86_64");
+        let root = std::env::temp_dir().join(format!("dw-upgrade-managed-{}", random_suffix()));
+        let file = |relative: &str| {
+            let path = root.join(relative);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(&path, b"x").unwrap();
+            path.to_string_lossy().into_owned()
+        };
+        let vendor = detect_target(Some(&file("app/vendor/bin/dw")), "dw", "Linux", "x86_64");
         assert_eq!(
             (vendor.kind, vendor.upgradeable),
             ("composer-vendor", false)
         );
-        let brew = detect_target(None, "/opt/homebrew/bin/dw", "Darwin", "arm64");
+        let brew = detect_target(Some(&file("opt/homebrew/bin/dw")), "dw", "Darwin", "arm64");
         assert_eq!(
             (brew.kind, brew.reason.as_str()),
             ("homebrew", HOMEBREW_REASON)
@@ -1202,12 +1189,14 @@ mod tests {
             (empty.kind, empty.reason.as_str()),
             ("unknown", "could not resolve the dw executable path")
         );
-        let other = detect_target(None, "/nonexistent/dw", "Linux", "riscv64");
+        let plain = file("bin/dw");
+        let other = detect_target(Some(&plain), "dw", "Linux", "riscv64");
         assert_eq!(
             other.reason,
             "no published release asset matches this platform (Linux/riscv64)"
         );
-        assert_eq!(other.path, "/nonexistent/dw");
+        assert_eq!(other.path, realpath(&plain).unwrap());
+        std::fs::remove_dir_all(&root).unwrap();
     }
 
     #[test]

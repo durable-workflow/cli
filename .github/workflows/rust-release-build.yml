@@ -300,11 +300,13 @@ jobs:
           MODE: ${{ inputs.mode }}
         run: |
           set -euo pipefail
-          # A prerelease has its own notes (docs/release-notes/2.5.0-rc.1.md);
-          # otherwise the version's core notes apply.
+          # A prerelease must have its own notes (docs/release-notes/2.5.0-rc.2.md);
+          # it never falls back to the stable version's notes. A stable release
+          # uses docs/release-notes/<version>.md.
           core="${VERSION%%-*}"
-          notes="docs/release-notes/$VERSION.md"
-          if [ ! -f "$notes" ]; then
+          if [ "$VERSION" != "$core" ]; then
+            notes="docs/release-notes/$VERSION.md"
+          else
             notes="docs/release-notes/$core.md"
           fi
           if [ -f "$notes" ]; then

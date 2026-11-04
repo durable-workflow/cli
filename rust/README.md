@@ -19,8 +19,8 @@ every command group reaches parity.
 | Profiles: file, location, permissions, resolution order | Ported |
 | Output modes, error envelope, next steps, exit codes | Ported |
 | `env:list`, `env:set`, `env:use`, `env:show`, `env:delete` | Ported |
-| `server:health` | Ported |
-| Compatibility preflight and `server:info` | Next slice |
+| `server:health`, `server:info` (and `cluster:info`) | Ported |
+| Compatibility preflight, session and `--version` warnings, exit 8 refusals | Ported |
 | Workflow, namespace and schedule commands | Next slices |
 | `--tls-verify=false` against HTTPS | Refused until durable-workflow/sdk-rust#180 |
 
@@ -34,6 +34,15 @@ Requires Rust 1.86 or newer.
 ```bash
 cargo test --locked
 cargo build --locked
+```
+
+The compatibility checks (`src/compat`) are also compared with the 2.x PHP
+classes they port, case by case, while those classes are in this
+repository:
+
+```bash
+php parity/compat-vectors.php ../src ../tests/fixtures src/compat/fixtures target/php-vectors.json
+DW_COMPAT_PHP_VECTORS=target/php-vectors.json cargo test --locked -- --ignored
 ```
 
 ## Parity with 2.x
@@ -52,6 +61,10 @@ parity/fetch-reference.sh      # pinned 2.x CLI, checksum-verified, into target/
 cargo build
 python3 parity/parity.py       # --build release, --report, --verbose
 ```
+
+Cases with a `mock` entry run against a loopback Server that serves the
+published PHP 2.11.8 cluster info with the case's patch applied, so
+compatibility warnings and refusals are compared without a broken Server.
 
 To also run the Server cases, start the published Servers pinned in
 `parity/servers.json`, set `DW_PARITY_SERVERS` to them (for example

@@ -191,6 +191,16 @@ jobs:
       - run: cargo fmt --check
       - run: cargo test --locked
       - run: cargo build --locked
+      - name: Set up PHP for the 2.x compatibility vectors
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240  # v2
+        with:
+          php-version: '8.4'
+          tools: none
+          coverage: none
+      - name: Compare compatibility checks with the 2.x PHP classes
+        run: |
+          php parity/compat-vectors.php ../src ../tests/fixtures src/compat/fixtures target/php-vectors.json
+          DW_COMPAT_PHP_VECTORS=target/php-vectors.json cargo test --locked -- --ignored
       - name: Fetch the pinned 2.x reference CLI
         run: parity/fetch-reference.sh
       - name: Compare against the 2.x CLI

@@ -1,13 +1,16 @@
 //! `dw`, the Durable Workflow command-line interface.
 
+mod build_info;
 mod catalog;
 mod cli;
 mod client;
 mod commands;
+mod compat;
 mod config;
 mod error;
 mod lookup;
 mod output;
+mod php;
 
 use cli::{Input, UsageError};
 use error::{exit, CliError, ErrorContext};
@@ -29,6 +32,7 @@ fn handler(name: &str) -> Option<Handler> {
     use commands::{env, server};
     Some(match name {
         "server:health" => Handler::Server(server::health),
+        "server:info" => Handler::Server(server::info),
         "env:list" => Handler::Local(env::list),
         "env:set" => Handler::Local(env::set),
         "env:use" => Handler::Local(env::use_env),
@@ -42,8 +46,11 @@ fn handler(name: &str) -> Option<Handler> {
 /// ported so far are namespace scoped.
 const NAMESPACE_SCOPED: &[&str] = &[];
 
+/// Verbs of a group and the command each one names.
+type GroupVerbs = &'static [(&'static str, &'static str)];
+
 /// `dw schedule list` and similar spellings for the canonical names.
-const GROUPED_ALIASES: &[(&[&str], &[(&str, &str)])] = &[
+const GROUPED_ALIASES: &[(&[&str], GroupVerbs)] = &[
     (
         &["activity", "activities"],
         &[("describe", "activity:describe"), ("list", "activity:list")],
@@ -121,17 +128,6 @@ fn rewrite_grouped(tokens: &[String]) -> Option<Vec<String>> {
         return Some(rewritten);
     }
     None
-}
-
-fn version_line() -> String {
-    let commit = option_env!("DW_CLI_COMMIT")
-        .map(|commit| &commit[..commit.len().min(12)])
-        .unwrap_or("unknown");
-    let built = option_env!("DW_CLI_BUILD_DATE").unwrap_or("source checkout");
-    let version = option_env!("DW_CLI_VERSION")
-        .map(|version| version.strip_prefix('v').unwrap_or(version))
-        .unwrap_or(env!("CARGO_PKG_VERSION"));
-    format!("dw {version} (commit {commit}, built {built})")
 }
 
 /// Symfony's terminal width: $COLUMNS, else 80.
@@ -214,7 +210,7 @@ fn listing(namespace: Option<&str>) -> String {
         .unwrap_or(0)
         + 2;
 
-    let mut text = format!("{}\n\n{APPLICATION_HELP}\n\n", version_line());
+    let mut text = format!("{}\n\n{APPLICATION_HELP}\n\n", build_info::version_line());
     text.push_str(&match namespace {
         Some(namespace) => format!("Available commands for the \"{namespace}\" namespace:"),
         None => "Available commands:".to_string(),
@@ -348,18 +344,95 @@ fn resolve_command(name: &str, tokens: &[String]) -> Result<String, i32> {
     }
 }
 
+/// The value of a global option as Symfony's getParameterOption reads it
+/// from raw tokens: `--name=v`, `--name v`, `-sv` or `-s v`, before `--`.
+fn raw_option(tokens: &[String], long: &str, short: Option<char>) -> Option<String> {
+    let long_flag = format!("--{long}");
+    let long_prefix = format!("--{long}=");
+    let short_flag = short.map(|c| format!("-{c}"));
+    let mut iter = tokens
+        .iter()
+        .take_while(|token| token.as_str() != "--")
+        .peekable();
+    while let Some(token) = iter.next() {
+        if let Some(value) = token.strip_prefix(&long_prefix) {
+            return Some(value.to_string()).filter(|value| !value.is_empty());
+        }
+        let is_short = short_flag.as_deref() == Some(token.as_str());
+        if *token == long_flag || is_short {
+            return iter
+                .peek()
+                .filter(|next| !next.is_empty() && !next.starts_with('-'))
+                .map(|next| next.to_string());
+        }
+        if let Some(value) = short_flag
+            .as_deref()
+            .and_then(|flag| token.strip_prefix(flag))
+        {
+            return Some(value.to_string());
+        }
+    }
+    None
+}
+
+/// Whether the caller named a Server for `--version`, by flag or environment.
+fn names_a_server(tokens: &[String]) -> bool {
+    raw_option(tokens, "server", Some('s')).is_some()
+        || raw_option(tokens, "env", None).is_some()
+        || config::env_string("DURABLE_WORKFLOW_SERVER_URL").is_some()
+        || config::env_string("DW_ENV").is_some()
+}
+
+/// `dw --version`, plus the first compatibility warning when the caller
+/// named a Server, as 2.x does.
+fn print_version(tokens: &[String]) {
+    println!("{}", build_info::version_line());
+    if !names_a_server(tokens) {
+        return;
+    }
+    let Ok(store) = config::ProfileStore::new() else {
+        return;
+    };
+    let options: Vec<Option<String>> = [
+        ("env", None),
+        ("server", Some('s')),
+        ("namespace", None),
+        ("token", None),
+        ("tls-verify", None),
+    ]
+    .into_iter()
+    .map(|(long, short)| raw_option(tokens, long, short))
+    .collect();
+    let flags = config::ConnectionFlags {
+        env: options[0].as_deref(),
+        server: options[1].as_deref(),
+        namespace: options[2].as_deref(),
+        token: options[3].as_deref(),
+        tls_verify: options[4].as_deref(),
+    };
+    let info = config::resolve(&store, &flags)
+        .and_then(|connection| client::Context::with_connection(connection, Mode::Table))
+        .and_then(|context| context.cluster_info(Some(client::PREFLIGHT_TIMEOUT)));
+    if let Ok(info) = info {
+        client::warn_first(&info, true);
+    }
+}
+
 fn run(raw: Vec<String>) -> i32 {
     let tokens = rewrite_grouped(&raw).unwrap_or(raw);
 
+    // Symfony answers --version before it looks for a command.
+    if tokens
+        .iter()
+        .take_while(|token| token.as_str() != "--")
+        .any(|token| token == "--version" || token == "-V")
+    {
+        print_version(&tokens);
+        return exit::SUCCESS;
+    }
+
     let Some((position, name)) = cli::first_argument(&tokens) else {
-        if tokens
-            .iter()
-            .any(|token| token == "--version" || token == "-V")
-        {
-            println!("{}", version_line());
-        } else {
-            println!("{}", listing(None));
-        }
+        println!("{}", listing(None));
         return exit::SUCCESS;
     };
     let name = name.to_string();
@@ -384,10 +457,6 @@ fn run(raw: Vec<String>) -> i32 {
             return exit::FAILURE;
         }
     };
-    if input.flag("version") {
-        println!("{}", version_line());
-        return exit::SUCCESS;
-    }
     if input.flag("help") {
         print_help(&spec);
         return exit::SUCCESS;
@@ -399,7 +468,7 @@ fn run(raw: Vec<String>) -> i32 {
                 Err(error) => {
                     // 2.x writes the listing header before it finds that the
                     // namespace does not exist.
-                    print!("{}\n\n{APPLICATION_HELP}\n\n", version_line());
+                    print!("{}\n\n{APPLICATION_HELP}\n\n", build_info::version_line());
                     print_usage_error(&UsageError {
                         message: error.message().to_string(),
                         synopsis: Some(spec.synopsis.clone()),
@@ -421,7 +490,10 @@ fn run(raw: Vec<String>) -> i32 {
     let server_command = matches!(handler, Handler::Server(_));
     let result = match handler {
         Handler::Local(run) => run(&input),
-        Handler::Server(run) => client::Context::new(&input).and_then(|context| run(&context)),
+        Handler::Server(run) => client::Context::new(&input).and_then(|context| {
+            context.warn_if_incompatible(client::uses_worker_protocol(&command));
+            run(&context)
+        }),
     };
     match result {
         Ok(code) => code,
@@ -440,6 +512,30 @@ mod tests {
 
     fn tokens(raw: &[&str]) -> Vec<String> {
         raw.iter().map(|token| token.to_string()).collect()
+    }
+
+    #[test]
+    fn raw_options_follow_symfony_parameter_rules() {
+        let t = tokens(&[
+            "--version",
+            "-shttp://a",
+            "--env",
+            "prod",
+            "--namespace=",
+            "--",
+            "--token=x",
+        ]);
+        assert_eq!(
+            raw_option(&t, "server", Some('s')).as_deref(),
+            Some("http://a")
+        );
+        assert_eq!(raw_option(&t, "env", None).as_deref(), Some("prod"));
+        assert_eq!(raw_option(&t, "namespace", None), None);
+        assert_eq!(raw_option(&t, "token", None), None);
+        assert_eq!(
+            raw_option(&tokens(&["--server", "--env"]), "server", Some('s')),
+            None
+        );
     }
 
     #[test]

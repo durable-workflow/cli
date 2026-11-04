@@ -204,7 +204,7 @@ class ReleaseRustWorkflowTest(unittest.TestCase):
     def test_post_publication_checks_run_control_code_only(self):
         for name in ("preflight", "verify-release"):
             refs = [s["with"]["ref"] for s in self.steps(name) if s.get("uses", "").startswith("actions/checkout@")]
-            self.assertEqual(["${{ needs.resolve.outputs.control_commit }}"], refs, name)
+            self.assertEqual(["${{ github.sha }}"], refs, name)
         self.assertFalse(any(s.get("uses", "").startswith("actions/checkout@") for s in self.steps("upgrade-from-2x")))
 
     # Hygiene.
@@ -214,6 +214,16 @@ class ReleaseRustWorkflowTest(unittest.TestCase):
             for step in job.get("steps", []):
                 if "uses" in step:
                     self.assertRegex(step["uses"], PINNED, f"{name}: {step['uses']}")
+
+    def test_tagged_source_jobs_use_no_caches(self):
+        # The build runs the tagged source; it must not read or write the
+        # Actions cache that default-branch workflows restore.
+        text = BUILD.read_text(encoding="utf-8")
+        self.assertNotIn("actions/cache", text)
+        self.assertNotRegex(text, r"^\s+cache(-dependency-path)?:", )
+        for name, job in self.build["jobs"].items():
+            for step in job["steps"]:
+                self.assertNotIn("cache", step.get("with", {}), name)
 
     def test_every_checkout_drops_credentials(self):
         for name, job in self.all_jobs():

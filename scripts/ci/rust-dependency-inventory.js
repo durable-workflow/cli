@@ -47,9 +47,9 @@ function lockChecksums(text) {
 // Packages reachable from the root through normal (non-dev, non-build)
 // dependency edges: the code linked into the executable.
 function linkedPackages(metadata) {
-  const root = metadata.resolve && metadata.resolve.root;
+  const root = metadata.resolve?.root;
   if (typeof root !== 'string') {
-    throw new Error('cargo metadata has no resolved root package');
+    throw new TypeError('cargo metadata has no resolved root package');
   }
   const nodes = new Map(metadata.resolve.nodes.map((node) => [node.id, node]));
   const seen = new Set();

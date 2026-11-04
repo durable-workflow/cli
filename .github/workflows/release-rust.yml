@@ -125,7 +125,7 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
         with:
           persist-credentials: false
-          ref: ${{ needs.resolve.outputs.control_commit }}
+          ref: ${{ github.sha }}
           path: release-control
 
       - name: Verify the release tag points at the expected commit
@@ -353,7 +353,7 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
         with:
           persist-credentials: false
-          ref: ${{ needs.resolve.outputs.control_commit }}
+          ref: ${{ github.sha }}
 
       - name: Verify downloads, checksums and attestations
         env:
@@ -389,7 +389,7 @@ jobs:
           set -euo pipefail
           release_base="https://github.com/${GITHUB_REPOSITORY}/releases"
           install_dir="$(mktemp -d)"
-          curl -fsSL --retry 3 --retry-all-errors -o "$RUNNER_TEMP/install.sh" \
+          curl --proto '=https' --tlsv1.2 -fsSL --retry 3 --retry-all-errors -o "$RUNNER_TEMP/install.sh" \
             "$release_base/download/$RELEASE_TAG/install.sh"
           VERSION="$RELEASE_TAG" DURABLE_WORKFLOW_INSTALL_DIR="$install_dir" \
             DURABLE_WORKFLOW_RELEASE_BASE_URL="$release_base" \
@@ -453,16 +453,19 @@ jobs:
           RELEASE_COMMIT: ${{ needs.resolve.outputs.commit }}
         run: |
           set -euo pipefail
-          sha256() { if command -v sha256sum >/dev/null; then sha256sum "$1"; else shasum -a 256 "$1"; fi | awk '{print $1}'; }
+          sha256() {
+            local file="$1"
+            if command -v sha256sum >/dev/null; then sha256sum "$file"; else shasum -a 256 "$file"; fi | awk '{print $1}'
+          }
           base="https://github.com/${GITHUB_REPOSITORY}/releases/download"
           work="$(mktemp -d)"
           export HOME="$work" DW_CONFIG_HOME="$work/config"
-          curl -fsSL --retry 3 --retry-all-errors -o "$work/SHA256SUMS" "$base/$RELEASE_TAG/SHA256SUMS"
+          curl --proto '=https' --tlsv1.2 -fsSL --retry 3 --retry-all-errors -o "$work/SHA256SUMS" "$base/$RELEASE_TAG/SHA256SUMS"
           expected="$(awk -v a="$ASSET" '$2 == a {print $1}' "$work/SHA256SUMS")"
           [ -n "$expected" ] || { echo "::error::$ASSET missing from $RELEASE_TAG SHA256SUMS"; exit 1; }
 
           if [ "$INSTALL" = "binary" ]; then
-            curl -fsSL --retry 3 --retry-all-errors -o "$work/dw" "$base/$LEGACY_VERSION/$ASSET"
+            curl --proto '=https' --tlsv1.2 -fsSL --retry 3 --retry-all-errors -o "$work/dw" "$base/$LEGACY_VERSION/$ASSET"
             [ "$(sha256 "$work/dw")" = "$LEGACY_SHA256" ] || { echo "::error::$LEGACY_VERSION $ASSET checksum mismatch"; exit 1; }
             chmod +x "$work/dw"
             "$work/dw" --version
@@ -477,7 +480,7 @@ jobs:
               *) echo "::error::Upgraded binary reports: $line"; exit 1 ;;
             esac
           else
-            curl -fsSL --retry 3 --retry-all-errors -o "$work/dw.phar" "$base/$LEGACY_VERSION/dw.phar"
+            curl --proto '=https' --tlsv1.2 -fsSL --retry 3 --retry-all-errors -o "$work/dw.phar" "$base/$LEGACY_VERSION/dw.phar"
             [ "$(sha256 "$work/dw.phar")" = "$LEGACY_PHAR_SHA256" ] || { echo "::error::$LEGACY_VERSION dw.phar checksum mismatch"; exit 1; }
             php "$work/dw.phar" --version
             # 2.x resolves the platform binary for a PHAR install but never
@@ -487,7 +490,7 @@ jobs:
             checksum_url="$(jq -r '.checksum_url' "$work/dry-run.json")"
             [ "$asset_url" = "$base/$RELEASE_TAG/$ASSET" ] || { echo "::error::dry run resolved $asset_url"; exit 1; }
             [ "$checksum_url" = "$base/$RELEASE_TAG/SHA256SUMS" ] || { echo "::error::dry run resolved $checksum_url"; exit 1; }
-            curl -fsSL --retry 3 --retry-all-errors -o "$work/resolved" "$asset_url"
+            curl --proto '=https' --tlsv1.2 -fsSL --retry 3 --retry-all-errors -o "$work/resolved" "$asset_url"
             [ "$(sha256 "$work/resolved")" = "$expected" ] || { echo "::error::resolved asset does not match SHA256SUMS"; exit 1; }
             chmod +x "$work/resolved"
             "$work/resolved" --version

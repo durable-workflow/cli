@@ -300,8 +300,13 @@ jobs:
           MODE: ${{ inputs.mode }}
         run: |
           set -euo pipefail
+          # A prerelease has its own notes (docs/release-notes/2.5.0-rc.1.md);
+          # otherwise the version's core notes apply.
           core="${VERSION%%-*}"
-          notes="docs/release-notes/$core.md"
+          notes="docs/release-notes/$VERSION.md"
+          if [ ! -f "$notes" ]; then
+            notes="docs/release-notes/$core.md"
+          fi
           if [ -f "$notes" ]; then
             cp "$notes" release/release-notes.md
           elif [ "$MODE" = "dry-run" ]; then

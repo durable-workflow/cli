@@ -563,6 +563,35 @@ class ReleaseRustWorkflowTest(unittest.TestCase):
         self.assertIn("releases/download/2.5.0/dw-macos-x86_64", formula)
         self.assertIn(hashlib.sha256(b"dw-macos-x86_64").hexdigest(), formula)
 
+    def run_notes_step(self, version, files):
+        [step] = [s for s in self.build["jobs"]["assemble"]["steps"] if s.get("name") == "Write the release notes"]
+        with tempfile.TemporaryDirectory(prefix="cli-notes-") as directory:
+            for name, text in files.items():
+                path = Path(directory) / "docs/release-notes" / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(text, encoding="utf-8")
+            (Path(directory) / "release").mkdir()
+            result = subprocess.run(
+                ["bash", "-euo", "pipefail", "-c", step["run"]],
+                cwd=directory, capture_output=True, text=True,
+                env=dict(os.environ, VERSION=version, MODE="release"),
+            )
+            notes = Path(directory) / "release/release-notes.md"
+            return result.returncode, notes.read_text(encoding="utf-8") if notes.exists() else None
+
+    def test_a_prerelease_uses_its_own_notes(self):
+        files = {"2.5.0.md": "stable", "2.5.0-rc.1.md": "preview"}
+        self.assertEqual((0, "preview"), self.run_notes_step("2.5.0-rc.1", files))
+        self.assertEqual((0, "stable"), self.run_notes_step("2.5.0-rc.2", files))
+        self.assertEqual((0, "stable"), self.run_notes_step("2.5.0", files))
+        self.assertEqual(1, self.run_notes_step("2.6.0", files)[0])
+
+    def test_the_rc1_notes_say_it_is_not_a_usable_release(self):
+        notes = (ROOT / "docs/release-notes/2.5.0-rc.1.md").read_text(encoding="utf-8")
+        for claim in ("not a usable release", "Do not install it", "never selected automatically",
+                      "not published to any tap", "immutable"):
+            self.assertIn(claim, notes)
+
     def test_no_phar_is_published(self):
         assemble = "\n".join(s.get("run", "") for s in self.build["jobs"]["assemble"]["steps"])
         publish = "\n".join(s.get("run", "") for s in self.steps("publish"))

@@ -8,9 +8,22 @@ crate="$(cd "$(dirname "$0")/.." && pwd)"
 reference="$crate/target/dw-reference"
 [[ -x "$reference" ]] || "$crate/parity/fetch-reference.sh" >/dev/null
 
-DW_CONFIG_HOME="$(mktemp -d)" "$reference" list --format=json | python3 -c '
-import json, sys
-listing = json.load(sys.stdin)
+# Help texts embed the invoked path (%command.full_name%). Store placeholders
+# that the CLI fills from its own argv[0], never this machine's path.
+DW_CONFIG_HOME="$(mktemp -d)" "$reference" list --format=json | DW_REFERENCE="$reference" python3 -c '
+import json, os, sys
+reference = os.environ["DW_REFERENCE"]
+
+def placeholders(value):
+    if isinstance(value, str):
+        return value.replace(reference, "{dw}").replace(os.path.basename(reference), "{dw_name}")
+    if isinstance(value, list):
+        return [placeholders(item) for item in value]
+    if isinstance(value, dict):
+        return {key: placeholders(item) for key, item in value.items()}
+    return value
+
+listing = placeholders(json.load(sys.stdin))
 commands = []
 for command in listing["commands"]:
     usage = command["usage"]
@@ -20,6 +33,7 @@ for command in listing["commands"]:
         "synopsis": usage[0],
         "aliases": usage[1:],
         "hidden": command["hidden"],
+        "help": command["help"],
         "definition": command["definition"],
     })
 json.dump({"source": "dw " + listing["application"]["version"].split(" ")[0], "commands": commands},

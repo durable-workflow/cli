@@ -872,6 +872,102 @@
     "server:info",
     "--server={mock}"
    ]
+  },
+  {
+   "name": "help for a command",
+   "argv": [
+    "env:use",
+    "--help"
+   ]
+  },
+  {
+   "name": "short help flag",
+   "argv": [
+    "env:set",
+    "-h"
+   ]
+  },
+  {
+   "name": "help lists aliases and value options",
+   "argv": [
+    "server:info",
+    "--help"
+   ]
+  },
+  {
+   "name": "help for an unported command",
+   "argv": [
+    "workflow:start",
+    "--help"
+   ]
+  },
+  {
+   "name": "help for a command with array options",
+   "argv": [
+    "workflow-task:complete",
+    "--help"
+   ]
+  },
+  {
+   "name": "help command",
+   "argv": [
+    "help",
+    "env:list"
+   ]
+  },
+  {
+   "name": "help command by alias",
+   "argv": [
+    "help",
+    "cluster:info"
+   ]
+  },
+  {
+   "name": "help command by abbreviation",
+   "argv": [
+    "help",
+    "e:li"
+   ]
+  },
+  {
+   "name": "help command for itself",
+   "argv": [
+    "help"
+   ]
+  },
+  {
+   "name": "help command, unknown name",
+   "argv": [
+    "help",
+    "nope"
+   ]
+  },
+  {
+   "name": "help command, typo",
+   "argv": [
+    "help",
+    "env:lst"
+   ]
+  },
+  {
+   "name": "help without a command",
+   "argv": [
+    "-h"
+   ]
+  },
+  {
+   "name": "help for list",
+   "argv": [
+    "list",
+    "--help"
+   ]
+  },
+  {
+   "name": "help wins over a missing argument",
+   "argv": [
+    "env:delete",
+    "-h"
+   ]
   }
  ]
 }

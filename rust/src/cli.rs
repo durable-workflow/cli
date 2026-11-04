@@ -37,7 +37,6 @@ pub struct ArgSpec {
 #[derive(Clone, Debug)]
 pub struct CommandSpec {
     pub name: String,
-    pub description: String,
     pub synopsis: String,
     pub args: Vec<ArgSpec>,
     pub opts: Vec<OptSpec>,

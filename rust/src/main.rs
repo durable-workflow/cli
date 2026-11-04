@@ -8,6 +8,7 @@ mod commands;
 mod compat;
 mod config;
 mod error;
+mod help;
 mod lookup;
 mod output;
 mod php;
@@ -241,12 +242,29 @@ fn listing(namespace: Option<&str>) -> String {
     text
 }
 
-fn print_help(spec: &cli::CommandSpec) {
-    println!("Description:");
-    println!("  {}", spec.description);
-    println!();
-    println!("Usage:");
-    println!("  {}", spec.synopsis);
+fn print_help(command: &str) {
+    if let Some(entry) = catalog::entry(command) {
+        print!("{}", help::render(entry));
+    }
+}
+
+/// `dw help [<command_name>]`. Lookup errors are reported with the help
+/// command's own synopsis, as 2.x does.
+fn run_help_command(input: &Input, synopsis: &str) -> i32 {
+    let name = input.arg("command_name").unwrap_or("help");
+    match lookup::find(name, terminal_width()) {
+        Ok(command) => {
+            print_help(&command);
+            exit::SUCCESS
+        }
+        Err(error) => {
+            print_usage_error(&UsageError {
+                message: error.message().to_string(),
+                synopsis: Some(synopsis.to_string()),
+            });
+            exit::FAILURE
+        }
+    }
 }
 
 /// The output mode for reporting an error. It never fails: a broken profile
@@ -435,7 +453,15 @@ fn run(raw: Vec<String>) -> i32 {
     }
 
     let Some((position, name)) = cli::first_argument(&tokens) else {
-        println!("{}", listing(None));
+        if tokens
+            .iter()
+            .any(|token| token == "--help" || token == "-h")
+        {
+            // Help without a command describes the default command, list.
+            print_help("list");
+        } else {
+            println!("{}", listing(None));
+        }
         return exit::SUCCESS;
     };
     let name = name.to_string();
@@ -461,8 +487,11 @@ fn run(raw: Vec<String>) -> i32 {
         }
     };
     if input.flag("help") {
-        print_help(&spec);
+        print_help(&command);
         return exit::SUCCESS;
+    }
+    if command == "help" {
+        return run_help_command(&input, &spec.synopsis);
     }
     if command == "list" {
         match input.arg("namespace") {

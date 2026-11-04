@@ -153,13 +153,23 @@ fn safe_executable_names_still_generate_working_shell_syntax() {
             let mut generate = scratch.command(&link);
             generate.args(["completion", name]);
             let output = bounded(generate);
-            assert!(output.status.success());
+            assert!(
+                output.status.success(),
+                "safe completion generation failed: command={command_name:?} shell={name:?} status={:?} stdout={:?} stderr={:?}",
+                output.status.code(),
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr),
+            );
             let script = scratch.0.join("generated-completion");
             fs::write(&script, &output.stdout).unwrap();
             if let Some(command) = shell(name, &scratch, &script) {
+                let sourced = bounded(command);
                 assert!(
-                    bounded(command).status.success(),
-                    "safe completion script failed to source"
+                    sourced.status.success(),
+                    "safe completion script failed to source: command={command_name:?} shell={name:?} status={:?} stdout={:?} stderr={:?}",
+                    sourced.status.code(),
+                    String::from_utf8_lossy(&sourced.stdout),
+                    String::from_utf8_lossy(&sourced.stderr),
                 );
             }
         }

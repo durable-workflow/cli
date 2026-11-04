@@ -6,4 +6,5 @@ pub mod info;
 pub mod runtime;
 pub mod schema;
 pub mod server;
+pub mod start_dev;
 pub mod upgrade;

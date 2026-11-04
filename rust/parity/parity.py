@@ -166,13 +166,16 @@ def run_case(binary, case, env_base, identity=None):
         env["DW_CONFIG_HOME"] = config_dir
         for key, value in case.get("env", {}).items():
             env[key] = substitute(value, case)
+        project = None
+        if "project" in case:
+            project = prepare_project(config_dir, case["project"], env)
         for step in case.get("setup", []):
             subprocess.run([binary] + [substitute(arg, case) for arg in step], env=env,
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60, check=False)
         argv = [substitute(arg, case) for arg in case["argv"]]
         # No terminal on stdin, so neither CLI may prompt.
         completed = subprocess.run([binary] + argv, env=env, stdin=subprocess.DEVNULL, capture_output=True,
-                                   text=True, timeout=60, check=False)
+                                   text=True, timeout=60, check=False, cwd=project)
         stdout_json = parse_json_lines(completed.stdout)
         stdout_text = completed.stdout
         if argv and argv[0] == "doctor":
@@ -187,6 +190,23 @@ def run_case(binary, case, env_base, identity=None):
         }
     finally:
         shutil.rmtree(config_dir, ignore_errors=True)
+
+
+def prepare_project(config_dir, options, env):
+    """Disposable Laravel stand-in with fake external tools; no services run."""
+    project = os.path.join(config_dir, "project with spaces" if options.get("spaces") else "project")
+    tool_dir = os.path.join(project, "bin")
+    os.makedirs(tool_dir)
+    if options.get("artisan", True):
+        with open(os.path.join(project, "artisan"), "w", encoding="utf-8") as handle:
+            handle.write("fixture project\n")
+    for tool, default in (("php", True), ("docker", False)):
+        if options.get(tool, default):
+            path = os.path.join(tool_dir, tool)
+            shutil.copyfile(os.path.join(CRATE, "parity", "fixtures", "start-dev", tool), path)
+            os.chmod(path, 0o700)
+    env["PATH"] = tool_dir
+    return project
 
 
 def compare(reference, candidate, case):

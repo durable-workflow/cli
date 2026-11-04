@@ -21,6 +21,7 @@ every command group reaches parity.
 | `env:list`, `env:set`, `env:use`, `env:show`, `env:delete` | Ported |
 | `server:health`, `server:info` (and `cluster:info`) | Ported |
 | Compatibility preflight, session and `--version` warnings, exit 8 refusals | Ported |
+| `server:start-dev`: local Laravel launch, Compose prerequisites and Unix signal cleanup | Ported |
 | `runtime:check`: native build identity and compilation target | Ported, intentional output/help difference |
 | `doctor`: redacted connection sources, server metadata, warnings and next steps | Ported |
 | Workflow, namespace and schedule commands | Next slices |

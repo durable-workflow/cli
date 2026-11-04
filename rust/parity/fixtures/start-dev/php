@@ -1,0 +1,9 @@
+#!/bin/sh
+printf 'arguments:'
+printf ' [%s]' "$@"
+printf '\ndatabase: %s\n' "$DB_CONNECTION"
+if [ -f compose.started ]; then printf 'compose started before HTTP\n'; fi
+printf '<info>fixture stdout λ</info>\n'
+printf 'fixture stderr\n' >&2
+if [ -n "$DW_DEV_PHP_SIGNAL" ]; then kill "-$DW_DEV_PHP_SIGNAL" "$$"; fi
+exit "${DW_DEV_PHP_EXIT:-0}"

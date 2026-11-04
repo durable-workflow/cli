@@ -16,8 +16,10 @@ path = "src/main.rs"
 # Pinned to the latest qualified SDK release. Move only to a release that has
 # passed sdk-rust's pre-publication acceptance.
 durable-workflow = "=4.11.0"
-# preserve_order keeps Server response keys in their original order, matching
-# the PHP CLI's pass-through JSON.
 serde = "1"
-serde_json = { version = "1", features = ["preserve_order"] }
+sha2 = "0.10"
+# preserve_order keeps Server response keys in their original order, matching
+# the PHP CLI's pass-through JSON. float_roundtrip parses every float to the
+# exact value PHP decodes, so re-encoded output and checksums match 2.x.
+serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
 tokio = { version = "1", features = ["rt", "macros"] }

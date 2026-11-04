@@ -1,6 +1,5 @@
-//! Output modes and rendering. JSON matches the 2.x CLI byte for byte:
-//! compact, slashes unescaped, and non-ASCII characters escaped as \uXXXX,
-//! which is PHP's json_encode default.
+//! Output modes and rendering. JSON matches the 2.x CLI byte for byte
+//! (see `encode`); the config file uses PHP's pretty-print layout.
 
 use crate::cli::Input;
 use crate::error::CliError;
@@ -74,8 +73,11 @@ fn escape_non_ascii(encoded: String) -> String {
     escaped
 }
 
+/// One JSON document exactly as 2.x prints it: PHP's
+/// `json_encode($value, JSON_UNESCAPED_SLASHES)` of the decoded value, so an
+/// empty Server object prints as `[]` and floats use PHP's format.
 pub fn encode(value: &Value) -> String {
-    escape_non_ascii(serde_json::to_string(value).expect("JSON values always serialize"))
+    crate::php::json_encode(value)
 }
 
 /// PHP's JSON_PRETTY_PRINT: four-space indent.
@@ -161,10 +163,26 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn json_matches_php_encoding() {
+    fn json_matches_php_encoding_and_empty_objects() {
+        assert_eq!(
+            encode(&json!({"checks": {}, "list": {"0": "a"}})),
+            r#"{"checks":[],"list":["a"]}"#
+        );
         let value = json!({"url": "http://x/y", "name": "Zo\u{eb} \u{1f680}"});
         let expected = "{\"url\":\"http://x/y\",\"name\":\"Zo\\u00eb \\ud83d\\ude80\"}";
         assert_eq!(encode(&value), expected);
+    }
+
+    #[test]
+    fn parsed_floats_reencode_exactly() {
+        for raw in [
+            "[1.4820142857142857]",
+            "[124435.71428571429]",
+            "[0.7071067811865476]",
+        ] {
+            let value: Value = serde_json::from_str(raw).unwrap();
+            assert_eq!(encode(&value), raw);
+        }
     }
 
     #[test]

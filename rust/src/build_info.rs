@@ -9,6 +9,11 @@ pub fn version() -> &'static str {
         .unwrap_or(env!("CARGO_PKG_VERSION"))
 }
 
+/// The compilation target, including the linked runtime ABI.
+pub fn target() -> &'static str {
+    env!("DW_CLI_TARGET")
+}
+
 /// `dw <version> (commit <sha>, built <date>)`, as `dw --version` prints it.
 pub fn version_line() -> String {
     let commit = option_env!("DW_CLI_COMMIT")

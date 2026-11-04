@@ -25,6 +25,10 @@ fn collect(dir: &Path, root: &Path, files: &mut Vec<(String, PathBuf)>) {
 }
 
 fn main() {
+    println!(
+        "cargo:rustc-env=DW_CLI_TARGET={}",
+        std::env::var("TARGET").expect("set by cargo")
+    );
     let crate_dir = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").expect("set by cargo"));
     let root = crate_dir
         .parent()

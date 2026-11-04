@@ -177,6 +177,9 @@ fn completion_help(path: &str, name: &str) -> String {
 
 /// The processed help text, styles still in place.
 fn processed_help(entry: &Entry) -> String {
+    if entry.name == "runtime:check" {
+        return crate::commands::runtime::HELP.into();
+    }
     let (path, name) = program();
     if entry.name == "completion" {
         return completion_help(&path, &name);

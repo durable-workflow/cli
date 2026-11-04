@@ -1098,7 +1098,15 @@
    "argv": [
     "list",
     "--format=json"
-   ]
+   ],
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "stdout_json"
+     ],
+     "reason": "The application JSON includes hidden runtime:check help; it now describes the approved native build-identity and target report instead of PHP extensions (cli#72)."
+    }
+   }
   },
   {
    "name": "list namespace json",
@@ -1873,6 +1881,95 @@
     "schema:list",
     "--ansi"
    ]
+  },
+  {
+   "name": "native runtime report",
+   "argv": [
+    "runtime:check"
+   ],
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "stdout_text"
+     ],
+     "reason": "The approved Rust-native runtime:check reports the binary build identity and compilation target instead of PHP runtime extensions (cli#72). Its help describes that report."
+    }
+   }
+  },
+  {
+   "name": "native runtime report with ANSI",
+   "argv": [
+    "runtime:check",
+    "--ansi"
+   ],
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "stdout_text"
+     ],
+     "reason": "The approved Rust-native runtime:check reports the binary build identity and compilation target instead of PHP runtime extensions (cli#72). Its help describes that report."
+    }
+   }
+  },
+  {
+   "name": "runtime report quiet",
+   "argv": [
+    "runtime:check",
+    "-q"
+   ]
+  },
+  {
+   "name": "runtime report silent",
+   "argv": [
+    "runtime:check",
+    "--silent"
+   ]
+  },
+  {
+   "name": "runtime rejects output option",
+   "argv": [
+    "runtime:check",
+    "--output=json"
+   ]
+  },
+  {
+   "name": "runtime rejects extra argument",
+   "argv": [
+    "runtime:check",
+    "extra"
+   ]
+  },
+  {
+   "name": "native runtime help JSON",
+   "argv": [
+    "help",
+    "runtime:check",
+    "--format=json"
+   ],
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "stdout_json"
+     ],
+     "reason": "The approved Rust-native runtime:check reports the binary build identity and compilation target instead of PHP runtime extensions (cli#72). Its help describes that report."
+    }
+   }
+  },
+  {
+   "name": "native runtime help Markdown",
+   "argv": [
+    "help",
+    "runtime:check",
+    "--format=md"
+   ],
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "stdout_text"
+     ],
+     "reason": "The approved Rust-native runtime:check reports the binary build identity and compilation target instead of PHP runtime extensions (cli#72). Its help describes that report."
+    }
+   }
   }
  ]
 }

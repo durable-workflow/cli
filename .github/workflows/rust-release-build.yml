@@ -160,6 +160,12 @@ jobs:
               exit 1
               ;;
           esac
+          runtime="$("dist/$ASSET" runtime:check | tr -d '\r')"
+          expected="$(printf 'Rust runtime: %s\nTarget: %s' "$line" "$TARGET")"
+          if [ "$runtime" != "$expected" ]; then
+            echo "::error::runtime:check does not report the staged binary's identity and target"
+            exit 1
+          fi
           if [ "$RUNNER_OS" = "macOS" ]; then
             description="$(file -b "dist/$ASSET")"
             echo "$description"

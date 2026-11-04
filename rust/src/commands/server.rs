@@ -1,6 +1,8 @@
 //! `server:*` commands.
 
 use crate::client;
+use crate::commands::info;
+use crate::compat::RequestContract;
 use crate::error::CliError;
 use crate::output::{format_status, print_json, render_table};
 use serde_json::Value;
@@ -99,6 +101,18 @@ pub fn health(context: &client::Context) -> Result<i32, CliError> {
             unhealthy.join(", ")
         );
     }
+    Ok(0)
+}
+
+/// `server:info`: cluster info after the compatibility preflight.
+pub fn info(context: &client::Context) -> Result<i32, CliError> {
+    let cluster_info = context.preflight(false)?;
+    if context.mode.machine_readable() {
+        print_json(&cluster_info);
+        return Ok(0);
+    }
+    let contract = RequestContract::from_cluster_info(&cluster_info).ok();
+    println!("{}", info::render(&cluster_info, contract.as_ref()));
     Ok(0)
 }
 

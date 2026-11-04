@@ -19,6 +19,8 @@ without a recorded reason.
 """
 
 import argparse
+import copy
+import http.server
 import json
 import os
 import re
@@ -26,6 +28,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import urllib.parse
 
 CRATE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -36,11 +39,15 @@ CANDIDATES = {
     "release": os.path.join(CRATE, "target", "release", "dw"),
 }
 REPORT = os.path.join(CRATE, "target", "parity-report.json")
+# Real cluster info from published PHP Server 2.11.8, served by the mock
+# Server with a case's patch applied.
+MOCK_CLUSTER_INFO = os.path.join(CRATE, "src", "compat", "fixtures", "cluster-info-php-2.11.8.json")
 
 TIME = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d[0-9.:+Z-]*")
 ULID = re.compile(r"\b[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}\b")
 VERSION_LINE = re.compile(r"dw \S+ \(commit [^,]+, built [^)]+\)")
 TRANSPORT_LINE = re.compile(r"^(Server unreachable|Request timed out): .*$", re.M)
+LOOPBACK_PORT = re.compile(r"127\.0\.0\.1:\d+")
 SERVER_LABEL = re.compile(r"[a-z][a-z0-9-]{0,31}")
 # Transport errors name the HTTP stack that failed; only the category is
 # part of the contract.
@@ -66,24 +73,35 @@ def substitute(text, case):
     return text
 
 
-def normalize_text(text, config_dir):
+def own_version(binary):
+    """The bare version a binary reports, which its messages embed."""
+    output = subprocess.run([binary, "--version"], capture_output=True, text=True, timeout=60, check=False).stdout
+    match = re.match(r"dw (\S+) ", output)
+    return match.group(1) if match else None
+
+
+def normalize_text(text, config_dir, version=None):
     text = text.replace(config_dir, "<config>")
+    if version:
+        text = VERSION_LINE.sub("dw <version>", text)
+        text = re.sub(r"(?<![\w.])" + re.escape(version) + r"(?![\w.-])", "<cli-version>", text)
     text = VERSION_LINE.sub("dw <version>", text)
     text = TIME.sub("<time>", text)
     text = TRANSPORT_LINE.sub("<transport error>", text)
+    text = LOOPBACK_PORT.sub("127.0.0.1:<port>", text)
     return ULID.sub("<id>", text)
 
 
-def normalize_value(value, config_dir):
+def normalize_value(value, config_dir, version=None):
     if isinstance(value, dict):
-        normalized = {key: normalize_value(item, config_dir) for key, item in value.items()}
+        normalized = {key: normalize_value(item, config_dir, version) for key, item in value.items()}
         if normalized.get("exit_code") in TRANSPORT_EXIT_CODES and isinstance(normalized.get("error"), str):
             normalized["error"] = "<transport error>"
         return normalized
     if isinstance(value, list):
-        return [normalize_value(item, config_dir) for item in value]
+        return [normalize_value(item, config_dir, version) for item in value]
     if isinstance(value, str):
-        return normalize_text(value, config_dir)
+        return normalize_text(value, config_dir, version)
     return value
 
 
@@ -115,7 +133,7 @@ def read_config(config_dir):
         return normalize_text(handle.read(), config_dir)
 
 
-def run_case(binary, case, env_base):
+def run_case(binary, case, env_base, version=None):
     config_dir = tempfile.mkdtemp(prefix="dw-parity-")
     try:
         env = dict(env_base)
@@ -132,10 +150,10 @@ def run_case(binary, case, env_base):
         stdout_json = parse_json_lines(completed.stdout)
         return {
             "exit_code": completed.returncode,
-            "stdout_json": normalize_value(stdout_json, config_dir) if stdout_json is not None else None,
-            "stdout_text": None if stdout_json is not None else normalize_text(completed.stdout, config_dir),
+            "stdout_json": normalize_value(stdout_json, config_dir, version) if stdout_json is not None else None,
+            "stdout_text": None if stdout_json is not None else normalize_text(completed.stdout, config_dir, version),
             "stderr_category": stderr_category(completed.stderr),
-            "stderr": normalize_text(completed.stderr, config_dir),
+            "stderr": normalize_text(completed.stderr, config_dir, version),
             "config": read_config(config_dir),
         }
     finally:
@@ -147,6 +165,50 @@ def compare(reference, candidate, case):
     if case.get("compare_text", True):
         fields.append("stdout_text")
     return [field for field in fields if reference[field] != candidate[field]]
+
+
+def patched_cluster_info(patches):
+    """The fixture with each [path, value] patch applied; a null value deletes."""
+    with open(MOCK_CLUSTER_INFO, encoding="utf-8") as handle:
+        info = json.load(handle)
+    for path, value in patches:
+        target = info
+        for key in path[:-1]:
+            target = target[key]
+        if value is None:
+            target.pop(path[-1], None)
+        else:
+            target[path[-1]] = copy.deepcopy(value)
+    return info
+
+
+class MockServer:
+    """A loopback Server answering /api/cluster/info and /api/health."""
+
+    def __init__(self, cluster_info):
+        body = json.dumps(cluster_info).encode()
+        health = json.dumps({"status": "serving", "timestamp": "2026-01-01T00:00:00+00:00", "checks": {"database": "ok"}}).encode()
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):  # noqa: N802 (http.server API)
+                payload = {"/api/cluster/info": body, "/api/health": health}.get(self.path.split("?")[0])
+                self.send_response(200 if payload else 404)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("X-Durable-Workflow-Control-Plane-Version", "2")
+                self.end_headers()
+                self.wfile.write(payload or b'{"message":"Not found."}')
+
+            def log_message(self, *args):
+                # Keep request logs out of the compared stderr.
+                return
+
+        self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.url = f"http://127.0.0.1:{self.server.server_address[1]}"
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+    def close(self):
+        self.server.shutdown()
+        self.server.server_close()
 
 
 def expand_cases(cases, servers):
@@ -195,10 +257,18 @@ def run_all(candidate_binary, servers, verbose):
     if token:
         env_base["DURABLE_WORKFLOW_AUTH_TOKEN"] = token
 
+    versions = {REFERENCE: own_version(REFERENCE), candidate_binary: own_version(candidate_binary)}
     results = []
     for case in expand_cases(cases, servers):
-        reference = run_case(REFERENCE, case, env_base)
-        candidate = run_case(candidate_binary, case, env_base)
+        mock = MockServer(patched_cluster_info(case["mock"])) if "mock" in case else None
+        if mock:
+            case = dict(case, vars={**case.get("vars", {}), "mock": mock.url})
+        try:
+            reference = run_case(REFERENCE, case, env_base, versions[REFERENCE])
+            candidate = run_case(candidate_binary, case, env_base, versions[candidate_binary])
+        finally:
+            if mock:
+                mock.close()
         differences = compare(reference, candidate, case)
         reason = intentional_reason(case, differences) if differences else None
         print_result(case, differences, reason, reference, candidate, verbose)

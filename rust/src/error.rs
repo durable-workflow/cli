@@ -12,7 +12,6 @@ pub mod exit {
     pub const NOT_FOUND: i32 = 5;
     pub const SERVER: i32 = 6;
     pub const TIMEOUT: i32 = 7;
-    #[allow(dead_code)]
     pub const COMPATIBILITY: i32 = 8;
 
     pub fn from_http_status(status: u16) -> i32 {
@@ -40,6 +39,8 @@ pub enum CliError {
         message: String,
         body: Option<Map<String, Value>>,
     },
+    /// The Server is outside what this CLI supports.
+    Compatibility(crate::compat::CompatibilityFailure),
     /// Anything else, such as an unreadable config file.
     Failure(String),
 }
@@ -52,6 +53,7 @@ impl CliError {
             | CliError::Timeout(message)
             | CliError::Failure(message)
             | CliError::Http { message, .. } => message,
+            CliError::Compatibility(failure) => &failure.message,
         }
     }
 
@@ -61,6 +63,7 @@ impl CliError {
             CliError::Network(_) => exit::NETWORK,
             CliError::Timeout(_) => exit::TIMEOUT,
             CliError::Http { status, .. } => exit::from_http_status(*status),
+            CliError::Compatibility(_) => exit::COMPATIBILITY,
             CliError::Failure(_) => exit::FAILURE,
         }
     }
@@ -205,6 +208,11 @@ pub fn recommendations(error: &CliError, context: &ErrorContext) -> Vec<Value> {
             )],
             _ => vec![],
         },
+        CliError::Compatibility(failure) => vec![item(
+            "compatibility.unsupported",
+            &failure.next_step,
+            context.doctor_command(),
+        )],
         CliError::Failure(_) => vec![],
     }
 }
@@ -263,9 +271,7 @@ const HISTORY_REFERENCE_FIELDS: &[&str] = &[
 ];
 
 /// The Server's non-empty error code fields, in envelope order.
-fn body_codes<'a>(
-    body: &'a Map<String, Value>,
-) -> impl Iterator<Item = (&'static str, &'a str)> + 'a {
+fn body_codes(body: &Map<String, Value>) -> impl Iterator<Item = (&'static str, &str)> + '_ {
     ["code", "error_code", "type", "rejection_reason"]
         .into_iter()
         .filter_map(|key| {
@@ -332,6 +338,12 @@ pub fn envelope(error: &CliError, context: &ErrorContext) -> Value {
     }
     if let CliError::Http { status, body, .. } = error {
         add_http_details(&mut envelope, error, *status, body.as_ref());
+    }
+    if let CliError::Compatibility(failure) = error {
+        envelope.insert(
+            "compatibility".into(),
+            Value::Object(failure.diagnostic.clone()),
+        );
     }
     let next = recommendations(error, context);
     if !next.is_empty() {

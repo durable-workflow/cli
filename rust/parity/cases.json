@@ -671,6 +671,207 @@
    "argv": [
     "env:nope"
    ]
+  },
+  {
+   "name": "server:info json",
+   "server": true,
+   "argv": [
+    "server:info",
+    "--server={server}",
+    "--output=json"
+   ]
+  },
+  {
+   "name": "server:info human",
+   "server": true,
+   "argv": [
+    "server:info",
+    "--server={server}"
+   ]
+  },
+  {
+   "name": "server:info via alias",
+   "server": true,
+   "argv": [
+    "cluster:info",
+    "--server={server}",
+    "--output=jsonl"
+   ]
+  },
+  {
+   "name": "version with a named server",
+   "server": true,
+   "argv": [
+    "--version",
+    "--server={server}"
+   ]
+  },
+  {
+   "name": "server:info unreachable",
+   "argv": [
+    "server:info",
+    "--server=http://127.0.0.1:1",
+    "--output=json"
+   ]
+  },
+  {
+   "name": "compatible mock server:info",
+   "mock": [],
+   "argv": [
+    "server:info",
+    "--server={mock}"
+   ]
+  },
+  {
+   "name": "refuse unsupported control plane version",
+   "mock": [
+    [
+     [
+      "control_plane",
+      "version"
+     ],
+     "3"
+    ]
+   ],
+   "argv": [
+    "server:info",
+    "--server={mock}",
+    "--output=json"
+   ]
+  },
+  {
+   "name": "refuse unsupported control plane version, human",
+   "mock": [
+    [
+     [
+      "control_plane",
+      "version"
+     ],
+     "3"
+    ]
+   ],
+   "argv": [
+    "server:info",
+    "--server={mock}"
+   ]
+  },
+  {
+   "name": "refuse missing control plane",
+   "mock": [
+    [
+     [
+      "control_plane"
+     ],
+     null
+    ]
+   ],
+   "argv": [
+    "server:info",
+    "--server={mock}",
+    "--output=json"
+   ]
+  },
+  {
+   "name": "refuse CLI outside the advertised window",
+   "mock": [
+    [
+     [
+      "client_compatibility",
+      "clients",
+      "cli",
+      "supported_versions"
+     ],
+     ">=9.0.0"
+    ]
+   ],
+   "argv": [
+    "server:info",
+    "--server={mock}",
+    "--output=json"
+   ]
+  },
+  {
+   "name": "refuse incompatible request contract",
+   "mock": [
+    [
+     [
+      "control_plane",
+      "request_contract",
+      "version"
+     ],
+     7
+    ]
+   ],
+   "argv": [
+    "server:info",
+    "--server={mock}",
+    "--output=json"
+   ]
+  },
+  {
+   "name": "warn on health for unsupported control plane",
+   "mock": [
+    [
+     [
+      "control_plane",
+      "version"
+     ],
+     "3"
+    ]
+   ],
+   "argv": [
+    "server:health",
+    "--server={mock}",
+    "--output=json"
+   ]
+  },
+  {
+   "name": "warn on health for missing auth composition",
+   "mock": [
+    [
+     [
+      "auth_composition_contract"
+     ],
+     null
+    ]
+   ],
+   "argv": [
+    "server:health",
+    "--server={mock}"
+   ]
+  },
+  {
+   "name": "warn on version for unsupported control plane",
+   "mock": [
+    [
+     [
+      "control_plane",
+      "version"
+     ],
+     "3"
+    ]
+   ],
+   "argv": [
+    "--version",
+    "--server={mock}"
+   ]
+  },
+  {
+   "name": "server:info renders an incompatible request contract",
+   "mock": [
+    [
+     [
+      "control_plane",
+      "request_contract",
+      "schema"
+     ],
+     "other"
+    ]
+   ],
+   "argv": [
+    "server:info",
+    "--server={mock}"
+   ]
   }
  ]
 }

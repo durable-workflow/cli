@@ -13,9 +13,9 @@ name = "dw"
 path = "src/main.rs"
 
 [dependencies]
-# Pinned to the latest qualified SDK release. Move only to a release that has
-# passed sdk-rust's pre-publication acceptance.
-durable-workflow = "=4.11.0"
+# Pinned to the latest qualified published SDK release. Move only after
+# sdk-rust's published-package acceptance.
+durable-workflow = "=4.12.0"
 serde = "1"
 sha2 = "0.10"
 # preserve_order keeps Server response keys in their original order, matching

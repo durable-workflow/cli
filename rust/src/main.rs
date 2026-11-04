@@ -6,6 +6,7 @@ mod client;
 mod commands;
 mod config;
 mod error;
+mod help;
 mod lookup;
 mod output;
 
@@ -42,8 +43,11 @@ fn handler(name: &str) -> Option<Handler> {
 /// ported so far are namespace scoped.
 const NAMESPACE_SCOPED: &[&str] = &[];
 
+/// Verbs of a group and the command each one names.
+type GroupVerbs = &'static [(&'static str, &'static str)];
+
 /// `dw schedule list` and similar spellings for the canonical names.
-const GROUPED_ALIASES: &[(&[&str], &[(&str, &str)])] = &[
+const GROUPED_ALIASES: &[(&[&str], GroupVerbs)] = &[
     (
         &["activity", "activities"],
         &[("describe", "activity:describe"), ("list", "activity:list")],
@@ -245,12 +249,29 @@ fn listing(namespace: Option<&str>) -> String {
     text
 }
 
-fn print_help(spec: &cli::CommandSpec) {
-    println!("Description:");
-    println!("  {}", spec.description);
-    println!();
-    println!("Usage:");
-    println!("  {}", spec.synopsis);
+fn print_help(command: &str) {
+    if let Some(entry) = catalog::entry(command) {
+        print!("{}", help::render(entry));
+    }
+}
+
+/// `dw help [<command_name>]`. Lookup errors are reported with the help
+/// command's own synopsis, as 2.x does.
+fn run_help_command(input: &Input, synopsis: &str) -> i32 {
+    let name = input.arg("command_name").unwrap_or("help");
+    match lookup::find(name, terminal_width()) {
+        Ok(command) => {
+            print_help(&command);
+            exit::SUCCESS
+        }
+        Err(error) => {
+            print_usage_error(&UsageError {
+                message: error.message().to_string(),
+                synopsis: Some(synopsis.to_string()),
+            });
+            exit::FAILURE
+        }
+    }
 }
 
 /// The output mode for reporting an error. It never fails: a broken profile
@@ -357,6 +378,12 @@ fn run(raw: Vec<String>) -> i32 {
             .any(|token| token == "--version" || token == "-V")
         {
             println!("{}", version_line());
+        } else if tokens
+            .iter()
+            .any(|token| token == "--help" || token == "-h")
+        {
+            // Help without a command describes the default command, list.
+            print_help("list");
         } else {
             println!("{}", listing(None));
         }
@@ -389,8 +416,11 @@ fn run(raw: Vec<String>) -> i32 {
         return exit::SUCCESS;
     }
     if input.flag("help") {
-        print_help(&spec);
+        print_help(&command);
         return exit::SUCCESS;
+    }
+    if command == "help" {
+        return run_help_command(&input, &spec.synopsis);
     }
     if command == "list" {
         match input.arg("namespace") {

@@ -68,6 +68,7 @@ def substitute(text, case):
 
 def normalize_text(text, config_dir):
     text = text.replace(config_dir, "<config>")
+    text = re.sub(re.escape(os.path.join(CRATE, "target", "parity-bin")) + r"/(reference|candidate)/", "<bin>/", text)
     text = VERSION_LINE.sub("dw <version>", text)
     text = TIME.sub("<time>", text)
     text = TRANSPORT_LINE.sub("<transport error>", text)
@@ -187,17 +188,39 @@ def print_result(case, differences, reason, reference, candidate, verbose):
             print(f"    candidate {field}: {json.dumps(candidate[field])[:600]}")
 
 
+def help_cases():
+    """`--help` for every 2.x command, ported or not, from the catalog."""
+    with open(os.path.join(CRATE, "src", "catalog.json"), encoding="utf-8") as handle:
+        names = [command["name"] for command in json.load(handle)["commands"]]
+    return [{"name": f"--help for {name}", "argv": [name, "--help"]} for name in names]
+
+
+def invocation_path(binary, role):
+    """A copy of the binary named `dw`. Help texts embed the executable's
+    resolved path (Symfony's %command.full_name%), so both CLIs need the
+    same file name; their directories are normalized."""
+    directory = os.path.join(CRATE, "target", "parity-bin", role)
+    os.makedirs(directory, exist_ok=True)
+    copy_path = os.path.join(directory, "dw")
+    if os.path.lexists(copy_path):
+        os.remove(copy_path)
+    shutil.copy2(binary, copy_path)
+    return copy_path
+
+
 def run_all(candidate_binary, servers, verbose):
     with open(CASES, encoding="utf-8") as handle:
-        cases = json.load(handle)["cases"]
+        cases = json.load(handle)["cases"] + help_cases()
     env_base = {key: value for key, value in os.environ.items() if not key.startswith(("DURABLE_WORKFLOW_", "DW_"))}
     token = os.environ.get("DW_PARITY_TOKEN")
     if token:
         env_base["DURABLE_WORKFLOW_AUTH_TOKEN"] = token
 
+    reference_binary = invocation_path(REFERENCE, "reference")
+    candidate_binary = invocation_path(candidate_binary, "candidate")
     results = []
     for case in expand_cases(cases, servers):
-        reference = run_case(REFERENCE, case, env_base)
+        reference = run_case(reference_binary, case, env_base)
         candidate = run_case(candidate_binary, case, env_base)
         differences = compare(reference, candidate, case)
         reason = intentional_reason(case, differences) if differences else None

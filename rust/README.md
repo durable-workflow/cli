@@ -15,7 +15,7 @@ every command group reaches parity.
 |---|---|
 | Option parsing (2.x rules), grouped aliases (`dw schedule list`) | Ported |
 | Command lookup: aliases, abbreviations, "Did you mean", namespace listings, `list` | Ported, from the 2.x catalog |
-| `--help` text for each command | Not yet (usage line only) |
+| `--help`, `-h` and `dw help <command>` for all 2.x commands | Ported, from the 2.x catalog |
 | Profiles: file, location, permissions, resolution order | Ported |
 | Output modes, error envelope, next steps, exit codes | Ported |
 | `env:list`, `env:set`, `env:use`, `env:show`, `env:delete` | Ported |
@@ -59,9 +59,10 @@ To also run the Server cases, start the published Servers pinned in
 `DW_PARITY_TOKEN` to their auth token.
 
 `src/catalog.json` is the 2.x command surface (names, aliases, usage lines,
-option definitions), generated from the pinned reference by
-`parity/update-catalog.sh`. Lookup, listings and usage errors read it, so
-they match 2.x even for commands not ported yet.
+option definitions and help text), generated from the pinned reference by
+`parity/update-catalog.sh`. Lookup, listings, help pages and usage errors
+read it, so they match 2.x even for commands not ported yet. The harness
+also checks `--help` for every catalog command.
 
 A case can record an intentional difference with a reason and the exact
 fields it excuses; any other differing field still fails. One exists today:

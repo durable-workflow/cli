@@ -13,7 +13,15 @@ pub struct Entry {
     pub synopsis: String,
     pub aliases: Vec<String>,
     pub hidden: bool,
+    /// The help text, with 2.x formatter styles still in place.
+    pub help: String,
     definition: Value,
+}
+
+impl Entry {
+    pub fn definition(&self) -> &Value {
+        &self.definition
+    }
 }
 
 fn entries() -> &'static [Entry] {
@@ -34,6 +42,7 @@ fn entries() -> &'static [Entry] {
                     .map(|aliases| aliases.iter().map(text).collect())
                     .unwrap_or_default(),
                 hidden: command["hidden"].as_bool().unwrap_or(false),
+                help: text(&command["help"]),
                 definition: command["definition"].clone(),
             })
             .collect()
@@ -93,7 +102,6 @@ pub fn spec(name: &str) -> Option<CommandSpec> {
     let definition = &entry.definition;
     Some(CommandSpec {
         name: entry.name.clone(),
-        description: entry.description.clone(),
         synopsis: entry.synopsis.clone(),
         args: definition_items(&definition["arguments"])
             .into_iter()

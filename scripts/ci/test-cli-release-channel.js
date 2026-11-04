@@ -5,7 +5,9 @@ const test = require('node:test');
 
 const {
   REQUIRED_ASSETS,
+  RUST_REQUIRED_ASSETS,
   expectedPrerelease,
+  requiredAssets,
   validateChannel,
   validateReleaseMetadata,
   verifyPublicReleaseChannel,
@@ -13,7 +15,7 @@ const {
 
 function release(tag, prerelease) {
   return {
-    assets: REQUIRED_ASSETS.map(name => ({name})),
+    assets: requiredAssets(tag).map(name => ({name})),
     draft: false,
     prerelease,
     tag_name: tag,
@@ -166,4 +168,37 @@ test('an explicitly older stable release validates against the newer actual stab
   const evidence = await verifyPublicReleaseChannel({fetchImpl, releaseTag: '2.2.0'});
   assert.equal(evidence.channel_version, '2.2.2');
   assert.equal(evidence.release_tag, '2.2.0');
+});
+
+test('Rust releases (2.5.0 and later) require the Rust asset set, with no PHAR', () => {
+  assert.equal(requiredAssets('2.4.9'), REQUIRED_ASSETS);
+  assert.equal(requiredAssets('2.5.0-rc.1'), RUST_REQUIRED_ASSETS);
+  assert.equal(requiredAssets('2.5.0'), RUST_REQUIRED_ASSETS);
+  assert.ok(!RUST_REQUIRED_ASSETS.includes('dw.phar'));
+  assert.ok(RUST_REQUIRED_ASSETS.includes('dw-macos-x86_64'));
+
+  const rc = release('2.5.0-rc.1', true);
+  assert.equal(validateReleaseMetadata(rc, '2.5.0-rc.1'), rc);
+
+  const withoutIntel = {...rc, assets: rc.assets.filter(asset => asset.name !== 'dw-macos-x86_64')};
+  assert.throws(
+    () => validateReleaseMetadata(withoutIntel, '2.5.0-rc.1'),
+    /missing required assets: dw-macos-x86_64/,
+  );
+
+  const phpShaped = {...release('2.4.9', false), tag_name: '2.5.0-rc.1', prerelease: true};
+  assert.throws(() => validateReleaseMetadata(phpShaped, '2.5.0-rc.1'), /missing required assets/);
+});
+
+test('an rc release validates against the older stable channel', async () => {
+  const responses = new Map([
+    ['https://api.github.com/repos/durable-workflow/cli/releases/latest', release('2.3.5', false)],
+    ['https://api.github.com/repos/durable-workflow/cli/releases/tags/2.5.0-rc.1', release('2.5.0-rc.1', true)],
+  ]);
+  const result = await verifyPublicReleaseChannel({
+    releaseTag: '2.5.0-rc.1',
+    fetchImpl: async url => jsonResponse(responses.get(url)),
+  });
+  assert.equal(result.channel_version, '2.3.5');
+  assert.equal(result.release_prerelease, true);
 });

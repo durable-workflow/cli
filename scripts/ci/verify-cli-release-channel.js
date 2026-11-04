@@ -1,8 +1,10 @@
 'use strict';
 
-const {parseReleaseVersion} = require('./release-version');
+const {parseReleaseVersion, releaseImplementation} = require('./release-version');
 
 const DEFAULT_API_BASE = 'https://api.github.com/repos/durable-workflow/cli';
+// Assets every published release of the PHP implementation (before 2.5.0)
+// carries.
 const REQUIRED_ASSETS = Object.freeze([
   'SHA256SUMS',
   'dw-linux-aarch64',
@@ -15,6 +17,30 @@ const REQUIRED_ASSETS = Object.freeze([
   'install.sh',
   'verify-release.sh',
 ]);
+
+// The Rust implementation (2.5.0 and later, prereleases included) publishes no
+// PHAR, adds Intel macOS, and lists each binary's linked packages.
+const RUST_REQUIRED_ASSETS = Object.freeze([
+  'SHA256SUMS',
+  'dw-linux-aarch64',
+  'dw-linux-aarch64.dependencies.json',
+  'dw-linux-x86_64',
+  'dw-linux-x86_64.dependencies.json',
+  'dw-macos-aarch64',
+  'dw-macos-aarch64.dependencies.json',
+  'dw-macos-x86_64',
+  'dw-macos-x86_64.dependencies.json',
+  'dw-windows-x86_64.dependencies.json',
+  'dw-windows-x86_64.exe',
+  'dw.rb',
+  'install.ps1',
+  'install.sh',
+  'verify-release.sh',
+]);
+
+function requiredAssets(tag) {
+  return releaseImplementation(tag) === 'rust' ? RUST_REQUIRED_ASSETS : REQUIRED_ASSETS;
+}
 
 function expectedPrerelease(tag) {
   const parsed = parseReleaseVersion(tag);
@@ -64,7 +90,7 @@ function validateReleaseMetadata(value, tag) {
   const assets = Array.isArray(value.assets)
     ? new Set(value.assets.map(asset => asset?.name).filter(name => typeof name === 'string'))
     : new Set();
-  const missing = REQUIRED_ASSETS.filter(asset => !assets.has(asset));
+  const missing = requiredAssets(tag).filter(asset => !assets.has(asset));
   if (missing.length > 0) {
     throw new Error(`GitHub release ${tag} is missing required assets: ${missing.join(', ')}`);
   }
@@ -141,6 +167,8 @@ function parseArguments(arguments_) {
 
 module.exports = {
   REQUIRED_ASSETS,
+  RUST_REQUIRED_ASSETS,
+  requiredAssets,
   expectedPrerelease,
   validateChannel,
   validateReleaseMetadata,

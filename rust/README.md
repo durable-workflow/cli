@@ -21,6 +21,7 @@ every command group reaches parity.
 | `env:list`, `env:set`, `env:use`, `env:show`, `env:delete` | Ported |
 | `server:health`, `server:info` (and `cluster:info`) | Ported |
 | Compatibility preflight, session and `--version` warnings, exit 8 refusals | Ported |
+| `server:start-dev`: local Laravel launch, Compose prerequisites and Unix signal cleanup | Ported |
 | Workflow, namespace and schedule commands | Next slices |
 | `--tls-verify=false` against HTTPS | Refused until durable-workflow/sdk-rust#180 |
 

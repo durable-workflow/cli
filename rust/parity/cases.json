@@ -1873,6 +1873,214 @@
     "schema:list",
     "--ansi"
    ]
+  },
+  {
+   "name": "start-dev no project",
+   "argv": [
+    "server:start-dev"
+   ]
+  },
+  {
+   "name": "start-dev zero port",
+   "argv": [
+    "server:start-dev",
+    "--port=0"
+   ]
+  },
+  {
+   "name": "start-dev high port",
+   "argv": [
+    "server:start-dev",
+    "--port=65536"
+   ]
+  },
+  {
+   "name": "start-dev noninteger port",
+   "argv": [
+    "server:start-dev",
+    "--port=8080.5"
+   ]
+  },
+  {
+   "name": "start-dev missing port",
+   "argv": [
+    "server:start-dev",
+    "--port"
+   ]
+  },
+  {
+   "name": "start-dev invalid driver",
+   "argv": [
+    "server:start-dev",
+    "--db=other"
+   ]
+  },
+  {
+   "name": "start-dev missing driver",
+   "argv": [
+    "server:start-dev",
+    "--db"
+   ]
+  },
+  {
+   "name": "start-dev invalid host",
+   "argv": [
+    "server:start-dev",
+    "--host=http://localhost"
+   ]
+  },
+  {
+   "name": "start-dev missing host",
+   "argv": [
+    "server:start-dev",
+    "--host"
+   ]
+  },
+  {
+   "name": "start-dev rejects output option",
+   "argv": [
+    "server:start-dev",
+    "--output=json"
+   ]
+  },
+  {
+   "name": "start-dev quiet validation",
+   "argv": [
+    "server:start-dev",
+    "--port=0",
+    "-q"
+   ]
+  },
+  {
+   "name": "start-dev missing external PHP",
+   "argv": [
+    "server:start-dev"
+   ],
+   "project": {
+    "php": false
+   },
+   "env": {}
+  },
+  {
+   "name": "start-dev missing Compose",
+   "argv": [
+    "server:start-dev",
+    "--db=mysql"
+   ],
+   "project": {},
+   "env": {}
+  },
+  {
+   "name": "start-dev sqlite default",
+   "argv": [
+    "server:start-dev"
+   ],
+   "project": {},
+   "env": {}
+  },
+  {
+   "name": "start-dev IPv6 and leading-zero port",
+   "argv": [
+    "server:start-dev",
+    "--host=::1",
+    "--port=09090"
+   ],
+   "project": {},
+   "env": {}
+  },
+  {
+   "name": "start-dev localhost",
+   "argv": [
+    "server:start-dev",
+    "--host=localhost"
+   ],
+   "project": {},
+   "env": {}
+  },
+  {
+   "name": "start-dev project path with spaces",
+   "argv": [
+    "server:start-dev"
+   ],
+   "project": {
+    "spaces": true
+   },
+   "env": {}
+  },
+  {
+   "name": "start-dev mysql",
+   "argv": [
+    "server:start-dev",
+    "--db=mysql"
+   ],
+   "project": {
+    "docker": true
+   },
+   "env": {}
+  },
+  {
+   "name": "start-dev pgsql",
+   "argv": [
+    "server:start-dev",
+    "--db=pgsql"
+   ],
+   "project": {
+    "docker": true
+   },
+   "env": {}
+  },
+  {
+   "name": "start-dev Compose failure",
+   "argv": [
+    "server:start-dev",
+    "--db=mysql"
+   ],
+   "project": {
+    "docker": true
+   },
+   "env": {
+    "DW_DEV_DOCKER_EXIT": "17"
+   }
+  },
+  {
+   "name": "start-dev HTTP failure",
+   "argv": [
+    "server:start-dev"
+   ],
+   "project": {},
+   "env": {
+    "DW_DEV_PHP_EXIT": "42"
+   }
+  },
+  {
+   "name": "start-dev quiet child failure",
+   "argv": [
+    "server:start-dev",
+    "-q"
+   ],
+   "project": {},
+   "env": {
+    "DW_DEV_PHP_EXIT": "42"
+   }
+  },
+  {
+   "name": "start-dev ANSI child output",
+   "argv": [
+    "server:start-dev",
+    "--ansi"
+   ],
+   "project": {},
+   "env": {}
+  },
+  {
+   "name": "start-dev child terminated by a signal",
+   "argv": [
+    "server:start-dev"
+   ],
+   "project": {},
+   "env": {
+    "DW_DEV_PHP_SIGNAL": "15"
+   }
   }
  ]
 }

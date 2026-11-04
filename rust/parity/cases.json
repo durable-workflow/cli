@@ -1468,6 +1468,317 @@
     "--server={server}",
     "--ansi"
    ]
+  },
+  {
+   "name": "upgrade dry run to the latest stable release (json)",
+   "argv": [
+    "upgrade",
+    "--dry-run",
+    "--output=json"
+   ],
+   "env": {
+    "DURABLE_WORKFLOW_RELEASE_API_URL": "{mock}/latest"
+   },
+   "mock_routes": {
+    "/latest": {
+     "body": {
+      "tag_name": "v9.9.9",
+      "draft": false,
+      "prerelease": false
+     }
+    }
+   }
+  },
+  {
+   "name": "upgrade dry run to the latest stable release (table)",
+   "argv": [
+    "upgrade",
+    "--dry-run"
+   ],
+   "env": {
+    "DURABLE_WORKFLOW_RELEASE_API_URL": "{mock}/latest"
+   },
+   "mock_routes": {
+    "/latest": {
+     "body": {
+      "tag_name": "9.9.9",
+      "draft": false,
+      "prerelease": false
+     }
+    }
+   }
+  },
+  {
+   "name": "upgrade when the installed release is newer than latest",
+   "argv": [
+    "upgrade",
+    "--output=json"
+   ],
+   "env": {
+    "DURABLE_WORKFLOW_RELEASE_API_URL": "{mock}/latest"
+   },
+   "mock_routes": {
+    "/latest": {
+     "body": {
+      "tag_name": "1.0.0",
+      "draft": false,
+      "prerelease": false
+     }
+    }
+   }
+  },
+  {
+   "name": "upgrade newer, table",
+   "argv": [
+    "upgrade"
+   ],
+   "env": {
+    "DURABLE_WORKFLOW_RELEASE_API_URL": "{mock}/latest"
+   },
+   "mock_routes": {
+    "/latest": {
+     "body": {
+      "tag_name": "1.0.0",
+      "draft": false,
+      "prerelease": false
+     }
+    }
+   }
+  },
+  {
+   "name": "upgrade refuses a prerelease as latest",
+   "argv": [
+    "upgrade",
+    "--dry-run",
+    "--output=json"
+   ],
+   "env": {
+    "DURABLE_WORKFLOW_RELEASE_API_URL": "{mock}/latest"
+   },
+   "mock_routes": {
+    "/latest": {
+     "body": {
+      "tag_name": "9.9.9-rc.1",
+      "draft": false,
+      "prerelease": true
+     }
+    }
+   }
+  },
+  {
+   "name": "upgrade refuses a draft as latest",
+   "argv": [
+    "upgrade",
+    "--dry-run",
+    "--output=json"
+   ],
+   "env": {
+    "DURABLE_WORKFLOW_RELEASE_API_URL": "{mock}/latest"
+   },
+   "mock_routes": {
+    "/latest": {
+     "body": {
+      "tag_name": "9.9.9",
+      "draft": true,
+      "prerelease": false
+     }
+    }
+   }
+  },
+  {
+   "name": "upgrade without a tag_name",
+   "argv": [
+    "upgrade",
+    "--dry-run",
+    "--output=json"
+   ],
+   "env": {
+    "DURABLE_WORKFLOW_RELEASE_API_URL": "{mock}/latest"
+   },
+   "mock_routes": {
+    "/latest": {
+     "body": {
+      "draft": false,
+      "prerelease": false
+     }
+    }
+   }
+  },
+  {
+   "name": "upgrade with a 404 release API",
+   "argv": [
+    "upgrade",
+    "--dry-run",
+    "--output=json"
+   ],
+   "env": {
+    "DURABLE_WORKFLOW_RELEASE_API_URL": "{mock}/latest"
+   },
+   "mock_routes": {
+    "/latest": {
+     "status": 404,
+     "body": {
+      "message": "Not Found"
+     }
+    }
+   }
+  },
+  {
+   "name": "upgrade with a 500 release API, table",
+   "argv": [
+    "upgrade",
+    "--dry-run"
+   ],
+   "env": {
+    "DURABLE_WORKFLOW_RELEASE_API_URL": "{mock}/latest"
+   },
+   "mock_routes": {
+    "/latest": {
+     "status": 500,
+     "content_type": "text/plain",
+     "body": "boom"
+    }
+   }
+  },
+  {
+   "name": "upgrade does not follow a redirect from the release API",
+   "argv": [
+    "upgrade",
+    "--dry-run",
+    "--output=json"
+   ],
+   "env": {
+    "DURABLE_WORKFLOW_RELEASE_API_URL": "{mock}/latest"
+   },
+   "mock_routes": {
+    "/latest": {
+     "status": 302,
+     "headers": {
+      "Location": "/elsewhere"
+     },
+     "body": ""
+    }
+   }
+  },
+  {
+   "name": "upgrade with a non-JSON release API",
+   "argv": [
+    "upgrade",
+    "--dry-run",
+    "--output=json"
+   ],
+   "env": {
+    "DURABLE_WORKFLOW_RELEASE_API_URL": "{mock}/latest"
+   },
+   "mock_routes": {
+    "/latest": {
+     "content_type": "text/html",
+     "body": "<html>nope</html>"
+    }
+   }
+  },
+  {
+   "name": "upgrade with an RFC 7807 error",
+   "argv": [
+    "upgrade",
+    "--dry-run",
+    "--output=json"
+   ],
+   "env": {
+    "DURABLE_WORKFLOW_RELEASE_API_URL": "{mock}/latest"
+   },
+   "mock_routes": {
+    "/latest": {
+     "status": 403,
+     "content_type": "application/problem+json",
+     "body": {
+      "title": "Forbidden",
+      "detail": "rate limited"
+     }
+    }
+   }
+  },
+  {
+   "name": "upgrade dry run to a pinned older tag",
+   "argv": [
+    "upgrade",
+    "--tag=v2.3.4",
+    "--dry-run",
+    "--output=json"
+   ]
+  },
+  {
+   "name": "upgrade dry run to a pinned tag, table",
+   "argv": [
+    "upgrade",
+    "--tag",
+    "2.0.0",
+    "--dry-run"
+   ]
+  },
+  {
+   "name": "upgrade with an invalid tag",
+   "argv": [
+    "upgrade",
+    "--tag=nope",
+    "--dry-run",
+    "--output=json"
+   ]
+  },
+  {
+   "name": "upgrade with an invalid output mode",
+   "argv": [
+    "upgrade",
+    "--output=xml"
+   ]
+  },
+  {
+   "name": "upgrade dry run, quiet",
+   "argv": [
+    "upgrade",
+    "--dry-run",
+    "-q"
+   ],
+   "env": {
+    "DURABLE_WORKFLOW_RELEASE_API_URL": "{mock}/latest"
+   },
+   "mock_routes": {
+    "/latest": {
+     "body": {
+      "tag_name": "9.9.9",
+      "draft": false,
+      "prerelease": false
+     }
+    }
+   }
+  },
+  {
+   "name": "upgrade to a release that has no assets",
+   "argv": [
+    "upgrade",
+    "--tag=99.99.99",
+    "--output=json"
+   ]
+  },
+  {
+   "name": "upgrade with an unreachable release API",
+   "argv": [
+    "upgrade",
+    "--dry-run",
+    "--output=json"
+   ],
+   "env": {
+    "DURABLE_WORKFLOW_RELEASE_API_URL": "http://127.0.0.1:9/latest"
+   },
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "stdout_text",
+      "stdout_json"
+     ],
+     "reason": "The transport detail after \"could not fetch the latest stable CLI release:\" is libcurl's text in 2.x (\"Failed to connect to 127.0.0.1:9 after 0 ms: Could not connect to server\") and this client's own wording here. The status, exit code and the rest of the envelope match."
+    }
+   }
   }
  ]
 }

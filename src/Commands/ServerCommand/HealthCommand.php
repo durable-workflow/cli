@@ -36,7 +36,10 @@ HELP);
         }
 
         $output->writeln('Server is '.$this->formatStatus($result['status'] ?? null));
-        $output->writeln('Timestamp: '.$result['timestamp']);
+        // Native Server's health response has no timestamp.
+        if (is_scalar($result['timestamp'] ?? null)) {
+            $output->writeln('Timestamp: '.$result['timestamp']);
+        }
 
         $checks = is_array($result['checks'] ?? null) ? $result['checks'] : [];
         $unhealthyChecks = [];
@@ -46,7 +49,13 @@ HELP);
 
             foreach ($checks as $check => $status) {
                 $checkName = (string) $check;
-                $statusValue = is_scalar($status) ? (string) $status : 'unknown';
+                // Native Server reports checks as booleans; PHP Server as "ok".
+                $statusValue = match (true) {
+                    $status === true => 'ok',
+                    $status === false => 'failed',
+                    is_scalar($status) => (string) $status,
+                    default => 'unknown',
+                };
                 $healthy = $this->isHealthyCheckStatus($statusValue);
 
                 if (! $healthy) {

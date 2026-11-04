@@ -19,10 +19,11 @@ tag="${tag#v}"
 [ -s "$dist_dir/$asset" ] || err "missing release asset: $dist_dir/$asset"
 
 checksum() {
+    checksum_file=$1
     if command -v sha256sum >/dev/null 2>&1; then
-        sha256sum "$1" | awk '{print $1}'
+        sha256sum "$checksum_file" | awk '{print $1}'
     elif command -v shasum >/dev/null 2>&1; then
-        shasum -a 256 "$1" | awk '{print $1}'
+        shasum -a 256 "$checksum_file" | awk '{print $1}'
     else
         err "sha256sum or shasum is required"
     fi

@@ -8,6 +8,7 @@
 //! list, recorded from the 2.x CLI in `completion.json`
 //! (`parity/update-completion.sh`).
 
+use super::completion_log;
 use crate::catalog;
 use crate::cli::Input;
 use crate::descriptor::{CommandView, OptionView, APPLICATION_OPTIONS};
@@ -55,23 +56,30 @@ fn basename(path: &str) -> String {
         .to_string()
 }
 
-fn log_path() -> std::path::PathBuf {
-    std::env::temp_dir().join(format!("sf_{}.log", command_name()))
+fn safe_command_name() -> Result<String, CliError> {
+    let name = command_name();
+    let mut bytes = name.bytes();
+    if !bytes
+        .next()
+        .is_some_and(|byte| byte.is_ascii_alphabetic() || byte == b'_')
+        || !bytes.all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b'.'))
+    {
+        return Err(CliError::Invalid("Cannot generate shell completion for this executable name. Invoke the binary as dw, or use ASCII letters, digits, dots, underscores and hyphens starting with a letter or underscore.".into()));
+    }
+    Ok(name)
 }
 
 // ---------------------------------------------------------------------------
 // `completion`
 
 pub fn completion(input: &Input) -> Result<i32, CliError> {
+    let name = safe_command_name()?;
     if input.flag("debug") {
-        let path = log_path();
-        if !path.exists() {
-            let _ = std::fs::write(&path, "");
-        }
-        let _ = std::process::Command::new("tail")
-            .arg("-f")
-            .arg(&path)
-            .status();
+        let file = completion_log::open(&name)
+            .map_err(|_| CliError::Invalid(completion_log::ERROR.into()))?;
+        completion_log::follow(file).map_err(|_| {
+            CliError::Failure("Unable to follow the shell completion debug log.".into())
+        })?;
         return Ok(exit::SUCCESS);
     }
     let shell = match input.arg("shell") {
@@ -93,7 +101,7 @@ pub fn completion(input: &Input) -> Result<i32, CliError> {
     };
     write_out(
         &text
-            .replace("{{ COMMAND_NAME }}", &command_name())
+            .replace("{{ COMMAND_NAME }}", &name)
             .replace("{{ VERSION }}", COMPLETION_API_VERSION),
     );
     Ok(exit::SUCCESS)
@@ -634,31 +642,32 @@ fn debugging() -> bool {
         .unwrap_or(false)
 }
 
-fn log(lines: &[String]) {
+fn log(lines: &[String]) -> Result<(), String> {
     if !debugging() {
-        return;
+        return Ok(());
     }
     use std::io::Write;
-    if let Ok(mut file) = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(log_path())
-    {
-        let _ = file.write_all((lines.join("\n") + "\n").as_bytes());
-    }
+    let name = safe_command_name().map_err(|_| completion_log::ERROR.to_string())?;
+    let mut file = completion_log::open(&name).map_err(|_| completion_log::ERROR.to_string())?;
+    file.write_all((lines.join("\n") + "\n").as_bytes())
+        .map_err(|_| completion_log::ERROR.to_string())
 }
 
 pub fn complete(input: &Input) -> Result<i32, CliError> {
     match run_complete(input) {
         Ok(code) => Ok(code),
         Err(message) => {
-            log(&["<error>Error!</error>".into(), message]);
+            let _ = log(&["<error>Error!</error>".into(), message]);
             Ok(exit::INVALID)
         }
     }
 }
 
 fn run_complete(input: &Input) -> Result<i32, String> {
+    if debugging() {
+        let name = safe_command_name().map_err(|_| completion_log::ERROR.to_string())?;
+        completion_log::open(&name).map_err(|_| completion_log::ERROR.to_string())?;
+    }
     // PHP truthiness: an empty string and "0" are false.
     let truthy = |name: &str| input.opt_str(name).filter(|value| *value != "0");
     let version = if truthy("symfony").is_some() {
@@ -669,7 +678,7 @@ fn run_complete(input: &Input) -> Result<i32, String> {
     if let Some(version) = version {
         if crate::compat::version::php_version_compare(version, COMPLETION_API_VERSION) < 0 {
             let message = format!("Completion script version is not supported (\"{version}\" given, \">={COMPLETION_API_VERSION}\" required).");
-            log(&[message.clone()]);
+            log(&[message.clone()])?;
             writeln_out(&format!("{message} Install the Symfony completion script again by using the \"completion\" command."));
             return Ok(126);
         }

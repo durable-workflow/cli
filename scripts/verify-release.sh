@@ -77,14 +77,20 @@ fi
 
 if [ "$VERIFY_ATTESTATIONS" = "1" ]; then
     command -v gh >/dev/null 2>&1 || err "gh is required for attestation verification"
+    # Only the repository's release workflows, run from main or a release
+    # tag on GitHub-hosted runners, can have signed a release asset.
+    repo_pattern=$(printf '%s' "$REPO" | sed 's/[.]/\\./g')
+    signer="^https://github\\.com/${repo_pattern}/\\.github/workflows/(release|release-rust)\\.yml@refs/(heads/main|tags/v?[0-9]+\\.[0-9]+\\.[0-9]+([-+][0-9A-Za-z.+-]+)?)\$"
     awk '{print $2}' "$RELEASE_DIR/SHA256SUMS" | sed 's/^\*//' | while IFS= read -r asset; do
         [ -n "$asset" ] || continue
         [ "$asset" = "SHA256SUMS" ] && continue
         [ -e "$RELEASE_DIR/$asset" ] || continue
-        gh attestation verify "$RELEASE_DIR/$asset" --repo "$REPO"
+        gh attestation verify "$RELEASE_DIR/$asset" --repo "$REPO" \
+            --cert-identity-regex "$signer" --deny-self-hosted-runners
     done
 
-    gh attestation verify "$RELEASE_DIR/SHA256SUMS" --repo "$REPO"
+    gh attestation verify "$RELEASE_DIR/SHA256SUMS" --repo "$REPO" \
+        --cert-identity-regex "$signer" --deny-self-hosted-runners
 fi
 
 printf 'Release assets verified in %s\n' "$RELEASE_DIR"

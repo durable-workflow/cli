@@ -14,6 +14,7 @@
 
 from pathlib import Path
 import re
+import hashlib
 import subprocess
 import unittest
 
@@ -33,6 +34,38 @@ CHECKOUT = "actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803"
 DOWNLOAD = "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c"
 ATTEST = "actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373"
 VALIDATOR_STEP = "Validate the exact producer artifact before use"
+INSTALLERS = [ROOT / "scripts/install.sh", ROOT / "scripts/install.ps1", ROOT / "scripts/verify-release.sh"]
+
+# Every action each job may use, without its pin. A cache action anywhere,
+# or any new action, fails until it is reviewed and added here.
+ALLOWED_ACTIONS = {
+    "release": {
+        "resolve": {"actions/checkout"},
+        "preflight": {"actions/checkout"},
+        "bundle": {"actions/download-artifact", "actions/upload-artifact"},
+        "publish": {"actions/checkout", "actions/download-artifact", "actions/attest-build-provenance"},
+        "verify-release": {"actions/checkout"},
+        "upgrade-from-2x": {"shivammathur/setup-php"},
+    },
+    "build": {
+        "build": {
+            "actions/checkout", "actions/setup-python", "actions/upload-artifact", "dtolnay/rust-toolchain",
+            "durable-workflow/.github/.github/actions/bootstrap-patched-pip",
+        },
+        "verify": {"actions/checkout", "actions/download-artifact"},
+        "assemble": {"actions/checkout", "actions/download-artifact", "actions/upload-artifact"},
+    },
+    "dry-run": {"resolve": {"actions/checkout"}},
+}
+
+# The publish job's inline commands, pinned exactly. Any change (a script
+# path, a tar option, a gh extension) fails until reviewed and re-pinned.
+PUBLISH_RUN_DIGESTS = {
+    "Validate the exact producer artifact before use": "ce06e15b0e2592c8deb55ae4f410e020afb89a6d675d140b0c5b9b4280bf9eaa",
+    "Extract only the allowlisted release files": "1074e3bcd19c91075f4c586cb2871af15135af3ff97bcde516cbdd34e64a8b1e",
+    "Verify the immutable release tag at the publication boundary": "21a53cce4259e3fb724a0d8e3c893a2b6252eaec8b76f043da750f4a110b3cf2",
+    "Create GitHub Release": "a7af1c40b14c06ed73df30b16ea36ce6e5ee0e0a0d445394b762785ff1213c11",
+}
 
 # Commands that would execute repository code: interpreters, build tools,
 # package managers, and any script path.
@@ -130,6 +163,25 @@ class ReleaseRustWorkflowTest(unittest.TestCase):
         self.assertEqual("dry-run", self.dry_run["jobs"]["build"]["with"]["mode"])
 
     # The publish job.
+
+    def test_jobs_use_only_allowlisted_actions(self):
+        documents = {"release": self.workflow, "build": self.build, "dry-run": self.dry_run}
+        for label, document in documents.items():
+            for name, job in document["jobs"].items():
+                if "uses" in job:
+                    self.assertEqual(LOCAL_BUILD, job["uses"], f"{label}:{name}")
+                    continue
+                used = {step["uses"].split("@")[0] for step in job["steps"] if "uses" in step}
+                self.assertEqual(ALLOWED_ACTIONS[label][name], used, f"{label}:{name}")
+
+    def test_publish_runs_in_the_protected_release_environment(self):
+        self.assertEqual("github-release", self.jobs["publish"]["environment"])
+
+    def test_publish_commands_are_pinned_exactly(self):
+        runs = {step["name"]: step["run"] for step in self.steps("publish") if "run" in step}
+        self.assertEqual(set(PUBLISH_RUN_DIGESTS), set(runs))
+        for name, script in runs.items():
+            self.assertEqual(PUBLISH_RUN_DIGESTS[name], hashlib.sha256(script.encode()).hexdigest(), name)
 
     def test_publish_uses_only_the_allowed_pinned_actions_in_order(self):
         actions = [step["uses"] for step in self.steps("publish") if "uses" in step]
@@ -236,6 +288,51 @@ class ReleaseRustWorkflowTest(unittest.TestCase):
             for step in job.get("steps", []):
                 for match in re.finditer(r"(?:^|[\s;&|(`$])python3?(?=\s)(\s+\S+)?", step.get("run", ""), re.MULTILINE):
                     self.assertEqual("-I", (match.group(1) or "").strip(), f"{name}: {match.group(0)}")
+
+    # Attestation identity.
+
+    def test_published_assets_are_verified_against_the_signing_workflow(self):
+        [step] = [s for s in self.steps("verify-release") if s.get("name") == "Verify downloads, checksums and attestations"]
+        command = compact(step["run"])
+        self.assertIn('--signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release-rust.yml"', command)
+        self.assertIn('--source-ref "$CONTROL_REF"', command)
+        self.assertIn("--deny-self-hosted-runners", command)
+        self.assertEqual("${{ needs.resolve.outputs.control_ref }}", step["env"]["CONTROL_REF"])
+
+    def test_installers_verify_the_signer_identity(self):
+        for path in INSTALLERS:
+            text = path.read_text(encoding="utf-8").replace("\\\n", " ")
+            calls = [line for line in text.splitlines() if "gh attestation verify" in line]
+            self.assertTrue(calls, path.name)
+            for call in calls:
+                self.assertIn("--cert-identity-regex", call, f"{path.name}: {call.strip()}")
+                self.assertIn("--deny-self-hosted-runners", call, f"{path.name}: {call.strip()}")
+            self.assertIn("(release|release-rust)", text, path.name)
+            self.assertIn("@refs/(heads/main|tags/v?[0-9]+", text, path.name)
+
+    # Concurrency and the latest marker.
+
+    def test_one_rust_release_runs_at_a_time(self):
+        self.assertEqual({"group": "rust-release", "cancel-in-progress": False}, self.workflow["concurrency"])
+
+    def test_older_releases_never_take_the_latest_marker(self):
+        def metadata(*args):
+            return subprocess.run(
+                ["node", str(VERSION_SCRIPT), "metadata", *args], check=True, capture_output=True, text=True,
+            ).stdout.split()
+        self.assertEqual(["false", "false"], metadata("2.4.9", "2.5.0"))
+        self.assertEqual(["false", "false"], metadata("2.5.1", "v2.6.0"))
+        self.assertEqual(["false", "true"], metadata("2.6.0", "2.5.0"))
+        self.assertEqual(["false", "true"], metadata("2.5.0"))
+        self.assertEqual(["true", "false"], metadata("2.5.0-rc.1", "2.3.5"))
+        for path, needle in (
+            (PHP, 'metadata "$tag" "$current_latest"'),
+            (RUST, 'metadata "$tag" "$current_latest"'),
+            (ROOT / "scripts/ci/reconcile-release-metadata.sh", 'metadata "$tag" "$current_latest"'),
+        ):
+            text = path.read_text(encoding="utf-8")
+            self.assertIn(needle, text, path.name)
+            self.assertIn("releases/latest", text, path.name)
 
     # Version gates.
 

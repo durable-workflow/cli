@@ -6,7 +6,10 @@ name: Release (Rust)
 #
 # Trust layout (#75, the sdk-python and sdk-rust publish pattern):
 # - rust-release-build.yml builds, verifies and assembles the assets with
-#   read-only access. It is the only place the tagged source is built or run.
+#   read-only access. It is the only place the release source is compiled
+#   and its binaries run before publication. On a tag push this workflow
+#   file and its control scripts (resolve, preflight, verify-release) also
+#   come from the tagged tree, read-only, as with any tag-triggered workflow.
 # - One publish job holds contents: write, attestations and id-token. It runs
 #   no repository code: only pinned actions, preinstalled system tools and the
 #   inline commands below, on one digest-checked handoff file.
@@ -33,8 +36,10 @@ on:
 permissions:
   contents: read
 
+# One Rust release runs at a time, whatever the tag spelling (v2.5.0 and
+# 2.5.0 are the same release); later runs queue.
 concurrency:
-  group: ${{ format('rust-release-{0}', inputs.tag || github.ref_name) }}
+  group: rust-release
   cancel-in-progress: false
 
 jobs:
@@ -58,6 +63,7 @@ jobs:
 
       - id: resolve
         env:
+          GH_TOKEN: ${{ github.token }}
           DISPATCH_TAG: ${{ inputs.tag }}
           DISPATCH_COMMIT: ${{ inputs.release_commit }}
           EVENT_SHA: ${{ github.sha }}
@@ -102,7 +108,9 @@ jobs:
             echo "::error::Source commit must be a full lowercase Git commit SHA"
             exit 1
           fi
-          read -r prerelease make_latest <<< "$(node scripts/ci/release-version.js metadata "$tag")"
+          # Never take GitHub's latest marker from a newer release.
+          current_latest="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq '.tag_name' 2>/dev/null || true)"
+          read -r prerelease make_latest <<< "$(node scripts/ci/release-version.js metadata "$tag" "$current_latest")"
           {
             echo "mode=release"
             echo "tag=$tag"
@@ -358,6 +366,7 @@ jobs:
       - name: Verify downloads, checksums and attestations
         env:
           GH_TOKEN: ${{ github.token }}
+          CONTROL_REF: ${{ needs.resolve.outputs.control_ref }}
           RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
         run: |
           set -euo pipefail
@@ -378,7 +387,8 @@ jobs:
           fi
           for asset in "${assets[@]}"; do
             gh attestation verify "downloaded/$asset" --repo "$GITHUB_REPOSITORY" \
-              --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release-rust.yml" >/dev/null
+              --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release-rust.yml" \
+              --source-ref "$CONTROL_REF" --deny-self-hosted-runners >/dev/null
             echo "$asset: attested"
           done
 

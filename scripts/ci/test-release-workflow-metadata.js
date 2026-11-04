@@ -60,7 +60,7 @@ test('the release action consumes metadata from the resolved tag', () => {
   assert.match(workflow, /make_latest: \$\{\{ steps\.resolve\.outputs\.make_latest \}\}/);
   assert.match(
     workflow,
-    /release_metadata="\$\(node scripts\/ci\/release-version\.js metadata "\$tag"\)"/,
+    /release_metadata="\$\(node scripts\/ci\/release-version\.js metadata "\$tag" "\$current_latest"\)"/,
   );
   assert.match(workflow, /read -r prerelease make_latest <<< "\$release_metadata"/);
   assert.match(workflow, /echo "prerelease=\$prerelease" >> "\$GITHUB_OUTPUT"/);

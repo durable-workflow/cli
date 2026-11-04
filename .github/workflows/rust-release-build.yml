@@ -1,10 +1,12 @@
 name: Rust release build
 
-# Read-only build of the Rust dw release assets, called by release-rust.yml
-# for a release and by release-rust-dry-run.yml for pull requests. Builds and
-# smoke tests each platform binary, compares the linux-x86_64 binary with the
-# pinned 2.x CLI, and assembles the complete asset set with SHA256SUMS. It
-# holds no secrets and no write or OIDC permission.
+# Read-only build of the Rust dw release assets: the only place the release
+# source is compiled and its binaries run before publication. Called by
+# release-rust.yml for a release and by release-rust-dry-run.yml for pull
+# requests. Builds and smoke tests each platform binary, compares the
+# linux-x86_64 binary with the pinned 2.x CLI, and assembles the complete
+# asset set with SHA256SUMS. It holds no secrets and no write or OIDC
+# permission.
 
 on:
   workflow_call:

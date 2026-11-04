@@ -636,8 +636,8 @@ SH);
         self::assertStringContainsString('release_version="${VERSION#v}"', $shellInstaller);
         self::assertStringContainsString('VERSION="${VERSION:-stable}"', $shellInstaller);
         self::assertStringContainsString('/latest/download/${asset}', $shellInstaller);
-        self::assertStringContainsString('gh attestation verify "$tmp" --repo "$REPO"', $shellInstaller);
-        self::assertStringContainsString('gh attestation verify "$sums" --repo "$REPO"', $shellInstaller);
+        self::assertStringContainsString('for subject in "$tmp" "$sums"; do', $shellInstaller);
+        self::assertStringContainsString('gh attestation verify "$subject" --repo "$REPO" --cert-identity-regex "$signer" --deny-self-hosted-runners', $shellInstaller);
         self::assertStringContainsString('mv "$tmp" "$INSTALL_DIR/$BIN_NAME"', $shellInstaller);
 
         $releaseWorkflow = self::readRepoFile('.github/workflows/release.yml');
@@ -652,8 +652,8 @@ SH);
         self::assertStringContainsString("else { 'stable' }", $powershellInstaller);
         self::assertStringContainsString('/latest/download/$asset', $powershellInstaller);
         self::assertStringContainsString('$version.StartsWith(\'v\')', $powershellInstaller);
-        self::assertStringContainsString('gh attestation verify $tmp --repo $repo', $powershellInstaller);
-        self::assertStringContainsString('gh attestation verify $sums --repo $repo', $powershellInstaller);
+        self::assertStringContainsString('foreach ($subject in @($tmp, $sums))', $powershellInstaller);
+        self::assertStringContainsString('gh attestation verify $subject --repo $repo --cert-identity-regex $signer --deny-self-hosted-runners', $powershellInstaller);
         self::assertStringContainsString('Move-Item -Force -Path $tmp -Destination $dest', $powershellInstaller);
     }
 

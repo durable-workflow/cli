@@ -73,6 +73,7 @@ jobs:
       - id: resolve
         shell: bash
         env:
+          GH_TOKEN: ${{ github.token }}
           DISPATCH_OPERATION: ${{ inputs.operation }}
           DISPATCH_TAG: ${{ inputs.tag }}
           DISPATCH_COMMIT: ${{ inputs.release_commit }}
@@ -130,7 +131,10 @@ jobs:
               echo "::error::$tag is released by release-rust.yml, not the PHP release pipeline"
               exit 1
             fi
-            release_metadata="$(node scripts/ci/release-version.js metadata "$tag")"
+            # Never take GitHub's latest marker from a newer release
+            # (install.sh installs latest by default).
+            current_latest="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq '.tag_name' 2>/dev/null || true)"
+            release_metadata="$(node scripts/ci/release-version.js metadata "$tag" "$current_latest")"
             read -r prerelease make_latest <<< "$release_metadata"
             if [ "$tag" = "2.0.0" ] && [ "$GITHUB_EVENT_NAME" != "workflow_dispatch" ]; then
               echo "::error::Stable 2.0.0 publication requires a protected main-branch dispatch"

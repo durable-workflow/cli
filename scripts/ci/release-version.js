@@ -29,17 +29,25 @@ function normalizeReleaseVersion(version) {
   return parseReleaseVersion(normalized) ? normalized : null;
 }
 
-function releaseMetadata(version) {
+// A stable release becomes GitHub's "latest" (which install.sh downloads by
+// default) only when it is not older than the current latest release, so a
+// 2.4.x patch published after 2.5.0 never takes the marker back.
+function releaseMetadata(version, currentLatest = null) {
   const parsed = parseReleaseVersion(version);
   if (parsed === null) {
     return null;
   }
 
   const prerelease = parsed.prerelease !== null;
+  let makeLatest = !prerelease;
+  if (makeLatest && currentLatest) {
+    const current = normalizeReleaseVersion(currentLatest);
+    makeLatest = current === null || compareReleaseVersions(version, current) >= 0;
+  }
 
   return {
     prerelease,
-    makeLatest: !prerelease,
+    makeLatest,
   };
 }
 
@@ -143,10 +151,10 @@ module.exports = {
 };
 
 if (require.main === module) {
-  const [command, version] = process.argv.slice(2);
+  const [command, version, currentLatest] = process.argv.slice(2);
 
   if (!['implementation', 'metadata', 'normalize'].includes(command) || version === undefined) {
-    console.error('Usage: release-version.js <implementation|metadata|normalize> <version>');
+    console.error('Usage: release-version.js <implementation|metadata|normalize> <version> [current-latest]');
     process.exit(2);
   }
 
@@ -161,7 +169,7 @@ if (require.main === module) {
   } else if (command === 'implementation') {
     process.stdout.write(`${releaseImplementation(normalized)}\n`);
   } else {
-    const metadata = releaseMetadata(normalized);
+    const metadata = releaseMetadata(normalized, currentLatest || null);
     process.stdout.write(`${metadata.prerelease} ${metadata.makeLatest}\n`);
   }
 }

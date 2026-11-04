@@ -5,7 +5,7 @@ use crate::cli::Input;
 use crate::config::ProfileStore;
 use crate::error::{exit, CliError};
 use crate::formatter::writeln_out;
-use crate::{build_info, client, compat, output, php};
+use crate::{build_info, client, compat, formatter, output, php};
 use serde_json::{json, Value};
 use std::fmt::Write as _;
 
@@ -211,8 +211,26 @@ fn text(value: &Value, fallback: &str) -> String {
     php::or(Some(value), fallback)
 }
 
+/// Only trusted render templates may create terminal formatting or layout.
+/// Keep remote/control text visible as data without changing machine JSON.
+fn display(value: &Value, fallback: &str) -> String {
+    let mut safe = String::new();
+    for character in text(value, fallback).chars() {
+        match character {
+            '\n' => safe.push_str("\\n"),
+            '\r' => safe.push_str("\\r"),
+            '\t' => safe.push_str("\\t"),
+            character if character.is_control() || matches!(character, '\u{2028}' | '\u{2029}') => {
+                write!(safe, "\\u{{{:04x}}}", u32::from(character)).expect("write to string");
+            }
+            character => safe.push(character),
+        }
+    }
+    formatter::escape(&safe)
+}
+
 fn line(out: &mut String, label: &str, value: &Value) {
-    writeln!(out, "  {label}: {}", text(value, "unknown")).expect("write to string");
+    writeln!(out, "  {label}: {}", display(value, "unknown")).expect("write to string");
 }
 
 fn render(diagnostic: &Value) -> String {
@@ -248,7 +266,7 @@ fn render(diagnostic: &Value) -> String {
         } else {
             "not set"
         },
-        text(&connection["token"]["source"], "none")
+        display(&connection["token"]["source"], "none")
     )
     .expect("write to string");
     writeln!(
@@ -269,7 +287,7 @@ fn render(diagnostic: &Value) -> String {
     {
         out.push_str("\nWarnings:\n");
         for warning in warnings {
-            writeln!(out, "  {}", text(warning, "")).expect("write to string");
+            writeln!(out, "  {}", display(warning, "")).expect("write to string");
         }
     }
     if let Some(recommendations) = diagnostic["recommendations"]
@@ -278,9 +296,10 @@ fn render(diagnostic: &Value) -> String {
     {
         out.push_str("\nNext steps:\n");
         for recommendation in recommendations {
-            writeln!(out, "  - {}", text(&recommendation["message"], "")).expect("write to string");
+            writeln!(out, "  - {}", display(&recommendation["message"], ""))
+                .expect("write to string");
             if let Some(command) = recommendation.get("command") {
-                writeln!(out, "    Try: {}", text(command, "")).expect("write to string");
+                writeln!(out, "    Try: {}", display(command, "")).expect("write to string");
             }
         }
     }
@@ -312,9 +331,9 @@ fn render_server(out: &mut String, server: &Value) {
             writeln!(
                 out,
                 "  Invocable Carrier: {} v{} ({})",
-                text(&invocable["schema"], "unknown"),
-                text(&invocable["version"], "unknown"),
-                text(&invocable["carrier_type"], "unknown")
+                display(&invocable["schema"], "unknown"),
+                display(&invocable["version"], "unknown"),
+                display(&invocable["carrier_type"], "unknown")
             )
             .expect("write to string");
         }
@@ -324,6 +343,25 @@ fn render_server(out: &mut String, server: &Value) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn human_connection_fields_cannot_create_markup_or_layout() {
+        let value = "<error>untrusted</error>\nForged:\u{1b}]0;title\u{7}\u{9b}31m";
+        let diagnostic = json!({
+            "dw": {},
+            "connection": {"server": value, "namespace": value,
+                "profile": {"name": value, "source": value},
+                "token": {"source": value}},
+            "server": {"reachable": false, "error": value},
+            "warnings": [value],
+            "recommendations": [{"message": value, "command": value}]
+        });
+        let human = formatter::format(&render(&diagnostic), false);
+        assert!(human.contains("<error>untrusted</error>\\nForged:"));
+        assert!(!human.contains("\nForged:"));
+        assert!(!human.chars().any(|c| c.is_control() && c != '\n'));
+        assert_eq!(diagnostic["connection"]["namespace"], value);
+    }
 
     #[test]
     fn published_metadata_keeps_fixture_summaries_and_order() {

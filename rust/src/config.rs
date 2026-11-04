@@ -436,6 +436,34 @@ pub struct ConnectionFlags<'a> {
     pub tls_verify: Option<&'a str>,
 }
 
+/// Runtime URLs are connection locations, not an implicit credential source.
+/// Refuse before client construction and never echo the rejected value.
+fn validate_runtime_url(server: &str) -> Result<(), CliError> {
+    let invalid = || {
+        CliError::Invalid(
+        "Invalid server URL: use an absolute HTTP(S) runtime base URL without user information, a query, a fragment, or whitespace. Supply authentication through a token option or configured token source."
+            .into(),
+    )
+    };
+    if server
+        .chars()
+        .any(|character| character.is_control() || character.is_whitespace())
+    {
+        return Err(invalid());
+    }
+    let url = reqwest::Url::parse(server).map_err(|_| invalid())?;
+    if !matches!(url.scheme(), "http" | "https")
+        || url.host_str().is_none()
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || url.query().is_some()
+        || url.fragment().is_some()
+    {
+        return Err(invalid());
+    }
+    Ok(())
+}
+
 pub fn resolve(store: &ProfileStore, flags: &ConnectionFlags) -> Result<Connection, CliError> {
     let (profile, profile_source) = if let Some(env) = flags.env {
         (Some(store.require(env, "--env")?), Some("flag"))
@@ -469,6 +497,7 @@ pub fn resolve(store: &ProfileStore, flags: &ConnectionFlags) -> Result<Connecti
         profile.as_ref().and_then(|p| p.server.as_ref()),
         "http://localhost:8080",
     );
+    validate_runtime_url(&server)?;
     let (namespace, namespace_source) = pick(
         flags.namespace,
         "DURABLE_WORKFLOW_NAMESPACE",
@@ -538,6 +567,35 @@ pub fn parse_boolean(value: &str, source: &str) -> Result<bool, CliError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn runtime_urls_keep_encoded_paths_but_refuse_implicit_credentials() {
+        for server in [
+            "http://127.0.0.1:8080",
+            "https://example.test/api/runtime/v1/namespaces/tenant-1",
+            "http://[::1]:8080/runtime/%3Fname%23value",
+        ] {
+            assert!(validate_runtime_url(server).is_ok());
+        }
+        for server in [
+            "https://fixture-user:fixture-password@example.test",
+            "https://fixture-user@example.test",
+            "https://:fixture-password@example.test",
+            "https://example.test?token=fixture-query",
+            "https://example.test#fixture-fragment",
+            "https://example.test?",
+            "https://example.test#",
+            "https://example.test/has space",
+            "https://example.test/\nvalue",
+            "https://example.test/\u{9b}value",
+            "relative/runtime",
+            "ftp://example.test",
+        ] {
+            let error = validate_runtime_url(server).unwrap_err();
+            assert_eq!(error.exit_code(), crate::error::exit::INVALID);
+            assert!(!error.message().contains("fixture-"));
+        }
+    }
 
     #[test]
     fn describe_redacts_literal_tokens() {

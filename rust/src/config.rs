@@ -371,6 +371,59 @@ pub struct Connection {
     pub token: Option<String>,
     pub tls_verify: bool,
     pub profile: Option<Profile>,
+    sources: ConnectionSources,
+}
+
+#[derive(Debug)]
+struct ConnectionSources {
+    server: &'static str,
+    namespace: &'static str,
+    profile: Option<&'static str>,
+    token: &'static str,
+    token_env: Option<String>,
+    tls: &'static str,
+}
+
+impl Connection {
+    /// Redacted provenance captured while resolving the connection. Never
+    /// include the bearer token in an operator diagnostic.
+    pub fn effective_config(&self, config_path: &str) -> Value {
+        let sources = &self.sources;
+        let profile_name = self.profile.as_ref().map(|profile| &profile.name);
+        let server = json!({"value": self.server, "source": sources.server,
+            "contract_source": contract_source(sources.server)});
+        json!({
+            "contract": {"schema": "durable-workflow.v2.auth-composition.contract", "version": 1},
+            "server": server, "server_url": server,
+            "namespace": {"value": self.namespace, "source": sources.namespace,
+                "contract_source": contract_source(sources.namespace)},
+            "profile": {"name": profile_name, "source": sources.profile,
+                "contract_source": sources.profile.map(|source| match source {
+                    "flag" => "flag_env", "current_env" => "current_profile", other => other,
+                }), "config_path": config_path},
+            "auth": {"type": if self.token.is_some() {"token"} else {"none"},
+                "transport": self.token.as_ref().map(|_| "bearer_authorization_header"),
+                "present": self.token.is_some(), "source": sources.token,
+                "contract_source": match sources.token {
+                    "DURABLE_WORKFLOW_AUTH_TOKEN" => "environment",
+                    "profile_literal" => "selected_profile", other => other,
+                },
+                "env": sources.token_env,
+                "profile": if sources.token.starts_with("profile_") {profile_name} else {None},
+                "value": self.token.as_ref().map(|_| "redacted")},
+            "tls": {"verify": self.tls_verify, "source": sources.tls,
+                "contract_source": contract_source(sources.tls)},
+            "identity": {"subject": null, "roles": [], "source": "server", "asserted": false},
+        })
+    }
+}
+
+fn contract_source(source: &str) -> &str {
+    match source {
+        "profile" => "selected_profile",
+        name if name.starts_with("DURABLE_WORKFLOW_") => "environment",
+        other => other,
+    }
 }
 
 /// Flag values that were written with a non-empty value. An empty or
@@ -384,45 +437,74 @@ pub struct ConnectionFlags<'a> {
 }
 
 pub fn resolve(store: &ProfileStore, flags: &ConnectionFlags) -> Result<Connection, CliError> {
-    let profile = if let Some(env) = flags.env {
-        Some(store.require(env, "--env")?)
+    let (profile, profile_source) = if let Some(env) = flags.env {
+        (Some(store.require(env, "--env")?), Some("flag"))
     } else if let Some(env) = env_string("DW_ENV") {
-        Some(store.require(&env, "DW_ENV")?)
+        (Some(store.require(&env, "DW_ENV")?), Some("DW_ENV"))
     } else if let Some(current) = store.load()?.current_env {
-        Some(store.require(&current, "dw env:use (current_env in config)")?)
+        (
+            Some(store.require(&current, "dw env:use (current_env in config)")?),
+            Some("current_env"),
+        )
     } else {
-        None
+        (None, None)
     };
 
-    let pick = |flag: Option<&str>, env: &str, profile_value: Option<&String>, default: &str| {
-        flag.map(str::to_string)
-            .or_else(|| env_string(env))
-            .or_else(|| profile_value.cloned())
-            .unwrap_or_else(|| default.to_string())
-    };
+    let pick =
+        |flag: Option<&str>, env: &'static str, profile_value: Option<&String>, default: &str| {
+            if let Some(value) = flag {
+                (value.to_string(), "flag")
+            } else if let Some(value) = env_string(env) {
+                (value, env)
+            } else if let Some(value) = profile_value {
+                (value.clone(), "profile")
+            } else {
+                (default.to_string(), "default")
+            }
+        };
 
-    let server = pick(
+    let (server, server_source) = pick(
         flags.server,
         "DURABLE_WORKFLOW_SERVER_URL",
         profile.as_ref().and_then(|p| p.server.as_ref()),
         "http://localhost:8080",
     );
-    let namespace = pick(
+    let (namespace, namespace_source) = pick(
         flags.namespace,
         "DURABLE_WORKFLOW_NAMESPACE",
         profile.as_ref().and_then(|p| p.namespace.as_ref()),
         "default",
     );
-    let token = flags
-        .token
-        .map(str::to_string)
-        .or_else(|| env_string("DURABLE_WORKFLOW_AUTH_TOKEN"))
-        .or_else(|| profile.as_ref().and_then(Profile::resolve_token));
-    let tls_verify = match flags.tls_verify {
-        Some(value) => parse_boolean(value, "--tls-verify")?,
+    let (token, token_source, token_env) = if let Some(value) = flags.token {
+        (Some(value.to_string()), "flag", None)
+    } else if let Some(value) = env_string("DURABLE_WORKFLOW_AUTH_TOKEN") {
+        (
+            Some(value),
+            "DURABLE_WORKFLOW_AUTH_TOKEN",
+            Some("DURABLE_WORKFLOW_AUTH_TOKEN".into()),
+        )
+    } else {
+        let resolved = profile.as_ref().and_then(Profile::resolve_token);
+        match profile
+            .as_ref()
+            .and_then(|profile| profile.token_source.as_ref())
+        {
+            Some(TokenSource::Env(name)) => (resolved, "profile_env", Some(name.clone())),
+            Some(TokenSource::Literal(_)) => (resolved, "profile_literal", None),
+            None => (None, "none", None),
+        }
+    };
+    let (tls_verify, tls_source) = match flags.tls_verify {
+        Some(value) => (parse_boolean(value, "--tls-verify")?, "flag"),
         None => match env_string("DURABLE_WORKFLOW_TLS_VERIFY") {
-            Some(value) => parse_boolean(&value, "DURABLE_WORKFLOW_TLS_VERIFY")?,
-            None => profile.as_ref().map(|p| p.tls_verify).unwrap_or(true),
+            Some(value) => (
+                parse_boolean(&value, "DURABLE_WORKFLOW_TLS_VERIFY")?,
+                "DURABLE_WORKFLOW_TLS_VERIFY",
+            ),
+            None => profile
+                .as_ref()
+                .map(|p| (p.tls_verify, "profile"))
+                .unwrap_or((true, "default")),
         },
     };
 
@@ -432,6 +514,14 @@ pub fn resolve(store: &ProfileStore, flags: &ConnectionFlags) -> Result<Connecti
         token,
         tls_verify,
         profile,
+        sources: ConnectionSources {
+            server: server_source,
+            namespace: namespace_source,
+            profile: profile_source,
+            token: token_source,
+            token_env,
+            tls: tls_source,
+        },
     })
 }
 
@@ -491,5 +581,45 @@ mod tests {
         assert!(parse_boolean(" Yes ", "x").unwrap());
         assert!(!parse_boolean("off", "x").unwrap());
         assert!(parse_boolean("maybe", "x").is_err());
+    }
+
+    #[test]
+    fn effective_config_redacts_auth_and_preserves_source_contracts() {
+        let connection = Connection {
+            server: "https://example.test".into(),
+            namespace: "tenant".into(),
+            token: Some("synthetic-private-value".into()),
+            tls_verify: false,
+            profile: Some(Profile {
+                name: "prod".into(),
+                server: None,
+                namespace: None,
+                token_source: None,
+                tls_verify: false,
+                output: None,
+            }),
+            sources: ConnectionSources {
+                server: "profile",
+                namespace: "DURABLE_WORKFLOW_NAMESPACE",
+                profile: Some("current_env"),
+                token: "profile_env",
+                token_env: Some("TEST_TOKEN".into()),
+                tls: "flag",
+            },
+        };
+        let effective = connection.effective_config("config.json");
+        assert!(!effective.to_string().contains("synthetic-private-value"));
+        assert_eq!(effective["server"], effective["server_url"]);
+        assert_eq!(effective["server"]["contract_source"], "selected_profile");
+        assert_eq!(effective["namespace"]["contract_source"], "environment");
+        assert_eq!(effective["profile"]["contract_source"], "current_profile");
+        assert_eq!(
+            effective["auth"],
+            json!({"type": "token", "transport": "bearer_authorization_header",
+            "present": true, "source": "profile_env", "contract_source": "profile_env",
+            "env": "TEST_TOKEN", "profile": "prod", "value": "redacted"})
+        );
+        assert_eq!(effective["tls"]["source"], "flag");
+        assert_eq!(effective["identity"]["asserted"], false);
     }
 }

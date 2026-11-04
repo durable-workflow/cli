@@ -283,7 +283,9 @@ jobs:
           # run may have published since. Drafts count too. The listing runs
           # outside any condition so an API error stops the job (fail closed).
           tags="$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --paginate --jq '.[].tag_name')"
-          if printf '%s\n' "$tags" | grep -Fxq -- "$RELEASE_TAG"; then
+          # A here-string, not a pipe: grep -q can exit early and SIGPIPE the
+          # writer, which pipefail would turn into a false "absent".
+          if grep -Fxq -- "$RELEASE_TAG" <<< "$tags"; then
             echo "::error::A GitHub Release for $RELEASE_TAG already exists; assets are never replaced"
             exit 1
           fi

@@ -81,7 +81,7 @@ ALLOWED_ACTIONS = {
 # path, a tar option, a gh extension) fails until reviewed and re-pinned.
 PUBLISH_RUN_DIGESTS = {
     "Validate the exact producer artifact before use": "ce06e15b0e2592c8deb55ae4f410e020afb89a6d675d140b0c5b9b4280bf9eaa",
-    "Refuse a tag that already has a GitHub Release": "8b35e4d683630addcbe2e951b5b6fd070263a288bbbe4db5027072fc145bf617",
+    "Refuse a tag that already has a GitHub Release": "cd035d1140208c847586f081760b4692c65ce3572a373ccbbc7affdaa362433a",
     "Extract only the allowlisted release files": "1074e3bcd19c91075f4c586cb2871af15135af3ff97bcde516cbdd34e64a8b1e",
     "Verify the immutable release tag at the publication boundary": "21a53cce4259e3fb724a0d8e3c893a2b6252eaec8b76f043da750f4a110b3cf2",
     "Create GitHub Release": "3f23a661b3debee7ed13aa9c519c880eb7959b6898d7d9670fd713bfc6d82419",
@@ -428,8 +428,8 @@ class ReleaseRustWorkflowTest(unittest.TestCase):
         # The first step after the policy-mandated checkout, download and validation.
         self.assertEqual(3, names.index("Refuse a tag that already has a GitHub Release"))
 
-    def run_publish_step(self, name, gh_script, env):
-        [step] = [s for s in self.steps("publish") if s.get("name") == name]
+    def run_publish_step(self, name, gh_script, env, steps=None):
+        [step] = [s for s in (steps or self.steps("publish")) if s.get("name") == name]
         with tempfile.TemporaryDirectory(prefix="cli-publish-step-") as directory:
             gh = Path(directory) / "gh"
             gh.write_text("#!/bin/sh\n" + gh_script, encoding="utf-8")
@@ -453,7 +453,16 @@ class ReleaseRustWorkflowTest(unittest.TestCase):
             result, _ = self.run_publish_step(name, gh_script, {"RELEASE_TAG": "2.5.0"})
             self.assertEqual(code, result.returncode, f"{gh_script!r}: {result.stderr}")
 
-    def test_latest_recheck_never_takes_the_marker_on_doubt(self):
+    def test_existing_release_check_survives_a_long_listing(self):
+        # Thousands of tags with the match first: a pipe into grep -q would
+        # SIGPIPE the writer and read as "absent".
+        gh_script = "printf '2.5.0\\n'; i=0; while [ $i -lt 20000 ]; do printf '1.%s.0\\n' $i; i=$((i+1)); done\n"
+        result, _ = self.run_publish_step(
+            "Refuse a tag that already has a GitHub Release", gh_script, {"RELEASE_TAG": "2.5.0"},
+        )
+        self.assertEqual(1, result.returncode, result.stderr)
+
+    def assert_latest_recheck(self, steps):
         record = 'echo "$*" >> "$GH_CALLS"\n'
         name = "Create GitHub Release"
         base = {"RELEASE_TAG": "2.5.0", "PRERELEASE": "false", "MAKE_LATEST": "true"}
@@ -465,12 +474,20 @@ class ReleaseRustWorkflowTest(unittest.TestCase):
             gh_script = (
                 'if [ "$1" = "api" ]; then ' + latest_reply + '; exit $?; fi\n' + record
             )
-            result, calls = self.run_publish_step(name, gh_script, dict(base, OBSERVED_LATEST=observed))
+            result, calls = self.run_publish_step(name, gh_script, dict(base, OBSERVED_LATEST=observed), steps)
             self.assertEqual(0, result.returncode, result.stderr)
             self.assertIn(expected, calls, (latest_reply, calls))
-        result, calls = self.run_publish_step(name, record, dict(base, MAKE_LATEST="false", OBSERVED_LATEST=""))
+            self.assertIn("release create 2.5.0", calls)
+        result, calls = self.run_publish_step(name, record, dict(base, MAKE_LATEST="false", OBSERVED_LATEST=""), steps)
         self.assertIn("--latest=false", calls)
         self.assertNotIn("api", calls)
+
+    def test_latest_recheck_never_takes_the_marker_on_doubt(self):
+        self.assert_latest_recheck(None)
+
+    def test_php_latest_recheck_never_takes_the_marker_on_doubt(self):
+        php = yaml.safe_load(PHP.read_text(encoding="utf-8"))
+        self.assert_latest_recheck(php["jobs"]["release"]["steps"])
 
     def test_latest_marker_is_rechecked_at_publication(self):
         php = yaml.safe_load(PHP.read_text(encoding="utf-8"))

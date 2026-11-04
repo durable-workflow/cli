@@ -6,7 +6,7 @@ set -euo pipefail
 
 crate="$(cd "$(dirname "$0")/.." && pwd)"
 reference="$crate/target/dw-reference"
-[ -x "$reference" ] || "$crate/parity/fetch-reference.sh" >/dev/null
+[[ -x "$reference" ]] || "$crate/parity/fetch-reference.sh" >/dev/null
 
 DW_CONFIG_HOME="$(mktemp -d)" "$reference" list --format=json | python3 -c '
 import json, sys

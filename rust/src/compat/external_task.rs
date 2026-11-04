@@ -4,6 +4,7 @@
 
 use super::{input_envelope, manifest_check, sha256_hex};
 use crate::php;
+use serde_json::json;
 use serde_json::Value;
 
 const VERSION: i64 = 1;
@@ -109,6 +110,56 @@ pub fn input_warning(cluster_info: &Value) -> Option<String> {
 /// `ExternalTaskResultContract::warning`.
 pub fn result_warning(cluster_info: &Value) -> Option<String> {
     contract_warning(cluster_info, &RESULT)
+}
+
+/// The same fixture summary `doctor` exposes in 2.x, retaining the
+/// Server's fixture order and validating the original manifest.
+fn diagnostic(cluster_info: &Value, contract: &Contract, names: &[(&str, &str)]) -> Value {
+    let Some(manifest) = php::array_get(php::get(cluster_info, "worker_protocol"), contract.key)
+        .filter(|value| php::is_array(value))
+    else {
+        return Value::Null;
+    };
+    let fixtures: Vec<_> = php::get(manifest, "fixtures")
+        .filter(|value| php::is_array(value))
+        .map(php::entries)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|(key, _)| key.text())
+        .filter(|key| names.iter().any(|(name, _)| *name == key))
+        .collect();
+    json!({
+        "schema": php::get(manifest, "schema").filter(|value| php::is_scalar(Some(value)))
+            .map(|value| php::to_string(Some(value))),
+        "version": php::get(manifest, "version").filter(|value| php::is_scalar(Some(value)))
+            .map(|value| php::int_cast(Some(value))),
+        "fixtures": fixtures,
+        "valid": (contract.validate)(manifest).is_empty(),
+    })
+}
+
+pub fn input_diagnostic(cluster_info: &Value) -> Value {
+    let mut summary = diagnostic(cluster_info, &INPUT, &INPUT_FIXTURES);
+    if !summary.is_null() {
+        let scope = &cluster_info["worker_protocol"][INPUT.key]["scope"];
+        // Insert the scope fields before valid, matching the PHP summary.
+        let valid = summary
+            .as_object_mut()
+            .expect("diagnostic object")
+            .remove("valid");
+        summary["activity_grade_fixture_keys"] = json!(scope_fixture_keys(
+            scope,
+            "activity_grade_external_execution"
+        ));
+        summary["worker_protocol_fixture_keys"] =
+            json!(scope_fixture_keys(scope, "worker_protocol_runtime"));
+        summary["valid"] = valid.unwrap_or(Value::Bool(false));
+    }
+    summary
+}
+
+pub fn result_diagnostic(cluster_info: &Value) -> Value {
+    diagnostic(cluster_info, &RESULT, &RESULT_FIXTURES)
 }
 
 fn contract_warning(cluster_info: &Value, contract: &Contract) -> Option<String> {

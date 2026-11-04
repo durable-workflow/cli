@@ -13,6 +13,7 @@ mod input_envelope;
 mod request_contract;
 pub mod version;
 
+pub use external_task::{input_diagnostic, result_diagnostic};
 pub use request_contract::RequestContract;
 
 use crate::php;

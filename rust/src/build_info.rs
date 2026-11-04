@@ -11,9 +11,20 @@ pub fn version() -> &'static str {
 
 /// `dw <version> (commit <sha>, built <date>)`, as `dw --version` prints it.
 pub fn version_line() -> String {
-    let commit = option_env!("DW_CLI_COMMIT")
+    format!(
+        "dw {} (commit {}, built {})",
+        version(),
+        commit(),
+        build_date()
+    )
+}
+
+pub fn commit() -> &'static str {
+    option_env!("DW_CLI_COMMIT")
         .map(|commit| &commit[..commit.len().min(12)])
-        .unwrap_or("unknown");
-    let built = option_env!("DW_CLI_BUILD_DATE").unwrap_or("source checkout");
-    format!("dw {} (commit {commit}, built {built})", version())
+        .unwrap_or("unknown")
+}
+
+pub fn build_date() -> &'static str {
+    option_env!("DW_CLI_BUILD_DATE").unwrap_or("source checkout")
 }

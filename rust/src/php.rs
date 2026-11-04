@@ -167,9 +167,19 @@ fn float_to_json(value: f64) -> String {
 }
 
 /// Shortest round-trip digits and decimal-point position, like
-/// `zend_dtoa(value, 0, ...)`.
+/// `zend_dtoa(value, 0, ...)`. Rust's shortest formatter can pick either of
+/// two equally short candidates when the value lies exactly halfway between
+/// them; PHP takes the correctly rounded one, ties to even. So keep the
+/// shortest length and use the correctly rounded digits at that length.
 fn shortest_digits(value: f64) -> (String, i32) {
-    split_exponent(&format!("{:e}", value.abs()))
+    let magnitude = value.abs();
+    let (digits, decpt) = split_exponent(&format!("{magnitude:e}"));
+    let rounded = format!("{:.*e}", digits.len().saturating_sub(1), magnitude);
+    if rounded.parse::<f64>().ok() == Some(magnitude) {
+        split_exponent(&rounded)
+    } else {
+        (digits, decpt)
+    }
 }
 
 /// Digits rounded to `precision` significant places with trailing zeros
@@ -521,6 +531,20 @@ pub fn ucfirst(text: &str) -> String {
     match chars.next() {
         Some(first) => first.to_ascii_uppercase().to_string() + chars.as_str(),
         None => String::new(),
+    }
+}
+
+#[cfg(test)]
+mod float_tests {
+    use super::*;
+
+    #[test]
+    fn halfway_values_round_to_even_like_php() {
+        // 1149865714285714.2 is stored as ...714.25: .2 and .3 both round-trip.
+        let value: Value = serde_json::from_str("[1149865714285714.2]").unwrap();
+        assert_eq!(json_encode(&value), "[1149865714285714.2]");
+        let value: Value = serde_json::from_str("[1.4820142857142857, 0.1, 1e300]").unwrap();
+        assert_eq!(json_encode(&value), "[1.4820142857142857,0.1,1.0e+300]");
     }
 }
 

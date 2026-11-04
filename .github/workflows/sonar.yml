@@ -2,7 +2,7 @@ name: SonarQube
 
 on:
   push:
-    branches: [main, maintenance/2.3.6-base]
+    branches: [main]
   pull_request:
     branches: [main, maintenance/2.3.6-base]
 

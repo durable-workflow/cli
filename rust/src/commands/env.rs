@@ -1,6 +1,6 @@
 //! `env:*`: local profile management. These commands never contact a Server.
 
-use crate::cli::{output_option, ArgSpec, CommandSpec, Input, OptSpec};
+use crate::cli::Input;
 use crate::config::{Profile, ProfileStore, TokenSource, OUTPUT_MODES};
 use crate::error::CliError;
 use crate::output::{print_json, print_json_list, render_table, resolve_mode, Mode};
@@ -44,19 +44,6 @@ fn with(mut data: Map<String, Value>, extra: &[(&str, Value)]) -> Value {
         data.insert((*key).to_string(), value.clone());
     }
     Value::Object(data)
-}
-
-pub fn list_spec() -> CommandSpec {
-    CommandSpec {
-        name: "env:list",
-        description: "List configured dw environment profiles",
-        args: vec![],
-        opts: vec![
-            output_option(),
-            OptSpec::flag("json"),
-            OptSpec::flag("show-token"),
-        ],
-    }
 }
 
 pub fn list(input: &Input) -> Result<i32, CliError> {
@@ -126,22 +113,6 @@ pub fn list(input: &Input) -> Result<i32, CliError> {
     Ok(0)
 }
 
-pub fn show_spec() -> CommandSpec {
-    CommandSpec {
-        name: "env:show",
-        description: "Show details for a dw environment profile",
-        args: vec![ArgSpec {
-            name: "name",
-            required: false,
-        }],
-        opts: vec![
-            output_option(),
-            OptSpec::flag("show-token"),
-            OptSpec::flag("json"),
-        ],
-    }
-}
-
 pub fn show(input: &Input) -> Result<i32, CliError> {
     let mode = local_mode(input)?;
     let store = ProfileStore::new()?;
@@ -191,18 +162,6 @@ pub fn show(input: &Input) -> Result<i32, CliError> {
     Ok(0)
 }
 
-pub fn use_spec() -> CommandSpec {
-    CommandSpec {
-        name: "env:use",
-        description: "Set the default dw environment profile",
-        args: vec![ArgSpec {
-            name: "name",
-            required: true,
-        }],
-        opts: vec![output_option(), OptSpec::flag("json")],
-    }
-}
-
 pub fn use_env(input: &Input) -> Result<i32, CliError> {
     let mode = local_mode(input)?;
     let store = ProfileStore::new()?;
@@ -230,18 +189,6 @@ pub fn use_env(input: &Input) -> Result<i32, CliError> {
     Ok(0)
 }
 
-pub fn delete_spec() -> CommandSpec {
-    CommandSpec {
-        name: "env:delete",
-        description: "Delete a dw environment profile",
-        args: vec![ArgSpec {
-            name: "name",
-            required: true,
-        }],
-        opts: vec![output_option(), OptSpec::flag("json")],
-    }
-}
-
 pub fn delete(input: &Input) -> Result<i32, CliError> {
     let mode = local_mode(input)?;
     let store = ProfileStore::new()?;
@@ -265,28 +212,6 @@ pub fn delete(input: &Input) -> Result<i32, CliError> {
         println!("Cleared the current dw env.");
     }
     Ok(0)
-}
-
-pub fn set_spec() -> CommandSpec {
-    CommandSpec {
-        name: "env:set",
-        description: "Create or update a dw environment profile",
-        args: vec![ArgSpec {
-            name: "name",
-            required: true,
-        }],
-        opts: vec![
-            output_option(),
-            OptSpec::required("server"),
-            OptSpec::required("namespace"),
-            OptSpec::required("token-env"),
-            OptSpec::required("token"),
-            OptSpec::required("tls-verify"),
-            OptSpec::required("profile-output"),
-            OptSpec::flag("make-default"),
-            OptSpec::flag("json"),
-        ],
-    }
 }
 
 fn valid_profile_name(name: &str) -> bool {

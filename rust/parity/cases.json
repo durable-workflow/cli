@@ -1,128 +1,676 @@
 {
-  "cases": [
-    {"name": "env:list empty, table", "argv": ["env:list"]},
-    {"name": "env:list empty, json", "argv": ["env:list", "--json"]},
-    {"name": "env:list empty, jsonl", "argv": ["env:list", "--output=jsonl"]},
-    {"name": "env:set new default, json", "argv": ["env:set", "dev", "--server=http://localhost:8080", "--namespace=default", "--make-default", "--json"]},
-    {"name": "env:set human", "argv": ["env:set", "dev", "--server", "http://localhost:8080"]},
-    {
-      "name": "env:list with literal and env tokens, table",
-      "setup": [
-        ["env:set", "dev", "--server=http://localhost:8080", "--namespace=default", "--make-default"],
-        ["env:set", "prod", "--server=https://x.example", "--token=s3cret", "--profile-output=json"],
-        ["env:set", "stage", "--server=https://s.example", "--token-env=STAGE_TOKEN", "--tls-verify=false"]
-      ],
-      "argv": ["env:list"]
-    },
-    {
-      "name": "env:list --show-token json",
-      "setup": [
-        ["env:set", "prod", "--server=https://x.example", "--token=s3cret"],
-        ["env:set", "dev", "--server=http://localhost:8080", "--make-default"]
-      ],
-      "argv": ["env:list", "--show-token", "--json"]
-    },
-    {
-      "name": "env:list jsonl",
-      "setup": [["env:set", "b", "--server=http://b"], ["env:set", "a", "--server=http://a", "--make-default"]],
-      "argv": ["env:list", "--output=jsonl"]
-    },
-    {
-      "name": "env:set updates only written fields",
-      "setup": [["env:set", "dev", "--server=http://one", "--namespace=orders", "--token-env=DEV_TOKEN"]],
-      "argv": ["env:set", "dev", "--server=http://two", "--json"]
-    },
-    {
-      "name": "env:set empty value clears a field",
-      "setup": [["env:set", "dev", "--server=http://one", "--namespace=orders", "--token=abc"]],
-      "argv": ["env:set", "dev", "--namespace=", "--token-env=", "--json"]
-    },
-    {"name": "env:set invalid name", "argv": ["env:set", "bad name"]},
-    {"name": "env:set invalid name json", "argv": ["env:set", "-bad", "--json"]},
-    {"name": "env:set invalid token env", "argv": ["env:set", "dev", "--token-env=lower", "--json"]},
-    {"name": "env:set token and token env", "argv": ["env:set", "dev", "--token=a", "--token-env=B", "--json"]},
-    {"name": "env:set invalid profile output", "argv": ["env:set", "dev", "--profile-output=xml", "--json"]},
-    {"name": "env:set invalid tls", "argv": ["env:set", "dev", "--tls-verify=maybe"]},
-    {"name": "env:set missing name", "argv": ["env:set"]},
-    {
-      "name": "env:show named json",
-      "setup": [["env:set", "prod", "--server=https://x.example", "--token=s3cret", "--profile-output=jsonl"]],
-      "argv": ["env:show", "prod", "--json"]
-    },
-    {
-      "name": "env:show current table",
-      "setup": [["env:set", "dev", "--server=http://localhost:8080", "--token-env=DEV_TOKEN", "--make-default"]],
-      "argv": ["env:show"]
-    },
-    {"name": "env:show without current", "argv": ["env:show"]},
-    {"name": "env:show without current json", "argv": ["env:show", "--json"]},
-    {
-      "name": "env:show unknown json",
-      "setup": [["env:set", "dev", "--server=http://localhost:8080"]],
-      "argv": ["env:show", "nope", "--json"]
-    },
-    {"name": "env:show unknown with no profiles", "argv": ["env:show", "nope"]},
-    {
-      "name": "env:use",
-      "setup": [["env:set", "prod", "--server=https://x.example", "--namespace=orders"]],
-      "argv": ["env:use", "prod"]
-    },
-    {
-      "name": "env:use json",
-      "setup": [["env:set", "prod", "--server=https://x.example"]],
-      "argv": ["env:use", "prod", "--json"]
-    },
-    {"name": "env:use unknown json", "argv": ["env:use", "nope", "--json"]},
-    {
-      "name": "env:delete current json",
-      "setup": [["env:set", "prod", "--server=https://x.example", "--make-default"], ["env:set", "dev", "--server=http://d"]],
-      "argv": ["env:delete", "prod", "--json"]
-    },
-    {
-      "name": "env:delete last profile leaves empty envs",
-      "setup": [["env:set", "prod", "--server=https://x.example", "--make-default"]],
-      "argv": ["env:delete", "prod"]
-    },
-    {"name": "env:delete unknown", "argv": ["env:delete", "nope"]},
-    {"name": "unknown option", "argv": ["env:list", "--bogus"]},
-    {"name": "option value on a flag", "argv": ["env:list", "--json=yes"]},
-    {"name": "too many arguments", "argv": ["env:use", "a", "b"]},
-    {"name": "invalid output mode", "argv": ["env:list", "--output=xml"]},
-    {"name": "invalid output mode json flag wins", "argv": ["env:list", "--output=xml", "--json"]},
-    {"name": "unknown command", "argv": ["nope:cmd"]},
-    {"name": "self-update refused", "argv": ["self-update"]},
-    {"name": "server:health has no --json", "argv": ["server:health", "--json"]},
-    {"name": "server:health unreachable", "argv": ["server:health", "--server=http://127.0.0.1:1"]},
-    {"name": "server:health unreachable json", "argv": ["server:health", "--server=http://127.0.0.1:1", "--output=json"]},
-    {"name": "server:health unreachable via env var", "env": {"DURABLE_WORKFLOW_SERVER_URL": "http://127.0.0.1:1"}, "argv": ["server:health", "--output=json"]},
-    {"name": "server:health unknown --env json", "argv": ["server:health", "--env=missing", "--output=json"]},
-    {"name": "server:health unknown DW_ENV", "env": {"DW_ENV": "missing"}, "argv": ["server:health"]},
-    {"name": "server:health invalid tls flag json", "argv": ["server:health", "--server=http://127.0.0.1:1", "--tls-verify=maybe", "--output=json"]},
-    {
-      "name": "server:health profile output mode",
-      "setup": [["env:set", "p", "--server=http://127.0.0.1:1", "--profile-output=json", "--make-default"]],
-      "argv": ["server:health"]
-    },
-    {
-      "name": "server:health explicit output overrides profile",
-      "setup": [["env:set", "p", "--server=http://127.0.0.1:1", "--profile-output=json", "--make-default"]],
-      "argv": ["server:health", "--output=table"]
-    },
-    {"name": "server:health json", "server": true, "argv": ["server:health", "--server={server}", "--output=json"]},
-    {
-      "name": "server:health human",
-      "server": true,
-      "argv": ["server:health", "--server={server}"],
-      "expected_difference": {
-        "native": "Native /health has no timestamp and reports checks as booleans. 2.x prints a PHP warning and reports a healthy database as unhealthy (durable-workflow/cli#74); the Rust CLI reports it correctly."
-      }
-    },
-    {"name": "server:health via env var", "server": true, "server_env": true, "argv": ["server:health", "--output=json"]},
-    {
-      "name": "server:health via profile",
-      "server": true,
-      "setup": [["env:set", "s", "--server={server}", "--make-default"]],
-      "argv": ["server:health", "--output=jsonl"]
+ "cases": [
+  {
+   "name": "env:list empty, table",
+   "argv": [
+    "env:list"
+   ]
+  },
+  {
+   "name": "env:list empty, json",
+   "argv": [
+    "env:list",
+    "--json"
+   ]
+  },
+  {
+   "name": "env:list empty, jsonl",
+   "argv": [
+    "env:list",
+    "--output=jsonl"
+   ]
+  },
+  {
+   "name": "env:set new default, json",
+   "argv": [
+    "env:set",
+    "dev",
+    "--server=http://localhost:8080",
+    "--namespace=default",
+    "--make-default",
+    "--json"
+   ]
+  },
+  {
+   "name": "env:set human",
+   "argv": [
+    "env:set",
+    "dev",
+    "--server",
+    "http://localhost:8080"
+   ]
+  },
+  {
+   "name": "env:list with literal and env tokens, table",
+   "setup": [
+    [
+     "env:set",
+     "dev",
+     "--server=http://localhost:8080",
+     "--namespace=default",
+     "--make-default"
+    ],
+    [
+     "env:set",
+     "prod",
+     "--server=https://x.example",
+     "--token=s3cret",
+     "--profile-output=json"
+    ],
+    [
+     "env:set",
+     "stage",
+     "--server=https://s.example",
+     "--token-env=STAGE_TOKEN",
+     "--tls-verify=false"
+    ]
+   ],
+   "argv": [
+    "env:list"
+   ]
+  },
+  {
+   "name": "env:list --show-token json",
+   "setup": [
+    [
+     "env:set",
+     "prod",
+     "--server=https://x.example",
+     "--token=s3cret"
+    ],
+    [
+     "env:set",
+     "dev",
+     "--server=http://localhost:8080",
+     "--make-default"
+    ]
+   ],
+   "argv": [
+    "env:list",
+    "--show-token",
+    "--json"
+   ]
+  },
+  {
+   "name": "env:list jsonl",
+   "setup": [
+    [
+     "env:set",
+     "b",
+     "--server=http://b"
+    ],
+    [
+     "env:set",
+     "a",
+     "--server=http://a",
+     "--make-default"
+    ]
+   ],
+   "argv": [
+    "env:list",
+    "--output=jsonl"
+   ]
+  },
+  {
+   "name": "env:set updates only written fields",
+   "setup": [
+    [
+     "env:set",
+     "dev",
+     "--server=http://one",
+     "--namespace=orders",
+     "--token-env=DEV_TOKEN"
+    ]
+   ],
+   "argv": [
+    "env:set",
+    "dev",
+    "--server=http://two",
+    "--json"
+   ]
+  },
+  {
+   "name": "env:set empty value clears a field",
+   "setup": [
+    [
+     "env:set",
+     "dev",
+     "--server=http://one",
+     "--namespace=orders",
+     "--token=abc"
+    ]
+   ],
+   "argv": [
+    "env:set",
+    "dev",
+    "--namespace=",
+    "--token-env=",
+    "--json"
+   ]
+  },
+  {
+   "name": "env:set invalid name",
+   "argv": [
+    "env:set",
+    "bad name"
+   ]
+  },
+  {
+   "name": "env:set invalid name json",
+   "argv": [
+    "env:set",
+    "-bad",
+    "--json"
+   ]
+  },
+  {
+   "name": "env:set invalid token env",
+   "argv": [
+    "env:set",
+    "dev",
+    "--token-env=lower",
+    "--json"
+   ]
+  },
+  {
+   "name": "env:set token and token env",
+   "argv": [
+    "env:set",
+    "dev",
+    "--token=a",
+    "--token-env=B",
+    "--json"
+   ]
+  },
+  {
+   "name": "env:set invalid profile output",
+   "argv": [
+    "env:set",
+    "dev",
+    "--profile-output=xml",
+    "--json"
+   ]
+  },
+  {
+   "name": "env:set invalid tls",
+   "argv": [
+    "env:set",
+    "dev",
+    "--tls-verify=maybe"
+   ]
+  },
+  {
+   "name": "env:set missing name",
+   "argv": [
+    "env:set"
+   ]
+  },
+  {
+   "name": "env:show named json",
+   "setup": [
+    [
+     "env:set",
+     "prod",
+     "--server=https://x.example",
+     "--token=s3cret",
+     "--profile-output=jsonl"
+    ]
+   ],
+   "argv": [
+    "env:show",
+    "prod",
+    "--json"
+   ]
+  },
+  {
+   "name": "env:show current table",
+   "setup": [
+    [
+     "env:set",
+     "dev",
+     "--server=http://localhost:8080",
+     "--token-env=DEV_TOKEN",
+     "--make-default"
+    ]
+   ],
+   "argv": [
+    "env:show"
+   ]
+  },
+  {
+   "name": "env:show without current",
+   "argv": [
+    "env:show"
+   ]
+  },
+  {
+   "name": "env:show without current json",
+   "argv": [
+    "env:show",
+    "--json"
+   ]
+  },
+  {
+   "name": "env:show unknown json",
+   "setup": [
+    [
+     "env:set",
+     "dev",
+     "--server=http://localhost:8080"
+    ]
+   ],
+   "argv": [
+    "env:show",
+    "nope",
+    "--json"
+   ]
+  },
+  {
+   "name": "env:show unknown with no profiles",
+   "argv": [
+    "env:show",
+    "nope"
+   ]
+  },
+  {
+   "name": "env:use",
+   "setup": [
+    [
+     "env:set",
+     "prod",
+     "--server=https://x.example",
+     "--namespace=orders"
+    ]
+   ],
+   "argv": [
+    "env:use",
+    "prod"
+   ]
+  },
+  {
+   "name": "env:use json",
+   "setup": [
+    [
+     "env:set",
+     "prod",
+     "--server=https://x.example"
+    ]
+   ],
+   "argv": [
+    "env:use",
+    "prod",
+    "--json"
+   ]
+  },
+  {
+   "name": "env:use unknown json",
+   "argv": [
+    "env:use",
+    "nope",
+    "--json"
+   ]
+  },
+  {
+   "name": "env:delete current json",
+   "setup": [
+    [
+     "env:set",
+     "prod",
+     "--server=https://x.example",
+     "--make-default"
+    ],
+    [
+     "env:set",
+     "dev",
+     "--server=http://d"
+    ]
+   ],
+   "argv": [
+    "env:delete",
+    "prod",
+    "--json"
+   ]
+  },
+  {
+   "name": "env:delete last profile leaves empty envs",
+   "setup": [
+    [
+     "env:set",
+     "prod",
+     "--server=https://x.example",
+     "--make-default"
+    ]
+   ],
+   "argv": [
+    "env:delete",
+    "prod"
+   ]
+  },
+  {
+   "name": "env:delete unknown",
+   "argv": [
+    "env:delete",
+    "nope"
+   ]
+  },
+  {
+   "name": "unknown option",
+   "argv": [
+    "env:list",
+    "--bogus"
+   ]
+  },
+  {
+   "name": "option value on a flag",
+   "argv": [
+    "env:list",
+    "--json=yes"
+   ]
+  },
+  {
+   "name": "too many arguments",
+   "argv": [
+    "env:use",
+    "a",
+    "b"
+   ]
+  },
+  {
+   "name": "invalid output mode",
+   "argv": [
+    "env:list",
+    "--output=xml"
+   ]
+  },
+  {
+   "name": "invalid output mode json flag wins",
+   "argv": [
+    "env:list",
+    "--output=xml",
+    "--json"
+   ]
+  },
+  {
+   "name": "unknown command",
+   "argv": [
+    "nope:cmd"
+   ]
+  },
+  {
+   "name": "self-update refused",
+   "argv": [
+    "self-update"
+   ]
+  },
+  {
+   "name": "server:health has no --json",
+   "argv": [
+    "server:health",
+    "--json"
+   ]
+  },
+  {
+   "name": "server:health unreachable",
+   "argv": [
+    "server:health",
+    "--server=http://127.0.0.1:1"
+   ]
+  },
+  {
+   "name": "server:health unreachable json",
+   "argv": [
+    "server:health",
+    "--server=http://127.0.0.1:1",
+    "--output=json"
+   ]
+  },
+  {
+   "name": "server:health unreachable via env var",
+   "env": {
+    "DURABLE_WORKFLOW_SERVER_URL": "http://127.0.0.1:1"
+   },
+   "argv": [
+    "server:health",
+    "--output=json"
+   ]
+  },
+  {
+   "name": "server:health unknown --env json",
+   "argv": [
+    "server:health",
+    "--env=missing",
+    "--output=json"
+   ]
+  },
+  {
+   "name": "server:health unknown DW_ENV",
+   "env": {
+    "DW_ENV": "missing"
+   },
+   "argv": [
+    "server:health"
+   ]
+  },
+  {
+   "name": "server:health invalid tls flag json",
+   "argv": [
+    "server:health",
+    "--server=http://127.0.0.1:1",
+    "--tls-verify=maybe",
+    "--output=json"
+   ]
+  },
+  {
+   "name": "server:health profile output mode",
+   "setup": [
+    [
+     "env:set",
+     "p",
+     "--server=http://127.0.0.1:1",
+     "--profile-output=json",
+     "--make-default"
+    ]
+   ],
+   "argv": [
+    "server:health"
+   ]
+  },
+  {
+   "name": "server:health explicit output overrides profile",
+   "setup": [
+    [
+     "env:set",
+     "p",
+     "--server=http://127.0.0.1:1",
+     "--profile-output=json",
+     "--make-default"
+    ]
+   ],
+   "argv": [
+    "server:health",
+    "--output=table"
+   ]
+  },
+  {
+   "name": "server:health json",
+   "server": true,
+   "argv": [
+    "server:health",
+    "--server={server}",
+    "--output=json"
+   ]
+  },
+  {
+   "name": "server:health human",
+   "server": true,
+   "argv": [
+    "server:health",
+    "--server={server}"
+   ]
+  },
+  {
+   "name": "server:health via env var",
+   "server": true,
+   "server_env": true,
+   "argv": [
+    "server:health",
+    "--output=json"
+   ]
+  },
+  {
+   "name": "server:health via profile",
+   "server": true,
+   "setup": [
+    [
+     "env:set",
+     "s",
+     "--server={server}",
+     "--make-default"
+    ]
+   ],
+   "argv": [
+    "server:health",
+    "--output=jsonl"
+   ]
+  },
+  {
+   "name": "unknown command",
+   "argv": [
+    "nope"
+   ]
+  },
+  {
+   "name": "unknown command in a known namespace",
+   "argv": [
+    "env:nope"
+   ]
+  },
+  {
+   "name": "typo with several suggestions",
+   "argv": [
+    "env:lst",
+    "-n"
+   ]
+  },
+  {
+   "name": "typo with one suggestion, no interaction",
+   "argv": [
+    "envlist",
+    "-n"
+   ]
+  },
+  {
+   "name": "typo with one suggestion, stdin is not a terminal",
+   "argv": [
+    "envlist"
+   ],
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "stdout_text",
+      "stderr",
+      "stderr_category"
+     ],
+     "reason": "2.x treats a non-terminal stdin as interactive and prints a \"Do you want to run env:list instead?\" prompt to stdout before exiting 1. This build only prompts on a terminal and reports the error on stderr, as 2.x does with -n."
     }
-  ]
+   }
+  },
+  {
+   "name": "unknown namespace with a suggestion",
+   "argv": [
+    "srver:health"
+   ]
+  },
+  {
+   "name": "abbreviated command",
+   "argv": [
+    "e:li",
+    "--json"
+   ]
+  },
+  {
+   "name": "abbreviated command, case-insensitive",
+   "argv": [
+    "ENV:LIST",
+    "--json"
+   ]
+  },
+  {
+   "name": "ambiguous abbreviation",
+   "argv": [
+    "env:s"
+   ]
+  },
+  {
+   "name": "namespace name lists its commands",
+   "argv": [
+    "env"
+   ]
+  },
+  {
+   "name": "abbreviated namespace lists its commands",
+   "argv": [
+    "sch"
+   ]
+  },
+  {
+   "name": "list",
+   "argv": [
+    "list"
+   ]
+  },
+  {
+   "name": "no arguments lists commands",
+   "argv": []
+  },
+  {
+   "name": "list one namespace",
+   "argv": [
+    "list",
+    "env"
+   ]
+  },
+  {
+   "name": "list unknown namespace",
+   "argv": [
+    "list",
+    "nope"
+   ]
+  },
+  {
+   "name": "version",
+   "argv": [
+    "--version"
+   ]
+  },
+  {
+   "name": "no arguments expected",
+   "argv": [
+    "env:list",
+    "extra"
+   ]
+  },
+  {
+   "name": "missing argument synopsis",
+   "argv": [
+    "env:use"
+   ]
+  },
+  {
+   "name": "unknown short option",
+   "argv": [
+    "server:health",
+    "-x"
+   ]
+  },
+  {
+   "name": "long message wraps at the terminal width",
+   "env": {
+    "COLUMNS": "40"
+   },
+   "argv": [
+    "env:nope"
+   ]
+  }
+ ]
 }

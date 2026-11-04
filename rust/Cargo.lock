@@ -282,7 +282,6 @@ name = "dw"
 version = "2.5.0-dev"
 dependencies = [
  "durable-workflow",
- "reqwest",
  "serde",
  "serde_json",
  "tokio",

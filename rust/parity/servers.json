@@ -1,0 +1,15 @@
+{
+  "comment": "Published Servers the parity harness runs its Server cases against. Start each with its published Compose file and pin the image by digest (DW_SERVER_IMAGE=durableworkflow/server@<digest>).",
+  "servers": {
+    "php": {
+      "version": "2.11.8",
+      "image": "durableworkflow/server@sha256:3848d5d5cd1b23bd2881e3fdecea64cc44b72e6fb812e577c2db6d0872d065dd",
+      "compose": "https://raw.githubusercontent.com/durable-workflow/server/2.11.8/docker-compose.published.yml"
+    },
+    "native": {
+      "version": "3.0.5",
+      "image": "durableworkflow/server@sha256:3cb6e5bf8ec766ac2abd933369b40a77af62794b6d7b921ce21d3fb263e88b72",
+      "compose": "https://raw.githubusercontent.com/durable-workflow/server/3.0.5/docker-compose.published.yml"
+    }
+  }
+}

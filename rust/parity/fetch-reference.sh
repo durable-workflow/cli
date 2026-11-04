@@ -12,8 +12,13 @@ print(pin["version"], pin["asset"], pin["sha256"])
 ' "$crate/parity/reference.json")
 
 mkdir -p "$crate/target"
-curl --proto '=https' --tlsv1.2 -fsSL --retry 3 -o "$output" \
+download="$(mktemp "$crate/target/dw-reference.XXXXXX")"
+trap 'rm -f "$download"' EXIT
+curl --proto '=https' --tlsv1.2 -fsSL --retry 3 -o "$download" \
   "https://github.com/durable-workflow/cli/releases/download/${version}/${asset}"
-echo "${sha256}  ${output}" | sha256sum -c -
-chmod +x "$output"
+# Only a verified download replaces the reference.
+echo "${sha256}  ${download}" | sha256sum -c -
+chmod +x "$download"
+mv "$download" "$output"
+trap - EXIT
 "$output" --version

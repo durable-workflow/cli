@@ -262,6 +262,66 @@ const HISTORY_REFERENCE_FIELDS: &[&str] = &[
     "closed_at",
 ];
 
+/// The Server's non-empty error code fields, in envelope order.
+fn body_codes<'a>(
+    body: &'a Map<String, Value>,
+) -> impl Iterator<Item = (&'static str, &'a str)> + 'a {
+    ["code", "error_code", "type", "rejection_reason"]
+        .into_iter()
+        .filter_map(|key| {
+            let value = body
+                .get(key)
+                .and_then(Value::as_str)
+                .filter(|value| !value.is_empty())?;
+            Some((key, value))
+        })
+}
+
+/// Copies Server refusal fields into the envelope without replacing any
+/// field the CLI already set, and groups the history references.
+fn copy_server_diagnostics(envelope: &mut Map<String, Value>, body: &Map<String, Value>) {
+    for key in SERVER_DIAGNOSTIC_FIELDS {
+        if let Some(value) = body.get(*key) {
+            envelope
+                .entry(key.to_string())
+                .or_insert_with(|| value.clone());
+        }
+    }
+    let references: Map<String, Value> = HISTORY_REFERENCE_FIELDS
+        .iter()
+        .filter_map(|key| body.get(*key).map(|value| (key.to_string(), value.clone())))
+        .collect();
+    if !references.is_empty() {
+        envelope
+            .entry("history_references")
+            .or_insert(Value::Object(references));
+    }
+}
+
+fn add_http_details(
+    envelope: &mut Map<String, Value>,
+    error: &CliError,
+    status: u16,
+    body: Option<&Map<String, Value>>,
+) {
+    envelope.insert("status_code".into(), json!(status));
+    if let Some(reason) = error.reason() {
+        envelope.insert("reason".into(), json!(reason));
+    }
+    if let Some(body) = body {
+        for (key, value) in body_codes(body) {
+            envelope.insert(key.into(), json!(value));
+        }
+        copy_server_diagnostics(envelope, body);
+    }
+    if let Some(errors) = error.validation_errors() {
+        envelope.insert("validation_errors".into(), errors.clone());
+    }
+    if let Some(body) = body {
+        envelope.insert("server_response".into(), Value::Object(body.clone()));
+    }
+}
+
 pub fn envelope(error: &CliError, context: &ErrorContext) -> Value {
     let mut envelope = Map::new();
     envelope.insert("error".into(), json!(error.message()));
@@ -270,49 +330,9 @@ pub fn envelope(error: &CliError, context: &ErrorContext) -> Value {
     if let Some(namespace) = &context.namespace {
         envelope.insert("namespace".into(), json!(namespace));
     }
-
     if let CliError::Http { status, body, .. } = error {
-        envelope.insert("status_code".into(), json!(status));
-        if let Some(reason) = error.reason() {
-            envelope.insert("reason".into(), json!(reason));
-        }
-        if let Some(body) = body {
-            for key in ["code", "error_code", "type", "rejection_reason"] {
-                if let Some(value) = body
-                    .get(key)
-                    .and_then(Value::as_str)
-                    .filter(|value| !value.is_empty())
-                {
-                    envelope.insert(key.into(), json!(value));
-                }
-            }
-            for key in SERVER_DIAGNOSTIC_FIELDS {
-                if let Some(value) = body.get(*key) {
-                    envelope
-                        .entry(key.to_string())
-                        .or_insert_with(|| value.clone());
-                }
-            }
-            let mut references = Map::new();
-            for key in HISTORY_REFERENCE_FIELDS {
-                if let Some(value) = body.get(*key) {
-                    references.insert(key.to_string(), value.clone());
-                }
-            }
-            if !references.is_empty() {
-                envelope
-                    .entry("history_references")
-                    .or_insert(Value::Object(references));
-            }
-        }
-        if let Some(errors) = error.validation_errors() {
-            envelope.insert("validation_errors".into(), errors.clone());
-        }
-        if let Some(body) = body {
-            envelope.insert("server_response".into(), Value::Object(body.clone()));
-        }
+        add_http_details(&mut envelope, error, *status, body.as_ref());
     }
-
     let next = recommendations(error, context);
     if !next.is_empty() {
         envelope.insert("recommendations".into(), Value::Array(next));
@@ -322,16 +342,11 @@ pub fn envelope(error: &CliError, context: &ErrorContext) -> Value {
 
 /// The Server's error codes, as `Code: value` lines.
 fn body_code_lines(body: &Map<String, Value>) -> Vec<String> {
-    ["code", "error_code", "type", "rejection_reason"]
-        .into_iter()
-        .filter_map(|key| {
-            let value = body
-                .get(key)
-                .and_then(Value::as_str)
-                .filter(|value| !value.is_empty())?;
+    body_codes(body)
+        .map(|(key, value)| {
             let mut label = key.replace('_', " ");
             label[..1].make_ascii_uppercase();
-            Some(format!("{label}: {value}"))
+            format!("{label}: {value}")
         })
         .collect()
 }

@@ -1,20 +1,9 @@
 //! `server:*` commands.
 
-use crate::cli::{connection_options, CommandSpec};
 use crate::client;
 use crate::error::CliError;
 use crate::output::{format_status, print_json, render_table};
 use serde_json::Value;
-
-pub fn health_spec() -> CommandSpec {
-    CommandSpec {
-        name: "server:health",
-        description: "Check server health",
-        args: vec![],
-        // Like 2.x, server:health takes --output=json but has no --json alias.
-        opts: connection_options(),
-    }
-}
 
 fn is_healthy(status: &str) -> bool {
     matches!(

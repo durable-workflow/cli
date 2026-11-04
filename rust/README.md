@@ -14,6 +14,8 @@ every command group reaches parity.
 | Area | State |
 |---|---|
 | Option parsing (2.x rules), grouped aliases (`dw schedule list`) | Ported |
+| Command lookup: aliases, abbreviations, "Did you mean", namespace listings, `list` | Ported, from the 2.x catalog |
+| `--help` text for each command | Not yet (usage line only) |
 | Profiles: file, location, permissions, resolution order | Ported |
 | Output modes, error envelope, next steps, exit codes | Ported |
 | `env:list`, `env:set`, `env:use`, `env:show`, `env:delete` | Ported |
@@ -42,7 +44,7 @@ CLI and once with this build, each in a fresh config directory. It compares:
 - exit codes;
 - stdout, with JSON compared as data after normalizing times, IDs, the
   config path and transport error text;
-- the stderr category;
+- stderr as normalized text (the same normalizations), plus its category;
 - the config file each case leaves behind.
 
 ```bash
@@ -51,8 +53,17 @@ cargo build
 python3 parity/parity.py       # --build release, --report, --verbose
 ```
 
-To also run the Server cases, set `DW_PARITY_SERVERS` to the running
-Servers (for example `php=http://127.0.0.1:18080,native=http://127.0.0.1:18081`)
-and `DW_PARITY_TOKEN` to their auth token. A case can record an intentional
-difference with a reason. One exists today: on native Server, `server:health`
-reports boolean checks correctly where 2.x does not (#74).
+To also run the Server cases, start the published Servers pinned in
+`parity/servers.json`, set `DW_PARITY_SERVERS` to them (for example
+`php=http://127.0.0.1:18080,native=http://127.0.0.1:18081`) and
+`DW_PARITY_TOKEN` to their auth token.
+
+`src/catalog.json` is the 2.x command surface (names, aliases, usage lines,
+option definitions), generated from the pinned reference by
+`parity/update-catalog.sh`. Lookup, listings and usage errors read it, so
+they match 2.x even for commands not ported yet.
+
+A case can record an intentional difference with a reason and the exact
+fields it excuses; any other differing field still fails. One exists today:
+2.x prompts "Do you want to run …?" on stdout even when stdin is not a
+terminal; this build prompts only on a terminal.

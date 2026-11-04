@@ -1,6 +1,6 @@
 {
   "comment": "The published 2.x CLI the Rust CLI is compared against. Move only to a published, checksum-verified release.",
-  "version": "2.3.4",
+  "version": "2.3.5",
   "asset": "dw-linux-x86_64",
-  "sha256": "3bdb00c451f66bebce78815abc82d5a23c1f4316b4445263cc2de72e42f64233"
+  "sha256": "92638c2dc1be3f26fce240b9e0985373a3b54f52ac110b99adfae7477c3b8efd"
 }

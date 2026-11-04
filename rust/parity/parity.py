@@ -38,7 +38,9 @@ CANDIDATES = {
 REPORT = os.path.join(CRATE, "target", "parity-report.json")
 
 TIME = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d[0-9.:+Z-]*")
-ULID = re.compile(r"\b[0-9A-Za-z]{26}\b")
+ULID = re.compile(r"\b[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}\b")
+VERSION_LINE = re.compile(r"dw \S+ \(commit [^,]+, built [^)]+\)")
+TRANSPORT_LINE = re.compile(r"^(Server unreachable|Request timed out): .*$", re.M)
 SERVER_LABEL = re.compile(r"[a-z][a-z0-9-]{0,31}")
 # Transport errors name the HTTP stack that failed; only the category is
 # part of the contract.
@@ -66,7 +68,9 @@ def substitute(text, case):
 
 def normalize_text(text, config_dir):
     text = text.replace(config_dir, "<config>")
+    text = VERSION_LINE.sub("dw <version>", text)
     text = TIME.sub("<time>", text)
+    text = TRANSPORT_LINE.sub("<transport error>", text)
     return ULID.sub("<id>", text)
 
 
@@ -122,14 +126,16 @@ def run_case(binary, case, env_base):
             subprocess.run([binary] + [substitute(arg, case) for arg in step], env=env,
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60, check=False)
         argv = [substitute(arg, case) for arg in case["argv"]]
-        completed = subprocess.run([binary] + argv, env=env, capture_output=True, text=True, timeout=60, check=False)
+        # No terminal on stdin, so neither CLI may prompt.
+        completed = subprocess.run([binary] + argv, env=env, stdin=subprocess.DEVNULL, capture_output=True,
+                                   text=True, timeout=60, check=False)
         stdout_json = parse_json_lines(completed.stdout)
         return {
             "exit_code": completed.returncode,
             "stdout_json": normalize_value(stdout_json, config_dir) if stdout_json is not None else None,
             "stdout_text": None if stdout_json is not None else normalize_text(completed.stdout, config_dir),
             "stderr_category": stderr_category(completed.stderr),
-            "stderr": completed.stderr,
+            "stderr": normalize_text(completed.stderr, config_dir),
             "config": read_config(config_dir),
         }
     finally:
@@ -137,7 +143,7 @@ def run_case(binary, case, env_base):
 
 
 def compare(reference, candidate, case):
-    fields = ["exit_code", "stderr_category", "stdout_json", "config"]
+    fields = ["exit_code", "stderr_category", "stderr", "stdout_json", "config"]
     if case.get("compare_text", True):
         fields.append("stdout_text")
     return [field for field in fields if reference[field] != candidate[field]]
@@ -155,9 +161,13 @@ def expand_cases(cases, servers):
             yield expanded
 
 
-def intentional_reason(case):
+def intentional_reason(case, differences):
+    """The recorded reason, only when every differing field is one it names."""
     reasons = case.get("expected_difference", {})
-    return reasons.get(case.get("server_label", ""), reasons.get("*"))
+    expected = reasons.get(case.get("server_label", ""), reasons.get("*"))
+    if expected and set(differences) <= set(expected["fields"]):
+        return expected["reason"]
+    return None
 
 
 def print_result(case, differences, reason, reference, candidate, verbose):
@@ -190,7 +200,7 @@ def run_all(candidate_binary, servers, verbose):
         reference = run_case(REFERENCE, case, env_base)
         candidate = run_case(candidate_binary, case, env_base)
         differences = compare(reference, candidate, case)
-        reason = intentional_reason(case) if differences else None
+        reason = intentional_reason(case, differences) if differences else None
         print_result(case, differences, reason, reference, candidate, verbose)
         results.append({"case": case["name"], "argv": case["argv"], "differences": differences,
                         "intentional": reason, "reference": reference, "candidate": candidate})

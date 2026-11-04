@@ -2,7 +2,8 @@
 //! existing scripts keep working: options may appear before or after
 //! arguments, `--name=value` and `--name value` are equivalent, `--` ends
 //! option parsing, and an option that takes an optional value consumes the
-//! next token only when it does not start with `-`.
+//! next token only when it does not start with `-`. Command definitions come
+//! from the 2.x catalog (see `catalog`).
 
 use std::collections::{HashMap, HashSet};
 
@@ -18,93 +19,28 @@ pub enum ValueMode {
 
 #[derive(Clone, Debug)]
 pub struct OptSpec {
-    pub long: &'static str,
-    pub short: Option<char>,
+    pub long: String,
+    /// Single-character shortcuts, such as `s` for `-s`.
+    pub shorts: Vec<char>,
     pub mode: ValueMode,
-    pub default: Option<&'static str>,
-}
-
-impl OptSpec {
-    pub const fn flag(long: &'static str) -> Self {
-        Self {
-            long,
-            short: None,
-            mode: ValueMode::None,
-            default: None,
-        }
-    }
-
-    pub const fn required(long: &'static str) -> Self {
-        Self {
-            long,
-            short: None,
-            mode: ValueMode::Required,
-            default: None,
-        }
-    }
-
-    pub const fn optional(long: &'static str) -> Self {
-        Self {
-            long,
-            short: None,
-            mode: ValueMode::Optional,
-            default: None,
-        }
-    }
-
-    pub const fn short(mut self, short: char) -> Self {
-        self.short = Some(short);
-        self
-    }
-
-    pub const fn default(mut self, value: &'static str) -> Self {
-        self.default = Some(value);
-        self
-    }
+    pub multiple: bool,
+    pub default: Option<String>,
 }
 
 #[derive(Clone, Debug)]
 pub struct ArgSpec {
-    pub name: &'static str,
+    pub name: String,
     pub required: bool,
+    pub array: bool,
 }
 
 #[derive(Clone, Debug)]
 pub struct CommandSpec {
-    pub name: &'static str,
-    pub description: &'static str,
+    pub name: String,
+    pub description: String,
+    pub synopsis: String,
     pub args: Vec<ArgSpec>,
     pub opts: Vec<OptSpec>,
-}
-
-/// Options every command accepts, as in the 2.x application definition.
-fn application_options() -> Vec<OptSpec> {
-    vec![
-        OptSpec::flag("help").short('h'),
-        OptSpec::flag("quiet").short('q'),
-        OptSpec::flag("silent"),
-        OptSpec::flag("verbose").short('v'),
-        OptSpec::flag("version").short('V'),
-        OptSpec::flag("ansi"),
-        OptSpec::flag("no-ansi"),
-        OptSpec::flag("no-interaction").short('n'),
-    ]
-}
-
-/// Connection options shared by every command that talks to a Server.
-pub fn connection_options() -> Vec<OptSpec> {
-    vec![
-        OptSpec::optional("server").short('s'),
-        OptSpec::optional("namespace"),
-        OptSpec::optional("token"),
-        OptSpec::required("tls-verify"),
-        OptSpec::required("env"),
-        output_option(),
-    ]
-}
-
-pub fn output_option() -> OptSpec {
-    OptSpec::required("output").default("table")
 }
 
 /// A usage error reported the way the 2.x CLI reports Symfony console
@@ -118,15 +54,18 @@ pub struct UsageError {
 #[derive(Debug, Default)]
 pub struct Input {
     pub command: String,
-    args: HashMap<String, String>,
-    opts: HashMap<String, Option<String>>,
+    args: HashMap<String, Vec<String>>,
+    opts: HashMap<String, Vec<Option<String>>>,
     flags: HashSet<String>,
     defaults: HashMap<String, String>,
 }
 
 impl Input {
     pub fn arg(&self, name: &str) -> Option<&str> {
-        self.args.get(name).map(String::as_str)
+        self.args
+            .get(name)
+            .and_then(|values| values.first())
+            .map(String::as_str)
     }
 
     pub fn flag(&self, name: &str) -> bool {
@@ -138,10 +77,10 @@ impl Input {
         self.opts.contains_key(name) || self.flags.contains(name)
     }
 
-    /// The option value, or its default when the caller did not write it.
-    /// `Some(None)` means it was written without a value.
+    /// The last written value of an option, or its default when the caller
+    /// did not write it. `Some(None)` means it was written without a value.
     pub fn opt(&self, name: &str) -> Option<Option<&str>> {
-        match self.opts.get(name) {
+        match self.opts.get(name).and_then(|values| values.last()) {
             Some(value) => Some(value.as_deref()),
             None => self.defaults.get(name).map(|value| Some(value.as_str())),
         }
@@ -153,49 +92,37 @@ impl Input {
     }
 }
 
-pub fn synopsis(spec: &CommandSpec) -> String {
-    let mut parts = vec![spec.name.to_string()];
-    for opt in &spec.opts {
-        let mut name = String::new();
-        if let Some(short) = opt.short {
-            name.push_str(&format!("-{short}|"));
+/// Splits raw tokens into the command name and the remaining tokens, using
+/// the same rule as Symfony: the first token that is neither an option nor
+/// the value of a known separate-value global option.
+pub fn first_argument(tokens: &[String]) -> Option<(usize, &str)> {
+    let mut index = 0;
+    while index < tokens.len() {
+        let token = tokens[index].as_str();
+        if token == "--" {
+            return tokens.get(index + 1).map(|name| (index + 1, name.as_str()));
         }
-        name.push_str("--");
-        name.push_str(opt.long);
-        let value = opt.long.to_uppercase();
-        parts.push(match opt.mode {
-            ValueMode::None => format!("[{name}]"),
-            ValueMode::Required => format!("[{name} {value}]"),
-            ValueMode::Optional => format!("[{name} [{value}]]"),
-        });
+        if !token.starts_with('-') || token == "-" {
+            return Some((index, token));
+        }
+        index += 1;
     }
-    for arg in &spec.args {
-        parts.push(if arg.required {
-            format!("<{}>", arg.name)
-        } else {
-            format!("[<{}>]", arg.name)
-        });
-    }
-    parts.join(" ")
+    None
 }
 
 pub fn parse(spec: &CommandSpec, tokens: &[String]) -> Result<Input, UsageError> {
-    let mut all_opts = spec.opts.clone();
-    all_opts.extend(application_options());
     let usage = |message: String| UsageError {
         message,
-        synopsis: Some(synopsis(spec)),
+        synopsis: Some(spec.synopsis.clone()),
     };
 
     let mut input = Input {
-        command: spec.name.to_string(),
+        command: spec.name.clone(),
         ..Input::default()
     };
-    for opt in &all_opts {
-        if let Some(default) = opt.default {
-            input
-                .defaults
-                .insert(opt.long.to_string(), default.to_string());
+    for opt in &spec.opts {
+        if let Some(default) = &opt.default {
+            input.defaults.insert(opt.long.clone(), default.clone());
         }
     }
 
@@ -214,77 +141,14 @@ pub fn parse(spec: &CommandSpec, tokens: &[String]) -> Result<Input, UsageError>
             only_args = true;
             continue;
         }
-
         if let Some(long) = token.strip_prefix("--") {
-            let (name, inline) = match long.split_once('=') {
-                Some((name, value)) => (name, Some(value.to_string())),
-                None => (long, None),
-            };
-            let opt = all_opts
-                .iter()
-                .find(|opt| opt.long == name)
-                .ok_or_else(|| usage(format!("The \"--{name}\" option does not exist.")))?;
-            set_option(
-                &mut input,
-                opt,
-                inline,
-                tokens,
-                &mut index,
-                &format!("--{name}"),
-            )
-            .map_err(usage)?;
-            continue;
-        }
-
-        // Short options may be bundled (-qn) or carry a value (-shttp://x).
-        let shorts: Vec<char> = token[1..].chars().collect();
-        let mut position = 0;
-        while position < shorts.len() {
-            let short = shorts[position];
-            let opt = all_opts
-                .iter()
-                .find(|opt| opt.short == Some(short))
-                .ok_or_else(|| usage(format!("The \"-{short}\" option does not exist.")))?;
-            if opt.mode != ValueMode::None {
-                let rest: String = shorts[position + 1..].iter().collect();
-                let inline = if rest.is_empty() { None } else { Some(rest) };
-                set_option(
-                    &mut input,
-                    opt,
-                    inline,
-                    tokens,
-                    &mut index,
-                    &format!("--{}", opt.long),
-                )
-                .map_err(usage)?;
-                break;
-            }
-            input.flags.insert(opt.long.to_string());
-            position += 1;
+            parse_long(spec, &mut input, long, tokens, &mut index).map_err(usage)?;
+        } else {
+            parse_short(spec, &mut input, &token[1..], tokens, &mut index).map_err(usage)?;
         }
     }
 
-    for (position, value) in positional.into_iter().enumerate() {
-        match spec.args.get(position) {
-            Some(arg) => {
-                input.args.insert(arg.name.to_string(), value);
-            }
-            None if spec.args.is_empty() => {
-                return Err(usage(format!(
-                    "No arguments expected for \"{}\" command, got \"{value}\".",
-                    spec.name
-                )));
-            }
-            None => {
-                let expected: Vec<String> =
-                    spec.args.iter().map(|arg| arg.name.to_string()).collect();
-                return Err(usage(format!(
-                    "Too many arguments, expected arguments \"{}\".",
-                    expected.join("\" \"")
-                )));
-            }
-        }
-    }
+    bind_arguments(spec, &mut input, positional).map_err(usage)?;
 
     // Help is answered before argument validation, as in Symfony.
     if input.flag("help") {
@@ -294,8 +158,8 @@ pub fn parse(spec: &CommandSpec, tokens: &[String]) -> Result<Input, UsageError>
     let missing: Vec<&str> = spec
         .args
         .iter()
-        .filter(|arg| arg.required && !input.args.contains_key(arg.name))
-        .map(|arg| arg.name)
+        .filter(|arg| arg.required && !input.args.contains_key(&arg.name))
+        .map(|arg| arg.name.as_str())
         .collect();
     if !missing.is_empty() {
         return Err(usage(format!(
@@ -303,8 +167,54 @@ pub fn parse(spec: &CommandSpec, tokens: &[String]) -> Result<Input, UsageError>
             missing.join(", ")
         )));
     }
-
     Ok(input)
+}
+
+fn parse_long(
+    spec: &CommandSpec,
+    input: &mut Input,
+    long: &str,
+    tokens: &[String],
+    index: &mut usize,
+) -> Result<(), String> {
+    let (name, inline) = match long.split_once('=') {
+        Some((name, value)) => (name, Some(value.to_string())),
+        None => (long, None),
+    };
+    let opt = spec
+        .opts
+        .iter()
+        .find(|opt| opt.long == name)
+        .ok_or_else(|| format!("The \"--{name}\" option does not exist."))?;
+    set_option(input, opt, inline, tokens, index)
+}
+
+/// Short options may be bundled (`-qn`) or carry a value (`-shttp://x`).
+fn parse_short(
+    spec: &CommandSpec,
+    input: &mut Input,
+    shorts: &str,
+    tokens: &[String],
+    index: &mut usize,
+) -> Result<(), String> {
+    let chars: Vec<char> = shorts.chars().collect();
+    let mut position = 0;
+    while position < chars.len() {
+        let short = chars[position];
+        let opt = spec
+            .opts
+            .iter()
+            .find(|opt| opt.shorts.contains(&short))
+            .ok_or_else(|| format!("The \"-{short}\" option does not exist."))?;
+        if opt.mode != ValueMode::None {
+            let rest: String = chars[position + 1..].iter().collect();
+            let inline = (!rest.is_empty()).then_some(rest);
+            return set_option(input, opt, inline, tokens, index);
+        }
+        input.flags.insert(opt.long.clone());
+        position += 1;
+    }
+    Ok(())
 }
 
 fn set_option(
@@ -313,29 +223,70 @@ fn set_option(
     inline: Option<String>,
     tokens: &[String],
     index: &mut usize,
-    display: &str,
 ) -> Result<(), String> {
-    match opt.mode {
-        ValueMode::None => {
-            if inline.is_some() {
-                return Err(format!("The \"{display}\" option does not accept a value."));
-            }
-            input.flags.insert(opt.long.to_string());
+    if opt.mode == ValueMode::None {
+        if inline.is_some() {
+            return Err(format!(
+                "The \"--{}\" option does not accept a value.",
+                opt.long
+            ));
         }
-        ValueMode::Required | ValueMode::Optional => {
-            let mut value = inline;
-            if value.is_none() {
-                if let Some(next) = tokens.get(*index) {
-                    if !next.is_empty() && !next.starts_with('-') {
-                        value = Some(next.clone());
-                        *index += 1;
-                    }
-                }
+        input.flags.insert(opt.long.clone());
+        return Ok(());
+    }
+
+    let mut value = inline;
+    if value.is_none() {
+        if let Some(next) = tokens.get(*index) {
+            if !next.is_empty() && !next.starts_with('-') {
+                value = Some(next.clone());
+                *index += 1;
             }
-            if value.is_none() && opt.mode == ValueMode::Required {
-                return Err(format!("The \"{display}\" option requires a value."));
+        }
+    }
+    if value.is_none() && opt.mode == ValueMode::Required {
+        return Err(format!("The \"--{}\" option requires a value.", opt.long));
+    }
+    let values = input.opts.entry(opt.long.clone()).or_default();
+    if !opt.multiple {
+        values.clear();
+    }
+    values.push(value);
+    Ok(())
+}
+
+fn bind_arguments(
+    spec: &CommandSpec,
+    input: &mut Input,
+    positional: Vec<String>,
+) -> Result<(), String> {
+    for (position, value) in positional.into_iter().enumerate() {
+        if let Some(last) = spec
+            .args
+            .last()
+            .filter(|arg| arg.array && position >= spec.args.len() - 1)
+        {
+            input.args.entry(last.name.clone()).or_default().push(value);
+            continue;
+        }
+        match spec.args.get(position) {
+            Some(arg) => {
+                input.args.insert(arg.name.clone(), vec![value]);
             }
-            input.opts.insert(opt.long.to_string(), value);
+            None if spec.args.is_empty() => {
+                return Err(format!(
+                    "No arguments expected for \"{}\" command, got \"{value}\".",
+                    spec.name
+                ));
+            }
+            None => {
+                let expected: Vec<&str> = spec.args.iter().map(|arg| arg.name.as_str()).collect();
+                return Err(format!(
+                    "Too many arguments to \"{}\" command, expected arguments \"{}\".",
+                    spec.name,
+                    expected.join("\" \"")
+                ));
+            }
         }
     }
     Ok(())
@@ -346,17 +297,11 @@ mod tests {
     use super::*;
 
     fn spec() -> CommandSpec {
-        let mut opts = connection_options();
-        opts.push(OptSpec::flag("json"));
-        CommandSpec {
-            name: "test:cmd",
-            description: "",
-            args: vec![ArgSpec {
-                name: "name",
-                required: true,
-            }],
-            opts,
-        }
+        crate::catalog::spec("env:use").unwrap()
+    }
+
+    fn health() -> CommandSpec {
+        crate::catalog::spec("server:health").unwrap()
     }
 
     fn tokens(raw: &[&str]) -> Vec<String> {
@@ -365,23 +310,21 @@ mod tests {
 
     #[test]
     fn options_may_follow_or_precede_arguments() {
-        let input = parse(
-            &spec(),
-            &tokens(&["--env", "prod", "dev", "--json", "-shttp://x"]),
-        )
-        .unwrap();
+        let input = parse(&spec(), &tokens(&["--output", "json", "dev", "--json"])).unwrap();
         assert_eq!(input.arg("name"), Some("dev"));
-        assert_eq!(input.opt_str("env"), Some("prod"));
-        assert_eq!(input.opt_str("server"), Some("http://x"));
+        assert_eq!(input.opt_str("output"), Some("json"));
         assert!(input.flag("json"));
+        let input = parse(&health(), &tokens(&["-shttp://x", "-q"])).unwrap();
+        assert_eq!(input.opt_str("server"), Some("http://x"));
+        assert!(input.flag("quiet"));
     }
 
     #[test]
     fn optional_value_does_not_consume_a_following_option() {
-        let input = parse(&spec(), &tokens(&["dev", "--server", "--json"])).unwrap();
+        let input = parse(&health(), &tokens(&["--server", "--env", "prod"])).unwrap();
         assert!(input.provided("server"));
         assert_eq!(input.opt("server"), Some(None));
-        assert!(input.flag("json"));
+        assert_eq!(input.opt_str("env"), Some("prod"));
     }
 
     #[test]
@@ -399,8 +342,8 @@ mod tests {
             "The \"--bogus\" option does not exist."
         );
         assert_eq!(
-            error(&["dev", "--env"]),
-            "The \"--env\" option requires a value."
+            error(&["dev", "--output"]),
+            "The \"--output\" option requires a value."
         );
         assert_eq!(
             error(&["dev", "--json=1"]),
@@ -409,7 +352,21 @@ mod tests {
         assert_eq!(error(&[]), "Not enough arguments (missing: \"name\").");
         assert_eq!(
             error(&["a", "b"]),
-            "Too many arguments, expected arguments \"name\"."
+            "Too many arguments to \"env:use\" command, expected arguments \"name\"."
+        );
+        let list = crate::catalog::spec("env:list").unwrap();
+        assert_eq!(
+            parse(&list, &tokens(&["extra"])).unwrap_err().message,
+            "No arguments expected for \"env:list\" command, got \"extra\"."
+        );
+    }
+
+    #[test]
+    fn usage_errors_carry_the_2x_synopsis() {
+        let error = parse(&spec(), &tokens(&[])).unwrap_err();
+        assert_eq!(
+            error.synopsis.as_deref(),
+            Some("env:use [--output OUTPUT] [--json] [--] <name>")
         );
     }
 

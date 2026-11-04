@@ -157,10 +157,6 @@ impl ProfileStore {
         })
     }
 
-    pub fn path(&self) -> &Path {
-        &self.path
-    }
-
     pub fn path_string(&self) -> String {
         self.path.to_string_lossy().into_owned()
     }

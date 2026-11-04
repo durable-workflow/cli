@@ -25,7 +25,7 @@ fn array_field<'a>(value: &'a Value, key: &str) -> Option<&'a Value> {
 
 pub fn render(info: &Value, request_contract: Option<&RequestContract>) -> String {
     let mut out = vec![
-        "Durable Workflow Server".to_string(),
+        "<info>Durable Workflow Server</info>".to_string(),
         format!("  Server ID: {}", or(get(info, "server_id"), "unknown")),
         format!("  Version: {}", or(get(info, "version"), "unknown")),
         format!(
@@ -62,7 +62,7 @@ fn render_capability(out: &mut Lines, name: &str, value: &Value, indent: usize) 
     let pad = " ".repeat(indent);
     if is_array(value) {
         if !non_empty_array(value) {
-            out.push(format!("{pad}{name}: none"));
+            out.push(format!("{pad}{name}: <comment>none</comment>"));
             return;
         }
         if is_list(value) && entries(value).iter().all(|(_, item)| is_plain_scalar(item)) {
@@ -73,7 +73,7 @@ fn render_capability(out: &mut Lines, name: &str, value: &Value, indent: usize) 
                     other => crate::php::to_string(Some(other)),
                 })
                 .collect();
-            out.push(format!("{pad}{name}: {}", items.join(", ")));
+            out.push(format!("{pad}{name}: <info>{}</info>", items.join(", ")));
             return;
         }
         out.push(format!("{pad}{name}:"));
@@ -83,9 +83,16 @@ fn render_capability(out: &mut Lines, name: &str, value: &Value, indent: usize) 
         return;
     }
     match value {
-        Value::Bool(flag) => out.push(format!("{pad}{name}: {}", if *flag { "yes" } else { "no" })),
-        other => out.push(format!(
+        Value::Bool(flag) => out.push(format!(
             "{pad}{name}: {}",
+            if *flag {
+                "<info>yes</info>"
+            } else {
+                "<comment>no</comment>"
+            }
+        )),
+        other => out.push(format!(
+            "{pad}{name}: <info>{}</info>",
             crate::php::to_string(Some(other))
         )),
     }
@@ -955,7 +962,7 @@ mod tests {
             "capabilities": {"workflow_tasks": true, "codecs": ["avro"], "empty": [], "nested": {"a": 1}},
             "limits": {"max_payload_bytes": 2097152, "max_history_events": 50000},
         });
-        let text = render(&info, None);
+        let text = crate::formatter::format(&render(&info, None), false);
         assert!(text.starts_with("Durable Workflow Server\n  Server ID: srv-1\n  Version: 2.11.8\n  Default Namespace: default\n\nCapabilities:\n"));
         assert!(text.contains(
             "  workflow_tasks: yes\n  codecs: avro\n  empty: none\n  nested:\n    a: 1\n"

@@ -112,7 +112,10 @@ pub fn warn_first(info: &Value, include_worker_protocol: bool) {
     if let Some(warning) =
         compat::warnings(info, build_info::version(), include_worker_protocol).first()
     {
-        eprintln!("{warning}{}", compat::WARNING_SUFFIX);
+        crate::formatter::writeln_err(&format!(
+            "<comment>{warning}{}</comment>",
+            compat::WARNING_SUFFIX
+        ));
     }
 }
 

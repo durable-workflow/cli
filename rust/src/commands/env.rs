@@ -3,6 +3,7 @@
 use crate::cli::Input;
 use crate::config::{Profile, ProfileStore, TokenSource, OUTPUT_MODES};
 use crate::error::CliError;
+use crate::formatter::writeln_out;
 use crate::output::{print_json, print_json_list, render_table, resolve_mode, Mode};
 use serde_json::{json, Map, Value};
 
@@ -72,8 +73,8 @@ pub fn list(input: &Input) -> Result<i32, CliError> {
     }
 
     if envs.is_empty() {
-        println!("No dw environments configured.");
-        println!("Create one with `dw env:set <name> --server=https://... --namespace=<ns>`.");
+        writeln_out("<comment>No dw environments configured.</comment>");
+        writeln_out("<comment>Create one with `dw env:set <name> --server=https://... --namespace=<ns>`.</comment>");
         return Ok(0);
     }
 
@@ -95,21 +96,18 @@ pub fn list(input: &Input) -> Result<i32, CliError> {
             ]
         })
         .collect();
-    println!(
-        "{}",
-        render_table(
-            &[
-                "Current",
-                "Name",
-                "Server",
-                "Namespace",
-                "Token",
-                "TLS Verify",
-                "Output"
-            ],
-            &rows
-        )
-    );
+    writeln_out(&render_table(
+        &[
+            "Current",
+            "Name",
+            "Server",
+            "Namespace",
+            "Token",
+            "TLS Verify",
+            "Output",
+        ],
+        &rows,
+    ));
     Ok(0)
 }
 
@@ -158,7 +156,7 @@ pub fn show(input: &Input) -> Result<i32, CliError> {
         ],
         vec!["config_path".into(), or_dash(&envelope["config_path"])],
     ];
-    println!("{}", render_table(&["Field", "Value"], &rows));
+    writeln_out(&render_table(&["Field", "Value"], &rows));
     Ok(0)
 }
 
@@ -179,12 +177,12 @@ pub fn use_env(input: &Input) -> Result<i32, CliError> {
         return Ok(0);
     }
 
-    println!("Using dw env [{name}].");
+    writeln_out(&format!("<info>Using dw env [{name}].</info>"));
     if let Some(server) = &profile.server {
-        println!("  server: {server}");
+        writeln_out(&format!("  server: {server}"));
     }
     if let Some(namespace) = &profile.namespace {
-        println!("  namespace: {namespace}");
+        writeln_out(&format!("  namespace: {namespace}"));
     }
     Ok(0)
 }
@@ -207,9 +205,9 @@ pub fn delete(input: &Input) -> Result<i32, CliError> {
         return Ok(0);
     }
 
-    println!("Deleted dw env [{name}].");
+    writeln_out(&format!("<info>Deleted dw env [{name}].</info>"));
     if cleared {
-        println!("Cleared the current dw env.");
+        writeln_out("<comment>Cleared the current dw env.</comment>");
     }
     Ok(0)
 }
@@ -344,9 +342,12 @@ pub fn set(input: &Input) -> Result<i32, CliError> {
         return Ok(0);
     }
 
-    println!("Saved dw env [{name}] to {}.", store.path_string());
+    writeln_out(&format!(
+        "<info>Saved dw env [{name}] to {}.</info>",
+        store.path_string()
+    ));
     if make_default {
-        println!("Set [{name}] as the current dw env.");
+        writeln_out(&format!("<info>Set [{name}] as the current dw env.</info>"));
     }
     Ok(0)
 }

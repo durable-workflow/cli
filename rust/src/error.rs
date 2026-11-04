@@ -403,7 +403,7 @@ fn next_step_lines(next: &[Value]) -> Vec<String> {
 
 /// Human error text for stderr.
 pub fn human(error: &CliError, context: &ErrorContext) -> String {
-    let mut lines = vec![error.message().to_string()];
+    let mut lines = vec![format!("<error>{}</error>", error.message())];
     if let Some(namespace) = &context.namespace {
         lines.push(format!("Namespace: {namespace}"));
     }
@@ -475,7 +475,7 @@ mod tests {
             r#"{"message":"Invalid.","reason":"bad_input","error_code":"E1","errors":{"name":["Required.",""],"type":"Unknown."}}"#,
         );
         assert_eq!(
-            human(&error, &context()),
+            crate::formatter::format(&human(&error, &context()), false),
             "Server error: Invalid.\nNamespace: default\nReason: bad_input\nError code: E1\nValidation: name: Required.\nValidation: type: Unknown.\nNext steps:\n  - Inspect the request options and retry in JSON mode if support needs the exact error envelope.\n    Try: dw workflow:cancel --output=json"
         );
     }

@@ -968,6 +968,506 @@
     "env:delete",
     "-h"
    ]
+  },
+  {
+   "name": "help wins over an unknown option",
+   "argv": [
+    "env:use",
+    "--help",
+    "--bogus"
+   ]
+  },
+  {
+   "name": "help wins over too many arguments",
+   "argv": [
+    "env:use",
+    "a",
+    "b",
+    "--help"
+   ]
+  },
+  {
+   "name": "help with a value",
+   "argv": [
+    "env:use",
+    "--help=x"
+   ]
+  },
+  {
+   "name": "help as the value of another option",
+   "argv": [
+    "env:list",
+    "--output",
+    "-h"
+   ]
+  },
+  {
+   "name": "quiet flag bundled before h runs the command",
+   "argv": [
+    "env:list",
+    "-qh"
+   ]
+  },
+  {
+   "name": "help in json via --help",
+   "argv": [
+    "env:use",
+    "--help",
+    "--format=json"
+   ]
+  },
+  {
+   "name": "help format before --help",
+   "argv": [
+    "env:use",
+    "--format=md",
+    "--help"
+   ]
+  },
+  {
+   "name": "help options after a bad token are ignored",
+   "argv": [
+    "env:use",
+    "--help",
+    "--bogus",
+    "--format=json"
+   ]
+  },
+  {
+   "name": "help command json",
+   "argv": [
+    "help",
+    "env:use",
+    "--format=json"
+   ]
+  },
+  {
+   "name": "help command md",
+   "argv": [
+    "help",
+    "server:info",
+    "--format=md"
+   ]
+  },
+  {
+   "name": "help command raw",
+   "argv": [
+    "help",
+    "env:use",
+    "--raw"
+   ]
+  },
+  {
+   "name": "help command xml",
+   "argv": [
+    "help",
+    "env:use",
+    "--format=xml"
+   ],
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "exit_code",
+      "stdout_text",
+      "stdout_json",
+      "stderr",
+      "stderr_category"
+     ],
+     "reason": "The 2.x standalone binary has no PHP DOM extension, so --format=xml dies with a PHP fatal error (exit 255). This build prints the XML the 2.x PHAR produces on a full PHP."
+    }
+   }
+  },
+  {
+   "name": "help command unsupported format",
+   "argv": [
+    "help",
+    "env:use",
+    "--format=yaml"
+   ]
+  },
+  {
+   "name": "help command ignores a bad option",
+   "argv": [
+    "help",
+    "--bogus",
+    "env:use"
+   ]
+  },
+  {
+   "name": "list json",
+   "argv": [
+    "list",
+    "--format=json"
+   ]
+  },
+  {
+   "name": "list namespace json",
+   "argv": [
+    "list",
+    "env",
+    "--format=json"
+   ]
+  },
+  {
+   "name": "list short json",
+   "argv": [
+    "list",
+    "--short",
+    "--format=json"
+   ]
+  },
+  {
+   "name": "list md",
+   "argv": [
+    "list",
+    "--format=md"
+   ]
+  },
+  {
+   "name": "list raw",
+   "argv": [
+    "list",
+    "--raw"
+   ]
+  },
+  {
+   "name": "list namespace raw",
+   "argv": [
+    "list",
+    "env",
+    "--raw"
+   ]
+  },
+  {
+   "name": "list abbreviated namespace",
+   "argv": [
+    "list",
+    "sch"
+   ]
+  },
+  {
+   "name": "list alias namespace",
+   "argv": [
+    "list",
+    "activities"
+   ]
+  },
+  {
+   "name": "list unknown namespace json",
+   "argv": [
+    "list",
+    "nope",
+    "--format=json"
+   ]
+  },
+  {
+   "name": "list unsupported format",
+   "argv": [
+    "list",
+    "--format=yaml"
+   ]
+  },
+  {
+   "name": "list xml",
+   "argv": [
+    "list",
+    "--format=xml"
+   ],
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "exit_code",
+      "stdout_text",
+      "stdout_json",
+      "stderr",
+      "stderr_category"
+     ],
+     "reason": "The 2.x standalone binary has no PHP DOM extension, so --format=xml dies with a PHP fatal error (exit 255). This build prints the XML the 2.x PHAR produces on a full PHP."
+    }
+   }
+  },
+  {
+   "name": "ansi help",
+   "argv": [
+    "env:use",
+    "--help",
+    "--ansi"
+   ]
+  },
+  {
+   "name": "ansi listing",
+   "argv": [
+    "list",
+    "--ansi"
+   ]
+  },
+  {
+   "name": "ansi version",
+   "argv": [
+    "--version",
+    "--ansi"
+   ]
+  },
+  {
+   "name": "ansi empty env list",
+   "argv": [
+    "env:list",
+    "--ansi"
+   ]
+  },
+  {
+   "name": "ansi table",
+   "setup": [
+    [
+     "env:set",
+     "prod",
+     "--server=https://x.example",
+     "--namespace=orders",
+     "--token=s3cret",
+     "--make-default"
+    ]
+   ],
+   "argv": [
+    "env:show",
+    "--ansi"
+   ]
+  },
+  {
+   "name": "ansi env set",
+   "argv": [
+    "env:set",
+    "dev",
+    "--server=http://d",
+    "--make-default",
+    "--ansi"
+   ]
+  },
+  {
+   "name": "ansi usage error",
+   "argv": [
+    "env:list",
+    "--bogus",
+    "--ansi"
+   ]
+  },
+  {
+   "name": "ansi unknown command",
+   "argv": [
+    "nope",
+    "--ansi"
+   ]
+  },
+  {
+   "name": "ansi command error",
+   "argv": [
+    "env:show",
+    "nope",
+    "--ansi"
+   ]
+  },
+  {
+   "name": "ansi wins over no-ansi",
+   "argv": [
+    "env:list",
+    "--no-ansi",
+    "--ansi"
+   ]
+  },
+  {
+   "name": "no-ansi listing",
+   "argv": [
+    "list",
+    "--no-ansi"
+   ]
+  },
+  {
+   "name": "quiet command",
+   "setup": [
+    [
+     "env:set",
+     "prod",
+     "--server=https://x.example",
+     "--namespace=orders",
+     "--token=s3cret",
+     "--make-default"
+    ]
+   ],
+   "argv": [
+    "env:list",
+    "-q"
+   ]
+  },
+  {
+   "name": "quiet json",
+   "setup": [
+    [
+     "env:set",
+     "prod",
+     "--server=https://x.example",
+     "--namespace=orders",
+     "--token=s3cret",
+     "--make-default"
+    ]
+   ],
+   "argv": [
+    "env:list",
+    "--json",
+    "-q"
+   ]
+  },
+  {
+   "name": "quiet command error",
+   "argv": [
+    "env:show",
+    "nope",
+    "-q"
+   ]
+  },
+  {
+   "name": "quiet json error",
+   "argv": [
+    "env:show",
+    "nope",
+    "--json",
+    "-q"
+   ]
+  },
+  {
+   "name": "quiet usage error still shown",
+   "argv": [
+    "env:list",
+    "--bogus",
+    "-q"
+   ]
+  },
+  {
+   "name": "quiet unknown command still shown",
+   "argv": [
+    "nope",
+    "-q"
+   ]
+  },
+  {
+   "name": "silent usage error hidden",
+   "argv": [
+    "env:list",
+    "--bogus",
+    "--silent"
+   ]
+  },
+  {
+   "name": "silent command",
+   "setup": [
+    [
+     "env:set",
+     "prod",
+     "--server=https://x.example",
+     "--namespace=orders",
+     "--token=s3cret",
+     "--make-default"
+    ]
+   ],
+   "argv": [
+    "env:list",
+    "--silent"
+   ]
+  },
+  {
+   "name": "quiet version",
+   "argv": [
+    "--version",
+    "-q"
+   ]
+  },
+  {
+   "name": "quiet help",
+   "argv": [
+    "env:use",
+    "--help",
+    "-q"
+   ]
+  },
+  {
+   "name": "quiet by environment",
+   "setup": [
+    [
+     "env:set",
+     "prod",
+     "--server=https://x.example",
+     "--namespace=orders",
+     "--token=s3cret",
+     "--make-default"
+    ]
+   ],
+   "env": {
+    "SHELL_VERBOSITY": "-1"
+   },
+   "argv": [
+    "env:list"
+   ]
+  },
+  {
+   "name": "verbose then quiet is not quiet",
+   "argv": [
+    "env:list",
+    "-vq"
+   ]
+  },
+  {
+   "name": "quiet network error",
+   "argv": [
+    "server:health",
+    "--server=http://127.0.0.1:1",
+    "-q"
+   ]
+  },
+  {
+   "name": "completion help for zsh",
+   "env": {
+    "SHELL": "/usr/bin/zsh"
+   },
+   "argv": [
+    "completion",
+    "--help"
+   ]
+  },
+  {
+   "name": "completion help for fish",
+   "env": {
+    "SHELL": "/usr/local/bin/fish"
+   },
+   "argv": [
+    "completion",
+    "--help"
+   ]
+  },
+  {
+   "name": "completion help without a shell",
+   "env": {
+    "SHELL": ""
+   },
+   "argv": [
+    "completion",
+    "--help"
+   ]
+  },
+  {
+   "name": "ansi health",
+   "server": true,
+   "argv": [
+    "server:health",
+    "--server={server}",
+    "--ansi"
+   ]
+  },
+  {
+   "name": "ansi server info",
+   "server": true,
+   "argv": [
+    "server:info",
+    "--server={server}",
+    "--ansi"
+   ]
   }
  ]
 }

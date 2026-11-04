@@ -7,17 +7,19 @@ mod client;
 mod commands;
 mod compat;
 mod config;
+mod descriptor;
 mod error;
-mod help;
+mod formatter;
 mod lookup;
 mod output;
 mod php;
 
 use cli::{Input, UsageError};
+use descriptor::Format;
 use error::{exit, CliError, ErrorContext};
 use lookup::LookupError;
 use output::Mode;
-use std::io::{BufRead, IsTerminal, Write};
+use std::io::{BufRead, Write};
 
 type Run = fn(&Input) -> Result<i32, CliError>;
 type RunWithServer = fn(&client::Context) -> Result<i32, CliError>;
@@ -168,103 +170,102 @@ fn error_block(message: &str) -> Vec<String> {
     block
 }
 
+/// Symfony's console error rendering: a blank line, the `<error>` block,
+/// a blank line and, for usage errors, the command synopsis. Shown when
+/// quiet, hidden when silent.
 fn print_usage_error(error: &UsageError) {
-    eprintln!();
+    let mut lines = vec![String::new()];
     for line in error_block(&error.message) {
-        eprintln!("{line}");
+        lines.push(format!("<error>{}</error>", formatter::escape(&line)));
     }
-    eprintln!();
+    lines.push(String::new());
     if let Some(synopsis) = &error.synopsis {
-        eprintln!("{synopsis}");
-        eprintln!();
+        lines.push(format!("<info>{}</info>", formatter::escape(synopsis)));
+        lines.push(String::new());
+    }
+    formatter::writeln_err_quiet(&lines.join("\n"));
+}
+
+/// Writes a description in its format: txt is styled for the stream, md
+/// passes through the formatter undecorated, json and xml are raw.
+fn write_description(text: &str, format: Format, to_stderr: bool) {
+    if formatter::verbosity() != formatter::Verbosity::Normal {
+        return;
+    }
+    match (format, to_stderr) {
+        (Format::Txt, false) => formatter::write_out(text),
+        (Format::Txt, true) => {
+            let stream = formatter::Stream::Stderr;
+            formatter::emit(
+                stream,
+                &formatter::format(text, formatter::decorated(stream)),
+            )
+        }
+        (Format::Md, _) => {
+            formatter::emit(formatter::Stream::Stdout, &formatter::format(text, false))
+        }
+        (Format::Json | Format::Xml, _) => formatter::emit(formatter::Stream::Stdout, text),
     }
 }
 
-const APPLICATION_HELP: &str = "Usage:
-  command [options] [arguments]
-
-Options:
-  -h, --help            Display help for the given command. When no command is given display help for the list command
-      --silent          Do not output any message
-  -q, --quiet           Only errors are displayed. All other output is suppressed
-  -V, --version         Display this application version
-      --ansi|--no-ansi  Force (or disable --no-ansi) ANSI output
-  -n, --no-interaction  Do not ask any interactive question
-  -v|vv|vvv, --verbose  Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug";
-
-/// The 2.x `list` text: all visible commands, or one namespace.
-fn listing(namespace: Option<&str>) -> String {
-    let mut entries: Vec<&catalog::Entry> = catalog::all()
-        .iter()
-        .filter(|entry| !entry.hidden)
-        .filter(|entry| match namespace {
-            Some(namespace) => entry.name.starts_with(&format!("{namespace}:")),
-            None => true,
-        })
-        .collect();
-    let group = |entry: &catalog::Entry| entry.name.rsplit_once(':').map(|(ns, _)| ns.to_string());
-    entries.sort_by(|a, b| group(a).cmp(&group(b)).then_with(|| a.name.cmp(&b.name)));
-    let width = entries
-        .iter()
-        .map(|entry| entry.name.chars().count())
-        .max()
-        .unwrap_or(0)
-        + 2;
-
-    let mut text = format!("{}\n\n{APPLICATION_HELP}\n\n", build_info::version_line());
-    text.push_str(&match namespace {
-        Some(namespace) => format!("Available commands for the \"{namespace}\" namespace:"),
-        None => "Available commands:".to_string(),
-    });
-    let mut current: Option<String> = None;
-    for entry in entries {
-        let entry_group = group(entry);
-        if namespace.is_none() && entry_group.is_some() && entry_group != current {
-            text.push_str(&format!(
-                "\n {}",
-                entry_group.as_deref().unwrap_or_default()
-            ));
-        }
-        current = entry_group;
-        let aliases = if entry.aliases.is_empty() {
-            String::new()
-        } else {
-            format!("[{}] ", entry.aliases.join("|"))
-        };
-        let padding = width - entry.name.chars().count();
-        text.push_str(&format!(
-            "\n  {}{}{aliases}{}",
-            entry.name,
-            " ".repeat(padding),
-            entry.description
-        ));
-    }
-    text
+/// The help command and `--help`: describe `command` with the help
+/// command's own options, which 2.x binds leniently.
+fn describe_help(command: &str, help_input: &Input) -> i32 {
+    let help_synopsis = catalog::spec("help")
+        .map(|spec| spec.synopsis)
+        .unwrap_or_default();
+    let format_name = help_input.opt_str("format").unwrap_or("txt");
+    let Some(format) = Format::parse(format_name) else {
+        print_usage_error(&UsageError {
+            message: descriptor::unsupported_format(format_name),
+            synopsis: Some(help_synopsis),
+        });
+        return exit::FAILURE;
+    };
+    let entry = catalog::entry(command).expect("resolved commands are in the catalog");
+    write_description(
+        &descriptor::describe_command(entry, format, help_input.flag("raw")),
+        format,
+        false,
+    );
+    exit::SUCCESS
 }
 
-fn print_help(command: &str) {
-    if let Some(entry) = catalog::entry(command) {
-        print!("{}", help::render(entry));
-    }
+fn help_options(tokens: &[String]) -> Input {
+    let spec = catalog::spec("help").expect("help is in the catalog");
+    cli::parse_lenient(&spec, tokens)
 }
 
-/// `dw help [<command_name>]`. Lookup errors are reported with the help
-/// command's own synopsis, as 2.x does.
-fn run_help_command(input: &Input, synopsis: &str) -> i32 {
-    let name = input.arg("command_name").unwrap_or("help");
-    match lookup::find(name, terminal_width()) {
-        Ok(command) => {
-            print_help(&command);
-            exit::SUCCESS
+/// `dw list [namespace] [--format] [--raw] [--short]`.
+fn run_list(input: &Input, synopsis: &str) -> i32 {
+    let format_name = input.opt_str("format").unwrap_or("txt");
+    let Some(format) = Format::parse(format_name) else {
+        print_usage_error(&UsageError {
+            message: descriptor::unsupported_format(format_name),
+            synopsis: Some(synopsis.to_string()),
+        });
+        return exit::FAILURE;
+    };
+    let raw = input.flag("raw");
+    let namespace = input.arg("namespace");
+    if let Some(Err(error)) = namespace.map(lookup::find_namespace) {
+        // 2.x writes the text listing header before it finds that the
+        // namespace does not exist.
+        if format == Format::Txt && !raw {
+            write_description(&descriptor::application_header(), format, false);
         }
-        Err(error) => {
-            print_usage_error(&UsageError {
-                message: error.message().to_string(),
-                synopsis: Some(synopsis.to_string()),
-            });
-            exit::FAILURE
-        }
+        print_usage_error(&UsageError {
+            message: error.message().to_string(),
+            synopsis: Some(synopsis.to_string()),
+        });
+        return exit::FAILURE;
     }
+    write_description(
+        &descriptor::describe_application(namespace, format, raw, input.flag("short")),
+        format,
+        false,
+    );
+    exit::SUCCESS
 }
 
 /// The output mode for reporting an error. It never fails: a broken profile
@@ -304,24 +305,25 @@ fn report(error: &CliError, input: &Input, server_command: bool) -> i32 {
     if error_mode(input, server_command).machine_readable() {
         output::print_json(&error::envelope(error, &context));
     } else {
-        eprintln!("{}", error::human(error, &context));
+        formatter::writeln_err(&error::human(error, &context));
     }
     error.exit_code()
-}
-
-fn interactive(tokens: &[String]) -> bool {
-    std::io::stdin().is_terminal()
-        && !tokens
-            .iter()
-            .any(|token| token == "-n" || token == "--no-interaction")
 }
 
 /// Symfony's single-suggestion confirmation. Only asked on a real terminal.
 fn confirm_alternative(name: &str, alternative: &str) -> bool {
     let mut stdout = std::io::stdout();
+    let decorated = formatter::decorated(formatter::Stream::Stdout);
     let _ = writeln!(stdout);
     for line in error_block(&format!("Command \"{name}\" is not defined.")) {
-        let _ = writeln!(stdout, "{line}");
+        let _ = writeln!(
+            stdout,
+            "{}",
+            formatter::format(
+                &format!("<error>{}</error>", formatter::escape(&line)),
+                decorated
+            )
+        );
     }
     let _ = write!(
         stdout,
@@ -339,7 +341,7 @@ fn resolve_command(name: &str, tokens: &[String]) -> Result<String, i32> {
     match lookup::find(name, terminal_width()) {
         Ok(command) => Ok(command),
         Err(LookupError::NotFound { alternatives, .. })
-            if alternatives.len() == 1 && interactive(tokens) =>
+            if alternatives.len() == 1 && formatter::interactive(tokens) =>
         {
             if confirm_alternative(name, &alternatives[0]) {
                 Ok(alternatives[0].clone())
@@ -350,7 +352,11 @@ fn resolve_command(name: &str, tokens: &[String]) -> Result<String, i32> {
         Err(error) => {
             // A name that is itself a namespace lists that namespace.
             if let Ok(namespace) = lookup::find_namespace(name) {
-                eprintln!("{}", listing(Some(&namespace)));
+                write_description(
+                    &descriptor::describe_application(Some(&namespace), Format::Txt, false, false),
+                    Format::Txt,
+                    true,
+                );
             } else {
                 print_usage_error(&UsageError {
                     message: error.message().to_string(),
@@ -405,7 +411,11 @@ fn names_a_server(tokens: &[String]) -> bool {
 /// `dw --version`, plus the first compatibility warning when the caller
 /// named a Server, as 2.x does.
 fn print_version(tokens: &[String]) {
-    println!("{}", build_info::version_line());
+    let line = build_info::version_line();
+    formatter::writeln_out(&format!(
+        "dw <info>{}</info>",
+        line.strip_prefix("dw ").unwrap_or(&line)
+    ));
     if !names_a_server(tokens) {
         return;
     }
@@ -439,36 +449,36 @@ fn print_version(tokens: &[String]) {
 
 fn run(raw: Vec<String>) -> i32 {
     let tokens = rewrite_grouped(&raw).unwrap_or(raw);
+    formatter::configure(&tokens);
 
     // Symfony answers --version before it looks for a command.
-    if tokens
-        .iter()
-        .take_while(|token| token.as_str() != "--")
-        .any(|token| {
-            token == "--version" || token.starts_with("--version=") || token.starts_with("-V")
-        })
-    {
+    if formatter::has_parameter_option(&tokens, &["--version", "-V"]) {
         print_version(&tokens);
         return exit::SUCCESS;
     }
 
+    let wants_help = formatter::has_parameter_option(&tokens, &["--help", "-h"]);
     let Some((position, name)) = cli::first_argument(&tokens) else {
-        if tokens
-            .iter()
-            .any(|token| token == "--help" || token == "-h")
-        {
+        if wants_help {
             // Help without a command describes the default command, list.
-            print_help("list");
-        } else {
-            println!("{}", listing(None));
+            return describe_help("list", &help_options(&[]));
         }
+        write_description(
+            &descriptor::describe_application(None, Format::Txt, false, false),
+            Format::Txt,
+            false,
+        );
         return exit::SUCCESS;
     };
     let name = name.to_string();
 
     if name == "update" || name == "self-update" {
-        eprintln!("Command \"{name}\" is not defined.");
-        eprintln!("Use dw upgrade to explicitly update a standalone installation.");
+        formatter::writeln_err(&format!(
+            "<error>Command \"{name}\" is not defined.</error>"
+        ));
+        formatter::writeln_err(
+            "Use <info>dw upgrade</info> to explicitly update a standalone installation.",
+        );
         return exit::INVALID;
     }
 
@@ -476,9 +486,31 @@ fn run(raw: Vec<String>) -> i32 {
         Ok(command) => command,
         Err(code) => return code,
     };
-    let spec = catalog::spec(&command).expect("resolved commands are in the catalog");
     let mut rest = tokens.clone();
     rest.remove(position);
+
+    // --help anywhere shows help before the command's own options are
+    // checked, as 2.x does; `help` itself ignores usage errors too.
+    if wants_help {
+        return describe_help(&command, &help_options(&rest));
+    }
+    if command == "help" {
+        let input = help_options(&rest);
+        let target = input.arg("command_name").unwrap_or("help");
+        return match lookup::find(target, terminal_width()) {
+            Ok(target) => describe_help(&target, &input),
+            Err(error) => {
+                let synopsis = catalog::spec("help").map(|spec| spec.synopsis);
+                print_usage_error(&UsageError {
+                    message: error.message().to_string(),
+                    synopsis,
+                });
+                exit::FAILURE
+            }
+        };
+    }
+
+    let spec = catalog::spec(&command).expect("resolved commands are in the catalog");
     let input = match cli::parse(&spec, &rest) {
         Ok(input) => input,
         Err(error) => {
@@ -486,37 +518,14 @@ fn run(raw: Vec<String>) -> i32 {
             return exit::FAILURE;
         }
     };
-    if input.flag("help") {
-        print_help(&command);
-        return exit::SUCCESS;
-    }
-    if command == "help" {
-        return run_help_command(&input, &spec.synopsis);
-    }
     if command == "list" {
-        match input.arg("namespace") {
-            Some(namespace) => match lookup::find_namespace(namespace) {
-                Ok(namespace) => println!("{}", listing(Some(&namespace))),
-                Err(error) => {
-                    // 2.x writes the listing header before it finds that the
-                    // namespace does not exist.
-                    print!("{}\n\n{APPLICATION_HELP}\n\n", build_info::version_line());
-                    print_usage_error(&UsageError {
-                        message: error.message().to_string(),
-                        synopsis: Some(spec.synopsis.clone()),
-                    });
-                    return exit::FAILURE;
-                }
-            },
-            None => println!("{}", listing(None)),
-        }
-        return exit::SUCCESS;
+        return run_list(&input, &spec.synopsis);
     }
 
     let Some(handler) = handler(&command) else {
-        eprintln!(
-            "Command \"{command}\" is not available in this dw build yet. Use the 2.x dw for it."
-        );
+        formatter::writeln_err(&format!(
+            "<error>Command \"{command}\" is not available in this dw build yet. Use the 2.x dw for it.</error>"
+        ));
         return exit::FAILURE;
     };
     let server_command = matches!(handler, Handler::Server(_));
@@ -537,8 +546,13 @@ fn run(raw: Vec<String>) -> i32 {
 }
 
 fn main() {
-    let code = run(std::env::args().skip(1).collect());
-    std::process::exit(code);
+    // Arguments that are not valid UTF-8 are read lossily instead of
+    // aborting, like PHP, which treats argv as bytes.
+    let arguments = std::env::args_os()
+        .skip(1)
+        .map(|argument| argument.to_string_lossy().into_owned())
+        .collect();
+    std::process::exit(run(arguments));
 }
 
 #[cfg(test)]
@@ -592,14 +606,5 @@ mod tests {
         assert_eq!(block[1].trim_end(), "  Command \"x\" is not defined.");
         assert_eq!(block[2].trim(), "");
         assert_eq!(block[4].trim_end(), "      env:list");
-    }
-
-    #[test]
-    fn namespace_listing_sizes_names_without_aliases() {
-        let text = listing(Some("activity"));
-        assert!(text.contains(
-            "Available commands for the \"activity\" namespace:\n  activity:complete  Complete"
-        ));
-        assert!(text.contains("\n  activity:describe  [activities:describe] Show"));
     }
 }

@@ -13,19 +13,19 @@ struct Scratch(PathBuf);
 impl Scratch {
     fn new() -> Self {
         static NEXT: AtomicU64 = AtomicU64::new(0);
-        let nonce = SystemTime::now()
+        let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        Self::create_in(&std::env::temp_dir(), nonce, &NEXT)
+        Self::create_in(&std::env::temp_dir(), timestamp, &NEXT)
             .expect("cannot create private completion test directory")
     }
 
-    fn create_in(root: &Path, nonce: u128, next: &AtomicU64) -> io::Result<Self> {
+    fn create_in(root: &Path, timestamp: u128, next: &AtomicU64) -> io::Result<Self> {
         for _ in 0..64 {
             let count = next.fetch_add(1, Ordering::Relaxed);
             let path = root.join(format!(
-                "dw-completion-test-{}-{nonce}-{count}",
+                "dw-completion-test-{}-{timestamp}-{count}",
                 std::process::id()
             ));
             match fs::DirBuilder::new().mode(0o700).create(&path) {

@@ -62,6 +62,31 @@ class ServerHealthCommandTest extends TestCase
         self::assertStringContainsString('redis', $display);
     }
 
+    public function test_health_command_renders_native_boolean_checks_without_timestamp(): void
+    {
+        // Native Server 3.x: {"status":"serving","checks":{"database":true}}
+        $command = new HealthCommand();
+        $command->setServerClient(new HealthFakeClient([
+            'status' => 'serving',
+            'checks' => [
+                'database' => true,
+                'storage' => false,
+            ],
+        ]));
+
+        $tester = new CommandTester($command);
+
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+
+        $display = $tester->getDisplay();
+
+        self::assertStringNotContainsString('Timestamp:', $display);
+        self::assertStringNotContainsString('Warning', $display);
+        self::assertMatchesRegularExpression('/\\|\\s+database\\s+\\|\\s+ok\\s+\\|\\s+-\\s+\\|/', $display);
+        self::assertMatchesRegularExpression('/\\|\\s+storage\\s+\\|\\s+failed\\s+\\|\\s+Check payload storage configuration\\.\\s+\\|/', $display);
+        self::assertStringContainsString('Inspect server logs and dependencies for: storage.', $display);
+    }
+
     public function test_health_command_honors_json_output(): void
     {
         $command = new HealthCommand();

@@ -23,6 +23,12 @@ sha2 = "0.10"
 # exact value PHP decodes, so re-encoded output and checksums match 2.x.
 serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
 tokio = { version = "1", features = ["rt", "macros"] }
+# Release downloads for `dw upgrade`; the same version and TLS stack the SDK uses.
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+
+[target.'cfg(unix)'.dependencies]
+# access(2), for PHP's is_writable/is_executable checks in `dw upgrade`.
+libc = "0.2"
 
 # Release binaries are the published standalone assets: one optimized,
 # symbol-stripped executable per platform.

@@ -282,6 +282,8 @@ name = "dw"
 version = "2.5.0-dev"
 dependencies = [
  "durable-workflow",
+ "libc",
+ "reqwest",
  "serde",
  "serde_json",
  "sha2",

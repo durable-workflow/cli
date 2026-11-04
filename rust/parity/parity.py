@@ -298,7 +298,14 @@ def help_cases():
     """`--help` for every 2.x command, ported or not, from the catalog."""
     with open(os.path.join(CRATE, "src", "catalog.json"), encoding="utf-8") as handle:
         names = [command["name"] for command in json.load(handle)["commands"]]
-    return [{"name": f"--help for {name}", "argv": [name, "--help"]} for name in names]
+    cases = [{"name": f"--help for {name}", "argv": [name, "--help"]} for name in names]
+    for case in cases:
+        if case["argv"][0] == "runtime:check":
+            case["expected_difference"] = {"*": {
+                "fields": ["stdout_text"],
+                "reason": "The Rust-native runtime:check help describes build identity and target instead of PHP extensions (cli#72).",
+            }}
+    return cases
 
 
 def invocation_path(binary, role):

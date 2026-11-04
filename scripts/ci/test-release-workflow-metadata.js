@@ -9,6 +9,65 @@ const test = require('node:test');
 const repository = path.resolve(__dirname, '../..');
 const resolver = path.join(__dirname, 'release-version.js');
 const workflowPath = path.join(repository, '.github/workflows/release.yml');
+const {releaseImplementation, releaseMetadata} = require('./release-version');
+
+test('the maintenance release stays on PHP while the Rust version boundary is preserved', () => {
+  for (const [version, implementation] of [
+    ['2.3.7', 'php'], ['2.4.99', 'php'], ['2.5.0-rc.1', 'rust'],
+    ['2.5.0', 'rust'], ['2.10.0', 'rust'], ['3.0.0', 'rust'],
+  ]) {
+    assert.equal(releaseImplementation(version), implementation, version);
+  }
+  assert.equal(releaseImplementation('invalid'), null);
+});
+
+test('maintenance metadata preserves a newer latest release and prerelease state', () => {
+  assert.deepEqual(releaseMetadata('2.3.7', '2.5.0'), {prerelease: false, makeLatest: false});
+  assert.deepEqual(releaseMetadata('2.3.7', '2.3.6'), {prerelease: false, makeLatest: true});
+  assert.deepEqual(releaseMetadata('2.3.7-rc.1', '2.3.6'), {prerelease: true, makeLatest: false});
+  assert.deepEqual(releaseMetadata('2.10.0', '2.9.0'), {prerelease: false, makeLatest: true});
+});
+
+test('the actual publication step drops latest when the observed channel changes', () => {
+  const os = require('node:os');
+  const workflow = fs.readFileSync(workflowPath, 'utf8');
+  const step = workflow.slice(workflow.indexOf('- name: Create GitHub Release'));
+  const lines = step.split('\n        run: |\n')[1].split('\n');
+  const shell = [];
+  for (const line of lines) {
+    if (line.trim() && !line.startsWith('          ')) break;
+    shell.push(line.slice(10));
+  }
+  assert.ok(shell.some(line => line.includes('gh release create')));
+  for (const [latest, expected] of [['2.3.6', 'true'], ['2.5.0', 'false']]) {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'dw-maintenance-control-'));
+    try {
+      const calls = path.join(directory, 'calls');
+      fs.mkdirSync(path.join(directory, 'dist'));
+      fs.writeFileSync(path.join(directory, 'dist', 'synthetic'), 'fixture only\n');
+      fs.writeFileSync(path.join(directory, 'gh'), `#!/bin/sh
+set -eu
+if [ "$1" = api ]; then printf '%s\\n' "$FAKE_LATEST";
+elif [ "$1" = release ] && [ "$2" = create ]; then printf '%s\\n' "$@" > "$FAKE_CALLS";
+else exit 99; fi
+`, {mode: 0o700});
+      execFileSync('/bin/bash', ['-c', shell.join('\n')], {
+        cwd: directory,
+        env: {
+          PATH: `${directory}:/usr/bin:/bin`,
+          FAKE_LATEST: latest, FAKE_CALLS: calls,
+          GITHUB_REPOSITORY: 'durable-workflow/cli',
+          RELEASE_TAG: '2.3.7', PRERELEASE: 'false', MAKE_LATEST: 'true', OBSERVED_LATEST: '2.3.6',
+        },
+        timeout: 10000,
+        stdio: 'pipe',
+      });
+      assert.ok(fs.readFileSync(calls, 'utf8').split('\n').includes(`--latest=${expected}`));
+    } finally {
+      fs.rmSync(directory, {force: true, recursive: true});
+    }
+  }
+});
 
 test('native launcher qualification reuses the guarded PHAR dependency artifact', () => {
   const workflow = fs.readFileSync(workflowPath, 'utf8');
@@ -60,7 +119,7 @@ test('the release action consumes metadata from the resolved tag', () => {
   assert.match(workflow, /make_latest: \$\{\{ steps\.resolve\.outputs\.make_latest \}\}/);
   assert.match(
     workflow,
-    /release_metadata="\$\(node scripts\/ci\/release-version\.js metadata "\$tag"\)"/,
+    /release_metadata="\$\(node scripts\/ci\/release-version\.js metadata "\$tag" "\$current_latest"\)"/,
   );
   assert.match(workflow, /read -r prerelease make_latest <<< "\$release_metadata"/);
   assert.match(workflow, /echo "prerelease=\$prerelease" >> "\$GITHUB_OUTPUT"/);

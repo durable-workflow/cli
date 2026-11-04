@@ -322,11 +322,16 @@ fn inside_homebrew(path: &str) -> bool {
     path.contains("/Cellar/") || path.contains("/opt/homebrew/") || path.contains("/linuxbrew/")
 }
 
-/// `InstallationTarget::detect` for a binary invoked as `argv0`. This build
-/// is never a PHAR, so the PHAR branches of 2.x cannot apply.
-pub fn detect_target(argv0: &str, os_family: &str, arch: &str) -> Target {
+/// `InstallationTarget::detect`. The binary to replace is the running
+/// executable (`executable`, canonicalized); argv[0] is only a fallback when
+/// the platform cannot report it. 2.x resolved argv[0] first, which made a
+/// `dw` entry in the current directory the target. This build is never a
+/// PHAR, so the PHAR branches of 2.x cannot apply.
+pub fn detect_target(executable: Option<&str>, argv0: &str, os_family: &str, arch: &str) -> Target {
     let asset = map_asset(os_family, arch);
-    let resolved = resolve_executable_path(argv0, os_family);
+    let resolved = executable
+        .and_then(realpath)
+        .unwrap_or_else(|| resolve_executable_path(argv0, os_family));
     let target = |kind, path: String, upgradeable, asset: Option<String>, reason: &str| Target {
         kind,
         path,
@@ -360,11 +365,14 @@ pub fn detect_target(argv0: &str, os_family: &str, arch: &str) -> Target {
 }
 
 fn detect() -> Target {
+    let executable = std::env::current_exe()
+        .ok()
+        .map(|path| path.to_string_lossy().into_owned());
     let argv0 = std::env::args_os()
         .next()
         .map(|arg| arg.to_string_lossy().into_owned())
         .unwrap_or_default();
-    detect_target(&argv0, os_family(), machine())
+    detect_target(executable.as_deref(), &argv0, os_family(), machine())
 }
 
 // ---------------------------------------------------------------------------
@@ -373,6 +381,8 @@ fn detect() -> Target {
 pub struct Catalog {
     authority_url: String,
     download_base: String,
+    /// Release downloads never leave HTTPS, even across redirects.
+    https_downloads: bool,
 }
 
 impl Catalog {
@@ -385,6 +395,7 @@ impl Catalog {
                 authority
             },
             download_base: DOWNLOAD_BASE.into(),
+            https_downloads: true,
         }
     }
 
@@ -393,10 +404,11 @@ impl Catalog {
         Self {
             authority_url: authority_url.into(),
             download_base: download_base.into(),
+            https_downloads: false,
         }
     }
 
-    fn client(max_redirects: usize) -> Result<reqwest::Client, String> {
+    fn client(max_redirects: usize, https_only: bool) -> Result<reqwest::Client, String> {
         let mut headers = reqwest::header::HeaderMap::new();
         headers.insert(
             reqwest::header::ACCEPT,
@@ -416,6 +428,7 @@ impl Catalog {
         reqwest::Client::builder()
             .default_headers(headers)
             .redirect(policy)
+            .https_only(https_only)
             .connect_timeout(Duration::from_secs(30))
             .read_timeout(Duration::from_secs(30))
             .build()
@@ -439,9 +452,11 @@ impl Catalog {
             Some(Value::String(tag)) if !tag.is_empty() => tag.trim_start_matches('v').to_string(),
             _ => return Err("latest stable CLI release must include a tag_name".into()),
         };
-        let stable = parse_semver(&tag).is_ok_and(|version| version.prerelease.is_none())
-            && !tag.contains('+')
-            && !tag.starts_with(' ');
+        // 2.x's anchored pattern: nothing but MAJOR.MINOR.PATCH, so no
+        // surrounding whitespace, prerelease or build metadata.
+        let stable = tag == crate::php::trim(&tag)
+            && parse_semver(&tag).is_ok_and(|version| version.prerelease.is_none())
+            && !tag.contains('+');
         if data.get("draft") != Some(&Value::Bool(false))
             || data.get("prerelease") != Some(&Value::Bool(false))
             || !stable
@@ -454,7 +469,7 @@ impl Catalog {
     /// Symfony's `$response->toArray()`, with its exception messages.
     async fn authority(&self) -> Result<Map<String, Value>, String> {
         let url = &self.authority_url;
-        let response = Self::client(0)?
+        let response = Self::client(0, false)?
             .get(url)
             .send()
             .await
@@ -508,7 +523,7 @@ impl Catalog {
     pub fn fetch(&self, url: &str) -> Result<Vec<u8>, String> {
         Self::block_on(async {
             let failed = |message: String| format!("failed to download {url}: {message}");
-            let response = Self::client(5)
+            let response = Self::client(5, self.https_downloads)
                 .map_err(failed)?
                 .get(url)
                 .send()
@@ -706,10 +721,25 @@ pub fn default_replacer(destination: &str, bytes: &[u8]) -> Result<(), ReplaceEr
             "install directory {dir} is not writable"
         )));
     }
+    #[cfg(windows)]
+    remove_stale_asides(destination);
     let temp = format!("{dir}/.dw-upgrade-{}", random_suffix());
-    let mut file = std::fs::File::create(&temp)
+    // A fresh, owner-only file: never an existing path or a planted link.
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o700);
+    }
+    let mut file = options
+        .open(&temp)
         .map_err(|_| ReplaceError::Permission(format!("could not create temp file in {dir}")))?;
-    if file.write_all(bytes).and_then(|()| file.flush()).is_err() {
+    if file
+        .write_all(bytes)
+        .and_then(|()| file.sync_all())
+        .is_err()
+    {
         drop(file);
         let _ = std::fs::remove_file(&temp);
         return Err(ReplaceError::Other(format!(
@@ -721,9 +751,10 @@ pub fn default_replacer(destination: &str, bytes: &[u8]) -> Result<(), ReplaceEr
     {
         use std::os::unix::fs::PermissionsExt;
         // Keep the installed binary's own permissions (an ordinary install
-        // is 0755), always owner-executable, never setuid or setgid.
+        // is 0755), always owner-executable, never group- or world-writable,
+        // setuid or setgid.
         let mode = std::fs::metadata(destination)
-            .map_or(0o700, |metadata| metadata.permissions().mode() & 0o777)
+            .map_or(0o700, |metadata| metadata.permissions().mode() & 0o755)
             | 0o100;
         if std::fs::set_permissions(&temp, std::fs::Permissions::from_mode(mode)).is_err() {
             let _ = std::fs::remove_file(&temp);
@@ -741,7 +772,11 @@ pub fn default_replacer(destination: &str, bytes: &[u8]) -> Result<(), ReplaceEr
         let _ = std::fs::remove_file(&temp);
         #[cfg(windows)]
         if let Some(aside) = &aside {
-            let _ = std::fs::rename(aside, destination);
+            if std::fs::rename(aside, destination).is_err() {
+                return Err(ReplaceError::Other(format!(
+                    "could not replace {destination}, and could not restore it from {aside}"
+                )));
+            }
         }
         return Err(ReplaceError::Permission(format!(
             "could not replace {destination} (destination not writable)"
@@ -749,11 +784,30 @@ pub fn default_replacer(destination: &str, bytes: &[u8]) -> Result<(), ReplaceEr
     }
     #[cfg(windows)]
     if let Some(aside) = aside {
-        // Still running; Windows deletes nothing in use. A later upgrade or
-        // the user can remove it.
+        // Fails while the old image is still running; the next upgrade
+        // removes it (remove_stale_asides).
         let _ = std::fs::remove_file(aside);
     }
     Ok(())
+}
+
+/// Removes `<binary>.old-*` files an earlier Windows upgrade left behind
+/// while the old executable was still running.
+#[cfg(windows)]
+fn remove_stale_asides(destination: &str) {
+    let path = Path::new(destination);
+    let (Some(dir), Some(name)) = (path.parent(), path.file_name()) else {
+        return;
+    };
+    let prefix = format!("{}.old-", name.to_string_lossy());
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        if entry.file_name().to_string_lossy().starts_with(&prefix) {
+            let _ = std::fs::remove_file(entry.path());
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1117,23 +1171,38 @@ mod tests {
     }
 
     #[test]
+    fn the_running_executable_wins_over_argv0() {
+        let dir = std::env::temp_dir().join(format!("dw-upgrade-exe-{}", random_suffix()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let real = dir.join("real-dw");
+        std::fs::write(&real, b"x").unwrap();
+        let expected = realpath(&real.to_string_lossy()).unwrap();
+        let target = detect_target(Some(&real.to_string_lossy()), "dw", "Linux", "x86_64");
+        assert_eq!(target.path, expected);
+        // Without a reportable executable, argv[0] is the fallback.
+        let fallback = detect_target(None, &real.to_string_lossy(), "Linux", "x86_64");
+        assert_eq!(fallback.path, expected);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
     fn managed_installs_are_refused() {
-        let vendor = detect_target("/app/vendor/bin/dw", "Linux", "x86_64");
+        let vendor = detect_target(None, "/app/vendor/bin/dw", "Linux", "x86_64");
         assert_eq!(
             (vendor.kind, vendor.upgradeable),
             ("composer-vendor", false)
         );
-        let brew = detect_target("/opt/homebrew/bin/dw", "Darwin", "arm64");
+        let brew = detect_target(None, "/opt/homebrew/bin/dw", "Darwin", "arm64");
         assert_eq!(
             (brew.kind, brew.reason.as_str()),
             ("homebrew", HOMEBREW_REASON)
         );
-        let empty = detect_target("", "Linux", "x86_64");
+        let empty = detect_target(None, "", "Linux", "x86_64");
         assert_eq!(
             (empty.kind, empty.reason.as_str()),
             ("unknown", "could not resolve the dw executable path")
         );
-        let other = detect_target("/nonexistent/dw", "Linux", "riscv64");
+        let other = detect_target(None, "/nonexistent/dw", "Linux", "riscv64");
         assert_eq!(
             other.reason,
             "no published release asset matches this platform (Linux/riscv64)"
@@ -1260,6 +1329,12 @@ mod tests {
             ),
             ("/html", 200, "text/html", b"<html>".to_vec()),
             (
+                "/padded",
+                200,
+                json,
+                br#"{"tag_name":"9.9.9\n","draft":false,"prerelease":false}"#.to_vec(),
+            ),
+            (
                 "/problem",
                 403,
                 "application/problem+json",
@@ -1270,6 +1345,10 @@ mod tests {
         assert_eq!(tag("/ok"), Ok("9.9.9".into()));
         assert_eq!(
             tag("/pre"),
+            Err("latest CLI release must be a published stable version".into())
+        );
+        assert_eq!(
+            tag("/padded"),
             Err("latest CLI release must be a published stable version".into())
         );
         assert_eq!(
@@ -1290,6 +1369,21 @@ mod tests {
         assert_eq!(
             tag("/problem"),
             Err(format!("{prefix}Forbidden\n\nrate limited"))
+        );
+    }
+
+    #[test]
+    fn release_downloads_refuse_plain_http() {
+        let base = serve(vec![("/x", 200, "text/plain", b"x".to_vec())]);
+        let catalog = Catalog {
+            authority_url: String::new(),
+            download_base: base.clone(),
+            https_downloads: true,
+        };
+        let error = catalog.fetch(&format!("{base}/x")).unwrap_err();
+        assert!(
+            error.starts_with(&format!("failed to download {base}/x: ")),
+            "{error}"
         );
     }
 
@@ -1423,6 +1517,14 @@ mod tests {
                     & 0o7777,
                 0o755
             );
+            // A group- or world-writable install does not stay writable.
+            std::fs::set_permissions(&destination, std::fs::Permissions::from_mode(0o777)).unwrap();
+            assert!(default_replacer(&destination.to_string_lossy(), b"newer").is_ok());
+            let mode = std::fs::metadata(&destination)
+                .unwrap()
+                .permissions()
+                .mode();
+            assert_eq!(mode & 0o7777, 0o755);
         }
         assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 1);
         let missing = dir.join("missing").join("dw");

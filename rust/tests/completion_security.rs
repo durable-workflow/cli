@@ -85,7 +85,10 @@ fn shell(shell: &str, scratch: &Scratch, script: &Path) -> Option<Command> {
                 .args([
                     "-f",
                     "-c",
-                    "autoload -Uz compinit; compinit -D; source \"$1\"",
+                    // CI images can expose inherited insecure completion directories.
+                    // Ignore those unrelated entries so this test exercises the
+                    // generated script instead of requiring an interactive prompt.
+                    "autoload -Uz compinit; compinit -D -i; source \"$1\"",
                     "zsh",
                 ])
                 .arg(script);

@@ -1832,14 +1832,18 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Check out the exact release source
+      # Verification scripts come from this workflow's own commit (the
+      # release control commit), never from a job output, so the release
+      # under test cannot supply the code that judges it.
+      - name: Check out the release control source
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
         with:
           persist-credentials: false
-          ref: ${{ needs.resolve-release.outputs.commit }}
+          ref: ${{ github.sha }}
 
       - name: Verify public release downloads
         env:
+          VERIFIED_SOURCE_SHA: ${{ needs.resolve-release.outputs.commit }}
           RELEASE_CONTROL_REF: ${{ needs.resolve-release.outputs.control_ref }}
           RELEASE_CONTROL_COMMIT: ${{ needs.resolve-release.outputs.control_commit }}
           RELEASE_INITIATOR: ${{ needs.resolve-release.outputs.initiator }}
@@ -1915,7 +1919,7 @@ jobs:
           done
 
           evidence="release-public-download-evidence.json"
-          release_commit="$(git rev-parse HEAD)"
+          release_commit="$VERIFIED_SOURCE_SHA"
           verified_at="$(date -u +%FT%TZ)"
           {
             printf '{\n'

@@ -167,7 +167,11 @@ test('public release verification runs read-only after publication', () => {
   assert.match(verify, /needs\.release\.result == 'success'/);
   assert.match(verify, /permissions:\n\s+contents: read\n/);
   assert.doesNotMatch(verify, /contents: write|id-token|attestations|environment:|secrets\./);
-  assert.match(verify, /ref: \$\{\{ needs\.resolve-release\.outputs\.commit \}\}/);
+  // Verification code comes from the workflow's own commit, not a job output.
+  assert.match(verify, /ref: \$\{\{ github\.sha \}\}/);
+  assert.doesNotMatch(verify, /ref: \$\{\{ needs\./);
+  assert.match(verify, /VERIFIED_SOURCE_SHA: \$\{\{ needs\.resolve-release\.outputs\.commit \}\}/);
+  assert.match(verify, /release_commit="\$VERIFIED_SOURCE_SHA"/);
   assert.match(verify, /persist-credentials: false/);
   assert.match(verify, /- name: Verify public release downloads/);
   assert.match(verify, /dw-release-check" upgrade --output=json/);

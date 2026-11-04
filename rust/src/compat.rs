@@ -11,7 +11,7 @@
 mod external_task;
 mod input_envelope;
 mod request_contract;
-mod version;
+pub mod version;
 
 pub use request_contract::RequestContract;
 

@@ -1,3 +1,4 @@
+pub mod completion;
 pub mod env;
 pub mod info;
 pub mod schema;

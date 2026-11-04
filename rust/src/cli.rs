@@ -86,6 +86,14 @@ impl Input {
     }
 
     /// The non-empty string value of an option, if any.
+    /// Every value of a multiple-value option, in order.
+    pub fn opt_all(&self, name: &str) -> Vec<&str> {
+        self.opts
+            .get(name)
+            .map(|values| values.iter().flatten().map(String::as_str).collect())
+            .unwrap_or_default()
+    }
+
     pub fn opt_str(&self, name: &str) -> Option<&str> {
         self.opt(name).flatten().filter(|value| !value.is_empty())
     }

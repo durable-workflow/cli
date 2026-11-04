@@ -1779,6 +1779,100 @@
      "reason": "The transport detail after \"could not fetch the latest stable CLI release:\" is libcurl's text in 2.x (\"Failed to connect to 127.0.0.1:9 after 0 ms: Could not connect to server\") and this client's own wording here. The status, exit code and the rest of the envelope match."
     }
    }
+  },
+  {
+   "name": "schema:list",
+   "argv": [
+    "schema:list"
+   ]
+  },
+  {
+   "name": "schema:manifest",
+   "argv": [
+    "schema:manifest"
+   ]
+  },
+  {
+   "name": "schema:show a command's JSON schema",
+   "argv": [
+    "schema:show",
+    "workflow:list"
+   ]
+  },
+  {
+   "name": "schema:show a command's JSONL schema",
+   "argv": [
+    "schema:show",
+    "workflow:list",
+    "--output=jsonl"
+   ]
+  },
+  {
+   "name": "schema:show with a flag-style output mode",
+   "argv": [
+    "schema:show",
+    "server:health",
+    "--output=--json"
+   ]
+  },
+  {
+   "name": "schema:show a config schema",
+   "argv": [
+    "schema:show",
+    "external-executor-config"
+   ]
+  },
+  {
+   "name": "schema:show an unknown name",
+   "argv": [
+    "schema:show",
+    "nope:nothing"
+   ]
+  },
+  {
+   "name": "schema:show an unsupported output mode",
+   "argv": [
+    "schema:show",
+    "workflow:list",
+    "--output=xml"
+   ]
+  },
+  {
+   "name": "schema:show an empty output mode",
+   "argv": [
+    "schema:show",
+    "workflow:list",
+    "--output="
+   ]
+  },
+  {
+   "name": "schema:show a command without a JSONL schema",
+   "argv": [
+    "schema:show",
+    "server:health",
+    "--output=jsonl"
+   ]
+  },
+  {
+   "name": "schema:show without a name",
+   "argv": [
+    "schema:show"
+   ]
+  },
+  {
+   "name": "schema:show quiet",
+   "argv": [
+    "schema:show",
+    "workflow:list",
+    "-q"
+   ]
+  },
+  {
+   "name": "schema:list with ansi",
+   "argv": [
+    "schema:list",
+    "--ansi"
+   ]
   }
  ]
 }

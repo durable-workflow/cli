@@ -32,8 +32,11 @@ enum Handler {
 /// Commands ported so far. Every other catalog command is recognized and
 /// reported as not yet available.
 fn handler(name: &str) -> Option<Handler> {
-    use commands::{env, server, upgrade};
+    use commands::{env, schema, server, upgrade};
     Some(match name {
+        "schema:list" => Handler::Local(schema::list),
+        "schema:manifest" => Handler::Local(schema::manifest),
+        "schema:show" => Handler::Local(schema::show),
         "upgrade" => Handler::Local(upgrade::run),
         "server:health" => Handler::Server(server::health),
         "server:info" => Handler::Server(server::info),

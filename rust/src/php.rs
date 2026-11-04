@@ -376,6 +376,50 @@ fn encode_value(value: &Value, out: &mut String) {
     }
 }
 
+/// PHP `json_encode($value, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)` of a
+/// decoded value: four-space indent, `"key": value`, and empty arrays (which
+/// an empty JSON object decodes to) printed as `[]`.
+pub fn json_encode_pretty(value: &Value) -> String {
+    let mut out = String::new();
+    encode_pretty(value, 0, &mut out);
+    out
+}
+
+fn encode_pretty(value: &Value, depth: usize, out: &mut String) {
+    let (entries, list): (Vec<(Option<&str>, &Value)>, bool) = match value {
+        Value::Array(items) => (items.iter().map(|item| (None, item)).collect(), true),
+        Value::Object(map) if is_list(value) => {
+            (map.values().map(|item| (None, item)).collect(), true)
+        }
+        Value::Object(map) => (
+            map.iter()
+                .map(|(key, item)| (Some(key.as_str()), item))
+                .collect(),
+            false,
+        ),
+        scalar => return encode_value(scalar, out),
+    };
+    let (open, close) = if list { ('[', ']') } else { ('{', '}') };
+    out.push(open);
+    if entries.is_empty() {
+        out.push(close);
+        return;
+    }
+    let indent = "    ".repeat(depth + 1);
+    for (index, (key, item)) in entries.iter().enumerate() {
+        out.push_str(if index > 0 { ",\n" } else { "\n" });
+        out.push_str(&indent);
+        if let Some(key) = key {
+            encode_string(key, out);
+            out.push_str(": ");
+        }
+        encode_pretty(item, depth + 1, out);
+    }
+    out.push('\n');
+    out.push_str(&"    ".repeat(depth));
+    out.push(close);
+}
+
 fn encode_list<'a>(items: impl Iterator<Item = &'a Value>, out: &mut String) {
     out.push('[');
     for (index, item) in items.enumerate() {

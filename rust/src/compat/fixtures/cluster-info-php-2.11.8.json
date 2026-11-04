@@ -1,0 +1,1858 @@
+{
+ "server_id": "6ecf521ff20a",
+ "version": "2.11.8",
+ "client_compatibility": {
+  "schema": "durable-workflow.v2.client-compatibility",
+  "version": 2,
+  "authority": "protocol_manifests",
+  "top_level_version_role": "informational",
+  "fail_closed": true,
+  "skew_refusal_matrix_contract": {
+   "schema": "durable-workflow.v2.skew-refusal-matrix.contract",
+   "version": 1,
+   "cluster_info_path": "skew_refusal_matrix_contract"
+  },
+  "required_protocols": {
+   "auth_composition": {
+    "schema": "durable-workflow.v2.auth-composition.contract",
+    "version": 1
+   },
+   "control_plane": {
+    "version": "2",
+    "header": "X-Durable-Workflow-Control-Plane-Version",
+    "request_contract": {
+     "schema": "durable-workflow.v2.control-plane-request.contract",
+     "version": 1
+    }
+   },
+   "worker_protocol": {
+    "version": "1.20",
+    "header": "X-Durable-Workflow-Protocol-Version",
+    "external_execution_surface_contract": {
+     "schema": "durable-workflow.v2.external-execution-surface.contract",
+     "version": 1
+    },
+    "external_executor_config_contract": {
+     "schema": "durable-workflow.v2.external-executor-config.contract",
+     "version": 1
+    },
+    "invocable_carrier_contract": {
+     "schema": "durable-workflow.v2.invocable-carrier.contract",
+     "version": 1
+    },
+    "external_task_input_contract": {
+     "schema": "durable-workflow.v2.external-task-input.contract",
+     "version": 1
+    },
+    "external_task_result_contract": {
+     "schema": "durable-workflow.v2.external-task-result.contract",
+     "version": 1
+    }
+   }
+  },
+  "clients": {
+   "sdk-php": {
+    "supported_versions": ">=2.0.0,<3.0.0",
+    "requires": [
+     "auth_composition.version",
+     "control_plane.version",
+     "control_plane.request_contract",
+     "worker_protocol.version"
+    ]
+   },
+   "cli": {
+    "supported_versions": ">=2.0.0,<3.0.0",
+    "requires": [
+     "auth_composition.version",
+     "control_plane.version",
+     "control_plane.request_contract"
+    ]
+   },
+   "sdk-python": {
+    "supported_versions": ">=2.0.0,<3.0.0",
+    "requires": [
+     "auth_composition.version",
+     "control_plane.version",
+     "control_plane.request_contract",
+     "worker_protocol.version",
+     "worker_protocol.external_execution_surface_contract",
+     "worker_protocol.external_executor_config_contract",
+     "worker_protocol.invocable_carrier_contract",
+     "worker_protocol.external_task_input_contract",
+     "worker_protocol.external_task_result_contract"
+    ]
+   },
+   "sdk-rust": {
+    "supported_versions": ">=2.0.0,<4.0.0",
+    "requires": [
+     "auth_composition.version",
+     "control_plane.version",
+     "control_plane.request_contract",
+     "worker_protocol.version",
+     "worker_protocol.external_execution_surface_contract",
+     "worker_protocol.external_executor_config_contract",
+     "worker_protocol.invocable_carrier_contract",
+     "worker_protocol.external_task_input_contract",
+     "worker_protocol.external_task_result_contract"
+    ]
+   }
+  }
+ },
+ "control_plane": {
+  "version": "2",
+  "header": "X-Durable-Workflow-Control-Plane-Version",
+  "request_contract": {
+   "schema": "durable-workflow.v2.control-plane-request.contract",
+   "version": 1,
+   "operations": {
+    "list": {
+     "fields": {
+      "status": {
+       "canonical_values": [
+        "running",
+        "completed",
+        "failed"
+       ],
+       "rejected_aliases": {
+        "cancelled": "failed",
+        "terminated": "failed",
+        "pending": "running",
+        "waiting": "running"
+       }
+      }
+     }
+    },
+    "start": {
+     "fields": {
+      "duplicate_policy": {
+       "canonical_values": [
+        "fail",
+        "use-existing"
+       ],
+       "rejected_aliases": {
+        "use_existing": "use-existing"
+       }
+      },
+      "execution_timeout_seconds": {
+       "type": "integer",
+       "min": 1
+      },
+      "run_timeout_seconds": {
+       "type": "integer",
+       "min": 1
+      },
+      "payload_codec": {
+       "type": "string",
+       "canonical_values": [
+        "avro"
+       ],
+       "description": "Fixed Avro Value codec used for durable workflow payloads. Omission selects avro."
+      }
+     },
+     "unsupported_fields": [
+      "workflow_execution_timeout",
+      "workflow_run_timeout",
+      "workflow_task_timeout",
+      "retry_policy",
+      "idempotency_key",
+      "request_id"
+     ]
+    },
+    "import_waterline_v1": {
+     "fields": {
+      "source_id": {
+       "type": "string",
+       "required": true,
+       "description": "Stable identifier for the source Waterline deployment."
+      },
+      "workflow": {
+       "type": "object",
+       "required": true,
+       "description": "Public Waterline v1 workflow detail projection."
+      },
+      "dry_run": {
+       "type": "boolean",
+       "required": false
+      }
+     }
+    },
+    "update": {
+     "fields": {
+      "wait_for": {
+       "canonical_values": [
+        "accepted",
+        "completed"
+       ]
+      },
+      "wait_timeout_seconds": {
+       "minimum": 1,
+       "maximum": 60
+      }
+     },
+     "removed_fields": {
+      "wait_policy": "Use wait_for."
+     }
+    },
+    "service_execute": {
+     "addressing": "service endpoint, service, and operation path segments resolve the handler binding",
+     "fields": {
+      "mode_override": {
+       "canonical_values": [
+        "sync",
+        "async"
+       ]
+      },
+      "wait_for": {
+       "canonical_values": [
+        "accepted",
+        "completed"
+       ]
+      },
+      "target_workflow_instance_id": {
+       "type": "string",
+       "required": false,
+       "description": "Workflow target for signal, update, query, activity, or carrier-backed operations when not fixed by the operation binding."
+      },
+      "target_workflow_run_id": {
+       "type": "string",
+       "required": false,
+       "description": "Run target for activity or carrier-backed operations when not fixed by the operation binding."
+      },
+      "idempotency_key": {
+       "type": "string",
+       "required": false,
+       "description": "Caller retry key that reuses the durable service-call id for the same resolved operation."
+      }
+     },
+     "durable_response_fields": [
+      "service_call_id",
+      "status",
+      "outcome",
+      "resolved_binding_kind",
+      "resolved_target_reference",
+      "linked_workflow_instance_id",
+      "linked_workflow_run_id",
+      "linked_workflow_update_id"
+     ]
+    }
+   }
+  }
+ },
+ "worker_protocol": {
+  "version": "1.20",
+  "external_execution_surface_contract": {
+   "schema": "durable-workflow.v2.external-execution-surface.contract",
+   "version": 1,
+   "product_boundary": {
+    "name": "activity_grade_external_execution",
+    "definition": "Durable, bounded, external task execution for operator, platform, and integration automation.",
+    "primary_wedge": "operator_platform_integration",
+    "secondary_wedge": "agent_or_script_driven_handlers",
+    "contract_first": true,
+    "carrier_second": true
+   },
+   "runtime_boundary": {
+    "external_handlers_may": [
+     "execute one leased workflow or activity task",
+     "heartbeat lease progress through the worker protocol",
+     "return a structured success or failure envelope",
+     "start, signal, update, or hand off bounded work through bridge adapters"
+    ],
+    "external_handlers_must_not": [
+     "interpret workflow replay semantics",
+     "own ContinueAsNew behavior",
+     "apply signal, update, or query ordering rules outside the server/runtime contract",
+     "mutate event history directly",
+     "act as an unbounded workflow runtime"
+    ]
+   },
+   "mvp": {
+    "contract": "external_task_input_and_result_envelopes",
+    "carrier_requirement": "at_least_one_supported_carrier",
+    "journeys": [
+     "operator_runs_bounded_maintenance_activity",
+     "integration_bridge_hands_off_event_to_workflow_ingress"
+    ]
+   },
+   "contract_seams": {
+    "input_envelope": {
+     "schema": "durable-workflow.v2.external-task-input.contract",
+     "version": 1,
+     "status": "published",
+     "cluster_info_path": "worker_protocol.external_task_input_contract"
+    },
+    "result_envelope": {
+     "schema": "durable-workflow.v2.external-task-result.contract",
+     "version": 1,
+     "status": "published",
+     "cluster_info_path": "worker_protocol.external_task_result_contract"
+    },
+    "auth_profile_tls_composition": {
+     "schema": "durable-workflow.v2.auth-composition.contract",
+     "version": 1,
+     "status": "published",
+     "cluster_info_path": "auth_composition_contract",
+     "required_outcome": "deterministic credential, profile, environment, and TLS precedence for external carriers"
+    },
+    "handler_mappings": {
+     "schema": "durable-workflow.v2.external-executor-config.contract",
+     "version": 1,
+     "status": "published",
+     "cluster_info_path": "worker_protocol.external_executor_config_contract",
+     "required_outcome": "configuration-first mapping from task kind, queue, and handler name to an external carrier invocation"
+    },
+    "invocable_http_carrier": {
+     "schema": "durable-workflow.v2.invocable-carrier.contract",
+     "version": 1,
+     "status": "published",
+     "cluster_info_path": "worker_protocol.invocable_carrier_contract",
+     "required_outcome": "activity-only HTTP invocation contract with stable request, response, failure, auth, and rollout boundaries"
+    },
+    "bridge_adapters": {
+     "schema": "durable-workflow.v2.bridge-adapter-outcome.contract",
+     "version": 1,
+     "status": "published",
+     "cluster_info_path": "bridge_adapter_outcome_contract",
+     "required_outcome": "bounded ingress and handoff adapters with explicit duplicate, auth, malformed payload, and routing outcomes"
+    },
+    "runtime_external_payload_transport": {
+     "schema": "durable-workflow.v2.runtime-external-payload-reference.v1",
+     "version": 1,
+     "status": "published",
+     "cluster_info_path": "namespace.external_payload_storage",
+     "required_outcome": "codec-tagged opaque references uploaded and fetched through the authenticated namespace runtime without provider credentials"
+    },
+    "admission_and_rollout_safety": {
+     "status": "partially_published",
+     "required_outcome": "bounded task admission, drain, retry, and rollback controls visible to operators"
+    }
+   },
+   "carrier_neutrality": {
+    "valid_carriers": [
+     "poll_based_cli_or_daemon",
+     "http_handler_invocation",
+     "queue_backed_worker",
+     "serverless_invocation"
+    ],
+    "carrier_requirements": [
+     "must_emit_declared_input_schema",
+     "must_accept_declared_result_schema",
+     "must_preserve_task_id_attempt_and_idempotency_key",
+     "must_map transport failures to structured failure or malformed_output outcomes",
+     "must keep auth, TLS, profile, and environment resolution deterministic"
+    ]
+   },
+   "non_goals": [
+    "shell_as_workflow_language",
+    "agents_as_primary_product_frame",
+    "external_handlers_as_replay_runtimes",
+    "generic_message_broker_platform"
+   ]
+  },
+  "external_executor_config_contract": {
+   "schema": "durable-workflow.v2.external-executor-config.contract",
+   "version": 1,
+   "config_schema": {
+    "schema": "durable-workflow.external-executor.config",
+    "version": 1,
+    "json_schema_id": "https://durable-workflow.com/schemas/cli/config/external-executor.schema.json",
+    "schema_source": "dw schema:show external-executor-config"
+   },
+   "steady_state_surface": "config_file",
+   "override_precedence": [
+    "flags",
+    "environment_overlay",
+    "config_file",
+    "schema_defaults"
+   ],
+   "server_runtime": {
+    "config_path_env": "DW_EXTERNAL_EXECUTOR_CONFIG_PATH",
+    "overlay_env": "DW_EXTERNAL_EXECUTOR_CONFIG_OVERLAY",
+    "cluster_info_path": "worker_protocol.external_executor_config_contract.runtime",
+    "execution_status": "validation_discovery_and_activity_poll_resolution"
+   },
+   "validation": {
+    "fail_closed": true,
+    "named_errors": [
+     "unreadable_config",
+     "invalid_json",
+     "invalid_schema",
+     "unsupported_version",
+     "unknown_overlay",
+     "unknown_carrier",
+     "unknown_auth_ref",
+     "unknown_handler",
+     "duplicate_mapping_name",
+     "invalid_queue_binding",
+     "missing_invocable_auth_ref",
+     "missing_handler_target",
+     "unsupported_carrier_capability",
+     "invalid_carrier_target",
+     "invalid_invocable_carrier_scope"
+    ]
+   },
+   "redaction": {
+    "path_disclosure": "basename_and_sha256_only",
+    "never_echo": [
+     "token",
+     "secret",
+     "authorization",
+     "signature",
+     "raw_environment_values"
+    ]
+   },
+   "runtime": {
+    "configured": false,
+    "status": "not_configured",
+    "source": null,
+    "overlay": null,
+    "summary": {
+     "carrier_count": 0,
+     "mapping_count": 0,
+     "mapping_kinds": []
+    },
+    "errors": []
+   }
+  },
+  "invocable_carrier_contract": {
+   "schema": "durable-workflow.v2.invocable-carrier.contract",
+   "version": 1,
+   "carrier_type": "invocable_http",
+   "scope": {
+    "task_kinds": [
+     "activity_task"
+    ],
+    "explicit_non_goals": [
+     "workflow_task_execution",
+     "workflow_replay",
+     "history_mutation",
+     "generic_webhook_ingress"
+    ]
+   },
+   "config_binding": {
+    "config_schema": "durable-workflow.external-executor.config",
+    "config_schema_version": 1,
+    "carrier_type_field": "carriers.<name>.type",
+    "required_type_value": "invocable_http",
+    "mapping_kind": "activity",
+    "capability": "activity_task"
+   },
+   "target_fields": {
+    "url": {
+     "type": "string",
+     "required": true,
+     "allowed_schemes": [
+      "https",
+      "http_loopback"
+     ],
+     "forbidden": [
+      "userinfo"
+     ],
+     "meaning": "Absolute HTTPS URL for the activity handler endpoint; loopback HTTP is only for local development."
+    },
+    "method": {
+     "type": "string",
+     "required": false,
+     "default": "POST",
+     "allowed": [
+      "POST"
+     ]
+    },
+    "timeout_seconds": {
+     "type": "integer",
+     "required": false,
+     "minimum": 1,
+     "maximum": 900,
+     "meaning": "Transport deadline for one handler attempt; carriers must also respect task.deadlines."
+    },
+    "retry_policy": {
+     "type": "object",
+     "required": false,
+     "meaning": "Optional carrier-owned transport retry budget for transient HTTP delivery failures only.",
+     "fields": {
+      "max_attempts": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 5,
+       "default": 1
+      },
+      "backoff_seconds": {
+       "type": "array<int>",
+       "minimum_item": 0,
+       "maximum_item": 300,
+       "maximum_items": 5
+      },
+      "retryable_status_codes": {
+       "type": "array<int>",
+       "allowed": [
+        408,
+        425,
+        429,
+        "5xx"
+       ],
+       "default": [
+        408,
+        429,
+        "5xx"
+       ]
+      }
+     },
+     "authority_boundary": "Transport retry may repeat handler delivery before result reporting; durable activity retry remains server/runtime-owned after complete/fail reporting."
+    }
+   },
+   "request": {
+    "method": "POST",
+    "content_type": "application/vnd.durable-workflow.external-task-input+json",
+    "body_schema": "durable-workflow.v2.external-task-input.contract",
+    "body_version": 1,
+    "idempotency_key_source": "task.idempotency_key"
+   },
+   "response": {
+    "content_type": "application/vnd.durable-workflow.external-task-result+json",
+    "body_schema": "durable-workflow.v2.external-task-result.contract",
+    "body_version": 1,
+    "success_result_path": "result.payload",
+    "failure_path": "failure"
+   },
+   "failure_mapping": {
+    "transport_timeout": "failure.kind=timeout classification=deadline_exceeded",
+    "non_2xx_without_valid_envelope": "malformed_output",
+    "invalid_json": "malformed_output",
+    "schema_mismatch": "malformed_output",
+    "unsupported_payload_reference": "unsupported_payload"
+   },
+   "auth": {
+    "source": "external_executor_config.auth_refs",
+    "redaction": "tokens_secrets_signatures_never_echoed",
+    "determinism": "effective auth must be discoverable by redacted config diagnostics before dispatch",
+    "required": "required for non-loopback targets; loopback HTTP may omit auth only for local development"
+   },
+   "rollout_safety": {
+    "coexistence": "poll_and_invocable_carriers_may_share_a_queue_only_when_mappings_are_activity_type_specific",
+    "drain_signal": "operators must remove or overlay-disable mappings before deleting endpoint credentials",
+    "retry_authority": "carrier policy may retry transport failures, but durable activity retry policy remains the server/runtime authority",
+    "retry_policy_path": "carriers.<name>.retry_policy"
+   }
+  },
+  "external_task_input_contract": {
+   "schema": "durable-workflow.v2.external-task-input.contract",
+   "version": 1,
+   "unknown_field_policy": "ignore_additive_reject_unknown_required",
+   "versioning": {
+    "add_optional_fields": "minor",
+    "add_required_fields": "major",
+    "rename_or_remove_fields": "major",
+    "unknown_fields": "must_be_ignored_unless_declared_required_by_a_supported_version"
+   },
+   "payload_support": {
+    "inline": "Handlers receive codec-tagged payload envelopes with codec and blob fields.",
+    "external_payload": "Handlers resolve opaque external payload references through the authenticated namespace runtime before decode; provider-specific references are unsupported.",
+    "unsupported_codec": "Handlers that cannot decode payload.codec must fail the task with unsupported_payload_codec."
+   },
+   "scope": {
+    "activity_grade_external_execution": {
+     "task_kinds": [
+      "activity_task"
+     ],
+     "fixture_keys": [
+      "activity_task"
+     ],
+     "carrier_expectation": "External carriers execute activity_task inputs as bounded handler invocations and return the external task result envelope."
+    },
+    "worker_protocol_runtime": {
+     "task_kinds": [
+      "workflow_task"
+     ],
+     "fixture_keys": [
+      "workflow_task",
+      "condition_timeout_history"
+     ],
+     "carrier_expectation": "Workflow_task inputs are published for SDK/runtime compatibility and worker-protocol drift tests; they are not activity-grade external handler inputs."
+    }
+   },
+   "envelopes": {
+    "workflow_task": {
+     "kind": "workflow_task",
+     "scope": "worker_protocol_runtime",
+     "external_execution_role": "not_activity_grade_handler_input",
+     "required_fields": [
+      "schema",
+      "version",
+      "task",
+      "workflow",
+      "lease",
+      "payloads",
+      "history",
+      "headers"
+     ],
+     "task_fields": {
+      "id": {
+       "source": "task.task_id",
+       "type": "string"
+      },
+      "kind": {
+       "constant": "workflow_task"
+      },
+      "attempt": {
+       "source": "task.workflow_task_attempt",
+       "type": "integer",
+       "minimum": 1
+      },
+      "task_queue": {
+       "source": "task.task_queue",
+       "type": "string"
+      },
+      "handler": {
+       "source": "task.workflow_type",
+       "type": "string",
+       "nullable": true
+      },
+      "connection": {
+       "source": "task.connection",
+       "type": "string",
+       "nullable": true
+      },
+      "compatibility": {
+       "source": "task.compatibility",
+       "type": "string",
+       "nullable": true
+      },
+      "idempotency_key": {
+       "source": "task.task_id + task.workflow_task_attempt",
+       "type": "string"
+      }
+     },
+     "workflow_fields": {
+      "id": {
+       "source": "task.workflow_id",
+       "type": "string"
+      },
+      "run_id": {
+       "source": "task.run_id",
+       "type": "string"
+      },
+      "status": {
+       "source": "task.run_status",
+       "type": "string",
+       "nullable": true
+      },
+      "resume": {
+       "source": "stable resume context fields from worker poll task",
+       "type": "object",
+       "nullable_fields": [
+        "workflow_wait_kind",
+        "open_wait_id",
+        "resume_source_kind",
+        "resume_source_id",
+        "workflow_update_id",
+        "workflow_signal_id",
+        "signal_name",
+        "signal_wait_id",
+        "workflow_command_id",
+        "activity_execution_id",
+        "activity_attempt_id",
+        "activity_type",
+        "child_call_id",
+        "child_workflow_run_id",
+        "workflow_sequence",
+        "workflow_event_type",
+        "timer_id",
+        "condition_wait_id",
+        "condition_key",
+        "condition_definition_fingerprint"
+       ]
+      }
+     },
+     "lease_fields": {
+      "owner": {
+       "source": "task.lease_owner",
+       "type": "string"
+      },
+      "expires_at": {
+       "source": "task.lease_expires_at",
+       "type": "string",
+       "format": "date-time"
+      },
+      "heartbeat_endpoint": {
+       "source": "worker protocol route",
+       "type": "string"
+      }
+     },
+     "payload_fields": {
+      "arguments": {
+       "source": "task.arguments",
+       "nullable": true
+      },
+      "signal_arguments": {
+       "source": "task.signal_arguments",
+       "nullable": true,
+       "meaning": "Codec-tagged arguments for the accepted signal that resumed this workflow task, when workflow_wait_kind is signal."
+      }
+     },
+     "history_fields": {
+      "events": {
+       "source": "task.history_events",
+       "type": "array"
+      },
+      "last_sequence": {
+       "source": "task.last_history_sequence",
+       "type": "integer"
+      },
+      "next_page_token": {
+       "source": "task.next_history_page_token",
+       "type": "string",
+       "nullable": true
+      },
+      "encoding": {
+       "source": "task.history_events_encoding",
+       "type": "string",
+       "nullable": true
+      }
+     },
+     "history_event_contracts": {
+      "condition_timeout": {
+       "timer_kind": "condition_timeout",
+       "condition_identity_field": "condition_wait_id",
+       "timer_identity_field": "timer_id",
+       "timer_events": {
+        "TimerScheduled": {
+         "required_payload_fields": [
+          "timer_id",
+          "sequence",
+          "timer_kind",
+          "condition_wait_id"
+         ]
+        },
+        "TimerFired": {
+         "required_payload_fields": [
+          "timer_id",
+          "sequence",
+          "timer_kind",
+          "condition_wait_id"
+         ]
+        },
+        "TimerCancelled": {
+         "required_payload_fields": [
+          "timer_id",
+          "sequence",
+          "timer_kind",
+          "condition_wait_id"
+         ]
+        }
+       },
+       "correlation": {
+        "match_fields": [
+         "timer_id",
+         "condition_wait_id"
+        ],
+        "condition_and_timer_sequences_may_differ": true,
+        "event_adjacency_required": false
+       },
+       "replay": {
+        "advances_ordinary_command_cursor": false,
+        "legacy_rows_without_explicit_identity": "supported_for_replay_reading"
+       },
+       "conformance": {
+        "fixture_cluster_info_path": "worker_protocol.external_task_input_contract.fixtures.condition_timeout_history.example.history.events",
+        "required_worker_runtimes": [
+         "sdk-php",
+         "sdk-python",
+         "sdk-rust"
+        ],
+        "required_interleaved_event_types": [
+         "UpdateApplied",
+         "SignalReceived"
+        ],
+        "required_timer_event_types": [
+         "TimerScheduled",
+         "TimerFired",
+         "TimerCancelled"
+        ],
+        "assertions": [
+         "timer_rows_are_self_identifying",
+         "timer_sequence_may_differ_from_condition_sequence",
+         "ordinary_activity_timer_cursor_does_not_advance",
+         "workflow_reaches_terminal_state"
+        ]
+       }
+      }
+     },
+     "intentionally_omitted": [
+      "server process identity",
+      "database primary keys not exposed as task or run identifiers",
+      "transport headers unrelated to durable task handling"
+     ],
+     "boundary": {
+      "workflow_replay": "owned_by_sdk_or_runtime_worker",
+      "history_interpretation": "owned_by_sdk_or_runtime_worker",
+      "external_carrier_use": "validate_shape_only_unless_the_carrier_is_a_workflow_runtime"
+     }
+    },
+    "activity_task": {
+     "kind": "activity_task",
+     "scope": "activity_grade_external_execution",
+     "external_execution_role": "activity_grade_handler_input",
+     "required_fields": [
+      "schema",
+      "version",
+      "task",
+      "workflow",
+      "lease",
+      "payloads",
+      "deadlines",
+      "headers"
+     ],
+     "task_fields": {
+      "id": {
+       "source": "task.task_id",
+       "type": "string"
+      },
+      "kind": {
+       "constant": "activity_task"
+      },
+      "attempt": {
+       "source": "task.attempt_number",
+       "type": "integer",
+       "minimum": 1
+      },
+      "activity_attempt_id": {
+       "source": "task.activity_attempt_id",
+       "type": "string"
+      },
+      "task_queue": {
+       "source": "task.task_queue",
+       "type": "string"
+      },
+      "handler": {
+       "source": "task.activity_type",
+       "type": "string"
+      },
+      "connection": {
+       "source": "task.connection",
+       "type": "string",
+       "nullable": true
+      },
+      "external_executor": {
+       "source": "task.external_executor",
+       "type": "object",
+       "nullable": true,
+       "meaning": "Resolved config-first handler mapping when DW_EXTERNAL_EXECUTOR_CONFIG_PATH matches this activity task."
+      },
+      "idempotency_key": {
+       "source": "task.activity_attempt_id",
+       "type": "string"
+      }
+     },
+     "workflow_fields": {
+      "id": {
+       "source": "task.workflow_id",
+       "type": "string"
+      },
+      "run_id": {
+       "source": "task.run_id",
+       "type": "string"
+      }
+     },
+     "lease_fields": {
+      "owner": {
+       "source": "task.lease_owner",
+       "type": "string"
+      },
+      "expires_at": {
+       "source": "task.lease_expires_at",
+       "type": "string",
+       "format": "date-time"
+      },
+      "heartbeat_endpoint": {
+       "source": "worker protocol route",
+       "type": "string"
+      }
+     },
+     "payload_fields": {
+      "arguments": {
+       "source": "task.arguments",
+       "nullable": true
+      }
+     },
+     "deadline_fields": {
+      "schedule_to_start": {
+       "source": "task.deadlines.schedule_to_start",
+       "nullable": true
+      },
+      "start_to_close": {
+       "source": "task.deadlines.start_to_close",
+       "nullable": true
+      },
+      "schedule_to_close": {
+       "source": "task.deadlines.schedule_to_close",
+       "nullable": true
+      },
+      "heartbeat": {
+       "source": "task.deadlines.heartbeat",
+       "nullable": true
+      }
+     },
+     "intentionally_omitted": [
+      "workflow history events",
+      "server process identity",
+      "transport headers unrelated to durable task handling"
+     ],
+     "boundary": {
+      "workflow_replay": "not_exposed_to_handler",
+      "history_interpretation": "not_exposed_to_handler",
+      "external_carrier_use": "execute_bounded_activity_handler_and_return_external_task_result"
+     }
+    }
+   },
+   "fixtures": {
+    "workflow_task": {
+     "artifact": "durable-workflow.v2.external-task-input.workflow-task.v1",
+     "media_type": "application/vnd.durable-workflow.external-task-input+json",
+     "schema": "durable-workflow.v2.external-task-input",
+     "version": 1,
+     "sha256": "eb4faf329a26a519ec3f157771ba4961726a073e12f011401896f69fbdf7442a",
+     "example": {
+      "schema": "durable-workflow.v2.external-task-input",
+      "version": 1,
+      "task": {
+       "id": "wft_01HV7D2K3X9K2M7YVQ4T0A1B2C",
+       "kind": "workflow_task",
+       "attempt": 2,
+       "task_queue": "billing-workflows",
+       "handler": "billing.invoice.workflow",
+       "connection": null,
+       "compatibility": "build-2026-04-22",
+       "idempotency_key": "wft_01HV7D2K3X9K2M7YVQ4T0A1B2C:2"
+      },
+      "workflow": {
+       "id": "invoice-2026-0001",
+       "run_id": "run_01HV7D2M5N1HDZ4Z8XBQJY6P9R",
+       "status": "running",
+       "resume": {
+        "workflow_wait_kind": "activity",
+        "open_wait_id": "activity:act_01HV7D2N5E4RKDNCQ44B9DHD9W",
+        "resume_source_kind": "activity",
+        "resume_source_id": "act_01HV7D2N5E4RKDNCQ44B9DHD9W",
+        "workflow_update_id": null,
+        "workflow_signal_id": null,
+        "signal_name": null,
+        "signal_wait_id": null,
+        "workflow_command_id": "cmd_01HV7D2N19FHPK3K0V33DD8TM8",
+        "activity_execution_id": "act_01HV7D2N5E4RKDNCQ44B9DHD9W",
+        "activity_attempt_id": "attempt_01HV7D2Q8G6HXH5PF1MF4J7P6Z",
+        "activity_type": "billing.charge-card",
+        "child_call_id": null,
+        "child_workflow_run_id": null,
+        "workflow_sequence": 42,
+        "workflow_event_type": "ActivityCompleted",
+        "timer_id": null,
+        "condition_wait_id": null,
+        "condition_key": null,
+        "condition_definition_fingerprint": null
+       }
+      },
+      "lease": {
+       "owner": "worker-python-a",
+       "expires_at": "2026-04-22T01:05:00.000000Z",
+       "heartbeat_endpoint": "/api/worker/workflow-tasks/wft_01HV7D2K3X9K2M7YVQ4T0A1B2C/heartbeat"
+      },
+      "payloads": {
+       "arguments": {
+        "codec": "avro",
+        "blob": "BASE64_AVRO_ARGUMENTS"
+       },
+       "signal_arguments": null
+      },
+      "history": {
+       "events": [
+        {
+         "event_id": "evt_01HV7D2M7A72M5JHVR75MB4BF3",
+         "event_type": "WorkflowStarted",
+         "sequence": 1
+        }
+       ],
+       "last_sequence": 42,
+       "next_page_token": "eyJhZnRlcl9zZXF1ZW5jZSI6NDJ9",
+       "encoding": null
+      },
+      "headers": {
+       "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00"
+      }
+     }
+    },
+    "condition_timeout_history": {
+     "artifact": "durable-workflow.v2.external-task-input.condition-timeout-history.v1",
+     "media_type": "application/vnd.durable-workflow.external-task-input+json",
+     "schema": "durable-workflow.v2.external-task-input",
+     "version": 1,
+     "sha256": "335d646aa916764500300a4d6866616f9ef1732c392c4afc6376c54986f5468a",
+     "example": {
+      "schema": "durable-workflow.v2.external-task-input",
+      "version": 1,
+      "task": {
+       "id": "wft_01HV7D2K3X9K2M7YVQ4T0A1B2C",
+       "kind": "workflow_task",
+       "attempt": 2,
+       "task_queue": "billing-workflows",
+       "handler": "billing.invoice.workflow",
+       "connection": null,
+       "compatibility": "build-2026-04-22",
+       "idempotency_key": "wft_01HV7D2K3X9K2M7YVQ4T0A1B2C:2"
+      },
+      "workflow": {
+       "id": "invoice-2026-0001",
+       "run_id": "run_01HV7D2M5N1HDZ4Z8XBQJY6P9R",
+       "status": "running",
+       "resume": {
+        "workflow_wait_kind": "condition",
+        "open_wait_id": "condition:41",
+        "resume_source_kind": "timer",
+        "resume_source_id": "timer:42",
+        "workflow_update_id": null,
+        "workflow_signal_id": null,
+        "signal_name": null,
+        "signal_wait_id": null,
+        "workflow_command_id": null,
+        "activity_execution_id": null,
+        "activity_attempt_id": null,
+        "activity_type": null,
+        "child_call_id": null,
+        "child_workflow_run_id": null,
+        "workflow_sequence": 42,
+        "workflow_event_type": "TimerFired",
+        "timer_id": "timer:42",
+        "condition_wait_id": "condition:41",
+        "condition_key": "invoice.approved",
+        "condition_definition_fingerprint": "sha256:condition-41"
+       }
+      },
+      "lease": {
+       "owner": "worker-runtime-a",
+       "expires_at": "2026-04-22T01:05:00.000000Z",
+       "heartbeat_endpoint": "/api/worker/workflow-tasks/wft_01HV7D2K3X9K2M7YVQ4T0A1B2C/heartbeat"
+      },
+      "payloads": {
+       "arguments": {
+        "codec": "avro",
+        "blob": "BASE64_AVRO_ARGUMENTS"
+       },
+       "signal_arguments": null
+      },
+      "history": {
+       "events": [
+        {
+         "event_id": "evt_01HV7D2M7A72M5JHVR75MB4BF3",
+         "event_type": "WorkflowStarted",
+         "sequence": 1
+        },
+        {
+         "event_id": "evt_condition_opened_41",
+         "event_type": "ConditionWaitOpened",
+         "sequence": 2,
+         "payload": {
+          "sequence": 41,
+          "condition_wait_id": "condition:41",
+          "condition_key": "invoice.approved",
+          "condition_definition_fingerprint": "sha256:condition-41",
+          "timeout_seconds": 30
+         }
+        },
+        {
+         "event_id": "evt_timer_scheduled_42",
+         "event_type": "TimerScheduled",
+         "sequence": 3,
+         "payload": {
+          "sequence": 42,
+          "timer_id": "timer:42",
+          "delay_seconds": 30,
+          "timer_kind": "condition_timeout",
+          "condition_wait_id": "condition:41",
+          "condition_key": "invoice.approved",
+          "condition_definition_fingerprint": "sha256:condition-41"
+         }
+        },
+        {
+         "event_id": "evt_update_applied_41",
+         "event_type": "UpdateApplied",
+         "sequence": 4,
+         "payload": {
+          "sequence": 41,
+          "update_id": "update:invoice-name",
+          "update_name": "rename-invoice",
+          "arguments": "[\"August invoice\"]"
+         }
+        },
+        {
+         "event_id": "evt_signal_received_41",
+         "event_type": "SignalReceived",
+         "sequence": 5,
+         "payload": {
+          "workflow_sequence": 41,
+          "signal_name": "approval-observed",
+          "value": "[\"finance\"]"
+         }
+        },
+        {
+         "event_id": "evt_timer_fired_42",
+         "event_type": "TimerFired",
+         "sequence": 6,
+         "payload": {
+          "sequence": 42,
+          "timer_id": "timer:42",
+          "delay_seconds": 30,
+          "timer_kind": "condition_timeout",
+          "condition_wait_id": "condition:41",
+          "condition_key": "invoice.approved",
+          "condition_definition_fingerprint": "sha256:condition-41"
+         }
+        },
+        {
+         "event_id": "evt_condition_opened_43",
+         "event_type": "ConditionWaitOpened",
+         "sequence": 7,
+         "payload": {
+          "sequence": 43,
+          "condition_wait_id": "condition:43",
+          "condition_key": "invoice.posted",
+          "condition_definition_fingerprint": "sha256:condition-43",
+          "timeout_seconds": 60
+         }
+        },
+        {
+         "event_id": "evt_timer_scheduled_44",
+         "event_type": "TimerScheduled",
+         "sequence": 8,
+         "payload": {
+          "sequence": 44,
+          "timer_id": "timer:44",
+          "delay_seconds": 60,
+          "timer_kind": "condition_timeout",
+          "condition_wait_id": "condition:43",
+          "condition_key": "invoice.posted",
+          "condition_definition_fingerprint": "sha256:condition-43"
+         }
+        },
+        {
+         "event_id": "evt_condition_satisfied_43",
+         "event_type": "ConditionWaitSatisfied",
+         "sequence": 9,
+         "payload": {
+          "sequence": 43,
+          "condition_wait_id": "condition:43",
+          "condition_key": "invoice.posted",
+          "timer_id": "timer:44"
+         }
+        },
+        {
+         "event_id": "evt_timer_cancelled_44",
+         "event_type": "TimerCancelled",
+         "sequence": 10,
+         "payload": {
+          "sequence": 44,
+          "timer_id": "timer:44",
+          "delay_seconds": 60,
+          "timer_kind": "condition_timeout",
+          "condition_wait_id": "condition:43",
+          "condition_key": "invoice.posted",
+          "condition_definition_fingerprint": "sha256:condition-43"
+         }
+        }
+       ],
+       "last_sequence": 10,
+       "next_page_token": "eyJhZnRlcl9zZXF1ZW5jZSI6MTB9",
+       "encoding": null
+      },
+      "headers": {
+       "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00"
+      }
+     }
+    },
+    "activity_task": {
+     "artifact": "durable-workflow.v2.external-task-input.activity-task.v1",
+     "media_type": "application/vnd.durable-workflow.external-task-input+json",
+     "schema": "durable-workflow.v2.external-task-input",
+     "version": 1,
+     "sha256": "595d63e8c0bef885c31a9771afbd58adfd4dc1ba4aa5d4a7b0bda99e568ae555",
+     "example": {
+      "schema": "durable-workflow.v2.external-task-input",
+      "version": 1,
+      "task": {
+       "id": "acttask_01HV7D3G3G61TAH2YB5RK45XJS",
+       "kind": "activity_task",
+       "attempt": 1,
+       "activity_attempt_id": "attempt_01HV7D3KJ1C8WQNNY8MVM8J40X",
+       "task_queue": "billing-activities",
+       "handler": "billing.charge-card",
+       "connection": null,
+       "idempotency_key": "attempt_01HV7D3KJ1C8WQNNY8MVM8J40X"
+      },
+      "workflow": {
+       "id": "invoice-2026-0001",
+       "run_id": "run_01HV7D2M5N1HDZ4Z8XBQJY6P9R"
+      },
+      "lease": {
+       "owner": "worker-python-a",
+       "expires_at": "2026-04-22T01:10:00.000000Z",
+       "heartbeat_endpoint": "/api/worker/activity-tasks/acttask_01HV7D3G3G61TAH2YB5RK45XJS/heartbeat"
+      },
+      "payloads": {
+       "arguments": {
+        "codec": "avro",
+        "blob": "BASE64_AVRO_ARGUMENTS"
+       }
+      },
+      "deadlines": {
+       "schedule_to_start": "2026-04-22T01:02:00.000000Z",
+       "start_to_close": "2026-04-22T01:07:00.000000Z",
+       "schedule_to_close": "2026-04-22T01:12:00.000000Z",
+       "heartbeat": "2026-04-22T01:04:00.000000Z"
+      },
+      "headers": {
+       "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-7a085853722dc6d2-00"
+      }
+     }
+    }
+   }
+  },
+  "external_task_result_contract": {
+   "schema": "durable-workflow.v2.external-task-result.contract",
+   "version": 1,
+   "unknown_field_policy": "ignore_additive_reject_unknown_required",
+   "versioning": {
+    "add_optional_fields": "minor",
+    "add_required_fields": "major",
+    "rename_or_remove_fields": "major",
+    "unknown_fields": "must_be_ignored_unless_declared_required_by_a_supported_version"
+   },
+   "exit_codes": {
+    "success": "Exit code 0 can only mean success when the carrier also produced a valid success envelope.",
+    "failure": "Non-zero exit codes are transport signals. Carriers must map them to a structured failure envelope or malformed_output.",
+    "reserved": {
+     "64": "Malformed carrier input or invalid output envelope.",
+     "70": "Handler runtime crash before a valid envelope was produced.",
+     "75": "Temporary carrier failure that may be retried by carrier policy.",
+     "130": "Cancellation signal received before a valid envelope was produced."
+    }
+   },
+   "stderr_policy": "logs_only_no_machine_meaning",
+   "payload_support": {
+    "codecs": [
+     "avro"
+    ],
+    "result_payload": "Success result payloads use codec=\"avro\". Null result is represented as result: null.",
+    "failure_details": "Failure details use codec=\"avro\" when present.",
+    "unsupported_codec": "A handler that cannot decode input payloads must return failure.kind unsupported_payload with failure.classification unsupported_payload_codec.",
+    "unsupported_external_payload": "A handler that cannot resolve an opaque reference through the authenticated namespace runtime must return failure.kind unsupported_payload with failure.classification unsupported_payload_reference."
+   },
+   "envelopes": {
+    "success": {
+     "kind": "success",
+     "required_fields": [
+      "schema",
+      "version",
+      "outcome",
+      "task",
+      "result",
+      "metadata"
+     ],
+     "outcome_fields": {
+      "status": {
+       "constant": "succeeded"
+      },
+      "recorded": {
+       "source": "worker protocol response.recorded",
+       "type": "boolean"
+      }
+     },
+     "task_fields": {
+      "id": {
+       "source": "external task input task.id",
+       "type": "string"
+      },
+      "kind": {
+       "source": "external task input task.kind",
+       "type": "string"
+      },
+      "attempt": {
+       "source": "external task input task.attempt",
+       "type": "integer",
+       "minimum": 1
+      },
+      "idempotency_key": {
+       "source": "external task input task.idempotency_key",
+       "type": "string"
+      }
+     },
+     "result_fields": {
+      "payload": {
+       "type": "object",
+       "nullable": true,
+       "codec_tagged": true
+      },
+      "metadata": {
+       "type": "object",
+       "nullable": true
+      }
+     }
+    },
+    "failure": {
+     "kind": "failure",
+     "required_fields": [
+      "schema",
+      "version",
+      "outcome",
+      "task",
+      "failure",
+      "metadata"
+     ],
+     "outcome_fields": {
+      "status": {
+       "constant": "failed"
+      },
+      "retryable": {
+       "type": "boolean"
+      },
+      "recorded": {
+       "source": "worker protocol response.recorded",
+       "type": "boolean"
+      }
+     },
+     "task_fields": {
+      "id": {
+       "source": "external task input task.id",
+       "type": "string"
+      },
+      "kind": {
+       "source": "external task input task.kind",
+       "type": "string"
+      },
+      "attempt": {
+       "source": "external task input task.attempt",
+       "type": "integer",
+       "minimum": 1
+      },
+      "idempotency_key": {
+       "source": "external task input task.idempotency_key",
+       "type": "string"
+      }
+     },
+     "failure_fields": {
+      "kind": {
+       "type": "string",
+       "values": [
+        "application",
+        "timeout",
+        "cancellation",
+        "malformed_output",
+        "handler_crash",
+        "decode_failure",
+        "unsupported_payload"
+       ]
+      },
+      "classification": {
+       "type": "string",
+       "values": [
+        "application_error",
+        "timeout",
+        "cancelled",
+        "deadline_exceeded",
+        "handler_crash",
+        "decode_failure",
+        "malformed_output",
+        "unsupported_payload_codec",
+        "unsupported_payload_reference"
+       ]
+      },
+      "message": {
+       "type": "string"
+      },
+      "type": {
+       "type": "string",
+       "nullable": true
+      },
+      "stack_trace": {
+       "type": "string",
+       "nullable": true
+      },
+      "timeout_type": {
+       "type": "string",
+       "nullable": true,
+       "values": [
+        "schedule_to_start",
+        "start_to_close",
+        "schedule_to_close",
+        "heartbeat",
+        "deadline_exceeded"
+       ]
+      },
+      "cancelled": {
+       "type": "boolean"
+      },
+      "details": {
+       "type": "object",
+       "nullable": true,
+       "codec_tagged": true
+      }
+     }
+    },
+    "malformed_output": {
+     "kind": "malformed_output",
+     "required_fields": [
+      "schema",
+      "version",
+      "outcome",
+      "task",
+      "failure",
+      "raw_output",
+      "metadata"
+     ],
+     "meaning": "The carrier could not parse a valid success or failure envelope from handler output.",
+     "retryability": "Carrier policy may retry malformed output only when the handler mapping declares it safe.",
+     "failure_defaults": {
+      "kind": "malformed_output",
+      "classification": "malformed_output",
+      "retryable": false,
+      "cancelled": false
+     }
+    }
+   },
+   "fixtures": {
+    "success": {
+     "artifact": "durable-workflow.v2.external-task-result.success.v1",
+     "media_type": "application/vnd.durable-workflow.external-task-result+json",
+     "schema": "durable-workflow.v2.external-task-result",
+     "version": 1,
+     "sha256": "49b6cbc940753afcff19cc4391ab8530cd3007364513c6a5a5ad54af66021ff9",
+     "example": {
+      "schema": "durable-workflow.v2.external-task-result",
+      "version": 1,
+      "outcome": {
+       "status": "succeeded",
+       "recorded": true
+      },
+      "task": {
+       "id": "acttask_01HV7D3G3G61TAH2YB5RK45XJS",
+       "kind": "activity_task",
+       "attempt": 1,
+       "idempotency_key": "attempt_01HV7D3KJ1C8WQNNY8MVM8J40X"
+      },
+      "result": {
+       "payload": {
+        "codec": "avro",
+        "blob": "wwHioz3/VYAiNw4CBG9rAgEA"
+       },
+       "metadata": {
+        "content_type": "application/vnd.durable-workflow.avro-value"
+       }
+      },
+      "metadata": {
+       "handler": "billing.charge-card",
+       "carrier": "process-carrier",
+       "duration_ms": 184
+      }
+     }
+    },
+    "failure": {
+     "artifact": "durable-workflow.v2.external-task-result.failure.v1",
+     "media_type": "application/vnd.durable-workflow.external-task-result+json",
+     "schema": "durable-workflow.v2.external-task-result",
+     "version": 1,
+     "sha256": "c952e3adbba6992df2d560bd03e9ca361d155df7444f74c794d00dcbc5ee06bf",
+     "example": {
+      "schema": "durable-workflow.v2.external-task-result",
+      "version": 1,
+      "outcome": {
+       "status": "failed",
+       "retryable": true,
+       "recorded": true
+      },
+      "task": {
+       "id": "acttask_01HV7D3G3G61TAH2YB5RK45XJS",
+       "kind": "activity_task",
+       "attempt": 1,
+       "idempotency_key": "attempt_01HV7D3KJ1C8WQNNY8MVM8J40X"
+      },
+      "failure": {
+       "kind": "timeout",
+       "classification": "deadline_exceeded",
+       "message": "Deadline exceeded while waiting for billing provider.",
+       "type": "ProviderTimeout",
+       "stack_trace": null,
+       "timeout_type": "deadline_exceeded",
+       "cancelled": false,
+       "details": {
+        "codec": "avro",
+        "blob": "wwHioz3/VYAiNw4CEHByb3ZpZGVyCg5iaWxsaW5nAA=="
+       }
+      },
+      "metadata": {
+       "handler": "billing.charge-card",
+       "carrier": "process-carrier",
+       "duration_ms": 5000
+      }
+     }
+    },
+    "malformed_output": {
+     "artifact": "durable-workflow.v2.external-task-result.malformed-output.v1",
+     "media_type": "application/vnd.durable-workflow.external-task-result+json",
+     "schema": "durable-workflow.v2.external-task-result",
+     "version": 1,
+     "sha256": "5ba060b37df5ec8a77857eb3fe6676ab04d01e9cc751df1cb3b8459ce3a7b78b",
+     "example": {
+      "schema": "durable-workflow.v2.external-task-result",
+      "version": 1,
+      "outcome": {
+       "status": "failed",
+       "retryable": false,
+       "recorded": false
+      },
+      "task": {
+       "id": "acttask_01HV7D3G3G61TAH2YB5RK45XJS",
+       "kind": "activity_task",
+       "attempt": 1,
+       "idempotency_key": "attempt_01HV7D3KJ1C8WQNNY8MVM8J40X"
+      },
+      "failure": {
+       "kind": "malformed_output",
+       "classification": "malformed_output",
+       "message": "Handler exited without producing a valid result envelope.",
+       "type": "MalformedExternalTaskOutput",
+       "stack_trace": null,
+       "timeout_type": null,
+       "cancelled": false,
+       "details": null
+      },
+      "raw_output": {
+       "stdout_preview": "{not json",
+       "stderr_preview": "deprecated flag ignored",
+       "exit_code": 64
+      },
+      "metadata": {
+       "handler": "billing.charge-card",
+       "carrier": "process-carrier",
+       "duration_ms": 22
+      }
+     }
+    },
+    "cancellation": {
+     "artifact": "durable-workflow.v2.external-task-result.cancellation.v1",
+     "media_type": "application/vnd.durable-workflow.external-task-result+json",
+     "schema": "durable-workflow.v2.external-task-result",
+     "version": 1,
+     "sha256": "7fe2b55360496bbdf21b5ef42ba1c7b7017fe36688ff62d53dcb1a7c411c3eae",
+     "example": {
+      "schema": "durable-workflow.v2.external-task-result",
+      "version": 1,
+      "outcome": {
+       "status": "failed",
+       "retryable": false,
+       "recorded": true
+      },
+      "task": {
+       "id": "acttask_01HV7D3G3G61TAH2YB5RK45XJS",
+       "kind": "activity_task",
+       "attempt": 1,
+       "idempotency_key": "attempt_01HV7D3KJ1C8WQNNY8MVM8J40X"
+      },
+      "failure": {
+       "kind": "cancellation",
+       "classification": "cancelled",
+       "message": "Activity was cancelled before the handler completed.",
+       "type": "ActivityCancelled",
+       "stack_trace": null,
+       "timeout_type": null,
+       "cancelled": true,
+       "details": null
+      },
+      "metadata": {
+       "handler": "billing.charge-card",
+       "carrier": "process-carrier",
+       "duration_ms": 610
+      }
+     }
+    },
+    "handler_crash": {
+     "artifact": "durable-workflow.v2.external-task-result.handler-crash.v1",
+     "media_type": "application/vnd.durable-workflow.external-task-result+json",
+     "schema": "durable-workflow.v2.external-task-result",
+     "version": 1,
+     "sha256": "5254a7238eb0025c3f1f75e2c143176fdade3fc063bc41e66b1042ba517fb3a1",
+     "example": {
+      "schema": "durable-workflow.v2.external-task-result",
+      "version": 1,
+      "outcome": {
+       "status": "failed",
+       "retryable": true,
+       "recorded": true
+      },
+      "task": {
+       "id": "acttask_01HV7D3G3G61TAH2YB5RK45XJS",
+       "kind": "activity_task",
+       "attempt": 1,
+       "idempotency_key": "attempt_01HV7D3KJ1C8WQNNY8MVM8J40X"
+      },
+      "failure": {
+       "kind": "handler_crash",
+       "classification": "handler_crash",
+       "message": "Handler process exited before producing a valid envelope.",
+       "type": "HandlerRuntimeCrash",
+       "stack_trace": null,
+       "timeout_type": null,
+       "cancelled": false,
+       "details": null
+      },
+      "metadata": {
+       "handler": "billing.charge-card",
+       "carrier": "process-carrier",
+       "duration_ms": 31
+      }
+     }
+    },
+    "decode_failure": {
+     "artifact": "durable-workflow.v2.external-task-result.decode-failure.v1",
+     "media_type": "application/vnd.durable-workflow.external-task-result+json",
+     "schema": "durable-workflow.v2.external-task-result",
+     "version": 1,
+     "sha256": "4c7ab41eb02a6942b08bde6f503bfccdce140ea7dd47cab45e1d713bb675ffba",
+     "example": {
+      "schema": "durable-workflow.v2.external-task-result",
+      "version": 1,
+      "outcome": {
+       "status": "failed",
+       "retryable": false,
+       "recorded": true
+      },
+      "task": {
+       "id": "acttask_01HV7D3G3G61TAH2YB5RK45XJS",
+       "kind": "activity_task",
+       "attempt": 1,
+       "idempotency_key": "attempt_01HV7D3KJ1C8WQNNY8MVM8J40X"
+      },
+      "failure": {
+       "kind": "decode_failure",
+       "classification": "decode_failure",
+       "message": "Carrier could not decode handler output as UTF-8 JSON.",
+       "type": "OutputDecodeFailure",
+       "stack_trace": null,
+       "timeout_type": null,
+       "cancelled": false,
+       "details": {
+        "codec": "avro",
+        "blob": "wwHioz3/VYAiNw4CDGRldGFpbAoaaW52YWxpZCB1dGYtOAA="
+       }
+      },
+      "metadata": {
+       "handler": "billing.charge-card",
+       "carrier": "process-carrier",
+       "duration_ms": 18
+      }
+     }
+    },
+    "unsupported_payload_codec": {
+     "artifact": "durable-workflow.v2.external-task-result.unsupported-payload-codec.v1",
+     "media_type": "application/vnd.durable-workflow.external-task-result+json",
+     "schema": "durable-workflow.v2.external-task-result",
+     "version": 1,
+     "sha256": "4e17055b824971dca90d6156b2c58d1ce8dc0c031bce014395440d2a5742998c",
+     "example": {
+      "schema": "durable-workflow.v2.external-task-result",
+      "version": 1,
+      "outcome": {
+       "status": "failed",
+       "retryable": false,
+       "recorded": true
+      },
+      "task": {
+       "id": "acttask_01HV7D3G3G61TAH2YB5RK45XJS",
+       "kind": "activity_task",
+       "attempt": 1,
+       "idempotency_key": "attempt_01HV7D3KJ1C8WQNNY8MVM8J40X"
+      },
+      "failure": {
+       "kind": "unsupported_payload",
+       "classification": "unsupported_payload_codec",
+       "message": "Handler does not support the input payload codec.",
+       "type": "UnsupportedPayloadCodec",
+       "stack_trace": null,
+       "timeout_type": null,
+       "cancelled": false,
+       "details": {
+        "codec": "avro",
+        "blob": "wwHioz3/VYAiNw4CCmNvZGVjCghqc29uAA=="
+       }
+      },
+      "metadata": {
+       "handler": "billing.charge-card",
+       "carrier": "process-carrier",
+       "duration_ms": 9
+      }
+     }
+    },
+    "unsupported_payload_reference": {
+     "artifact": "durable-workflow.v2.external-task-result.unsupported-payload-reference.v1",
+     "media_type": "application/vnd.durable-workflow.external-task-result+json",
+     "schema": "durable-workflow.v2.external-task-result",
+     "version": 1,
+     "sha256": "f86bc0192c9c808dda8f185f3293c51158314d1750789da35917af0b69bba013",
+     "example": {
+      "schema": "durable-workflow.v2.external-task-result",
+      "version": 1,
+      "outcome": {
+       "status": "failed",
+       "retryable": false,
+       "recorded": true
+      },
+      "task": {
+       "id": "acttask_01HV7D3G3G61TAH2YB5RK45XJS",
+       "kind": "activity_task",
+       "attempt": 1,
+       "idempotency_key": "attempt_01HV7D3KJ1C8WQNNY8MVM8J40X"
+      },
+      "failure": {
+       "kind": "unsupported_payload",
+       "classification": "unsupported_payload_reference",
+       "message": "Handler cannot resolve the external storage payload reference.",
+       "type": "UnsupportedPayloadReference",
+       "stack_trace": null,
+       "timeout_type": null,
+       "cancelled": false,
+       "details": {
+        "codec": "avro",
+        "blob": "wwHioz3/VYAiNw4CEHByb3ZpZGVyCgRncwA="
+       }
+      },
+      "metadata": {
+       "handler": "billing.charge-card",
+       "carrier": "process-carrier",
+       "duration_ms": 12
+      }
+     }
+    }
+   }
+  }
+ },
+ "auth_composition_contract": {
+  "schema": "durable-workflow.v2.auth-composition.contract",
+  "version": 1,
+  "scope": "external_execution_carriers",
+  "unknown_field_policy": "ignore_additive_reject_unknown_required",
+  "precedence": {
+   "connection_values": [
+    "flag",
+    "environment",
+    "selected_profile",
+    "default"
+   ],
+   "profile_selection": [
+    "flag_env",
+    "DW_ENV",
+    "current_profile",
+    "default_profile"
+   ],
+   "notes": [
+    "flags win only for the current invocation",
+    "environment values are portable carrier inputs and must not be persisted by default",
+    "selected profile values are persisted configuration, but secret fields should be references",
+    "defaults are explicit and must appear in effective-config diagnostics"
+   ]
+  },
+  "canonical_environment": {
+   "server_url": "DURABLE_WORKFLOW_SERVER_URL",
+   "namespace": "DURABLE_WORKFLOW_NAMESPACE",
+   "auth_token": "DURABLE_WORKFLOW_AUTH_TOKEN",
+   "tls_verify": "DURABLE_WORKFLOW_TLS_VERIFY",
+   "profile": "DW_ENV"
+  },
+  "auth_material": {
+   "token": {
+    "status": "supported",
+    "transport": "bearer_authorization_header",
+    "persisted_as": "secret_reference_or_profile_env_reference",
+    "effective_config_value": "redacted"
+   },
+   "mtls": {
+    "status": "reserved",
+    "persisted_as": "certificate_and_key_references",
+    "effective_config_value": "references_only"
+   },
+   "signed_headers": {
+    "status": "reserved",
+    "persisted_as": "key_reference_and_header_allowlist",
+    "effective_config_value": "references_only"
+   },
+   "extensions": {
+    "status": "reserved",
+    "rule": "new auth material types must define redaction, persistence, and source precedence before use"
+   }
+  },
+  "effective_config": {
+   "required_fields": [
+    "server_url",
+    "namespace",
+    "profile",
+    "auth",
+    "tls",
+    "identity"
+   ],
+   "source_values": [
+    "flag",
+    "environment",
+    "selected_profile",
+    "profile_env",
+    "default",
+    "server"
+   ],
+   "field_contracts": {
+    "server_url": {
+     "value": "normalized_absolute_url",
+     "source": "one_of_source_values"
+    },
+    "namespace": {
+     "value": "non_empty_namespace_name",
+     "source": "one_of_source_values"
+    },
+    "profile": {
+     "name": "nullable_string",
+     "source": "flag_env_or_DW_ENV_or_current_profile_or_default_profile"
+    },
+    "auth": {
+     "type": "token_or_mtls_or_signed_headers_or_none",
+     "source": "one_of_source_values",
+     "value": "redacted_or_reference_only"
+    },
+    "tls": {
+     "verify": "boolean",
+     "source": "one_of_source_values"
+    },
+    "identity": {
+     "subject": "nullable_string",
+     "roles": "list_of_strings",
+     "source": "server_or_carrier"
+    }
+   }
+  },
+  "redaction": {
+   "never_echo": [
+    "bearer_tokens",
+    "private_keys",
+    "shared_signature_keys",
+    "client_certificate_private_key_material",
+    "raw_authorization_headers"
+   ],
+   "allowed_diagnostics": [
+    "redacted",
+    "secret_reference_name",
+    "environment_variable_name",
+    "profile_name",
+    "certificate_reference_name",
+    "key_reference_name"
+   ]
+  },
+  "resolution": {
+   "server_url": "carriers normalize and use the winning absolute URL without appending hidden path defaults",
+   "namespace": "carriers send the winning namespace explicitly when the protocol supports namespace headers",
+   "identity": "servers may report authenticated subject and roles; carriers must treat identity as server-asserted when present",
+   "tls": "carriers must fail closed on invalid TLS unless the winning tls.verify value is false"
+  }
+ }
+}

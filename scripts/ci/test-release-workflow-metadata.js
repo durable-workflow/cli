@@ -60,7 +60,7 @@ test('the release action consumes metadata from the resolved tag', () => {
   assert.match(workflow, /make_latest: \$\{\{ steps\.resolve\.outputs\.make_latest \}\}/);
   assert.match(
     workflow,
-    /release_metadata="\$\(node scripts\/ci\/release-version\.js metadata "\$tag"\)"/,
+    /release_metadata="\$\(node scripts\/ci\/release-version\.js metadata "\$tag" "\$current_latest"\)"/,
   );
   assert.match(workflow, /read -r prerelease make_latest <<< "\$release_metadata"/);
   assert.match(workflow, /echo "prerelease=\$prerelease" >> "\$GITHUB_OUTPUT"/);
@@ -70,16 +70,12 @@ test('the release action consumes metadata from the resolved tag', () => {
     workflow.indexOf('- name: Create GitHub Release'),
     workflow.indexOf('- name: Verify public release downloads'),
   );
-  assert.match(
-    releaseAction,
-    /prerelease: \$\{\{ needs\.resolve-release\.outputs\.prerelease \}\}/,
-  );
-  assert.match(
-    releaseAction,
-    /make_latest: \$\{\{ needs\.resolve-release\.outputs\.make_latest \}\}/,
-  );
-  assert.match(releaseAction, /body_path: release-notes\.md/);
-  assert.match(releaseAction, /files: \|\n\s+dist\/\*/);
+  assert.match(releaseAction, /PRERELEASE: \$\{\{ needs\.resolve-release\.outputs\.prerelease \}\}/);
+  assert.match(releaseAction, /MAKE_LATEST: \$\{\{ needs\.resolve-release\.outputs\.make_latest \}\}/);
+  assert.match(releaseAction, /--notes-file release-notes\.md --generate-notes "--latest=\$MAKE_LATEST"/);
+  assert.match(releaseAction, /flags\+=\(--prerelease\)/);
+  assert.match(releaseAction, /gh release create "\$RELEASE_TAG" --repo "\$GITHUB_REPOSITORY" "\$\{flags\[@\]\}" dist\/\*/);
+  assert.doesNotMatch(workflow, /softprops\/action-gh-release/);
 });
 
 test('metadata reconciliation can only write from the main branch', () => {
@@ -135,4 +131,45 @@ test('upgrade channel verification uses the executable installed from the public
     /verify-cli-upgrade-result\.js \\\n+\s+--mode apply --release-version "\$tag" --channel-version "\$channel_version"/,
   );
   assert.doesNotMatch(verification, /dist\/dw-linux-x86_64 upgrade/);
+});
+
+function workflowJob(workflow, name) {
+  const start = workflow.indexOf(`\n  ${name}:\n`);
+  assert.notEqual(start, -1, `missing job ${name}`);
+  const rest = workflow.slice(start + 1);
+  const next = rest.slice(1).search(/\n {2}[a-z][a-z0-9-]*:\n/);
+  return next === -1 ? rest : rest.slice(0, next + 1);
+}
+
+test('the publishing job never runs installers or the published dw', () => {
+  const workflow = fs.readFileSync(workflowPath, 'utf8');
+  const publish = workflowJob(workflow, 'release');
+
+  // GitHub keeps every secret a job can use in memory and any step in an
+  // id-token job can mint tokens, so code from the release runs elsewhere.
+  assert.match(publish, /contents: write/);
+  assert.match(publish, /id-token: write/);
+  assert.doesNotMatch(publish, /Verify public release downloads/);
+  // Syntax checks (sh -n) and copies of the installer are fine; running it is not.
+  assert.doesNotMatch(publish, /sh "\$installer"|\bsh scripts\/install\.sh|DURABLE_WORKFLOW_BIN_NAME=/);
+  assert.doesNotMatch(publish, /dw-release-check|dw-channel-check|upgrade --/);
+});
+
+test('public release verification runs read-only after publication', () => {
+  const workflow = fs.readFileSync(workflowPath, 'utf8');
+  const verify = workflowJob(workflow, 'verify-release');
+
+  assert.match(verify, /needs: \[resolve-release, release\]/);
+  assert.match(verify, /needs\.release\.result == 'success'/);
+  assert.match(verify, /permissions:\n\s+contents: read\n/);
+  assert.doesNotMatch(verify, /contents: write|id-token|attestations|environment:|secrets\./);
+  // Verification code comes from the workflow's own commit, not a job output.
+  assert.match(verify, /ref: \$\{\{ github\.sha \}\}/);
+  assert.doesNotMatch(verify, /ref: \$\{\{ needs\./);
+  assert.match(verify, /VERIFIED_SOURCE_SHA: \$\{\{ needs\.resolve-release\.outputs\.commit \}\}/);
+  assert.match(verify, /release_commit="\$VERIFIED_SOURCE_SHA"/);
+  assert.match(verify, /persist-credentials: false/);
+  assert.match(verify, /- name: Verify public release downloads/);
+  assert.match(verify, /dw-release-check" upgrade --output=json/);
+  assert.match(verify, /name: release-evidence/);
 });

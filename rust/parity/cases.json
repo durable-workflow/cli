@@ -1,0 +1,3387 @@
+{
+ "cases": [
+  {
+   "name": "env:list empty, table",
+   "argv": [
+    "env:list"
+   ]
+  },
+  {
+   "name": "env:list empty, json",
+   "argv": [
+    "env:list",
+    "--json"
+   ]
+  },
+  {
+   "name": "env:list empty, jsonl",
+   "argv": [
+    "env:list",
+    "--output=jsonl"
+   ]
+  },
+  {
+   "name": "env:set new default, json",
+   "argv": [
+    "env:set",
+    "dev",
+    "--server=http://localhost:8080",
+    "--namespace=default",
+    "--make-default",
+    "--json"
+   ]
+  },
+  {
+   "name": "env:set human",
+   "argv": [
+    "env:set",
+    "dev",
+    "--server",
+    "http://localhost:8080"
+   ]
+  },
+  {
+   "name": "env:list with literal and env tokens, table",
+   "setup": [
+    [
+     "env:set",
+     "dev",
+     "--server=http://localhost:8080",
+     "--namespace=default",
+     "--make-default"
+    ],
+    [
+     "env:set",
+     "prod",
+     "--server=https://x.example",
+     "--token=s3cret",
+     "--profile-output=json"
+    ],
+    [
+     "env:set",
+     "stage",
+     "--server=https://s.example",
+     "--token-env=STAGE_TOKEN",
+     "--tls-verify=false"
+    ]
+   ],
+   "argv": [
+    "env:list"
+   ]
+  },
+  {
+   "name": "env:list --show-token json",
+   "setup": [
+    [
+     "env:set",
+     "prod",
+     "--server=https://x.example",
+     "--token=s3cret"
+    ],
+    [
+     "env:set",
+     "dev",
+     "--server=http://localhost:8080",
+     "--make-default"
+    ]
+   ],
+   "argv": [
+    "env:list",
+    "--show-token",
+    "--json"
+   ]
+  },
+  {
+   "name": "env:list jsonl",
+   "setup": [
+    [
+     "env:set",
+     "b",
+     "--server=http://b"
+    ],
+    [
+     "env:set",
+     "a",
+     "--server=http://a",
+     "--make-default"
+    ]
+   ],
+   "argv": [
+    "env:list",
+    "--output=jsonl"
+   ]
+  },
+  {
+   "name": "env:set updates only written fields",
+   "setup": [
+    [
+     "env:set",
+     "dev",
+     "--server=http://one",
+     "--namespace=orders",
+     "--token-env=DEV_TOKEN"
+    ]
+   ],
+   "argv": [
+    "env:set",
+    "dev",
+    "--server=http://two",
+    "--json"
+   ]
+  },
+  {
+   "name": "env:set empty value clears a field",
+   "setup": [
+    [
+     "env:set",
+     "dev",
+     "--server=http://one",
+     "--namespace=orders",
+     "--token=abc"
+    ]
+   ],
+   "argv": [
+    "env:set",
+    "dev",
+    "--namespace=",
+    "--token-env=",
+    "--json"
+   ]
+  },
+  {
+   "name": "env:set invalid name",
+   "argv": [
+    "env:set",
+    "bad name"
+   ]
+  },
+  {
+   "name": "env:set invalid name json",
+   "argv": [
+    "env:set",
+    "-bad",
+    "--json"
+   ]
+  },
+  {
+   "name": "env:set invalid token env",
+   "argv": [
+    "env:set",
+    "dev",
+    "--token-env=lower",
+    "--json"
+   ]
+  },
+  {
+   "name": "env:set token and token env",
+   "argv": [
+    "env:set",
+    "dev",
+    "--token=a",
+    "--token-env=B",
+    "--json"
+   ]
+  },
+  {
+   "name": "env:set invalid profile output",
+   "argv": [
+    "env:set",
+    "dev",
+    "--profile-output=xml",
+    "--json"
+   ]
+  },
+  {
+   "name": "env:set invalid tls",
+   "argv": [
+    "env:set",
+    "dev",
+    "--tls-verify=maybe"
+   ]
+  },
+  {
+   "name": "env:set missing name",
+   "argv": [
+    "env:set"
+   ]
+  },
+  {
+   "name": "env:show named json",
+   "setup": [
+    [
+     "env:set",
+     "prod",
+     "--server=https://x.example",
+     "--token=s3cret",
+     "--profile-output=jsonl"
+    ]
+   ],
+   "argv": [
+    "env:show",
+    "prod",
+    "--json"
+   ]
+  },
+  {
+   "name": "env:show current table",
+   "setup": [
+    [
+     "env:set",
+     "dev",
+     "--server=http://localhost:8080",
+     "--token-env=DEV_TOKEN",
+     "--make-default"
+    ]
+   ],
+   "argv": [
+    "env:show"
+   ]
+  },
+  {
+   "name": "env:show without current",
+   "argv": [
+    "env:show"
+   ]
+  },
+  {
+   "name": "env:show without current json",
+   "argv": [
+    "env:show",
+    "--json"
+   ]
+  },
+  {
+   "name": "env:show unknown json",
+   "setup": [
+    [
+     "env:set",
+     "dev",
+     "--server=http://localhost:8080"
+    ]
+   ],
+   "argv": [
+    "env:show",
+    "nope",
+    "--json"
+   ]
+  },
+  {
+   "name": "env:show unknown with no profiles",
+   "argv": [
+    "env:show",
+    "nope"
+   ]
+  },
+  {
+   "name": "env:use",
+   "setup": [
+    [
+     "env:set",
+     "prod",
+     "--server=https://x.example",
+     "--namespace=orders"
+    ]
+   ],
+   "argv": [
+    "env:use",
+    "prod"
+   ]
+  },
+  {
+   "name": "env:use json",
+   "setup": [
+    [
+     "env:set",
+     "prod",
+     "--server=https://x.example"
+    ]
+   ],
+   "argv": [
+    "env:use",
+    "prod",
+    "--json"
+   ]
+  },
+  {
+   "name": "env:use unknown json",
+   "argv": [
+    "env:use",
+    "nope",
+    "--json"
+   ]
+  },
+  {
+   "name": "env:delete current json",
+   "setup": [
+    [
+     "env:set",
+     "prod",
+     "--server=https://x.example",
+     "--make-default"
+    ],
+    [
+     "env:set",
+     "dev",
+     "--server=http://d"
+    ]
+   ],
+   "argv": [
+    "env:delete",
+    "prod",
+    "--json"
+   ]
+  },
+  {
+   "name": "env:delete last profile leaves empty envs",
+   "setup": [
+    [
+     "env:set",
+     "prod",
+     "--server=https://x.example",
+     "--make-default"
+    ]
+   ],
+   "argv": [
+    "env:delete",
+    "prod"
+   ]
+  },
+  {
+   "name": "env:delete unknown",
+   "argv": [
+    "env:delete",
+    "nope"
+   ]
+  },
+  {
+   "name": "unknown option",
+   "argv": [
+    "env:list",
+    "--bogus"
+   ]
+  },
+  {
+   "name": "option value on a flag",
+   "argv": [
+    "env:list",
+    "--json=yes"
+   ]
+  },
+  {
+   "name": "too many arguments",
+   "argv": [
+    "env:use",
+    "a",
+    "b"
+   ]
+  },
+  {
+   "name": "invalid output mode",
+   "argv": [
+    "env:list",
+    "--output=xml"
+   ]
+  },
+  {
+   "name": "invalid output mode json flag wins",
+   "argv": [
+    "env:list",
+    "--output=xml",
+    "--json"
+   ]
+  },
+  {
+   "name": "unknown command",
+   "argv": [
+    "nope:cmd"
+   ]
+  },
+  {
+   "name": "self-update refused",
+   "argv": [
+    "self-update"
+   ]
+  },
+  {
+   "name": "server:health has no --json",
+   "argv": [
+    "server:health",
+    "--json"
+   ]
+  },
+  {
+   "name": "server:health unreachable",
+   "argv": [
+    "server:health",
+    "--server=http://127.0.0.1:1"
+   ]
+  },
+  {
+   "name": "server:health unreachable json",
+   "argv": [
+    "server:health",
+    "--server=http://127.0.0.1:1",
+    "--output=json"
+   ]
+  },
+  {
+   "name": "server:health unreachable via env var",
+   "env": {
+    "DURABLE_WORKFLOW_SERVER_URL": "http://127.0.0.1:1"
+   },
+   "argv": [
+    "server:health",
+    "--output=json"
+   ]
+  },
+  {
+   "name": "server:health unknown --env json",
+   "argv": [
+    "server:health",
+    "--env=missing",
+    "--output=json"
+   ]
+  },
+  {
+   "name": "server:health unknown DW_ENV",
+   "env": {
+    "DW_ENV": "missing"
+   },
+   "argv": [
+    "server:health"
+   ]
+  },
+  {
+   "name": "server:health invalid tls flag json",
+   "argv": [
+    "server:health",
+    "--server=http://127.0.0.1:1",
+    "--tls-verify=maybe",
+    "--output=json"
+   ]
+  },
+  {
+   "name": "server:health profile output mode",
+   "setup": [
+    [
+     "env:set",
+     "p",
+     "--server=http://127.0.0.1:1",
+     "--profile-output=json",
+     "--make-default"
+    ]
+   ],
+   "argv": [
+    "server:health"
+   ]
+  },
+  {
+   "name": "server:health explicit output overrides profile",
+   "setup": [
+    [
+     "env:set",
+     "p",
+     "--server=http://127.0.0.1:1",
+     "--profile-output=json",
+     "--make-default"
+    ]
+   ],
+   "argv": [
+    "server:health",
+    "--output=table"
+   ]
+  },
+  {
+   "name": "server:health json",
+   "server": true,
+   "argv": [
+    "server:health",
+    "--server={server}",
+    "--output=json"
+   ]
+  },
+  {
+   "name": "server:health human",
+   "server": true,
+   "argv": [
+    "server:health",
+    "--server={server}"
+   ]
+  },
+  {
+   "name": "server:health via env var",
+   "server": true,
+   "server_env": true,
+   "argv": [
+    "server:health",
+    "--output=json"
+   ]
+  },
+  {
+   "name": "server:health via profile",
+   "server": true,
+   "setup": [
+    [
+     "env:set",
+     "s",
+     "--server={server}",
+     "--make-default"
+    ]
+   ],
+   "argv": [
+    "server:health",
+    "--output=jsonl"
+   ]
+  },
+  {
+   "name": "unknown command",
+   "argv": [
+    "nope"
+   ]
+  },
+  {
+   "name": "unknown command in a known namespace",
+   "argv": [
+    "env:nope"
+   ]
+  },
+  {
+   "name": "typo with several suggestions",
+   "argv": [
+    "env:lst",
+    "-n"
+   ]
+  },
+  {
+   "name": "typo with one suggestion, no interaction",
+   "argv": [
+    "envlist",
+    "-n"
+   ]
+  },
+  {
+   "name": "typo with one suggestion, stdin is not a terminal",
+   "argv": [
+    "envlist"
+   ],
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "stdout_text",
+      "stderr",
+      "stderr_category"
+     ],
+     "reason": "2.x treats a non-terminal stdin as interactive and prints a \"Do you want to run env:list instead?\" prompt to stdout before exiting 1. This build only prompts on a terminal and reports the error on stderr, as 2.x does with -n."
+    }
+   }
+  },
+  {
+   "name": "unknown namespace with a suggestion",
+   "argv": [
+    "srver:health"
+   ]
+  },
+  {
+   "name": "abbreviated command",
+   "argv": [
+    "e:li",
+    "--json"
+   ]
+  },
+  {
+   "name": "abbreviated command, case-insensitive",
+   "argv": [
+    "ENV:LIST",
+    "--json"
+   ]
+  },
+  {
+   "name": "ambiguous abbreviation",
+   "argv": [
+    "env:s"
+   ]
+  },
+  {
+   "name": "namespace name lists its commands",
+   "argv": [
+    "env"
+   ]
+  },
+  {
+   "name": "abbreviated namespace lists its commands",
+   "argv": [
+    "sch"
+   ]
+  },
+  {
+   "name": "list",
+   "argv": [
+    "list"
+   ]
+  },
+  {
+   "name": "no arguments lists commands",
+   "argv": []
+  },
+  {
+   "name": "list one namespace",
+   "argv": [
+    "list",
+    "env"
+   ]
+  },
+  {
+   "name": "list unknown namespace",
+   "argv": [
+    "list",
+    "nope"
+   ]
+  },
+  {
+   "name": "version",
+   "argv": [
+    "--version"
+   ]
+  },
+  {
+   "name": "no arguments expected",
+   "argv": [
+    "env:list",
+    "extra"
+   ]
+  },
+  {
+   "name": "missing argument synopsis",
+   "argv": [
+    "env:use"
+   ]
+  },
+  {
+   "name": "unknown short option",
+   "argv": [
+    "server:health",
+    "-x"
+   ]
+  },
+  {
+   "name": "long message wraps at the terminal width",
+   "env": {
+    "COLUMNS": "40"
+   },
+   "argv": [
+    "env:nope"
+   ]
+  },
+  {
+   "name": "server:info json",
+   "server": true,
+   "argv": [
+    "server:info",
+    "--server={server}",
+    "--output=json"
+   ]
+  },
+  {
+   "name": "server:info human",
+   "server": true,
+   "argv": [
+    "server:info",
+    "--server={server}"
+   ]
+  },
+  {
+   "name": "server:info via alias",
+   "server": true,
+   "argv": [
+    "cluster:info",
+    "--server={server}",
+    "--output=jsonl"
+   ]
+  },
+  {
+   "name": "version with a named server",
+   "server": true,
+   "argv": [
+    "--version",
+    "--server={server}"
+   ]
+  },
+  {
+   "name": "server:info unreachable",
+   "argv": [
+    "server:info",
+    "--server=http://127.0.0.1:1",
+    "--output=json"
+   ]
+  },
+  {
+   "name": "compatible mock server:info",
+   "mock": [],
+   "argv": [
+    "server:info",
+    "--server={mock}"
+   ]
+  },
+  {
+   "name": "refuse unsupported control plane version",
+   "mock": [
+    [
+     [
+      "control_plane",
+      "version"
+     ],
+     "3"
+    ]
+   ],
+   "argv": [
+    "server:info",
+    "--server={mock}",
+    "--output=json"
+   ]
+  },
+  {
+   "name": "refuse unsupported control plane version, human",
+   "mock": [
+    [
+     [
+      "control_plane",
+      "version"
+     ],
+     "3"
+    ]
+   ],
+   "argv": [
+    "server:info",
+    "--server={mock}"
+   ]
+  },
+  {
+   "name": "refuse missing control plane",
+   "mock": [
+    [
+     [
+      "control_plane"
+     ],
+     null
+    ]
+   ],
+   "argv": [
+    "server:info",
+    "--server={mock}",
+    "--output=json"
+   ]
+  },
+  {
+   "name": "refuse CLI outside the advertised window",
+   "mock": [
+    [
+     [
+      "client_compatibility",
+      "clients",
+      "cli",
+      "supported_versions"
+     ],
+     ">=9.0.0"
+    ]
+   ],
+   "argv": [
+    "server:info",
+    "--server={mock}",
+    "--output=json"
+   ]
+  },
+  {
+   "name": "refuse incompatible request contract",
+   "mock": [
+    [
+     [
+      "control_plane",
+      "request_contract",
+      "version"
+     ],
+     7
+    ]
+   ],
+   "argv": [
+    "server:info",
+    "--server={mock}",
+    "--output=json"
+   ]
+  },
+  {
+   "name": "warn on health for unsupported control plane",
+   "mock": [
+    [
+     [
+      "control_plane",
+      "version"
+     ],
+     "3"
+    ]
+   ],
+   "argv": [
+    "server:health",
+    "--server={mock}",
+    "--output=json"
+   ]
+  },
+  {
+   "name": "warn on health for missing auth composition",
+   "mock": [
+    [
+     [
+      "auth_composition_contract"
+     ],
+     null
+    ]
+   ],
+   "argv": [
+    "server:health",
+    "--server={mock}"
+   ]
+  },
+  {
+   "name": "warn on version for unsupported control plane",
+   "mock": [
+    [
+     [
+      "control_plane",
+      "version"
+     ],
+     "3"
+    ]
+   ],
+   "argv": [
+    "--version",
+    "--server={mock}"
+   ]
+  },
+  {
+   "name": "server:info renders an incompatible request contract",
+   "mock": [
+    [
+     [
+      "control_plane",
+      "request_contract",
+      "schema"
+     ],
+     "other"
+    ]
+   ],
+   "argv": [
+    "server:info",
+    "--server={mock}"
+   ]
+  },
+  {
+   "name": "help for a command",
+   "argv": [
+    "env:use",
+    "--help"
+   ]
+  },
+  {
+   "name": "short help flag",
+   "argv": [
+    "env:set",
+    "-h"
+   ]
+  },
+  {
+   "name": "help lists aliases and value options",
+   "argv": [
+    "server:info",
+    "--help"
+   ]
+  },
+  {
+   "name": "help for an unported command",
+   "argv": [
+    "workflow:start",
+    "--help"
+   ]
+  },
+  {
+   "name": "help for a command with array options",
+   "argv": [
+    "workflow-task:complete",
+    "--help"
+   ]
+  },
+  {
+   "name": "help command",
+   "argv": [
+    "help",
+    "env:list"
+   ]
+  },
+  {
+   "name": "help command by alias",
+   "argv": [
+    "help",
+    "cluster:info"
+   ]
+  },
+  {
+   "name": "help command by abbreviation",
+   "argv": [
+    "help",
+    "e:li"
+   ]
+  },
+  {
+   "name": "help command for itself",
+   "argv": [
+    "help"
+   ]
+  },
+  {
+   "name": "help command, unknown name",
+   "argv": [
+    "help",
+    "nope"
+   ]
+  },
+  {
+   "name": "help command, typo",
+   "argv": [
+    "help",
+    "env:lst"
+   ]
+  },
+  {
+   "name": "help without a command",
+   "argv": [
+    "-h"
+   ]
+  },
+  {
+   "name": "help for list",
+   "argv": [
+    "list",
+    "--help"
+   ]
+  },
+  {
+   "name": "help wins over a missing argument",
+   "argv": [
+    "env:delete",
+    "-h"
+   ]
+  },
+  {
+   "name": "help wins over an unknown option",
+   "argv": [
+    "env:use",
+    "--help",
+    "--bogus"
+   ]
+  },
+  {
+   "name": "help wins over too many arguments",
+   "argv": [
+    "env:use",
+    "a",
+    "b",
+    "--help"
+   ]
+  },
+  {
+   "name": "help with a value",
+   "argv": [
+    "env:use",
+    "--help=x"
+   ]
+  },
+  {
+   "name": "help as the value of another option",
+   "argv": [
+    "env:list",
+    "--output",
+    "-h"
+   ]
+  },
+  {
+   "name": "quiet flag bundled before h runs the command",
+   "argv": [
+    "env:list",
+    "-qh"
+   ]
+  },
+  {
+   "name": "help in json via --help",
+   "argv": [
+    "env:use",
+    "--help",
+    "--format=json"
+   ]
+  },
+  {
+   "name": "help format before --help",
+   "argv": [
+    "env:use",
+    "--format=md",
+    "--help"
+   ]
+  },
+  {
+   "name": "help options after a bad token are ignored",
+   "argv": [
+    "env:use",
+    "--help",
+    "--bogus",
+    "--format=json"
+   ]
+  },
+  {
+   "name": "help command json",
+   "argv": [
+    "help",
+    "env:use",
+    "--format=json"
+   ]
+  },
+  {
+   "name": "help command md",
+   "argv": [
+    "help",
+    "server:info",
+    "--format=md"
+   ]
+  },
+  {
+   "name": "help command raw",
+   "argv": [
+    "help",
+    "env:use",
+    "--raw"
+   ]
+  },
+  {
+   "name": "help command xml",
+   "argv": [
+    "help",
+    "env:use",
+    "--format=xml"
+   ],
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "exit_code",
+      "stdout_text",
+      "stdout_json",
+      "stderr",
+      "stderr_category"
+     ],
+     "reason": "The 2.x standalone binary has no PHP DOM extension, so --format=xml dies with a PHP fatal error (exit 255). This build prints the XML the 2.x PHAR produces on a full PHP."
+    }
+   }
+  },
+  {
+   "name": "help command unsupported format",
+   "argv": [
+    "help",
+    "env:use",
+    "--format=yaml"
+   ]
+  },
+  {
+   "name": "help command ignores a bad option",
+   "argv": [
+    "help",
+    "--bogus",
+    "env:use"
+   ]
+  },
+  {
+   "name": "list json",
+   "argv": [
+    "list",
+    "--format=json"
+   ],
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "stdout_json"
+     ],
+     "reason": "The application JSON includes hidden runtime:check help; it now describes the approved native build-identity and target report instead of PHP extensions (cli#72)."
+    }
+   }
+  },
+  {
+   "name": "list namespace json",
+   "argv": [
+    "list",
+    "env",
+    "--format=json"
+   ]
+  },
+  {
+   "name": "list short json",
+   "argv": [
+    "list",
+    "--short",
+    "--format=json"
+   ]
+  },
+  {
+   "name": "list md",
+   "argv": [
+    "list",
+    "--format=md"
+   ]
+  },
+  {
+   "name": "list raw",
+   "argv": [
+    "list",
+    "--raw"
+   ]
+  },
+  {
+   "name": "list namespace raw",
+   "argv": [
+    "list",
+    "env",
+    "--raw"
+   ]
+  },
+  {
+   "name": "list abbreviated namespace",
+   "argv": [
+    "list",
+    "sch"
+   ]
+  },
+  {
+   "name": "list alias namespace",
+   "argv": [
+    "list",
+    "activities"
+   ]
+  },
+  {
+   "name": "list unknown namespace json",
+   "argv": [
+    "list",
+    "nope",
+    "--format=json"
+   ]
+  },
+  {
+   "name": "list unsupported format",
+   "argv": [
+    "list",
+    "--format=yaml"
+   ]
+  },
+  {
+   "name": "list xml",
+   "argv": [
+    "list",
+    "--format=xml"
+   ],
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "exit_code",
+      "stdout_text",
+      "stdout_json",
+      "stderr",
+      "stderr_category"
+     ],
+     "reason": "The 2.x standalone binary has no PHP DOM extension, so --format=xml dies with a PHP fatal error (exit 255). This build prints the XML the 2.x PHAR produces on a full PHP."
+    }
+   }
+  },
+  {
+   "name": "ansi help",
+   "argv": [
+    "env:use",
+    "--help",
+    "--ansi"
+   ]
+  },
+  {
+   "name": "ansi listing",
+   "argv": [
+    "list",
+    "--ansi"
+   ]
+  },
+  {
+   "name": "ansi version",
+   "argv": [
+    "--version",
+    "--ansi"
+   ]
+  },
+  {
+   "name": "ansi empty env list",
+   "argv": [
+    "env:list",
+    "--ansi"
+   ]
+  },
+  {
+   "name": "ansi table",
+   "setup": [
+    [
+     "env:set",
+     "prod",
+     "--server=https://x.example",
+     "--namespace=orders",
+     "--token=s3cret",
+     "--make-default"
+    ]
+   ],
+   "argv": [
+    "env:show",
+    "--ansi"
+   ]
+  },
+  {
+   "name": "ansi env set",
+   "argv": [
+    "env:set",
+    "dev",
+    "--server=http://d",
+    "--make-default",
+    "--ansi"
+   ]
+  },
+  {
+   "name": "ansi usage error",
+   "argv": [
+    "env:list",
+    "--bogus",
+    "--ansi"
+   ]
+  },
+  {
+   "name": "ansi unknown command",
+   "argv": [
+    "nope",
+    "--ansi"
+   ]
+  },
+  {
+   "name": "ansi command error",
+   "argv": [
+    "env:show",
+    "nope",
+    "--ansi"
+   ]
+  },
+  {
+   "name": "ansi wins over no-ansi",
+   "argv": [
+    "env:list",
+    "--no-ansi",
+    "--ansi"
+   ]
+  },
+  {
+   "name": "no-ansi listing",
+   "argv": [
+    "list",
+    "--no-ansi"
+   ]
+  },
+  {
+   "name": "quiet command",
+   "setup": [
+    [
+     "env:set",
+     "prod",
+     "--server=https://x.example",
+     "--namespace=orders",
+     "--token=s3cret",
+     "--make-default"
+    ]
+   ],
+   "argv": [
+    "env:list",
+    "-q"
+   ]
+  },
+  {
+   "name": "quiet json",
+   "setup": [
+    [
+     "env:set",
+     "prod",
+     "--server=https://x.example",
+     "--namespace=orders",
+     "--token=s3cret",
+     "--make-default"
+    ]
+   ],
+   "argv": [
+    "env:list",
+    "--json",
+    "-q"
+   ]
+  },
+  {
+   "name": "quiet command error",
+   "argv": [
+    "env:show",
+    "nope",
+    "-q"
+   ]
+  },
+  {
+   "name": "quiet json error",
+   "argv": [
+    "env:show",
+    "nope",
+    "--json",
+    "-q"
+   ]
+  },
+  {
+   "name": "quiet usage error still shown",
+   "argv": [
+    "env:list",
+    "--bogus",
+    "-q"
+   ]
+  },
+  {
+   "name": "quiet unknown command still shown",
+   "argv": [
+    "nope",
+    "-q"
+   ]
+  },
+  {
+   "name": "silent usage error hidden",
+   "argv": [
+    "env:list",
+    "--bogus",
+    "--silent"
+   ]
+  },
+  {
+   "name": "silent command",
+   "setup": [
+    [
+     "env:set",
+     "prod",
+     "--server=https://x.example",
+     "--namespace=orders",
+     "--token=s3cret",
+     "--make-default"
+    ]
+   ],
+   "argv": [
+    "env:list",
+    "--silent"
+   ]
+  },
+  {
+   "name": "quiet version",
+   "argv": [
+    "--version",
+    "-q"
+   ]
+  },
+  {
+   "name": "quiet help",
+   "argv": [
+    "env:use",
+    "--help",
+    "-q"
+   ]
+  },
+  {
+   "name": "quiet by environment",
+   "setup": [
+    [
+     "env:set",
+     "prod",
+     "--server=https://x.example",
+     "--namespace=orders",
+     "--token=s3cret",
+     "--make-default"
+    ]
+   ],
+   "env": {
+    "SHELL_VERBOSITY": "-1"
+   },
+   "argv": [
+    "env:list"
+   ]
+  },
+  {
+   "name": "verbose then quiet is not quiet",
+   "argv": [
+    "env:list",
+    "-vq"
+   ]
+  },
+  {
+   "name": "quiet network error",
+   "argv": [
+    "server:health",
+    "--server=http://127.0.0.1:1",
+    "-q"
+   ]
+  },
+  {
+   "name": "completion help for zsh",
+   "env": {
+    "SHELL": "/usr/bin/zsh"
+   },
+   "argv": [
+    "completion",
+    "--help"
+   ]
+  },
+  {
+   "name": "completion help for fish",
+   "env": {
+    "SHELL": "/usr/local/bin/fish"
+   },
+   "argv": [
+    "completion",
+    "--help"
+   ]
+  },
+  {
+   "name": "completion help without a shell",
+   "env": {
+    "SHELL": ""
+   },
+   "argv": [
+    "completion",
+    "--help"
+   ]
+  },
+  {
+   "name": "ansi health",
+   "server": true,
+   "argv": [
+    "server:health",
+    "--server={server}",
+    "--ansi"
+   ]
+  },
+  {
+   "name": "ansi server info",
+   "server": true,
+   "argv": [
+    "server:info",
+    "--server={server}",
+    "--ansi"
+   ]
+  },
+  {
+   "name": "upgrade dry run to the latest stable release (json)",
+   "argv": [
+    "upgrade",
+    "--dry-run",
+    "--output=json"
+   ],
+   "env": {
+    "DURABLE_WORKFLOW_RELEASE_API_URL": "{mock}/latest"
+   },
+   "mock_routes": {
+    "/latest": {
+     "body": {
+      "tag_name": "v9.9.9",
+      "draft": false,
+      "prerelease": false
+     }
+    }
+   }
+  },
+  {
+   "name": "upgrade dry run to the latest stable release (table)",
+   "argv": [
+    "upgrade",
+    "--dry-run"
+   ],
+   "env": {
+    "DURABLE_WORKFLOW_RELEASE_API_URL": "{mock}/latest"
+   },
+   "mock_routes": {
+    "/latest": {
+     "body": {
+      "tag_name": "9.9.9",
+      "draft": false,
+      "prerelease": false
+     }
+    }
+   }
+  },
+  {
+   "name": "upgrade when the installed release is newer than latest",
+   "argv": [
+    "upgrade",
+    "--output=json"
+   ],
+   "env": {
+    "DURABLE_WORKFLOW_RELEASE_API_URL": "{mock}/latest"
+   },
+   "mock_routes": {
+    "/latest": {
+     "body": {
+      "tag_name": "1.0.0",
+      "draft": false,
+      "prerelease": false
+     }
+    }
+   }
+  },
+  {
+   "name": "upgrade newer, table",
+   "argv": [
+    "upgrade"
+   ],
+   "env": {
+    "DURABLE_WORKFLOW_RELEASE_API_URL": "{mock}/latest"
+   },
+   "mock_routes": {
+    "/latest": {
+     "body": {
+      "tag_name": "1.0.0",
+      "draft": false,
+      "prerelease": false
+     }
+    }
+   }
+  },
+  {
+   "name": "upgrade refuses a prerelease as latest",
+   "argv": [
+    "upgrade",
+    "--dry-run",
+    "--output=json"
+   ],
+   "env": {
+    "DURABLE_WORKFLOW_RELEASE_API_URL": "{mock}/latest"
+   },
+   "mock_routes": {
+    "/latest": {
+     "body": {
+      "tag_name": "9.9.9-rc.1",
+      "draft": false,
+      "prerelease": true
+     }
+    }
+   }
+  },
+  {
+   "name": "upgrade refuses a draft as latest",
+   "argv": [
+    "upgrade",
+    "--dry-run",
+    "--output=json"
+   ],
+   "env": {
+    "DURABLE_WORKFLOW_RELEASE_API_URL": "{mock}/latest"
+   },
+   "mock_routes": {
+    "/latest": {
+     "body": {
+      "tag_name": "9.9.9",
+      "draft": true,
+      "prerelease": false
+     }
+    }
+   }
+  },
+  {
+   "name": "upgrade without a tag_name",
+   "argv": [
+    "upgrade",
+    "--dry-run",
+    "--output=json"
+   ],
+   "env": {
+    "DURABLE_WORKFLOW_RELEASE_API_URL": "{mock}/latest"
+   },
+   "mock_routes": {
+    "/latest": {
+     "body": {
+      "draft": false,
+      "prerelease": false
+     }
+    }
+   }
+  },
+  {
+   "name": "upgrade with a 404 release API",
+   "argv": [
+    "upgrade",
+    "--dry-run",
+    "--output=json"
+   ],
+   "env": {
+    "DURABLE_WORKFLOW_RELEASE_API_URL": "{mock}/latest"
+   },
+   "mock_routes": {
+    "/latest": {
+     "status": 404,
+     "body": {
+      "message": "Not Found"
+     }
+    }
+   }
+  },
+  {
+   "name": "upgrade with a 500 release API, table",
+   "argv": [
+    "upgrade",
+    "--dry-run"
+   ],
+   "env": {
+    "DURABLE_WORKFLOW_RELEASE_API_URL": "{mock}/latest"
+   },
+   "mock_routes": {
+    "/latest": {
+     "status": 500,
+     "content_type": "text/plain",
+     "body": "boom"
+    }
+   }
+  },
+  {
+   "name": "upgrade does not follow a redirect from the release API",
+   "argv": [
+    "upgrade",
+    "--dry-run",
+    "--output=json"
+   ],
+   "env": {
+    "DURABLE_WORKFLOW_RELEASE_API_URL": "{mock}/latest"
+   },
+   "mock_routes": {
+    "/latest": {
+     "status": 302,
+     "headers": {
+      "Location": "/elsewhere"
+     },
+     "body": ""
+    }
+   }
+  },
+  {
+   "name": "upgrade with a non-JSON release API",
+   "argv": [
+    "upgrade",
+    "--dry-run",
+    "--output=json"
+   ],
+   "env": {
+    "DURABLE_WORKFLOW_RELEASE_API_URL": "{mock}/latest"
+   },
+   "mock_routes": {
+    "/latest": {
+     "content_type": "text/html",
+     "body": "<html>nope</html>"
+    }
+   }
+  },
+  {
+   "name": "upgrade with an RFC 7807 error",
+   "argv": [
+    "upgrade",
+    "--dry-run",
+    "--output=json"
+   ],
+   "env": {
+    "DURABLE_WORKFLOW_RELEASE_API_URL": "{mock}/latest"
+   },
+   "mock_routes": {
+    "/latest": {
+     "status": 403,
+     "content_type": "application/problem+json",
+     "body": {
+      "title": "Forbidden",
+      "detail": "rate limited"
+     }
+    }
+   }
+  },
+  {
+   "name": "upgrade dry run to a pinned older tag",
+   "argv": [
+    "upgrade",
+    "--tag=v2.3.4",
+    "--dry-run",
+    "--output=json"
+   ]
+  },
+  {
+   "name": "upgrade dry run to a pinned tag, table",
+   "argv": [
+    "upgrade",
+    "--tag",
+    "2.0.0",
+    "--dry-run"
+   ]
+  },
+  {
+   "name": "upgrade with an invalid tag",
+   "argv": [
+    "upgrade",
+    "--tag=nope",
+    "--dry-run",
+    "--output=json"
+   ]
+  },
+  {
+   "name": "upgrade with an invalid output mode",
+   "argv": [
+    "upgrade",
+    "--output=xml"
+   ]
+  },
+  {
+   "name": "upgrade dry run, quiet",
+   "argv": [
+    "upgrade",
+    "--dry-run",
+    "-q"
+   ],
+   "env": {
+    "DURABLE_WORKFLOW_RELEASE_API_URL": "{mock}/latest"
+   },
+   "mock_routes": {
+    "/latest": {
+     "body": {
+      "tag_name": "9.9.9",
+      "draft": false,
+      "prerelease": false
+     }
+    }
+   }
+  },
+  {
+   "name": "upgrade to a release that has no assets",
+   "argv": [
+    "upgrade",
+    "--tag=99.99.99",
+    "--output=json"
+   ]
+  },
+  {
+   "name": "upgrade with an unreachable release API",
+   "argv": [
+    "upgrade",
+    "--dry-run",
+    "--output=json"
+   ],
+   "env": {
+    "DURABLE_WORKFLOW_RELEASE_API_URL": "http://127.0.0.1:9/latest"
+   },
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "stdout_text",
+      "stdout_json"
+     ],
+     "reason": "The transport detail after \"could not fetch the latest stable CLI release:\" is libcurl's text in 2.x (\"Failed to connect to 127.0.0.1:9 after 0 ms: Could not connect to server\") and this client's own wording here. The status, exit code and the rest of the envelope match."
+    }
+   }
+  },
+  {
+   "name": "schema:list",
+   "argv": [
+    "schema:list"
+   ]
+  },
+  {
+   "name": "schema:manifest",
+   "argv": [
+    "schema:manifest"
+   ]
+  },
+  {
+   "name": "schema:show a command's JSON schema",
+   "argv": [
+    "schema:show",
+    "workflow:list"
+   ]
+  },
+  {
+   "name": "schema:show a command's JSONL schema",
+   "argv": [
+    "schema:show",
+    "workflow:list",
+    "--output=jsonl"
+   ]
+  },
+  {
+   "name": "schema:show with a flag-style output mode",
+   "argv": [
+    "schema:show",
+    "server:health",
+    "--output=--json"
+   ]
+  },
+  {
+   "name": "schema:show a config schema",
+   "argv": [
+    "schema:show",
+    "external-executor-config"
+   ]
+  },
+  {
+   "name": "schema:show an unknown name",
+   "argv": [
+    "schema:show",
+    "nope:nothing"
+   ]
+  },
+  {
+   "name": "schema:show an unsupported output mode",
+   "argv": [
+    "schema:show",
+    "workflow:list",
+    "--output=xml"
+   ]
+  },
+  {
+   "name": "schema:show an empty output mode",
+   "argv": [
+    "schema:show",
+    "workflow:list",
+    "--output="
+   ]
+  },
+  {
+   "name": "schema:show a command without a JSONL schema",
+   "argv": [
+    "schema:show",
+    "server:health",
+    "--output=jsonl"
+   ]
+  },
+  {
+   "name": "schema:show without a name",
+   "argv": [
+    "schema:show"
+   ]
+  },
+  {
+   "name": "schema:show quiet",
+   "argv": [
+    "schema:show",
+    "workflow:list",
+    "-q"
+   ]
+  },
+  {
+   "name": "schema:list with ansi",
+   "argv": [
+    "schema:list",
+    "--ansi"
+   ]
+  },
+  {
+   "name": "completion bash",
+   "argv": [
+    "completion",
+    "bash"
+   ]
+  },
+  {
+   "name": "completion zsh",
+   "argv": [
+    "completion",
+    "zsh"
+   ]
+  },
+  {
+   "name": "completion fish",
+   "argv": [
+    "completion",
+    "fish"
+   ]
+  },
+  {
+   "name": "completion from SHELL",
+   "argv": [
+    "completion"
+   ],
+   "env": {
+    "SHELL": "/usr/bin/zsh"
+   }
+  },
+  {
+   "name": "completion with SHELL unset",
+   "argv": [
+    "completion"
+   ],
+   "env": {
+    "SHELL": ""
+   }
+  },
+  {
+   "name": "completion unsupported shell",
+   "argv": [
+    "completion",
+    "tcsh"
+   ]
+  },
+  {
+   "name": "completion quiet",
+   "argv": [
+    "completion",
+    "bash",
+    "-q"
+   ]
+  },
+  {
+   "name": "_complete bash: commands before one is typed",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c1",
+    "-a1",
+    "-idw"
+   ]
+  },
+  {
+   "name": "_complete bash: option names of a command",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-iupgrade",
+    "-i--"
+   ]
+  },
+  {
+   "name": "_complete bash: global option names before a command",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c1",
+    "-a1",
+    "-idw",
+    "-i--"
+   ]
+  },
+  {
+   "name": "_complete bash: help's command_name",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-ihelp"
+   ]
+  },
+  {
+   "name": "_complete zsh: commands before one is typed",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-szsh",
+    "-c1",
+    "-a1",
+    "-idw"
+   ]
+  },
+  {
+   "name": "_complete zsh: option names of a command",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-szsh",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-iupgrade",
+    "-i--"
+   ]
+  },
+  {
+   "name": "_complete zsh: global option names before a command",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-szsh",
+    "-c1",
+    "-a1",
+    "-idw",
+    "-i--"
+   ]
+  },
+  {
+   "name": "_complete zsh: help's command_name",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-szsh",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-ihelp"
+   ]
+  },
+  {
+   "name": "_complete fish: commands before one is typed",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sfish",
+    "-c1",
+    "-a1",
+    "-idw"
+   ]
+  },
+  {
+   "name": "_complete fish: option names of a command",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sfish",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-iupgrade",
+    "-i--"
+   ]
+  },
+  {
+   "name": "_complete fish: global option names before a command",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sfish",
+    "-c1",
+    "-a1",
+    "-idw",
+    "-i--"
+   ]
+  },
+  {
+   "name": "_complete fish: help's command_name",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sfish",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-ihelp"
+   ]
+  },
+  {
+   "name": "_complete bash: an ambiguous partial command",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c1",
+    "-a1",
+    "-idw",
+    "-iwor"
+   ]
+  },
+  {
+   "name": "_complete bash: a unique partial command expands",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c1",
+    "-a1",
+    "-idw",
+    "-iupg"
+   ]
+  },
+  {
+   "name": "_complete bash: an alias",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c1",
+    "-a1",
+    "-idw",
+    "-iworkflows:li"
+   ]
+  },
+  {
+   "name": "_complete bash: option value with =",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-iupgrade",
+    "-i--output="
+   ]
+  },
+  {
+   "name": "_complete bash: option value with = and a prefix",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-iworkflow:list",
+    "-i--output=js"
+   ]
+  },
+  {
+   "name": "_complete bash: option value after a separate option",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c3",
+    "-a1",
+    "-idw",
+    "-iworkflow:list",
+    "-i--output"
+   ]
+  },
+  {
+   "name": "_complete bash: option value after a separate option with a prefix",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c3",
+    "-a1",
+    "-idw",
+    "-iworkflow:list",
+    "-i--output",
+    "-ij"
+   ]
+  },
+  {
+   "name": "_complete bash: an option without suggestions",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-iworkflow:list",
+    "-i--namespace="
+   ]
+  },
+  {
+   "name": "_complete bash: a short option value",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-iworkflow:list",
+    "-i-s"
+   ]
+  },
+  {
+   "name": "_complete bash: a flag is not completed",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c3",
+    "-a1",
+    "-idw",
+    "-iupgrade",
+    "-i--dry-run"
+   ]
+  },
+  {
+   "name": "_complete bash: a negatable option name",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-iupgrade",
+    "-i--no-"
+   ]
+  },
+  {
+   "name": "_complete bash: global options before the command",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c3",
+    "-a1",
+    "-idw",
+    "-i-v",
+    "-iupgrade",
+    "-i--output="
+   ]
+  },
+  {
+   "name": "_complete bash: an option value before the command",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c3",
+    "-a1",
+    "-idw",
+    "-i--ansi",
+    "-iactivity:fail",
+    "-i--failure-kind="
+   ]
+  },
+  {
+   "name": "_complete bash: list namespace",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-ilist"
+   ]
+  },
+  {
+   "name": "_complete bash: list format",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-ilist",
+    "-i--format="
+   ]
+  },
+  {
+   "name": "_complete bash: help format",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-ihelp",
+    "-i--format="
+   ]
+  },
+  {
+   "name": "_complete bash: completion shell argument",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-icompletion"
+   ]
+  },
+  {
+   "name": "_complete bash: a second argument",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c3",
+    "-a1",
+    "-idw",
+    "-iworkflow:signal",
+    "-iwf"
+   ]
+  },
+  {
+   "name": "_complete bash: after all arguments",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c3",
+    "-a1",
+    "-idw",
+    "-ienv:use",
+    "-iprod"
+   ]
+  },
+  {
+   "name": "_complete bash: after a double dash",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c3",
+    "-a1",
+    "-idw",
+    "-iupgrade",
+    "-i--",
+    "-i--out"
+   ]
+  },
+  {
+   "name": "_complete bash: an unknown command",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-inope:nope"
+   ]
+  },
+  {
+   "name": "_complete bash: an unknown command's options",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-inope:nope",
+    "-i--"
+   ]
+  },
+  {
+   "name": "_complete bash: cursor on the first token",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c1",
+    "-a1",
+    "-idw",
+    "-iupgrade"
+   ]
+  },
+  {
+   "name": "_complete: unsupported API version",
+   "argv": [
+    "_complete",
+    "-sbash",
+    "-c1",
+    "-a0",
+    "-idw"
+   ]
+  },
+  {
+   "name": "_complete: deprecated symfony flag",
+   "argv": [
+    "_complete",
+    "-sbash",
+    "-c1",
+    "-S5.4",
+    "-idw"
+   ]
+  },
+  {
+   "name": "_complete: missing shell",
+   "argv": [
+    "_complete",
+    "-c1",
+    "-a1",
+    "-idw"
+   ]
+  },
+  {
+   "name": "_complete: unsupported shell",
+   "argv": [
+    "_complete",
+    "-stcsh",
+    "-c1",
+    "-a1",
+    "-idw"
+   ]
+  },
+  {
+   "name": "_complete: missing current",
+   "argv": [
+    "_complete",
+    "-sbash",
+    "-a1",
+    "-idw"
+   ]
+  },
+  {
+   "name": "_complete: zero current",
+   "argv": [
+    "_complete",
+    "-sbash",
+    "-c0",
+    "-a1",
+    "-idw"
+   ]
+  },
+  {
+   "name": "_complete: non-numeric current",
+   "argv": [
+    "_complete",
+    "-sbash",
+    "-cx",
+    "-a1",
+    "-idw"
+   ]
+  },
+  {
+   "name": "_complete: current beyond the tokens",
+   "argv": [
+    "_complete",
+    "-sbash",
+    "-c5",
+    "-a1",
+    "-idw"
+   ]
+  },
+  {
+   "name": "_complete: no tokens",
+   "argv": [
+    "_complete",
+    "-sbash",
+    "-c1",
+    "-a1"
+   ]
+  },
+  {
+   "name": "_complete: an API version older than 1",
+   "argv": [
+    "_complete",
+    "-sbash",
+    "-c1",
+    "-a0.9",
+    "-idw"
+   ]
+  },
+  {
+   "name": "doctor JSON",
+   "argv": [
+    "doctor",
+    "--output=json",
+    "--server={mock}"
+   ],
+   "mock": []
+  },
+  {
+   "name": "doctor JSONL",
+   "argv": [
+    "doctor",
+    "--output=jsonl",
+    "--server={mock}"
+   ],
+   "mock": []
+  },
+  {
+   "name": "doctor human",
+   "argv": [
+    "doctor",
+    "--server={mock}"
+   ],
+   "mock": []
+  },
+  {
+   "name": "doctor ANSI",
+   "argv": [
+    "doctor",
+    "--ansi",
+    "--server={mock}"
+   ],
+   "mock": []
+  },
+  {
+   "name": "doctor quiet",
+   "argv": [
+    "doctor",
+    "-q",
+    "--server={mock}"
+   ],
+   "mock": []
+  },
+  {
+   "name": "doctor clean with flag token",
+   "argv": [
+    "doctor",
+    "--token=parity-test-token",
+    "--output=json",
+    "--server={mock}"
+   ],
+   "mock": []
+  },
+  {
+   "name": "doctor environment connection",
+   "argv": [
+    "doctor",
+    "--output=json"
+   ],
+   "mock": [],
+   "env": {
+    "DURABLE_WORKFLOW_SERVER_URL": "{mock}",
+    "DURABLE_WORKFLOW_NAMESPACE": "env-namespace",
+    "DURABLE_WORKFLOW_AUTH_TOKEN": "parity-test-token",
+    "DURABLE_WORKFLOW_TLS_VERIFY": "false"
+   }
+  },
+  {
+   "name": "doctor flag profile",
+   "argv": [
+    "doctor",
+    "--env=prod",
+    "--output=json"
+   ],
+   "mock": [],
+   "env": {},
+   "setup": [
+    [
+     "env:set",
+     "prod",
+     "--server={mock}",
+     "--namespace=profile-ns",
+     "--token=profile-test-token",
+     "--tls-verify=false"
+    ]
+   ]
+  },
+  {
+   "name": "doctor selected profile",
+   "argv": [
+    "doctor",
+    "--output=json"
+   ],
+   "mock": [],
+   "env": {},
+   "setup": [
+    [
+     "env:set",
+     "prod",
+     "--server={mock}",
+     "--namespace=profile-ns",
+     "--token=profile-test-token",
+     "--tls-verify=false"
+    ],
+    [
+     "env:use",
+     "prod"
+    ]
+   ]
+  },
+  {
+   "name": "doctor DW_ENV profile",
+   "argv": [
+    "doctor",
+    "--output=json"
+   ],
+   "mock": [],
+   "env": {
+    "DW_ENV": "prod"
+   },
+   "setup": [
+    [
+     "env:set",
+     "prod",
+     "--server={mock}",
+     "--namespace=profile-ns",
+     "--token=profile-test-token",
+     "--tls-verify=false"
+    ]
+   ]
+  },
+  {
+   "name": "doctor profile env token present",
+   "argv": [
+    "doctor",
+    "--env=prod",
+    "--output=json"
+   ],
+   "mock": [],
+   "env": {
+    "PARITY_DOCTOR_TOKEN": "profile-env-test-token"
+   },
+   "setup": [
+    [
+     "env:set",
+     "prod",
+     "--server={mock}",
+     "--token-env=PARITY_DOCTOR_TOKEN"
+    ]
+   ]
+  },
+  {
+   "name": "doctor profile env token missing",
+   "argv": [
+    "doctor",
+    "--env=prod",
+    "--output=json"
+   ],
+   "mock": [],
+   "env": {
+    "PARITY_DOCTOR_TOKEN": ""
+   },
+   "setup": [
+    [
+     "env:set",
+     "prod",
+     "--server={mock}",
+     "--token-env=PARITY_DOCTOR_TOKEN"
+    ]
+   ]
+  },
+  {
+   "name": "doctor flag precedence",
+   "argv": [
+    "doctor",
+    "--env=prod",
+    "--namespace=flag-ns",
+    "--token=flag-test-token",
+    "--tls-verify=true",
+    "--output=json"
+   ],
+   "mock": [],
+   "env": {
+    "DURABLE_WORKFLOW_NAMESPACE": "env-ns",
+    "DURABLE_WORKFLOW_AUTH_TOKEN": "env-test-token",
+    "DURABLE_WORKFLOW_TLS_VERIFY": "false"
+   },
+   "setup": [
+    [
+     "env:set",
+     "prod",
+     "--server={mock}",
+     "--namespace=profile-ns",
+     "--token=profile-test-token",
+     "--tls-verify=false"
+    ]
+   ]
+  },
+  {
+   "name": "doctor TLS disabled",
+   "argv": [
+    "doctor",
+    "--tls-verify=false",
+    "--output=json",
+    "--server={mock}"
+   ],
+   "mock": []
+  },
+  {
+   "name": "doctor incompatible control plane",
+   "argv": [
+    "doctor",
+    "--output=json",
+    "--server={mock}"
+   ],
+   "mock": [
+    [
+     [
+      "control_plane",
+      "version"
+     ],
+     "3"
+    ]
+   ]
+  },
+  {
+   "name": "doctor incompatible worker protocol",
+   "argv": [
+    "doctor",
+    "--output=json",
+    "--server={mock}"
+   ],
+   "mock": [
+    [
+     [
+      "worker_protocol",
+      "version"
+     ],
+     "99.0"
+    ]
+   ]
+  },
+  {
+   "name": "doctor missing protocol metadata",
+   "argv": [
+    "doctor",
+    "--output=json",
+    "--server={mock}"
+   ],
+   "mock": [
+    [
+     [
+      "control_plane"
+     ],
+     null
+    ],
+    [
+     [
+      "worker_protocol"
+     ],
+     null
+    ],
+    [
+     [
+      "auth_composition_contract"
+     ],
+     null
+    ]
+   ]
+  },
+  {
+   "name": "doctor malformed protocol metadata",
+   "argv": [
+    "doctor",
+    "--output=json",
+    "--server={mock}"
+   ],
+   "mock": [
+    [
+     [
+      "version"
+     ],
+     false
+    ],
+    [
+     [
+      "server_id"
+     ],
+     {}
+    ],
+    [
+     [
+      "auth_composition_contract"
+     ],
+     []
+    ],
+    [
+     [
+      "control_plane"
+     ],
+     []
+    ],
+    [
+     [
+      "worker_protocol"
+     ],
+     {
+      "version": 7,
+      "invocable_carrier_contract": {
+       "version": true,
+       "scope": {
+        "task_kinds": {
+         "x": "activity_task"
+        }
+       }
+      },
+      "external_task_input_contract": {
+       "version": "2x",
+       "fixtures": {
+        "unknown": {},
+        "activity_task": {}
+       }
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "name": "doctor native published metadata",
+   "argv": [
+    "doctor",
+    "--output=json",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/cluster/info": {
+     "body": {
+      "server_id": "9b667a0d792b",
+      "version": "3.0.5",
+      "implementation": "rust",
+      "control_plane": {
+       "version": "2",
+       "request_contract": {
+        "schema": "durable-workflow.v2.control-plane-request.contract",
+        "version": 1,
+        "operations": {
+         "list": {
+          "fields": {
+           "status": {
+            "canonical_values": [
+             "running",
+             "completed",
+             "failed"
+            ],
+            "rejected_aliases": {
+             "cancelled": "failed",
+             "terminated": "failed",
+             "pending": "running",
+             "waiting": "running"
+            }
+           }
+          }
+         },
+         "update": {
+          "fields": {
+           "wait_for": {
+            "canonical_values": [
+             "accepted",
+             "completed"
+            ]
+           },
+           "wait_timeout_seconds": {
+            "minimum": 1,
+            "maximum": 60
+           }
+          }
+         }
+        }
+       }
+      },
+      "worker_protocol": {
+       "version": "1.20"
+      },
+      "auth_composition_contract": {
+       "schema": "durable-workflow.v2.auth-composition.contract",
+       "version": 1,
+       "scope": "external_execution_carriers",
+       "unknown_field_policy": "ignore_additive_reject_unknown_required",
+       "precedence": {
+        "connection_values": [
+         "flag",
+         "environment",
+         "selected_profile",
+         "default"
+        ],
+        "profile_selection": [
+         "flag_env",
+         "DW_ENV",
+         "current_profile",
+         "default_profile"
+        ],
+        "notes": [
+         "flags win only for the current invocation",
+         "environment values are portable carrier inputs and must not be persisted by default",
+         "selected profile values are persisted configuration, but secret fields should be references",
+         "defaults are explicit and must appear in effective-config diagnostics"
+        ]
+       },
+       "canonical_environment": {
+        "server_url": "DURABLE_WORKFLOW_SERVER_URL",
+        "namespace": "DURABLE_WORKFLOW_NAMESPACE",
+        "auth_token": "DURABLE_WORKFLOW_AUTH_TOKEN",
+        "tls_verify": "DURABLE_WORKFLOW_TLS_VERIFY",
+        "profile": "DW_ENV"
+       },
+       "auth_material": {
+        "token": {
+         "status": "supported",
+         "transport": "bearer_authorization_header",
+         "persisted_as": "secret_reference_or_profile_env_reference",
+         "effective_config_value": "redacted"
+        },
+        "mtls": {
+         "status": "reserved",
+         "persisted_as": "certificate_and_key_references",
+         "effective_config_value": "references_only"
+        },
+        "signed_headers": {
+         "status": "reserved",
+         "persisted_as": "key_reference_and_header_allowlist",
+         "effective_config_value": "references_only"
+        },
+        "extensions": {
+         "status": "reserved",
+         "rule": "new auth material types must define redaction, persistence, and source precedence before use"
+        }
+       },
+       "effective_config": {
+        "required_fields": [
+         "server_url",
+         "namespace",
+         "profile",
+         "auth",
+         "tls",
+         "identity"
+        ],
+        "source_values": [
+         "flag",
+         "environment",
+         "selected_profile",
+         "profile_env",
+         "default",
+         "server"
+        ],
+        "field_contracts": {
+         "server_url": {
+          "value": "normalized_absolute_url",
+          "source": "one_of_source_values"
+         },
+         "namespace": {
+          "value": "non_empty_namespace_name",
+          "source": "one_of_source_values"
+         },
+         "profile": {
+          "name": "nullable_string",
+          "source": "flag_env_or_DW_ENV_or_current_profile_or_default_profile"
+         },
+         "auth": {
+          "type": "token_or_mtls_or_signed_headers_or_none",
+          "source": "one_of_source_values",
+          "value": "redacted_or_reference_only"
+         },
+         "tls": {
+          "verify": "boolean",
+          "source": "one_of_source_values"
+         },
+         "identity": {
+          "subject": "nullable_string",
+          "roles": "list_of_strings",
+          "source": "server_or_carrier"
+         }
+        }
+       },
+       "redaction": {
+        "never_echo": [
+         "bearer_tokens",
+         "private_keys",
+         "shared_signature_keys",
+         "client_certificate_private_key_material",
+         "raw_authorization_headers"
+        ],
+        "allowed_diagnostics": [
+         "redacted",
+         "secret_reference_name",
+         "environment_variable_name",
+         "profile_name",
+         "certificate_reference_name",
+         "key_reference_name"
+        ]
+       },
+       "resolution": {
+        "server_url": "carriers normalize and use the winning absolute URL without appending hidden path defaults",
+        "namespace": "carriers send the winning namespace explicitly when the protocol supports namespace headers",
+        "identity": "servers may report authenticated subject and roles; carriers must treat identity as server-asserted when present",
+        "tls": "carriers must fail closed on invalid TLS unless the winning tls.verify value is false"
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "doctor HTTP 401",
+   "argv": [
+    "doctor",
+    "--output=json",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/cluster/info": {
+     "status": 401,
+     "body": {
+      "message": "Synthetic diagnostic refusal"
+     }
+    }
+   }
+  },
+  {
+   "name": "doctor HTTP 403",
+   "argv": [
+    "doctor",
+    "--output=json",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/cluster/info": {
+     "status": 403,
+     "body": {
+      "message": "Synthetic diagnostic refusal"
+     }
+    }
+   }
+  },
+  {
+   "name": "doctor HTTP 404",
+   "argv": [
+    "doctor",
+    "--output=json",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/cluster/info": {
+     "status": 404,
+     "body": {
+      "message": "Synthetic diagnostic refusal"
+     }
+    }
+   }
+  },
+  {
+   "name": "doctor HTTP 422",
+   "argv": [
+    "doctor",
+    "--output=json",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/cluster/info": {
+     "status": 422,
+     "body": {
+      "message": "Synthetic diagnostic refusal"
+     }
+    }
+   }
+  },
+  {
+   "name": "doctor HTTP 500",
+   "argv": [
+    "doctor",
+    "--output=json",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/cluster/info": {
+     "status": 500,
+     "body": {
+      "message": "Synthetic diagnostic refusal"
+     }
+    }
+   }
+  },
+  {
+   "name": "doctor unreachable JSON",
+   "argv": [
+    "doctor",
+    "--server=http://127.0.0.1:9",
+    "--output=json"
+   ]
+  },
+  {
+   "name": "doctor unreachable human",
+   "argv": [
+    "doctor",
+    "--server=http://127.0.0.1:9"
+   ]
+  },
+  {
+   "name": "native runtime report",
+   "argv": [
+    "runtime:check"
+   ],
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "stdout_text"
+     ],
+     "reason": "The approved Rust-native runtime:check reports the binary build identity and compilation target instead of PHP runtime extensions (cli#72). Its help describes that report."
+    }
+   }
+  },
+  {
+   "name": "native runtime report with ANSI",
+   "argv": [
+    "runtime:check",
+    "--ansi"
+   ],
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "stdout_text"
+     ],
+     "reason": "The approved Rust-native runtime:check reports the binary build identity and compilation target instead of PHP runtime extensions (cli#72). Its help describes that report."
+    }
+   }
+  },
+  {
+   "name": "runtime report quiet",
+   "argv": [
+    "runtime:check",
+    "-q"
+   ]
+  },
+  {
+   "name": "runtime report silent",
+   "argv": [
+    "runtime:check",
+    "--silent"
+   ]
+  },
+  {
+   "name": "runtime rejects output option",
+   "argv": [
+    "runtime:check",
+    "--output=json"
+   ]
+  },
+  {
+   "name": "runtime rejects extra argument",
+   "argv": [
+    "runtime:check",
+    "extra"
+   ]
+  },
+  {
+   "name": "native runtime help JSON",
+   "argv": [
+    "help",
+    "runtime:check",
+    "--format=json"
+   ],
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "stdout_json"
+     ],
+     "reason": "The approved Rust-native runtime:check reports the binary build identity and compilation target instead of PHP runtime extensions (cli#72). Its help describes that report."
+    }
+   }
+  },
+  {
+   "name": "native runtime help Markdown",
+   "argv": [
+    "help",
+    "runtime:check",
+    "--format=md"
+   ],
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "stdout_text"
+     ],
+     "reason": "The approved Rust-native runtime:check reports the binary build identity and compilation target instead of PHP runtime extensions (cli#72). Its help describes that report."
+    }
+   }
+  },
+  {
+   "name": "start-dev no project",
+   "argv": [
+    "server:start-dev"
+   ]
+  },
+  {
+   "name": "start-dev zero port",
+   "argv": [
+    "server:start-dev",
+    "--port=0"
+   ]
+  },
+  {
+   "name": "start-dev high port",
+   "argv": [
+    "server:start-dev",
+    "--port=65536"
+   ]
+  },
+  {
+   "name": "start-dev noninteger port",
+   "argv": [
+    "server:start-dev",
+    "--port=8080.5"
+   ]
+  },
+  {
+   "name": "start-dev missing port",
+   "argv": [
+    "server:start-dev",
+    "--port"
+   ]
+  },
+  {
+   "name": "start-dev invalid driver",
+   "argv": [
+    "server:start-dev",
+    "--db=other"
+   ]
+  },
+  {
+   "name": "start-dev missing driver",
+   "argv": [
+    "server:start-dev",
+    "--db"
+   ]
+  },
+  {
+   "name": "start-dev invalid host",
+   "argv": [
+    "server:start-dev",
+    "--host=http://localhost"
+   ]
+  },
+  {
+   "name": "start-dev missing host",
+   "argv": [
+    "server:start-dev",
+    "--host"
+   ]
+  },
+  {
+   "name": "start-dev rejects output option",
+   "argv": [
+    "server:start-dev",
+    "--output=json"
+   ]
+  },
+  {
+   "name": "start-dev quiet validation",
+   "argv": [
+    "server:start-dev",
+    "--port=0",
+    "-q"
+   ]
+  },
+  {
+   "name": "start-dev missing external PHP",
+   "argv": [
+    "server:start-dev"
+   ],
+   "project": {
+    "php": false
+   },
+   "env": {}
+  },
+  {
+   "name": "start-dev missing Compose",
+   "argv": [
+    "server:start-dev",
+    "--db=mysql"
+   ],
+   "project": {},
+   "env": {}
+  },
+  {
+   "name": "start-dev sqlite default",
+   "argv": [
+    "server:start-dev"
+   ],
+   "project": {},
+   "env": {}
+  },
+  {
+   "name": "start-dev IPv6 and leading-zero port",
+   "argv": [
+    "server:start-dev",
+    "--host=::1",
+    "--port=09090"
+   ],
+   "project": {},
+   "env": {}
+  },
+  {
+   "name": "start-dev localhost",
+   "argv": [
+    "server:start-dev",
+    "--host=localhost"
+   ],
+   "project": {},
+   "env": {}
+  },
+  {
+   "name": "start-dev project path with spaces",
+   "argv": [
+    "server:start-dev"
+   ],
+   "project": {
+    "spaces": true
+   },
+   "env": {}
+  },
+  {
+   "name": "start-dev mysql",
+   "argv": [
+    "server:start-dev",
+    "--db=mysql"
+   ],
+   "project": {
+    "docker": true
+   },
+   "env": {}
+  },
+  {
+   "name": "start-dev pgsql",
+   "argv": [
+    "server:start-dev",
+    "--db=pgsql"
+   ],
+   "project": {
+    "docker": true
+   },
+   "env": {}
+  },
+  {
+   "name": "start-dev Compose failure",
+   "argv": [
+    "server:start-dev",
+    "--db=mysql"
+   ],
+   "project": {
+    "docker": true
+   },
+   "env": {
+    "DW_DEV_DOCKER_EXIT": "17"
+   }
+  },
+  {
+   "name": "start-dev HTTP failure",
+   "argv": [
+    "server:start-dev"
+   ],
+   "project": {},
+   "env": {
+    "DW_DEV_PHP_EXIT": "42"
+   }
+  },
+  {
+   "name": "start-dev quiet child failure",
+   "argv": [
+    "server:start-dev",
+    "-q"
+   ],
+   "project": {},
+   "env": {
+    "DW_DEV_PHP_EXIT": "42"
+   }
+  },
+  {
+   "name": "start-dev ANSI child output",
+   "argv": [
+    "server:start-dev",
+    "--ansi"
+   ],
+   "project": {},
+   "env": {}
+  },
+  {
+   "name": "start-dev child terminated by a signal",
+   "argv": [
+    "server:start-dev"
+   ],
+   "project": {},
+   "env": {
+    "DW_DEV_PHP_SIGNAL": "15"
+   }
+  }
+ ]
+}

@@ -65,6 +65,8 @@ jobs:
       initiator: ${{ steps.resolve.outputs.initiator }}
       prerelease: ${{ steps.resolve.outputs.prerelease }}
       make_latest: ${{ steps.resolve.outputs.make_latest }}
+      implementation: ${{ steps.resolve.outputs.implementation }}
+      observed_latest: ${{ steps.resolve.outputs.observed_latest }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
         with:
@@ -72,6 +74,7 @@ jobs:
       - id: resolve
         shell: bash
         env:
+          GH_TOKEN: ${{ github.token }}
           DISPATCH_OPERATION: ${{ inputs.operation }}
           DISPATCH_TAG: ${{ inputs.tag }}
           DISPATCH_COMMIT: ${{ inputs.release_commit }}
@@ -117,7 +120,22 @@ jobs:
               echo "::error::Invalid release tag: $raw_tag"
               exit 1
             fi
-            release_metadata="$(node scripts/ci/release-version.js metadata "$tag")"
+            # 2.5.0 and later are the Rust implementation, released by
+            # release-rust.yml. This PHP pipeline never builds them.
+            implementation="$(node scripts/ci/release-version.js implementation "$tag")"
+            if [ "$implementation" != "php" ]; then
+              if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+                echo "::notice::$tag is released by release-rust.yml; the PHP pipeline skips it"
+                echo "implementation=$implementation" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+              echo "::error::$tag is released by release-rust.yml, not the PHP release pipeline"
+              exit 1
+            fi
+            # Never take GitHub's latest marker from a newer release
+            # (install.sh installs latest by default).
+            current_latest="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq '.tag_name' 2>/dev/null || true)"
+            release_metadata="$(node scripts/ci/release-version.js metadata "$tag" "$current_latest")"
             read -r prerelease make_latest <<< "$release_metadata"
             if [ "$tag" = "2.0.0" ] && [ "$GITHUB_EVENT_NAME" != "workflow_dispatch" ]; then
               echo "::error::Stable 2.0.0 publication requires a protected main-branch dispatch"
@@ -137,6 +155,8 @@ jobs:
           echo "initiator=$GITHUB_EVENT_NAME" >> "$GITHUB_OUTPUT"
           echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
           echo "make_latest=$make_latest" >> "$GITHUB_OUTPUT"
+          echo "implementation=php" >> "$GITHUB_OUTPUT"
+          echo "observed_latest=${current_latest:-}" >> "$GITHUB_OUTPUT"
           if [ "$cache_warm" = "true" ]; then
             echo "Resolved trusted phpmicro cache warm at $commit"
           else
@@ -144,7 +164,7 @@ jobs:
           fi
 
       - name: Record release control and package authorities
-        if: steps.resolve.outputs.cache_warm != 'true'
+        if: steps.resolve.outputs.cache_warm != 'true' && steps.resolve.outputs.implementation == 'php'
         env:
           RELEASE_TAG: ${{ steps.resolve.outputs.tag }}
           RELEASE_COMMIT: ${{ steps.resolve.outputs.commit }}
@@ -168,7 +188,7 @@ jobs:
           NODE
 
       - name: Retain release control authority
-        if: steps.resolve.outputs.cache_warm != 'true'
+        if: steps.resolve.outputs.cache_warm != 'true' && steps.resolve.outputs.implementation == 'php'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
         with:
           name: release-control-authority
@@ -178,7 +198,9 @@ jobs:
   release-preflight:
     name: Release preflight
     needs: resolve-release
-    if: needs.resolve-release.outputs.cache_warm != 'true'
+    if: >-
+      needs.resolve-release.outputs.cache_warm != 'true' &&
+      needs.resolve-release.outputs.implementation == 'php'
     runs-on: ubuntu-latest
     outputs:
       public_assets_present: ${{ steps.public_assets.outputs.present }}
@@ -1805,20 +1827,59 @@ jobs:
           EOF
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228  # v3
+        # gh creates the release as a draft, uploads every asset, then
+        # publishes it, prereleases included, so a release is complete when it
+        # becomes visible and immutable releases accept it.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.resolve-release.outputs.tag }}
+          PRERELEASE: ${{ needs.resolve-release.outputs.prerelease }}
+          MAKE_LATEST: ${{ needs.resolve-release.outputs.make_latest }}
+          OBSERVED_LATEST: ${{ needs.resolve-release.outputs.observed_latest }}
+        run: |
+          set -euo pipefail
+          # Keep the latest marker where it is if another release became
+          # latest after this run decided.
+          if [ "$MAKE_LATEST" = "true" ]; then
+            latest_now="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq '.tag_name' 2>/dev/null || true)"
+            if [ "$latest_now" != "$OBSERVED_LATEST" ]; then
+              echo "::warning::Latest release changed from '${OBSERVED_LATEST}' to '${latest_now}' during this run; publishing without the latest marker"
+              MAKE_LATEST=false
+            fi
+          fi
+          flags=(--verify-tag --title "$RELEASE_TAG" --notes-file release-notes.md --generate-notes "--latest=$MAKE_LATEST")
+          if [ "$PRERELEASE" = "true" ]; then
+            flags+=(--prerelease)
+          fi
+          gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" "${flags[@]}" dist/*
+
+  verify-release:
+    name: Verify published release
+    # Installs and runs the published dw, which bundles third-party code.
+    # This job only reads repository contents and has no release environment
+    # or OIDC permission, so nothing it runs can change the repository or
+    # mint attestation tokens (#75).
+    needs: [resolve-release, release]
+    if: >-
+      always() &&
+      needs.resolve-release.result == 'success' &&
+      needs.release.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      # Verification scripts come from this workflow's own commit (the
+      # release control commit), never from a job output, so the release
+      # under test cannot supply the code that judges it.
+      - name: Check out the release control source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
         with:
-          tag_name: ${{ needs.resolve-release.outputs.tag }}
-          name: ${{ needs.resolve-release.outputs.tag }}
-          body_path: release-notes.md
-          files: |
-            dist/*
-          generate_release_notes: true
-          fail_on_unmatched_files: true
-          prerelease: ${{ needs.resolve-release.outputs.prerelease }}
-          make_latest: ${{ needs.resolve-release.outputs.make_latest }}
+          persist-credentials: false
+          ref: ${{ github.sha }}
 
       - name: Verify public release downloads
         env:
+          VERIFIED_SOURCE_SHA: ${{ needs.resolve-release.outputs.commit }}
           RELEASE_CONTROL_REF: ${{ needs.resolve-release.outputs.control_ref }}
           RELEASE_CONTROL_COMMIT: ${{ needs.resolve-release.outputs.control_commit }}
           RELEASE_INITIATOR: ${{ needs.resolve-release.outputs.initiator }}
@@ -1894,7 +1955,7 @@ jobs:
           done
 
           evidence="release-public-download-evidence.json"
-          release_commit="$(git rev-parse HEAD)"
+          release_commit="$VERIFIED_SOURCE_SHA"
           verified_at="$(date -u +%FT%TZ)"
           {
             printf '{\n'

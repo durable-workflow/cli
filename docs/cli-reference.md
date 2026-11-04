@@ -75,10 +75,11 @@ Available assets:
 
 Tagged releases also include `dw.rb`, a generated Homebrew formula for the
 macOS arm64 binary, with the release URL and SHA256 baked in. Until a public
-tap is live, two install paths are supported: install from the bundled formula
-directly with `brew install --formula ./dw.rb` after downloading it from the
-release, or vendor the same formula into a self-hosted tap so users can run
-`brew install <org>/<tap>/dw`. See [`docs/distribution.md`](distribution.md)
+tap is live, two install paths are supported, both through a tap because
+Homebrew refuses a formula outside one: put the downloaded formula in a local
+tap (`brew tap-new --no-git "$USER/local"`, copy `dw.rb` into its `Formula/`
+directory, then `brew install "$USER/local/dw"`), or vendor the same formula
+into a self-hosted tap so users can run `brew install <org>/<tap>/dw`. See [`docs/distribution.md`](distribution.md)
 for the full Homebrew install runbook.
 
 macOS x86_64 standalone binaries are not currently produced because the
@@ -530,6 +531,16 @@ the key, the retained command (`retained_command_id`, `retained_command_type`,
 `retained_outcome`) and the mismatched `conflict` parts. Servers that predate
 keyed signals accept the field and omit the `retained`/`intent_verified`
 flags.
+
+Batch cancellation with `--all-matching` cancels the exact run each listed
+workflow had when it was selected. If that run has continued as new, been
+replaced or closed before the request reaches Server, the workflow is reported
+as a failure with Server's `reason` (for example
+`historical_run_command_rejected` or `run_not_active`). The current run is not
+cancelled in its place. The selection is not expanded while the command runs,
+and a workflow that appears on more than one list page is targeted once, at
+its first listed run. JSON output lists each selected `workflow_id`, `run_id`
+and `namespace` in `targets`, and each failure includes its `run_id`.
 
 ### Nexus service calls
 

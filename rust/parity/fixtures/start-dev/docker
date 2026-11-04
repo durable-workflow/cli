@@ -1,0 +1,6 @@
+#!/bin/sh
+printf 'compose arguments:'
+printf ' [%s]' "$@"
+printf '\n'
+printf started > compose.started
+exit "${DW_DEV_DOCKER_EXIT:-0}"

@@ -348,18 +348,24 @@ reproducibility regression — please open a release-blocking issue.
 The release workflow generates `dw.rb`, a Homebrew formula that pins the
 exact release URL and SHA256 of `dw-macos-aarch64`, and publishes it as
 a release asset alongside the binary. Operators who consume the CLI via
-Homebrew today have two options until a public tap is registered:
+Homebrew today have two options until a public tap is registered. Homebrew
+only installs formulae from a tap (`brew install --formula ./dw.rb` is
+rejected with "Homebrew requires formulae to be in a tap"), so both go
+through one:
 
-- **Per-release install from the bundled formula.**
+- **Per-release install through a local tap.**
 
   ```bash
   gh release download <tag> --repo durable-workflow/cli --pattern dw.rb --output dw.rb
-  brew install --formula ./dw.rb
+  brew tap-new --no-git "$USER/local"
+  cp dw.rb "$(brew --repository "$USER/local")/Formula/dw.rb"
+  brew install "$USER/local/dw"
   ```
 
   The formula has the release URL and SHA256 baked in, so `brew install`
   validates the binary's checksum against the locked-in value before
-  linking it into the keg.
+  linking it into the keg. For a later release, replace the formula file
+  and run `brew upgrade "$USER/local/dw"`.
 
 - **Self-hosted tap.** Vendor the generated `dw.rb` into your own tap
   repository (`brew tap-new <org>/durable-workflow`,
@@ -368,7 +374,7 @@ Homebrew today have two options until a public tap is registered:
   and SHA256 keep the install path verifiable inside your tap as well.
 
 A canonical `durable-workflow/tap` is on the roadmap. Until it lands,
-the per-release install above is the supported path and should be
+the per-release local-tap install above is the supported path and should be
 documented in any internal runbook that automates `dw` installs on macOS.
 
 ## Operator runbook checklist

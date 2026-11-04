@@ -1,0 +1,40 @@
+[package]
+name = "dw"
+version = "2.5.0-rc.2"
+edition = "2021"
+rust-version = "1.86"
+description = "Command-line interface for Durable Workflow Server and Cloud"
+license = "MIT"
+repository = "https://github.com/durable-workflow/cli"
+publish = false
+
+[[bin]]
+name = "dw"
+path = "src/main.rs"
+
+[dependencies]
+# Pinned to the latest qualified published SDK release. Move only after
+# sdk-rust's published-package acceptance.
+durable-workflow = "=4.12.0"
+serde = "1"
+sha2 = "0.10"
+# Merge child stdout/stderr without a shell on Rust 1.86, including Windows.
+os_pipe = "1.2.3"
+# preserve_order keeps Server response keys in their original order, matching
+# the PHP CLI's pass-through JSON. float_roundtrip parses every float to the
+# exact value PHP decodes, so re-encoded output and checksums match 2.x.
+serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
+tokio = { version = "1", features = ["rt", "macros"] }
+# Release downloads for `dw upgrade`; the same version and TLS stack the SDK uses.
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+
+[target.'cfg(unix)'.dependencies]
+# access(2), for PHP's is_writable/is_executable checks in `dw upgrade`.
+libc = "0.2"
+
+# Release binaries are the published standalone assets: one optimized,
+# symbol-stripped executable per platform.
+[profile.release]
+codegen-units = 1
+lto = true
+strip = "symbols"

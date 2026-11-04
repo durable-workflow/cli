@@ -64,6 +64,7 @@ command -v curl >/dev/null 2>&1 || err "curl is required"
 case "$VERSION" in
     supported) VERSION=stable ;;
     prerelease) err "pass an explicit prerelease tag with VERSION=..." ;;
+    *) ;;
 esac
 
 if [ "$VERSION" = "latest" ] || [ "$VERSION" = "stable" ]; then
@@ -127,13 +128,17 @@ if [ "$VERIFY_ATTESTATIONS" = "1" ]; then
     command -v gh >/dev/null 2>&1 || err "gh is required when DURABLE_WORKFLOW_INSTALL_VERIFY_ATTESTATIONS=1"
 
     info "Verifying GitHub artifact attestations"
-    if [ "$OUTPUT_MODE" = "json" ]; then
-        gh attestation verify "$tmp" --repo "$REPO" >&2
-        gh attestation verify "$sums" --repo "$REPO" >&2
-    else
-        gh attestation verify "$tmp" --repo "$REPO"
-        gh attestation verify "$sums" --repo "$REPO"
-    fi
+    # Only the repository's release workflows, run from main or a release
+    # tag on GitHub-hosted runners, can have signed a release asset.
+    repo_pattern=$(printf '%s' "$REPO" | sed 's/[.]/\\./g')
+    signer="^https://github\\.com/${repo_pattern}/\\.github/workflows/(release|release-rust)\\.yml@refs/(heads/main|tags/v?[0-9]+\\.[0-9]+\\.[0-9]+([-+][0-9A-Za-z.+-]+)?)\$"
+    for subject in "$tmp" "$sums"; do
+        if [ "$OUTPUT_MODE" = "json" ]; then
+            gh attestation verify "$subject" --repo "$REPO" --cert-identity-regex "$signer" --deny-self-hosted-runners >&2
+        else
+            gh attestation verify "$subject" --repo "$REPO" --cert-identity-regex "$signer" --deny-self-hosted-runners
+        fi
+    done
 fi
 
 chmod +x "$tmp"
@@ -157,6 +162,7 @@ if resolved_path=$(command -v "$BIN_NAME" 2>/dev/null); then
                 pre_install_path="$canonical_pre_install_dir/$pre_install_name"
             fi
             ;;
+        *) ;;
     esac
 fi
 
@@ -218,6 +224,7 @@ if resolved_path=$(command -v "$BIN_NAME" 2>/dev/null); then
                 active_path="$canonical_active_dir/$active_name"
             fi
             ;;
+        *) ;;
     esac
 fi
 
@@ -265,6 +272,7 @@ if [ -n "${PPID:-}" ] && parent_command=$(ps -p "$PPID" -o comm= 2>/dev/null); t
         bash|dash|sh|ash|ksh|ksh93|mksh|pdksh|zsh|fish)
             parent_shell_name="$parent_command"
             ;;
+        *) ;;
     esac
 fi
 

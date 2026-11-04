@@ -104,7 +104,7 @@ class ReleaseCachePolicyTest(unittest.TestCase):
                 self.assertEqual("${{ github.sha }}", checkout["with"]["ref"])
                 self.assertIs(False, checkout["with"]["persist-credentials"])
 
-    def resolve(self, event, ref, operation="", commit="", tag=""):
+    def resolve(self, event, ref, operation="", commit="", tag="", latest=""):
         step = next(
             step
             for step in self.workflow["jobs"]["resolve-release"]["steps"]
@@ -113,8 +113,26 @@ class ReleaseCachePolicyTest(unittest.TestCase):
         sha = RELEASE if ref.startswith("refs/tags/") else MAIN
         with tempfile.TemporaryDirectory(prefix="cli-release-cache-") as directory:
             output = Path(directory) / "outputs"
+            # A local gh stands in for the GitHub API: it answers only the
+            # latest-release lookup, and never reaches the network.
+            bin_directory = Path(directory) / "bin"
+            bin_directory.mkdir()
+            fake_gh = bin_directory / "gh"
+            fake_gh.write_text(
+                "#!/bin/sh\n"
+                'if [ "$1 $2" = "api repos/$GITHUB_REPOSITORY/releases/latest" ] && [ -n "$FAKE_LATEST_TAG" ]; then\n'
+                '  printf "%s\\n" "$FAKE_LATEST_TAG"; exit 0\n'
+                "fi\n"
+                "exit 1\n",
+                encoding="utf-8",
+            )
+            fake_gh.chmod(0o755)
             env = dict(os.environ)
             env.update({
+                "PATH": f"{bin_directory}{os.pathsep}{env.get('PATH', '')}",
+                "GITHUB_REPOSITORY": "durable-workflow/cli",
+                "GH_TOKEN": "",
+                "FAKE_LATEST_TAG": latest,
                 "GITHUB_EVENT_NAME": event,
                 "GITHUB_REF_NAME": ref.removeprefix("refs/heads/").removeprefix("refs/tags/"),
                 "GITHUB_OUTPUT": str(output),
@@ -169,6 +187,22 @@ class ReleaseCachePolicyTest(unittest.TestCase):
                 self.assertEqual("false", values["cache_warm"])
                 self.assertEqual(RELEASE, values["commit"])
                 self.assertEqual("2.3.3", values["tag"])
+
+    def test_older_patches_never_take_the_latest_marker(self) -> None:
+        for latest, expected in (("", "true"), ("2.3.2", "true"), ("2.3.3", "true"), ("2.5.0", "false"), ("v2.5.0", "false")):
+            with self.subTest(latest=latest):
+                result, values, _ = self.resolve("push", "refs/tags/2.3.3", latest=latest)
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertEqual(expected, values["make_latest"])
+                self.assertEqual(latest, values["observed_latest"])
+
+    def test_rust_versions_never_enter_the_php_pipeline(self) -> None:
+        result, values, _ = self.resolve("push", "refs/tags/2.5.0")
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual({"implementation": "rust"}, values)
+        result, values, _ = self.resolve("workflow_dispatch", "refs/heads/main", "release", RELEASE, "2.5.0")
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("released by release-rust.yml", result.stdout + result.stderr)
 
     def test_untrusted_refs_and_incomplete_releases_are_rejected(self) -> None:
         for event, ref, operation, commit, tag in (

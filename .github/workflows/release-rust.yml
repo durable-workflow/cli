@@ -36,12 +36,6 @@ on:
 permissions:
   contents: read
 
-# One Rust release runs at a time, whatever the tag spelling (v2.5.0 and
-# 2.5.0 are the same release); later runs queue.
-concurrency:
-  group: rust-release
-  cancel-in-progress: false
-
 jobs:
   resolve:
     name: Resolve release
@@ -207,6 +201,11 @@ jobs:
       needs.build.result == 'success' &&
       needs.bundle.result == 'success'
     runs-on: ubuntu-latest
+    # Keyed by the normalized tag, so v2.5.0 and 2.5.0 publish one at a time
+    # while different releases never queue behind (or cancel) each other.
+    concurrency:
+      group: rust-release-publish-${{ needs.resolve.outputs.tag }}
+      cancel-in-progress: false
     environment: github-release
     permissions:
       actions: read

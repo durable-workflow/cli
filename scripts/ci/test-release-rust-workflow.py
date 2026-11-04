@@ -35,6 +35,23 @@ DOWNLOAD = "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c"
 ATTEST = "actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373"
 VALIDATOR_STEP = "Validate the exact producer artifact before use"
 INSTALLERS = [ROOT / "scripts/install.sh", ROOT / "scripts/install.ps1", ROOT / "scripts/verify-release.sh"]
+# The exact signer identity, anchored at both ends, for durable-workflow/cli.
+SIGNER_REGEX = (
+    r"^https://github\.com/durable-workflow/cli/\.github/workflows/(release|release-rust)\.yml"
+    r"@refs/(heads/main|tags/v?[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.+-]+)?)$"
+)
+_SHELL_SIGNER = (
+    'signer="^https://github\\\\.com/${repo_pattern}/\\\\.github/workflows/(release|release-rust)\\\\.yml'
+    '@refs/(heads/main|tags/v?[0-9]+\\\\.[0-9]+\\\\.[0-9]+([-+][0-9A-Za-z.+-]+)?)\\$"'
+)
+SIGNER_PATTERNS = {
+    "install.sh": _SHELL_SIGNER,
+    "verify-release.sh": _SHELL_SIGNER,
+    "install.ps1": (
+        '$signer = "^https://github\\.com/$repoPattern/\\.github/workflows/(release|release-rust)\\.yml'
+        '@refs/(heads/main|tags/v?[0-9]+\\.[0-9]+\\.[0-9]+([-+][0-9A-Za-z.+-]+)?)$"'
+    ),
+}
 
 # Every action each job may use, without its pin. A cache action anywhere,
 # or any new action, fails until it is reviewed and added here.
@@ -307,13 +324,44 @@ class ReleaseRustWorkflowTest(unittest.TestCase):
             for call in calls:
                 self.assertIn("--cert-identity-regex", call, f"{path.name}: {call.strip()}")
                 self.assertIn("--deny-self-hosted-runners", call, f"{path.name}: {call.strip()}")
-            self.assertIn("(release|release-rust)", text, path.name)
-            self.assertIn("@refs/(heads/main|tags/v?[0-9]+", text, path.name)
+            self.assertIn(SIGNER_PATTERNS[path.name], text, path.name)
+
+    def test_signer_pattern_is_anchored_and_exact(self):
+        # The shell pattern as the script evaluates it: built from the repo,
+        # anchored at both ends, and nothing else admitted.
+        script = (ROOT / "scripts/install.sh").read_text(encoding="utf-8")
+        [assignment] = [line.strip() for line in script.splitlines() if line.strip().startswith("signer=")]
+        evaluated = subprocess.run(
+            ["sh", "-c", f'REPO=durable-workflow/cli; repo_pattern=$(printf "%s" "$REPO" | sed "s/[.]/\\\\./g"); {assignment}; printf "%s" "$signer"'],
+            check=True, capture_output=True, text=True,
+        ).stdout
+        self.assertEqual(SIGNER_REGEX, evaluated)
+        pattern = re.compile(evaluated)
+        base = "https://github.com/durable-workflow/cli/.github/workflows/"
+        for accepted in ("release-rust.yml@refs/tags/2.5.0", "release.yml@refs/heads/main", "release.yml@refs/tags/v2.3.5",
+                         "release-rust.yml@refs/tags/2.5.0-rc.1"):
+            self.assertIsNotNone(pattern.search(base + accepted), accepted)
+        for refused in ("build.yml@refs/heads/main", "release.yml@refs/heads/main-x", "release-rust.yml@refs/tags/2.5.0\nx",
+                        "release.yml@refs/heads/topic", "xrelease.yml@refs/heads/main"):
+            self.assertIsNone(pattern.search(base + refused), refused)
+        for refused in ("https://github.com/evil/cli/.github/workflows/release.yml@refs/heads/main",
+                        "https://github.com.evil/durable-workflow/cli/.github/workflows/release.yml@refs/heads/main",
+                        "x" + base + "release.yml@refs/heads/main"):
+            self.assertIsNone(pattern.search(refused), refused)
 
     # Concurrency and the latest marker.
 
-    def test_one_rust_release_runs_at_a_time(self):
-        self.assertEqual({"group": "rust-release", "cancel-in-progress": False}, self.workflow["concurrency"])
+    def test_publication_serializes_per_normalized_tag(self):
+        # A workflow-level group would let a newer pending run cancel an older
+        # pending one; per-tag job concurrency only serializes the same release.
+        self.assertNotIn("concurrency", self.workflow)
+        self.assertEqual(
+            {"group": "rust-release-publish-${{ needs.resolve.outputs.tag }}", "cancel-in-progress": False},
+            self.jobs["publish"]["concurrency"],
+        )
+        # The tag output is the normalized tag (no leading v).
+        self.assertIn('echo "tag=$tag"', self.steps("resolve")[1]["run"])
+        self.assertIn('tag="$(node scripts/ci/release-version.js normalize "$raw_tag")"', self.steps("resolve")[1]["run"])
 
     def test_older_releases_never_take_the_latest_marker(self):
         def metadata(*args):
@@ -325,6 +373,10 @@ class ReleaseRustWorkflowTest(unittest.TestCase):
         self.assertEqual(["false", "true"], metadata("2.6.0", "2.5.0"))
         self.assertEqual(["false", "true"], metadata("2.5.0"))
         self.assertEqual(["true", "false"], metadata("2.5.0-rc.1", "2.3.5"))
+        # Re-publishing the current latest version keeps the marker.
+        self.assertEqual(["false", "true"], metadata("2.5.0", "2.5.0"))
+        self.assertEqual(["false", "true"], metadata("v2.5.0", "2.5.0"))
+        self.assertEqual(["false", "true"], metadata("2.5.0", "v2.5.0"))
         for path, needle in (
             (PHP, 'metadata "$tag" "$current_latest"'),
             (RUST, 'metadata "$tag" "$current_latest"'),
@@ -333,6 +385,22 @@ class ReleaseRustWorkflowTest(unittest.TestCase):
             text = path.read_text(encoding="utf-8")
             self.assertIn(needle, text, path.name)
             self.assertIn("releases/latest", text, path.name)
+
+    def test_php_release_attaches_every_asset_at_creation(self):
+        # Immutable releases refuse uploads after publication; gh drafts the
+        # release while uploading, then publishes it.
+        text = PHP.read_text(encoding="utf-8")
+        php = yaml.safe_load(text)
+        self.assertNotIn("softprops/action-gh-release", text)
+        [create] = [s for s in php["jobs"]["release"]["steps"] if s.get("name") == "Create GitHub Release"]
+        self.assertNotIn("uses", create)
+        self.assertIn('gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" "${flags[@]}" dist/*', create["run"])
+        self.assertIn("--verify-tag", create["run"])
+        self.assertNotIn("--draft", create["run"])
+        for document in (php, self.workflow):
+            for job in document["jobs"].values():
+                for step in job.get("steps", []):
+                    self.assertNotRegex(step.get("run", ""), r"gh release (upload|edit)|releases/[^ ]*/assets", step.get("name"))
 
     # Version gates.
 

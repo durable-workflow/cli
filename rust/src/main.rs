@@ -32,8 +32,11 @@ enum Handler {
 /// Commands ported so far. Every other catalog command is recognized and
 /// reported as not yet available.
 fn handler(name: &str) -> Option<Handler> {
-    use commands::{env, runtime, schema, server, upgrade};
+    use commands::{completion, doctor, env, runtime, schema, server, upgrade};
     Some(match name {
+        "completion" => Handler::Local(completion::completion),
+        "_complete" => Handler::Local(completion::complete),
+        "doctor" => Handler::Local(doctor::run),
         "runtime:check" => Handler::Local(runtime::run),
         "schema:list" => Handler::Local(schema::list),
         "schema:manifest" => Handler::Local(schema::manifest),

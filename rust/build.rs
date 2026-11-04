@@ -11,6 +11,12 @@ fn collect(dir: &Path, root: &Path, files: &mut Vec<(String, PathBuf)>) {
         .collect();
     entries.sort();
     for path in entries {
+        // Never follow a symlink out of schemas/.
+        let metadata = std::fs::symlink_metadata(&path)
+            .unwrap_or_else(|error| panic!("cannot stat {}: {error}", path.display()));
+        if metadata.file_type().is_symlink() {
+            continue;
+        }
         if path.is_dir() {
             collect(&path, root, files);
         } else if path

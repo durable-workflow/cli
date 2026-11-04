@@ -1883,6 +1883,1210 @@
    ]
   },
   {
+   "name": "completion bash",
+   "argv": [
+    "completion",
+    "bash"
+   ]
+  },
+  {
+   "name": "completion zsh",
+   "argv": [
+    "completion",
+    "zsh"
+   ]
+  },
+  {
+   "name": "completion fish",
+   "argv": [
+    "completion",
+    "fish"
+   ]
+  },
+  {
+   "name": "completion from SHELL",
+   "argv": [
+    "completion"
+   ],
+   "env": {
+    "SHELL": "/usr/bin/zsh"
+   }
+  },
+  {
+   "name": "completion with SHELL unset",
+   "argv": [
+    "completion"
+   ],
+   "env": {
+    "SHELL": ""
+   }
+  },
+  {
+   "name": "completion unsupported shell",
+   "argv": [
+    "completion",
+    "tcsh"
+   ]
+  },
+  {
+   "name": "completion quiet",
+   "argv": [
+    "completion",
+    "bash",
+    "-q"
+   ]
+  },
+  {
+   "name": "_complete bash: commands before one is typed",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c1",
+    "-a1",
+    "-idw"
+   ]
+  },
+  {
+   "name": "_complete bash: option names of a command",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-iupgrade",
+    "-i--"
+   ]
+  },
+  {
+   "name": "_complete bash: global option names before a command",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c1",
+    "-a1",
+    "-idw",
+    "-i--"
+   ]
+  },
+  {
+   "name": "_complete bash: help's command_name",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-ihelp"
+   ]
+  },
+  {
+   "name": "_complete zsh: commands before one is typed",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-szsh",
+    "-c1",
+    "-a1",
+    "-idw"
+   ]
+  },
+  {
+   "name": "_complete zsh: option names of a command",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-szsh",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-iupgrade",
+    "-i--"
+   ]
+  },
+  {
+   "name": "_complete zsh: global option names before a command",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-szsh",
+    "-c1",
+    "-a1",
+    "-idw",
+    "-i--"
+   ]
+  },
+  {
+   "name": "_complete zsh: help's command_name",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-szsh",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-ihelp"
+   ]
+  },
+  {
+   "name": "_complete fish: commands before one is typed",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sfish",
+    "-c1",
+    "-a1",
+    "-idw"
+   ]
+  },
+  {
+   "name": "_complete fish: option names of a command",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sfish",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-iupgrade",
+    "-i--"
+   ]
+  },
+  {
+   "name": "_complete fish: global option names before a command",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sfish",
+    "-c1",
+    "-a1",
+    "-idw",
+    "-i--"
+   ]
+  },
+  {
+   "name": "_complete fish: help's command_name",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sfish",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-ihelp"
+   ]
+  },
+  {
+   "name": "_complete bash: an ambiguous partial command",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c1",
+    "-a1",
+    "-idw",
+    "-iwor"
+   ]
+  },
+  {
+   "name": "_complete bash: a unique partial command expands",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c1",
+    "-a1",
+    "-idw",
+    "-iupg"
+   ]
+  },
+  {
+   "name": "_complete bash: an alias",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c1",
+    "-a1",
+    "-idw",
+    "-iworkflows:li"
+   ]
+  },
+  {
+   "name": "_complete bash: option value with =",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-iupgrade",
+    "-i--output="
+   ]
+  },
+  {
+   "name": "_complete bash: option value with = and a prefix",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-iworkflow:list",
+    "-i--output=js"
+   ]
+  },
+  {
+   "name": "_complete bash: option value after a separate option",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c3",
+    "-a1",
+    "-idw",
+    "-iworkflow:list",
+    "-i--output"
+   ]
+  },
+  {
+   "name": "_complete bash: option value after a separate option with a prefix",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c3",
+    "-a1",
+    "-idw",
+    "-iworkflow:list",
+    "-i--output",
+    "-ij"
+   ]
+  },
+  {
+   "name": "_complete bash: an option without suggestions",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-iworkflow:list",
+    "-i--namespace="
+   ]
+  },
+  {
+   "name": "_complete bash: a short option value",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-iworkflow:list",
+    "-i-s"
+   ]
+  },
+  {
+   "name": "_complete bash: a flag is not completed",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c3",
+    "-a1",
+    "-idw",
+    "-iupgrade",
+    "-i--dry-run"
+   ]
+  },
+  {
+   "name": "_complete bash: a negatable option name",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-iupgrade",
+    "-i--no-"
+   ]
+  },
+  {
+   "name": "_complete bash: global options before the command",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c3",
+    "-a1",
+    "-idw",
+    "-i-v",
+    "-iupgrade",
+    "-i--output="
+   ]
+  },
+  {
+   "name": "_complete bash: an option value before the command",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c3",
+    "-a1",
+    "-idw",
+    "-i--ansi",
+    "-iactivity:fail",
+    "-i--failure-kind="
+   ]
+  },
+  {
+   "name": "_complete bash: list namespace",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-ilist"
+   ]
+  },
+  {
+   "name": "_complete bash: list format",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-ilist",
+    "-i--format="
+   ]
+  },
+  {
+   "name": "_complete bash: help format",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-ihelp",
+    "-i--format="
+   ]
+  },
+  {
+   "name": "_complete bash: completion shell argument",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-icompletion"
+   ]
+  },
+  {
+   "name": "_complete bash: a second argument",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c3",
+    "-a1",
+    "-idw",
+    "-iworkflow:signal",
+    "-iwf"
+   ]
+  },
+  {
+   "name": "_complete bash: after all arguments",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c3",
+    "-a1",
+    "-idw",
+    "-ienv:use",
+    "-iprod"
+   ]
+  },
+  {
+   "name": "_complete bash: after a double dash",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c3",
+    "-a1",
+    "-idw",
+    "-iupgrade",
+    "-i--",
+    "-i--out"
+   ]
+  },
+  {
+   "name": "_complete bash: an unknown command",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-inope:nope"
+   ]
+  },
+  {
+   "name": "_complete bash: an unknown command's options",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-inope:nope",
+    "-i--"
+   ]
+  },
+  {
+   "name": "_complete bash: cursor on the first token",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c1",
+    "-a1",
+    "-idw",
+    "-iupgrade"
+   ]
+  },
+  {
+   "name": "_complete: unsupported API version",
+   "argv": [
+    "_complete",
+    "-sbash",
+    "-c1",
+    "-a0",
+    "-idw"
+   ]
+  },
+  {
+   "name": "_complete: deprecated symfony flag",
+   "argv": [
+    "_complete",
+    "-sbash",
+    "-c1",
+    "-S5.4",
+    "-idw"
+   ]
+  },
+  {
+   "name": "_complete: missing shell",
+   "argv": [
+    "_complete",
+    "-c1",
+    "-a1",
+    "-idw"
+   ]
+  },
+  {
+   "name": "_complete: unsupported shell",
+   "argv": [
+    "_complete",
+    "-stcsh",
+    "-c1",
+    "-a1",
+    "-idw"
+   ]
+  },
+  {
+   "name": "_complete: missing current",
+   "argv": [
+    "_complete",
+    "-sbash",
+    "-a1",
+    "-idw"
+   ]
+  },
+  {
+   "name": "_complete: zero current",
+   "argv": [
+    "_complete",
+    "-sbash",
+    "-c0",
+    "-a1",
+    "-idw"
+   ]
+  },
+  {
+   "name": "_complete: non-numeric current",
+   "argv": [
+    "_complete",
+    "-sbash",
+    "-cx",
+    "-a1",
+    "-idw"
+   ]
+  },
+  {
+   "name": "_complete: current beyond the tokens",
+   "argv": [
+    "_complete",
+    "-sbash",
+    "-c5",
+    "-a1",
+    "-idw"
+   ]
+  },
+  {
+   "name": "_complete: no tokens",
+   "argv": [
+    "_complete",
+    "-sbash",
+    "-c1",
+    "-a1"
+   ]
+  },
+  {
+   "name": "_complete: an API version older than 1",
+   "argv": [
+    "_complete",
+    "-sbash",
+    "-c1",
+    "-a0.9",
+    "-idw"
+   ]
+  },
+  {
+   "name": "doctor JSON",
+   "argv": [
+    "doctor",
+    "--output=json",
+    "--server={mock}"
+   ],
+   "mock": []
+  },
+  {
+   "name": "doctor JSONL",
+   "argv": [
+    "doctor",
+    "--output=jsonl",
+    "--server={mock}"
+   ],
+   "mock": []
+  },
+  {
+   "name": "doctor human",
+   "argv": [
+    "doctor",
+    "--server={mock}"
+   ],
+   "mock": []
+  },
+  {
+   "name": "doctor ANSI",
+   "argv": [
+    "doctor",
+    "--ansi",
+    "--server={mock}"
+   ],
+   "mock": []
+  },
+  {
+   "name": "doctor quiet",
+   "argv": [
+    "doctor",
+    "-q",
+    "--server={mock}"
+   ],
+   "mock": []
+  },
+  {
+   "name": "doctor clean with flag token",
+   "argv": [
+    "doctor",
+    "--token=parity-test-token",
+    "--output=json",
+    "--server={mock}"
+   ],
+   "mock": []
+  },
+  {
+   "name": "doctor environment connection",
+   "argv": [
+    "doctor",
+    "--output=json"
+   ],
+   "mock": [],
+   "env": {
+    "DURABLE_WORKFLOW_SERVER_URL": "{mock}",
+    "DURABLE_WORKFLOW_NAMESPACE": "env-namespace",
+    "DURABLE_WORKFLOW_AUTH_TOKEN": "parity-test-token",
+    "DURABLE_WORKFLOW_TLS_VERIFY": "false"
+   }
+  },
+  {
+   "name": "doctor flag profile",
+   "argv": [
+    "doctor",
+    "--env=prod",
+    "--output=json"
+   ],
+   "mock": [],
+   "env": {},
+   "setup": [
+    [
+     "env:set",
+     "prod",
+     "--server={mock}",
+     "--namespace=profile-ns",
+     "--token=profile-test-token",
+     "--tls-verify=false"
+    ]
+   ]
+  },
+  {
+   "name": "doctor selected profile",
+   "argv": [
+    "doctor",
+    "--output=json"
+   ],
+   "mock": [],
+   "env": {},
+   "setup": [
+    [
+     "env:set",
+     "prod",
+     "--server={mock}",
+     "--namespace=profile-ns",
+     "--token=profile-test-token",
+     "--tls-verify=false"
+    ],
+    [
+     "env:use",
+     "prod"
+    ]
+   ]
+  },
+  {
+   "name": "doctor DW_ENV profile",
+   "argv": [
+    "doctor",
+    "--output=json"
+   ],
+   "mock": [],
+   "env": {
+    "DW_ENV": "prod"
+   },
+   "setup": [
+    [
+     "env:set",
+     "prod",
+     "--server={mock}",
+     "--namespace=profile-ns",
+     "--token=profile-test-token",
+     "--tls-verify=false"
+    ]
+   ]
+  },
+  {
+   "name": "doctor profile env token present",
+   "argv": [
+    "doctor",
+    "--env=prod",
+    "--output=json"
+   ],
+   "mock": [],
+   "env": {
+    "PARITY_DOCTOR_TOKEN": "profile-env-test-token"
+   },
+   "setup": [
+    [
+     "env:set",
+     "prod",
+     "--server={mock}",
+     "--token-env=PARITY_DOCTOR_TOKEN"
+    ]
+   ]
+  },
+  {
+   "name": "doctor profile env token missing",
+   "argv": [
+    "doctor",
+    "--env=prod",
+    "--output=json"
+   ],
+   "mock": [],
+   "env": {
+    "PARITY_DOCTOR_TOKEN": ""
+   },
+   "setup": [
+    [
+     "env:set",
+     "prod",
+     "--server={mock}",
+     "--token-env=PARITY_DOCTOR_TOKEN"
+    ]
+   ]
+  },
+  {
+   "name": "doctor flag precedence",
+   "argv": [
+    "doctor",
+    "--env=prod",
+    "--namespace=flag-ns",
+    "--token=flag-test-token",
+    "--tls-verify=true",
+    "--output=json"
+   ],
+   "mock": [],
+   "env": {
+    "DURABLE_WORKFLOW_NAMESPACE": "env-ns",
+    "DURABLE_WORKFLOW_AUTH_TOKEN": "env-test-token",
+    "DURABLE_WORKFLOW_TLS_VERIFY": "false"
+   },
+   "setup": [
+    [
+     "env:set",
+     "prod",
+     "--server={mock}",
+     "--namespace=profile-ns",
+     "--token=profile-test-token",
+     "--tls-verify=false"
+    ]
+   ]
+  },
+  {
+   "name": "doctor TLS disabled",
+   "argv": [
+    "doctor",
+    "--tls-verify=false",
+    "--output=json",
+    "--server={mock}"
+   ],
+   "mock": []
+  },
+  {
+   "name": "doctor incompatible control plane",
+   "argv": [
+    "doctor",
+    "--output=json",
+    "--server={mock}"
+   ],
+   "mock": [
+    [
+     [
+      "control_plane",
+      "version"
+     ],
+     "3"
+    ]
+   ]
+  },
+  {
+   "name": "doctor incompatible worker protocol",
+   "argv": [
+    "doctor",
+    "--output=json",
+    "--server={mock}"
+   ],
+   "mock": [
+    [
+     [
+      "worker_protocol",
+      "version"
+     ],
+     "99.0"
+    ]
+   ]
+  },
+  {
+   "name": "doctor missing protocol metadata",
+   "argv": [
+    "doctor",
+    "--output=json",
+    "--server={mock}"
+   ],
+   "mock": [
+    [
+     [
+      "control_plane"
+     ],
+     null
+    ],
+    [
+     [
+      "worker_protocol"
+     ],
+     null
+    ],
+    [
+     [
+      "auth_composition_contract"
+     ],
+     null
+    ]
+   ]
+  },
+  {
+   "name": "doctor malformed protocol metadata",
+   "argv": [
+    "doctor",
+    "--output=json",
+    "--server={mock}"
+   ],
+   "mock": [
+    [
+     [
+      "version"
+     ],
+     false
+    ],
+    [
+     [
+      "server_id"
+     ],
+     {}
+    ],
+    [
+     [
+      "auth_composition_contract"
+     ],
+     []
+    ],
+    [
+     [
+      "control_plane"
+     ],
+     []
+    ],
+    [
+     [
+      "worker_protocol"
+     ],
+     {
+      "version": 7,
+      "invocable_carrier_contract": {
+       "version": true,
+       "scope": {
+        "task_kinds": {
+         "x": "activity_task"
+        }
+       }
+      },
+      "external_task_input_contract": {
+       "version": "2x",
+       "fixtures": {
+        "unknown": {},
+        "activity_task": {}
+       }
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "name": "doctor native published metadata",
+   "argv": [
+    "doctor",
+    "--output=json",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/cluster/info": {
+     "body": {
+      "server_id": "9b667a0d792b",
+      "version": "3.0.5",
+      "implementation": "rust",
+      "control_plane": {
+       "version": "2",
+       "request_contract": {
+        "schema": "durable-workflow.v2.control-plane-request.contract",
+        "version": 1,
+        "operations": {
+         "list": {
+          "fields": {
+           "status": {
+            "canonical_values": [
+             "running",
+             "completed",
+             "failed"
+            ],
+            "rejected_aliases": {
+             "cancelled": "failed",
+             "terminated": "failed",
+             "pending": "running",
+             "waiting": "running"
+            }
+           }
+          }
+         },
+         "update": {
+          "fields": {
+           "wait_for": {
+            "canonical_values": [
+             "accepted",
+             "completed"
+            ]
+           },
+           "wait_timeout_seconds": {
+            "minimum": 1,
+            "maximum": 60
+           }
+          }
+         }
+        }
+       }
+      },
+      "worker_protocol": {
+       "version": "1.20"
+      },
+      "auth_composition_contract": {
+       "schema": "durable-workflow.v2.auth-composition.contract",
+       "version": 1,
+       "scope": "external_execution_carriers",
+       "unknown_field_policy": "ignore_additive_reject_unknown_required",
+       "precedence": {
+        "connection_values": [
+         "flag",
+         "environment",
+         "selected_profile",
+         "default"
+        ],
+        "profile_selection": [
+         "flag_env",
+         "DW_ENV",
+         "current_profile",
+         "default_profile"
+        ],
+        "notes": [
+         "flags win only for the current invocation",
+         "environment values are portable carrier inputs and must not be persisted by default",
+         "selected profile values are persisted configuration, but secret fields should be references",
+         "defaults are explicit and must appear in effective-config diagnostics"
+        ]
+       },
+       "canonical_environment": {
+        "server_url": "DURABLE_WORKFLOW_SERVER_URL",
+        "namespace": "DURABLE_WORKFLOW_NAMESPACE",
+        "auth_token": "DURABLE_WORKFLOW_AUTH_TOKEN",
+        "tls_verify": "DURABLE_WORKFLOW_TLS_VERIFY",
+        "profile": "DW_ENV"
+       },
+       "auth_material": {
+        "token": {
+         "status": "supported",
+         "transport": "bearer_authorization_header",
+         "persisted_as": "secret_reference_or_profile_env_reference",
+         "effective_config_value": "redacted"
+        },
+        "mtls": {
+         "status": "reserved",
+         "persisted_as": "certificate_and_key_references",
+         "effective_config_value": "references_only"
+        },
+        "signed_headers": {
+         "status": "reserved",
+         "persisted_as": "key_reference_and_header_allowlist",
+         "effective_config_value": "references_only"
+        },
+        "extensions": {
+         "status": "reserved",
+         "rule": "new auth material types must define redaction, persistence, and source precedence before use"
+        }
+       },
+       "effective_config": {
+        "required_fields": [
+         "server_url",
+         "namespace",
+         "profile",
+         "auth",
+         "tls",
+         "identity"
+        ],
+        "source_values": [
+         "flag",
+         "environment",
+         "selected_profile",
+         "profile_env",
+         "default",
+         "server"
+        ],
+        "field_contracts": {
+         "server_url": {
+          "value": "normalized_absolute_url",
+          "source": "one_of_source_values"
+         },
+         "namespace": {
+          "value": "non_empty_namespace_name",
+          "source": "one_of_source_values"
+         },
+         "profile": {
+          "name": "nullable_string",
+          "source": "flag_env_or_DW_ENV_or_current_profile_or_default_profile"
+         },
+         "auth": {
+          "type": "token_or_mtls_or_signed_headers_or_none",
+          "source": "one_of_source_values",
+          "value": "redacted_or_reference_only"
+         },
+         "tls": {
+          "verify": "boolean",
+          "source": "one_of_source_values"
+         },
+         "identity": {
+          "subject": "nullable_string",
+          "roles": "list_of_strings",
+          "source": "server_or_carrier"
+         }
+        }
+       },
+       "redaction": {
+        "never_echo": [
+         "bearer_tokens",
+         "private_keys",
+         "shared_signature_keys",
+         "client_certificate_private_key_material",
+         "raw_authorization_headers"
+        ],
+        "allowed_diagnostics": [
+         "redacted",
+         "secret_reference_name",
+         "environment_variable_name",
+         "profile_name",
+         "certificate_reference_name",
+         "key_reference_name"
+        ]
+       },
+       "resolution": {
+        "server_url": "carriers normalize and use the winning absolute URL without appending hidden path defaults",
+        "namespace": "carriers send the winning namespace explicitly when the protocol supports namespace headers",
+        "identity": "servers may report authenticated subject and roles; carriers must treat identity as server-asserted when present",
+        "tls": "carriers must fail closed on invalid TLS unless the winning tls.verify value is false"
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "doctor HTTP 401",
+   "argv": [
+    "doctor",
+    "--output=json",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/cluster/info": {
+     "status": 401,
+     "body": {
+      "message": "Synthetic diagnostic refusal"
+     }
+    }
+   }
+  },
+  {
+   "name": "doctor HTTP 403",
+   "argv": [
+    "doctor",
+    "--output=json",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/cluster/info": {
+     "status": 403,
+     "body": {
+      "message": "Synthetic diagnostic refusal"
+     }
+    }
+   }
+  },
+  {
+   "name": "doctor HTTP 404",
+   "argv": [
+    "doctor",
+    "--output=json",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/cluster/info": {
+     "status": 404,
+     "body": {
+      "message": "Synthetic diagnostic refusal"
+     }
+    }
+   }
+  },
+  {
+   "name": "doctor HTTP 422",
+   "argv": [
+    "doctor",
+    "--output=json",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/cluster/info": {
+     "status": 422,
+     "body": {
+      "message": "Synthetic diagnostic refusal"
+     }
+    }
+   }
+  },
+  {
+   "name": "doctor HTTP 500",
+   "argv": [
+    "doctor",
+    "--output=json",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/cluster/info": {
+     "status": 500,
+     "body": {
+      "message": "Synthetic diagnostic refusal"
+     }
+    }
+   }
+  },
+  {
+   "name": "doctor unreachable JSON",
+   "argv": [
+    "doctor",
+    "--server=http://127.0.0.1:9",
+    "--output=json"
+   ]
+  },
+  {
+   "name": "doctor unreachable human",
+   "argv": [
+    "doctor",
+    "--server=http://127.0.0.1:9"
+   ]
+  },
+  {
    "name": "native runtime report",
    "argv": [
     "runtime:check"

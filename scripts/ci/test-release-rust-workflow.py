@@ -579,18 +579,31 @@ class ReleaseRustWorkflowTest(unittest.TestCase):
             notes = Path(directory) / "release/release-notes.md"
             return result.returncode, notes.read_text(encoding="utf-8") if notes.exists() else None
 
-    def test_a_prerelease_uses_its_own_notes(self):
+    def test_a_prerelease_uses_only_its_own_notes(self):
         files = {"2.5.0.md": "stable", "2.5.0-rc.1.md": "preview"}
         self.assertEqual((0, "preview"), self.run_notes_step("2.5.0-rc.1", files))
-        self.assertEqual((0, "stable"), self.run_notes_step("2.5.0-rc.2", files))
+        # A prerelease without its own notes fails closed; it never borrows
+        # the stable notes.
+        self.assertEqual((1, None), self.run_notes_step("2.5.0-rc.2", files))
         self.assertEqual((0, "stable"), self.run_notes_step("2.5.0", files))
         self.assertEqual(1, self.run_notes_step("2.6.0", files)[0])
 
-    def test_the_rc1_notes_say_it_is_not_a_usable_release(self):
-        notes = (ROOT / "docs/release-notes/2.5.0-rc.1.md").read_text(encoding="utf-8")
-        for claim in ("not a usable release", "Do not install it", "never selected automatically",
-                      "not published to any tap", "immutable"):
-            self.assertIn(claim, notes)
+    def test_every_rc_notes_file_says_it_is_not_a_usable_release(self):
+        files = sorted((ROOT / "docs/release-notes").glob("*-rc.*.md"))
+        self.assertTrue(files)
+        for path in files:
+            notes = path.read_text(encoding="utf-8")
+            version = path.name.removesuffix(".md")
+            self.assertTrue(notes.startswith(f"Durable Workflow CLI {version} "), path.name)
+            for claim in ("not a usable release", "Do not install it", "never selected automatically",
+                          "not published to any tap", "immutable", f"`dw upgrade --tag {version}`"):
+                self.assertIn(claim, notes, path.name)
+
+    def test_the_crate_version_has_its_notes(self):
+        crate = re.search(r'^version = "([^"]+)"', (ROOT / "rust/Cargo.toml").read_text(encoding="utf-8"), re.M).group(1)
+        core = crate.split("-")[0]
+        if crate != core and not crate.endswith("-dev"):
+            self.assertTrue((ROOT / f"docs/release-notes/{crate}.md").is_file(), crate)
 
     def test_every_installer_run_puts_its_install_directory_on_path(self):
         # install.sh exits 1 ("not ready") when the install directory is not

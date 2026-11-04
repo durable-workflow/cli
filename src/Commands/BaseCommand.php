@@ -20,6 +20,7 @@ use DurableWorkflow\Cli\Support\ServerHttpException;
 use DurableWorkflow\Cli\Support\TimeoutException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Exception\ExceptionInterface as ConsoleException;
+use Symfony\Component\Console\Formatter\OutputFormatter;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\ConsoleOutputInterface;
@@ -28,6 +29,10 @@ use Symfony\Component\Console\Output\OutputInterface;
 abstract class BaseCommand extends Command
 {
     private const INPUT_ENCODINGS = ['json', 'raw', 'base64'];
+
+    private const COMMAND_REQUEST_ID_MAX_CHARACTERS = 255;
+
+    private const REQUEST_ID_CONFLICT_REASON = 'request_id_conflict';
 
     private const NAMESPACE_SCOPED_COMMAND_NAMES = [
         'activity:complete',
@@ -121,6 +126,12 @@ abstract class BaseCommand extends Command
     private mixed $serverClientFactory = null;
 
     private ?ProfileStore $profileStore = null;
+
+    /**
+     * The durable command key sent with the current signal or update request,
+     * remembered so error output can name it when the response is lost.
+     */
+    private ?string $commandRequestId = null;
 
     protected function configure(): void
     {
@@ -397,10 +408,10 @@ abstract class BaseCommand extends Command
                 value: $value,
                 optionName: $optionName,
             );
+        } catch (ServerException|InvalidOptionException $exception) {
+            throw $exception;
         } catch (\RuntimeException $exception) {
-            $this->writeHumanError($output, $exception->getMessage());
-
-            return false;
+            throw new InvalidOptionException($exception->getMessage(), 0, $exception);
         }
 
         return true;
@@ -582,7 +593,7 @@ abstract class BaseCommand extends Command
      */
     protected function renderJson(OutputInterface $output, array $data): int
     {
-        $output->writeln(json_encode($data, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+        $output->writeln(json_encode($data, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR), OutputInterface::OUTPUT_RAW);
 
         return Command::SUCCESS;
     }
@@ -607,7 +618,7 @@ abstract class BaseCommand extends Command
         if ($this->outputMode($input) === OutputMode::JSONL) {
             $items = $envelope[$itemsKey] ?? [];
             foreach ($items as $item) {
-                $output->writeln(json_encode($item, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+                $output->writeln(json_encode($item, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR), OutputInterface::OUTPUT_RAW);
             }
 
             return Command::SUCCESS;
@@ -661,6 +672,75 @@ abstract class BaseCommand extends Command
         }
 
         return $payload;
+    }
+
+    /**
+     * Resolve the durable command key for a signal or update request: the
+     * explicit `--request-id` value when one was given, otherwise one key
+     * generated for this invocation. The key is remembered so a lost or
+     * conflicting response can still name it for a retry.
+     *
+     * @param string $commandKind `signal` or `update`
+     */
+    protected function commandRequestId(InputInterface $input, string $commandKind): string
+    {
+        $this->commandRequestId = null;
+
+        $explicit = $input->hasOption('request-id') ? $input->getOption('request-id') : null;
+
+        if ($explicit !== null || $input->hasParameterOption('--request-id', true)) {
+            if (! is_scalar($explicit)) {
+                throw new InvalidOptionException('--request-id must not be empty or whitespace-only.');
+            }
+            $explicit = (string) $explicit;
+
+            $characters = preg_match_all('/./us', $explicit);
+            if ($characters === false) {
+                throw new InvalidOptionException('--request-id must be valid UTF-8.');
+            }
+            if ($this->isBlankCommandRequestId($explicit)) {
+                throw new InvalidOptionException('--request-id must not be empty or whitespace-only.');
+            }
+            if ($characters > self::COMMAND_REQUEST_ID_MAX_CHARACTERS) {
+                throw new InvalidOptionException(sprintf(
+                    '--request-id must be 1 to %d Unicode characters; got %d characters.',
+                    self::COMMAND_REQUEST_ID_MAX_CHARACTERS,
+                    $characters,
+                ));
+            }
+
+            return $this->commandRequestId = $explicit;
+        }
+
+        return $this->commandRequestId = sprintf('cli-%s-%s', $commandKind, bin2hex(random_bytes(16)));
+    }
+
+    private function isBlankCommandRequestId(string $value): bool
+    {
+        return trim($value) === '' || preg_match('/\A[\s\p{Z}]*\z/u', $value) === 1;
+    }
+
+    /**
+     * Print the command key and, when the server reported them, the retained
+     * receipt flags so an operator can retry with the same key.
+     *
+     * @param array<string, mixed> $result
+     */
+    protected function writeCommandReceiptLines(OutputInterface $output, array $result): void
+    {
+        if ($this->hasNonEmptyString($result['request_id'] ?? null)) {
+            $output->writeln('  Request ID: '.$this->humanOutputText($result['request_id']));
+        }
+
+        if (is_bool($result['retained'] ?? null)) {
+            $output->writeln('  Retained: '.($result['retained']
+                ? 'yes (original receipt returned for this request id)'
+                : 'no'));
+        }
+
+        if (is_bool($result['intent_verified'] ?? null)) {
+            $output->writeln('  Intent Verified: '.($result['intent_verified'] ? 'yes' : 'no'));
+        }
     }
 
     /**
@@ -871,6 +951,8 @@ abstract class BaseCommand extends Command
             'update_name',
             'update_id',
             'request_id',
+            'retained',
+            'intent_verified',
             'outcome',
             'reason',
             'rejection_reason',
@@ -926,6 +1008,8 @@ abstract class BaseCommand extends Command
             'update_name',
             'update_id',
             'request_id',
+            'retained',
+            'intent_verified',
             'state',
             'update_state',
             'outcome',
@@ -1136,13 +1220,14 @@ abstract class BaseCommand extends Command
         }
 
         if ($jsonRequested) {
-            $output->writeln($this->encodeErrorEnvelope($e, $exitCode, $input));
+            $output->writeln($this->encodeErrorEnvelope($e, $exitCode, $input), OutputInterface::OUTPUT_RAW);
 
             return $exitCode;
         }
 
         $this->writeHumanError($output, $e->getMessage());
         $this->writeHumanErrorNamespaceContext($output, $input);
+        $this->writeHumanErrorRequestIdContext($output, $input);
         $this->writeHumanHttpErrorDetails($output, $e);
 
         $recommendations = $this->errorRecommendations($e, $input);
@@ -1247,6 +1332,12 @@ abstract class BaseCommand extends Command
             'rejection_reason',
             'rejection_category',
             'request_id',
+            'retained',
+            'intent_verified',
+            'retained_command_id',
+            'retained_command_type',
+            'retained_outcome',
+            'conflict',
             'workflow_sequence',
             'result',
             'result_envelope',
@@ -1295,7 +1386,12 @@ abstract class BaseCommand extends Command
     private function writeHumanError(OutputInterface $output, string $message): void
     {
         $target = $output instanceof ConsoleOutputInterface ? $output->getErrorOutput() : $output;
-        $target->writeln('<error>'.$message.'</error>');
+        $target->writeln('<error>'.$this->humanOutputText($message).'</error>');
+    }
+
+    private function humanOutputText(string $text): string
+    {
+        return OutputFormatter::escape(preg_replace('/[\x00-\x1F\x7F\x{80}-\x{9F}]/u', ' ', $text) ?? '-');
     }
 
     private function writeHumanErrorNamespaceContext(OutputInterface $output, InputInterface $input): void
@@ -1309,6 +1405,17 @@ abstract class BaseCommand extends Command
         $target->writeln('Namespace: '.$namespace);
     }
 
+    private function writeHumanErrorRequestIdContext(OutputInterface $output, InputInterface $input): void
+    {
+        $requestId = $this->errorRequestIdContext($input);
+        if ($requestId === null) {
+            return;
+        }
+
+        $target = $output instanceof ConsoleOutputInterface ? $output->getErrorOutput() : $output;
+        $target->writeln('Request ID: '.$this->humanOutputText($requestId));
+    }
+
     private function writeHumanHttpErrorDetails(OutputInterface $output, \Throwable $e): void
     {
         if (! $e instanceof ServerHttpException) {
@@ -1318,17 +1425,10 @@ abstract class BaseCommand extends Command
         $target = $output instanceof ConsoleOutputInterface ? $output->getErrorOutput() : $output;
 
         if ($e->reason() !== null) {
-            $target->writeln('Reason: '.$e->reason());
+            $target->writeln('Reason: '.$this->humanOutputText($e->reason()));
         }
 
-        if ($e->body !== null) {
-            foreach (['code', 'error_code', 'type', 'rejection_reason'] as $key) {
-                $value = $e->body[$key] ?? null;
-                if (is_string($value) && $value !== '') {
-                    $target->writeln(str_replace('_', ' ', ucfirst($key)).': '.$value);
-                }
-            }
-        }
+        $this->writeHumanHttpErrorBody($target, $e);
 
         $validationErrors = $e->validationErrors();
         if ($validationErrors === null) {
@@ -1336,7 +1436,27 @@ abstract class BaseCommand extends Command
         }
 
         foreach ($this->flattenValidationErrors($validationErrors) as $message) {
-            $target->writeln('Validation: '.$message);
+            $target->writeln('Validation: '.$this->humanOutputText($message));
+        }
+    }
+
+    private function writeHumanHttpErrorBody(OutputInterface $output, ServerHttpException $e): void
+    {
+        if ($e->body === null) {
+            return;
+        }
+
+        foreach (['code', 'error_code', 'type', 'rejection_reason'] as $key) {
+            $value = $e->body[$key] ?? null;
+            if (is_string($value) && $value !== '') {
+                $output->writeln(str_replace('_', ' ', ucfirst($key)).': '.$this->humanOutputText($value));
+            }
+        }
+
+        if ($e->reason() === self::REQUEST_ID_CONFLICT_REASON) {
+            foreach ($this->requestIdConflictLines($e->body) as $line) {
+                $output->writeln($this->humanOutputText($line));
+            }
         }
     }
 
@@ -1382,19 +1502,19 @@ abstract class BaseCommand extends Command
 
     private function errorRequestIdContext(InputInterface $input): ?string
     {
-        if (! $input->hasOption('request-id')) {
-            return null;
+        if ($this->commandRequestId !== null) {
+            return $this->commandRequestId;
         }
 
-        $requestId = $input->getOption('request-id');
+        $requestId = $input->hasOption('request-id') ? $input->getOption('request-id') : null;
 
         if (! is_scalar($requestId)) {
             return null;
         }
 
-        $requestId = trim((string) $requestId);
+        $requestId = (string) $requestId;
 
-        return $requestId === '' ? null : $requestId;
+        return $this->isBlankCommandRequestId($requestId) || preg_match('//u', $requestId) !== 1 ? null : $requestId;
     }
 
     /**
@@ -1420,7 +1540,7 @@ abstract class BaseCommand extends Command
 
         $request = array_filter([
             'wait_for' => $this->stringOptionContext($input, 'wait') ?? (is_scalar($envelope['wait_for'] ?? null) ? (string) $envelope['wait_for'] : 'accepted'),
-            'request_id' => $this->stringOptionContext($input, 'request-id') ?? (is_scalar($envelope['request_id'] ?? null) ? (string) $envelope['request_id'] : null),
+            'request_id' => $this->errorRequestIdContext($input) ?? (is_scalar($envelope['request_id'] ?? null) ? (string) $envelope['request_id'] : null),
             'input' => $this->workflowUpdateInputContext($input),
         ], static fn (mixed $value): bool => $value !== null);
 
@@ -1556,10 +1676,10 @@ abstract class BaseCommand extends Command
         $target->writeln('Next steps:');
 
         foreach ($recommendations as $recommendation) {
-            $target->writeln('  - '.$recommendation['message']);
+            $target->writeln('  - '.$this->humanOutputText($recommendation['message']));
 
             if (isset($recommendation['command'])) {
-                $target->writeln('    Try: '.$recommendation['command']);
+                $target->writeln('    Try: '.$this->humanOutputText($recommendation['command']));
             }
         }
     }
@@ -1575,47 +1695,129 @@ abstract class BaseCommand extends Command
      */
     private function errorRecommendations(\Throwable $e, ?InputInterface $input): array
     {
-        if ($e instanceof NetworkException) {
-            return [[
+        $recommendations = $this->baseErrorRecommendations($e, $input);
+
+        $retry = $this->requestIdRetryRecommendation($e);
+        if ($retry !== null) {
+            $recommendations[] = $retry;
+        }
+
+        return $recommendations;
+    }
+
+    /**
+     * When the outcome of a keyed signal or update is unknown (transport
+     * failure or a server-side error), default to inspection. A transport
+     * failure does not establish the Server's retained-admission capability.
+     *
+     * @return array{id: string, severity: string, message: string}|null
+     */
+    private function requestIdRetryRecommendation(\Throwable $e): ?array
+    {
+        if ($this->commandRequestId === null) {
+            return null;
+        }
+
+        $uncertain = $e instanceof NetworkException
+            || $e instanceof TimeoutException
+            || ($e instanceof ServerHttpException && $e->statusCode >= 500 && $e->statusCode <= 599);
+
+        if (! $uncertain) {
+            return null;
+        }
+
+        return [
+            'id' => 'request_id.retry',
+            'severity' => 'error',
+            'message' => 'The outcome of this command is unknown. Inspect workflow history and command receipts before retrying. Keep the exact request ID; use --json for an exact copy. Retry with the same key only if the Server advertises retained command admission; a request ID alone does not prevent duplicates.',
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $body
+     * @return list<string>
+     */
+    private function requestIdConflictLines(array $body): array
+    {
+        $lines = [];
+
+        $retained = array_filter([
+            'id' => $this->nonEmptyScalarString($body['retained_command_id'] ?? null),
+            'type' => $this->nonEmptyScalarString($body['retained_command_type'] ?? null),
+            'outcome' => $this->nonEmptyScalarString($body['retained_outcome'] ?? null),
+        ], static fn (?string $value): bool => $value !== null);
+
+        if ($retained !== []) {
+            $lines[] = 'Retained command: '.implode(', ', array_map(
+                static fn (string $field, string $value): string => $field.' '.$value,
+                array_keys($retained),
+                $retained,
+            ));
+        }
+
+        $conflict = $this->requestIdConflictParts($body);
+        if ($conflict !== []) {
+            $lines[] = 'Conflicting parts: '.implode(', ', $conflict);
+        }
+
+        return $lines;
+    }
+
+    /**
+     * @param array<string, mixed> $body
+     * @return list<string>
+     */
+    private function requestIdConflictParts(array $body): array
+    {
+        $conflict = $body['conflict'] ?? null;
+        if (! is_array($conflict)) {
+            return [];
+        }
+
+        $parts = [];
+        foreach ($conflict as $part) {
+            $value = $this->nonEmptyScalarString($part);
+            if ($value !== null) {
+                $parts[] = $value;
+            }
+        }
+
+        return $parts;
+    }
+
+    /**
+     * @return list<array{id: string, severity: string, message: string, command?: string}>
+     */
+    private function baseErrorRecommendations(\Throwable $e, ?InputInterface $input): array
+    {
+        return match (true) {
+            $e instanceof NetworkException => [[
                 'id' => 'server.unreachable',
                 'severity' => 'error',
                 'message' => 'Check the server URL, DNS, port, and TLS settings for the selected environment.',
                 'command' => $this->doctorCommand($input),
-            ]];
-        }
-
-        if ($e instanceof TimeoutException) {
-            return [[
+            ]],
+            $e instanceof TimeoutException => [[
                 'id' => 'server.timeout',
                 'severity' => 'error',
                 'message' => 'Check server load and network reachability, then retry with a smaller request or narrower query.',
                 'command' => $this->doctorCommand($input),
-            ]];
-        }
-
-        if ($e instanceof ServerHttpException) {
-            return $this->httpErrorRecommendations($e, $input);
-        }
-
-        if ($e instanceof CompatibilityException) {
-            return [[
+            ]],
+            $e instanceof ServerHttpException => $this->httpErrorRecommendations($e, $input),
+            $e instanceof CompatibilityException => [[
                 'id' => 'compatibility.unsupported',
                 'severity' => 'error',
                 'message' => $e->nextStep(),
                 'command' => $this->doctorCommand($input),
-            ]];
-        }
-
-        if ($e instanceof InvalidOptionException) {
-            return [[
+            ]],
+            $e instanceof InvalidOptionException => [[
                 'id' => 'input.invalid',
                 'severity' => 'error',
                 'message' => 'Review the command usage and option values before retrying.',
                 'command' => sprintf('dw %s --help', (string) $this->getName()),
-            ]];
-        }
-
-        return [];
+            ]],
+            default => [],
+        };
     }
 
     /**
@@ -1638,6 +1840,25 @@ abstract class BaseCommand extends Command
                 'severity' => 'error',
                 'message' => 'Check the namespace, workflow/run identifiers, and selected environment.',
                 'command' => sprintf('dw %s --help', (string) $this->getName()),
+            ]];
+        }
+
+        if ($e->statusCode === 409 && $e->reason() === self::REQUEST_ID_CONFLICT_REASON) {
+            $body = $e->body ?? [];
+            $requestId = $this->nonEmptyScalarString($body['request_id'] ?? null)
+                ?? ($input !== null ? $this->errorRequestIdContext($input) : null)
+                ?? 'given';
+            $parts = $this->requestIdConflictParts($body);
+
+            return [[
+                'id' => 'request_id.conflict',
+                'severity' => 'error',
+                'message' => sprintf(
+                    'Request id [%s] already identifies a %s command with a different %s. Repeat that original command unchanged to read its receipt, or pass a new --request-id to record a new command.',
+                    $requestId,
+                    $this->nonEmptyScalarString($body['retained_command_type'] ?? null) ?? 'retained',
+                    $parts === [] ? 'intent' : implode('/', $parts),
+                ),
             ]];
         }
 

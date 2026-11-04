@@ -29,6 +29,28 @@ use Symfony\Component\Console\Tester\CommandTester;
  */
 class OutputContractTest extends TestCase
 {
+    public function test_json_and_jsonl_preserve_opaque_values_with_or_without_color(): void
+    {
+        $value = "wf-<info>opaque</info><href=https://example.invalid>link</>\x1B]0;title\x07\nend";
+        foreach (['json', 'jsonl'] as $mode) {
+            foreach ([false, true] as $decorated) {
+                $command = new WorkflowListCommand();
+                $command->setServerClient(new OutputContractListClient([
+                    'workflows' => [['workflow_id' => $value, 'status' => 'running']],
+                    'next_page_token' => $value,
+                ]));
+                $tester = new CommandTester($command);
+                self::assertSame(0, $tester->execute(['--output' => $mode], ['decorated' => $decorated]));
+                $display = trim($tester->getDisplay());
+                self::assertSame(1, substr_count($display, "\n") + 1);
+                $decoded = json_decode($display, true, flags: JSON_THROW_ON_ERROR);
+                $item = $mode === 'json' ? $decoded['workflows'][0] : $decoded;
+                self::assertSame($value, $item['workflow_id']);
+                if ($mode === 'json') { self::assertSame($value, $decoded['next_page_token']); }
+            }
+        }
+    }
+
     public function test_json_mode_emits_single_json_document_for_list_command(): void
     {
         $command = new WorkflowListCommand();

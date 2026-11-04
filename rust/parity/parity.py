@@ -209,11 +209,41 @@ def prepare_project(config_dir, options, env):
     return project
 
 
+def normalize_schema_manifest(text, case, side):
+    """Allow only reviewed, directional schema hash updates; retain all other bytes."""
+    if case.get("argv") != ["schema:manifest"] or not isinstance(text, str):
+        return text
+    try:
+        manifest = json.loads(text)
+    except ValueError:
+        return text
+    if (not isinstance(manifest, dict)
+            or manifest.get("schema") != "durable-workflow.cli.output-schema-manifest"
+            or manifest.get("version") != 3
+            or not isinstance(manifest.get("commands"), dict)):
+        return text
+    for command, update in case.get("schema_sha256_updates", {}).items():
+        digest = update[side]
+        entry = manifest["commands"].get(command)
+        if (isinstance(entry, dict) and entry.get("sha256") == digest
+                and text.count(digest) == 1):
+            text = text.replace(digest, f"<reviewed-schema-sha256:{command}>")
+    return text
+
+
 def compare(reference, candidate, case):
     fields = ["exit_code", "stderr_category", "stderr", "stdout_json", "config"]
     if case.get("compare_text", True):
         fields.append("stdout_text")
-    return [field for field in fields if reference[field] != candidate[field]]
+    differences = []
+    for field in fields:
+        left, right = reference[field], candidate[field]
+        if field == "stdout_text" and case.get("schema_sha256_updates"):
+            left = normalize_schema_manifest(left, case, "reference")
+            right = normalize_schema_manifest(right, case, "candidate")
+        if left != right:
+            differences.append(field)
+    return differences
 
 
 def patched_cluster_info(patches):

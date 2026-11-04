@@ -550,7 +550,7 @@
       "schema": "schemas/output/workflow-signal.schema.json",
       "schema_id": "https://durable-workflow.github.io/cli-json-envelopes/v3/schemas/workflow-signal.schema.json",
       "resolver_url": "https://durable-workflow.github.io/cli-json-envelopes/v3/schemas/workflow-signal.schema.json",
-      "sha256": "sha256:c42c02f7a54faa082982028482bc231ca29c495a2a00fabce5b0ae580a2505bf"
+      "sha256": "sha256:5a5fe23d6a1bead8508887b57b1dfb58448b92ed4292ce0da88bcdd1abf37e81"
     },
     "workflow:start": {
       "output": "--json",
@@ -571,7 +571,7 @@
       "schema": "schemas/output/workflow-update.schema.json",
       "schema_id": "https://durable-workflow.github.io/cli-json-envelopes/v3/schemas/workflow-update.schema.json",
       "resolver_url": "https://durable-workflow.github.io/cli-json-envelopes/v3/schemas/workflow-update.schema.json",
-      "sha256": "sha256:a3997a4b623d84b166ea3a124b0a33e5c400acc51694332186813b96aa389eb1"
+      "sha256": "sha256:8888b18ff8d8ef7cac35f2aae362192b04617dc28760c25ddccf085880c3e25c"
     }
   },
   "jsonl_commands": {

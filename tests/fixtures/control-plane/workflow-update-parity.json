@@ -22,10 +22,12 @@
       "workflow-id": "wf-polyglot-231",
       "update-name": "quota.adjust",
       "--wait": "completed",
+      "--request-id": "cli-update-polyglot-231",
       "--input": "[{\"quota\":50,\"reason\":\"gold-tier\"}]"
     },
     "expected_body": {
       "wait_for": "completed",
+      "request_id": "cli-update-polyglot-231",
       "input": [
         {
           "quota": 50,

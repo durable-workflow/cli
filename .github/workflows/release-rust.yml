@@ -431,6 +431,9 @@ jobs:
           set -euo pipefail
           release_base="https://github.com/${GITHUB_REPOSITORY}/releases"
           install_dir="$(mktemp -d)"
+          # The installer reports "not ready" (and exits 1) unless the install
+          # directory is on PATH, as it would be for a real user.
+          export PATH="$install_dir:$PATH"
           curl --proto '=https' --tlsv1.2 -fsSL --retry 3 --retry-all-errors -o "$RUNNER_TEMP/install.sh" \
             "$release_base/download/$RELEASE_TAG/install.sh"
           VERSION="$RELEASE_TAG" DURABLE_WORKFLOW_INSTALL_DIR="$install_dir" \

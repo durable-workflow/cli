@@ -592,6 +592,21 @@ class ReleaseRustWorkflowTest(unittest.TestCase):
                       "not published to any tap", "immutable"):
             self.assertIn(claim, notes)
 
+    def test_every_installer_run_puts_its_install_directory_on_path(self):
+        # install.sh exits 1 ("not ready") when the install directory is not
+        # on PATH; rc.1's verify-release failed this way.
+        runs = 0
+        for name, job in self.all_jobs():
+            for step in job.get("steps", []):
+                script = step.get("run", "")
+                for match in re.finditer(r'DURABLE_WORKFLOW_INSTALL_DIR="\$([A-Za-z_]+)"', script):
+                    runs += 1
+                    variable = match.group(1)
+                    exported = script.find(f'export PATH="${variable}:')
+                    self.assertNotEqual(-1, exported, f"{name}: {step.get('name')} never puts ${variable} on PATH")
+                    self.assertLess(exported, match.start(), f"{name}: {step.get('name')} exports PATH after installing")
+        self.assertGreaterEqual(runs, 1)
+
     def test_no_phar_is_published(self):
         assemble = "\n".join(s.get("run", "") for s in self.build["jobs"]["assemble"]["steps"])
         publish = "\n".join(s.get("run", "") for s in self.steps("publish"))

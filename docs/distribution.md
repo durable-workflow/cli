@@ -17,8 +17,8 @@ CLI talks to the configured server and nothing else.
 | One-line installer (`install.sh` / `install.ps1`) | Most users | SHA256 against the release `SHA256SUMS` manifest, optional GitHub artifact attestation when `gh` is installed and `DURABLE_WORKFLOW_INSTALL_VERIFY_ATTESTATIONS=1` is set. |
 | Exact-version installer (`VERSION=<tag>`) | CI, conformance, and reproducible automation | Same checksum and optional attestation path as the one-line installer, pinned to a named release tag. |
 | Direct download from the GitHub release | Operators bringing their own automation | `verify-release.sh` (bundled with each tagged release) plus `gh attestation verify` for end-to-end provenance. |
-| Homebrew formula (`dw.rb`) | macOS users on Homebrew (arm64; Intel from 2.5.0) | The release-bundled formula pins the exact release URL and SHA256; `brew install` verifies the checksum before linking. |
-| PHAR (`dw.phar`) plus a system PHP, releases before 2.5.0 only | PHP-aware operators on 2.x | Same `SHA256SUMS` plus attestation surface as the native binaries. |
+| Homebrew formula (`dw.rb`) | macOS arm64 users on Homebrew | The release-bundled formula pins the exact release URL and SHA256; `brew install` verifies the checksum before linking. |
+| PHAR (`dw.phar`) plus a system PHP | PHP-aware operators | Same `SHA256SUMS` plus attestation surface as the native binaries. |
 
 The one-line installer is the recommended path on every supported platform.
 Both `install.sh` and `install.ps1` download the matching `SHA256SUMS` manifest,
@@ -61,9 +61,8 @@ The provenance boundary for the 2.0 line is:
    `durable-workflow/cli`. The release workflow runs only on
    `refs/tags/<MAJOR>.<MINOR>.<PATCH>*`.
 2. **`SHA256SUMS`** — generated inside the release workflow over every
-   supported release asset for the tag (Linux x86_64, Linux aarch64,
-   macOS aarch64, Windows x86_64, macOS x86_64 from 2.5.0, the PHAR
-   before 2.5.0, the installer scripts, the
+   supported release asset for the tag (PHAR, Linux x86_64, Linux
+   aarch64, macOS aarch64, Windows x86_64, the installer scripts, the
    `verify-release.sh` helper, and the generated Homebrew formula).
 3. **GitHub artifact attestations** — the release workflow signs every
    asset (including `SHA256SUMS`) with the GitHub Actions OIDC identity
@@ -347,8 +346,7 @@ reproducibility regression — please open a release-blocking issue.
 ## Homebrew install path
 
 The release workflow generates `dw.rb`, a Homebrew formula that pins the
-exact release URL and SHA256 of `dw-macos-aarch64` (and, from 2.5.0,
-`dw-macos-x86_64` in an `on_intel` block), and publishes it as
+exact release URL and SHA256 of `dw-macos-aarch64`, and publishes it as
 a release asset alongside the binary. Operators who consume the CLI via
 Homebrew today have two options until a public tap is registered:
 

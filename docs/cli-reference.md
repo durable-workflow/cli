@@ -71,22 +71,19 @@ release for normal installation, or select an exact tag for reproducible builds.
 
 Available assets:
 `dw-linux-x86_64`, `dw-linux-aarch64`,
-`dw-macos-aarch64`, `dw-windows-x86_64.exe`, and from 2.5.0
-`dw-macos-x86_64` for Intel Macs.
+`dw-macos-aarch64`, `dw-windows-x86_64.exe`.
 
 Tagged releases also include `dw.rb`, a generated Homebrew formula for the
-macOS arm64 binary (and, from 2.5.0, the Intel binary), with the release URL
-and SHA256 baked in. Until a public
+macOS arm64 binary, with the release URL and SHA256 baked in. Until a public
 tap is live, two install paths are supported: install from the bundled formula
 directly with `brew install --formula ./dw.rb` after downloading it from the
 release, or vendor the same formula into a self-hosted tap so users can run
 `brew install <org>/<tap>/dw`. See [`docs/distribution.md`](distribution.md)
 for the full Homebrew install runbook.
 
-From 2.5.0, releases include `dw-macos-x86_64` for Intel Macs, and the
-installer selects it. Earlier releases had no Intel binary; Intel Mac users ran
-the PHAR, which 2.5.0 no longer publishes. Published 2.x `dw upgrade` has no
-Intel asset to move to, so install 2.5.0 on an Intel Mac with `install.sh`.
+macOS x86_64 standalone binaries are not currently produced because the
+`macos-13` runner label is not available to this org; Intel Mac users can
+run the PHAR with a system PHP.
 
 To verify a direct download, fetch the matching `SHA256SUMS` file from the
 same release and check it before moving the binary into your PATH:
@@ -124,8 +121,7 @@ if (-not $expected.Line.StartsWith($actual)) { throw 'Checksum mismatch' }
 .\dw-windows-x86_64.exe --version
 ```
 
-**2. PHAR (releases before 2.5.0 only; requires PHP >= 8.2).** From 2.5.0
-there is no PHAR: use a standalone binary. For older releases, download `dw.phar` from the
+**2. PHAR (requires PHP >= 8.2).** Download `dw.phar` from the
 [releases page](https://github.com/durable-workflow/cli/releases) and run it
 with `php dw.phar` (or `chmod +x` and call directly — the PHAR
 has a `#!/usr/bin/env php` shebang).
@@ -145,9 +141,8 @@ for the underlying steps; tools are cached under `build/.tools/`.
 ### Release Policy
 
 Release assets are published from the tagged source by GitHub Actions. Each
-release includes `SHA256SUMS` for every supported native binary for that tag:
-Linux x86_64, Linux aarch64, macOS aarch64, and Windows x86_64, plus macOS
-x86_64 from 2.5.0, and `dw.phar` for releases before 2.5.0.
+release includes `SHA256SUMS` for `dw.phar` and every supported native binary
+for that tag: Linux x86_64, Linux aarch64, macOS aarch64, and Windows x86_64.
 The release workflow waits for all supported platform builders before
 publishing the manifest; a failed platform build blocks the release instead of
 publishing a partial standalone surface.

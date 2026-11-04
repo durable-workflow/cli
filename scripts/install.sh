@@ -54,6 +54,10 @@ case "$uname_m" in
     *) err "unsupported architecture: $uname_m" ;;
 esac
 
+if [ "$os" = "macos" ] && [ "$arch" = "x86_64" ]; then
+    err "macos-x86_64 binaries are not currently published. Use the PHAR with a system PHP instead."
+fi
+
 asset="dw-${os}-${arch}"
 command -v curl >/dev/null 2>&1 || err "curl is required"
 

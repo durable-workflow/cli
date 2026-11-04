@@ -551,11 +551,9 @@ class ReleaseRustWorkflowTest(unittest.TestCase):
                 self.assertRegex(script, rf"(?<![\w.-]){re.escape(prefix + asset)}(?![\w.-])", f"{label}: {asset}")
                 self.assertIn(prefix + inventory, script, f"{label}: {inventory}")
 
-    def test_intel_macs_are_built_and_installed(self):
+    def test_intel_macs_are_built_and_in_the_formula(self):
         [intel] = [e for e in self.build["jobs"]["build"]["strategy"]["matrix"]["include"] if e["asset"] == "dw-macos-x86_64"]
         self.assertEqual({"target": "x86_64-apple-darwin", "runner": "macos-15"}, {k: intel[k] for k in ("target", "runner")})
-        installer = (ROOT / "scripts/install.sh").read_text(encoding="utf-8")
-        self.assertNotIn("macos-x86_64 binaries are not currently published", installer)
         with tempfile.TemporaryDirectory(prefix="cli-formula-") as directory:
             for asset in ("dw-macos-aarch64", "dw-macos-x86_64"):
                 (Path(directory) / asset).write_bytes(asset.encode())

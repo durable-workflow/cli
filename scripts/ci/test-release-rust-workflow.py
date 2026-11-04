@@ -15,7 +15,9 @@
 from pathlib import Path
 import re
 import hashlib
+import os
 import subprocess
+import tempfile
 import unittest
 
 import yaml
@@ -79,7 +81,7 @@ ALLOWED_ACTIONS = {
 # path, a tar option, a gh extension) fails until reviewed and re-pinned.
 PUBLISH_RUN_DIGESTS = {
     "Validate the exact producer artifact before use": "ce06e15b0e2592c8deb55ae4f410e020afb89a6d675d140b0c5b9b4280bf9eaa",
-    "Refuse a tag that already has a GitHub Release": "653a9cdecd8b846025d385f21d8baf669841b8b8c5d07e8ddb068117ccd3739a",
+    "Refuse a tag that already has a GitHub Release": "8b35e4d683630addcbe2e951b5b6fd070263a288bbbe4db5027072fc145bf617",
     "Extract only the allowlisted release files": "1074e3bcd19c91075f4c586cb2871af15135af3ff97bcde516cbdd34e64a8b1e",
     "Verify the immutable release tag at the publication boundary": "21a53cce4259e3fb724a0d8e3c893a2b6252eaec8b76f043da750f4a110b3cf2",
     "Create GitHub Release": "3f23a661b3debee7ed13aa9c519c880eb7959b6898d7d9670fd713bfc6d82419",
@@ -425,6 +427,50 @@ class ReleaseRustWorkflowTest(unittest.TestCase):
         names = [step.get("name") for step in self.steps("publish")]
         # The first step after the policy-mandated checkout, download and validation.
         self.assertEqual(3, names.index("Refuse a tag that already has a GitHub Release"))
+
+    def run_publish_step(self, name, gh_script, env):
+        [step] = [s for s in self.steps("publish") if s.get("name") == name]
+        with tempfile.TemporaryDirectory(prefix="cli-publish-step-") as directory:
+            gh = Path(directory) / "gh"
+            gh.write_text("#!/bin/sh\n" + gh_script, encoding="utf-8")
+            gh.chmod(0o755)
+            calls = Path(directory) / "calls"
+            full_env = dict(os.environ, PATH=f"{directory}{os.pathsep}{os.environ['PATH']}",
+                            GITHUB_REPOSITORY="o/r", GH_CALLS=str(calls), **env)
+            result = subprocess.run(["bash", "-euo", "pipefail", "-c", step["run"]], env=full_env,
+                                    capture_output=True, text=True, timeout=10, cwd=directory)
+            return result, calls.read_text() if calls.exists() else ""
+
+    def test_existing_release_check_fails_closed(self):
+        name = "Refuse a tag that already has a GitHub Release"
+        cases = {
+            'echo "HTTP 502" >&2; exit 1\n': 1,     # API error: stop
+            "printf '2.4.0\\n2.5.0\\n'\n": 1,     # release exists (or a draft): stop
+            "printf '2.4.0\\n2.5.0-rc.1\\n'\n": 0,  # absent: continue
+            "exit 0\n": 0,                          # no releases at all: continue
+        }
+        for gh_script, code in cases.items():
+            result, _ = self.run_publish_step(name, gh_script, {"RELEASE_TAG": "2.5.0"})
+            self.assertEqual(code, result.returncode, f"{gh_script!r}: {result.stderr}")
+
+    def test_latest_recheck_never_takes_the_marker_on_doubt(self):
+        record = 'echo "$*" >> "$GH_CALLS"\n'
+        name = "Create GitHub Release"
+        base = {"RELEASE_TAG": "2.5.0", "PRERELEASE": "false", "MAKE_LATEST": "true"}
+        for latest_reply, observed, expected in (
+            ("printf '2.4.0\\n'", "2.4.0", "--latest=true"),   # unchanged: keep the decision
+            ("printf '2.6.0\\n'", "2.4.0", "--latest=false"),  # changed during the run
+            ("exit 1", "2.4.0", "--latest=false"),            # API error: no marker
+        ):
+            gh_script = (
+                'if [ "$1" = "api" ]; then ' + latest_reply + '; exit $?; fi\n' + record
+            )
+            result, calls = self.run_publish_step(name, gh_script, dict(base, OBSERVED_LATEST=observed))
+            self.assertEqual(0, result.returncode, result.stderr)
+            self.assertIn(expected, calls, (latest_reply, calls))
+        result, calls = self.run_publish_step(name, record, dict(base, MAKE_LATEST="false", OBSERVED_LATEST=""))
+        self.assertIn("--latest=false", calls)
+        self.assertNotIn("api", calls)
 
     def test_latest_marker_is_rechecked_at_publication(self):
         php = yaml.safe_load(PHP.read_text(encoding="utf-8"))

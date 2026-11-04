@@ -1798,7 +1798,17 @@
    "name": "schema:manifest",
    "argv": [
     "schema:manifest"
-   ]
+   ],
+   "schema_sha256_updates": {
+    "workflow:signal": {
+     "reference": "sha256:c42c02f7a54faa082982028482bc231ca29c495a2a00fabce5b0ae580a2505bf",
+     "candidate": "sha256:5a5fe23d6a1bead8508887b57b1dfb58448b92ed4292ce0da88bcdd1abf37e81"
+    },
+    "workflow:update": {
+     "reference": "sha256:a3997a4b623d84b166ea3a124b0a33e5c400acc51694332186813b96aa389eb1",
+     "candidate": "sha256:8888b18ff8d8ef7cac35f2aae362192b04617dc28760c25ddccf085880c3e25c"
+    }
+   }
   },
   {
    "name": "schema:show a command's JSON schema",

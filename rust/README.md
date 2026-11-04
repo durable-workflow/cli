@@ -59,6 +59,10 @@ CLI and once with this build, each in a fresh config directory. It compares:
 - stderr as normalized text (the same normalizations), plus its category;
 - the config file each case leaves behind.
 
+The manifest case records exact reference and candidate hashes for reviewed
+additive schema changes. Only those two values at the named command's `sha256`
+field are normalized. Other hashes, manifest metadata and formatting still compare.
+
 ```bash
 parity/fetch-reference.sh      # pinned 2.x CLI, checksum-verified, into target/
 cargo build

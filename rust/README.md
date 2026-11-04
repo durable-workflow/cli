@@ -1,8 +1,10 @@
 # dw in Rust
 
-This crate is the Rust implementation of `dw`, planned as CLI 3.0.0 (#72).
-It keeps the 2.x command names, options, profile file, JSON envelopes and
-exit codes, so existing scripts and profiles keep working.
+This crate is the Rust implementation of `dw` (#72). It will ship as a 2.x
+minor release, because it keeps the 2.x command names, options, profile
+file, JSON envelopes and exit codes, so existing scripts and profiles keep
+working. A 2.x version also stays inside the CLI range that PHP Server 2.x
+advertises.
 
 It is not released yet. The 2.x PHP CLI remains the supported `dw` until
 every command group reaches parity.

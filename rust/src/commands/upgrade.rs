@@ -268,7 +268,7 @@ fn path_lookup_candidates(argv0: &str, os_family: &str) -> Vec<String> {
         extensions = if crate::php::trim(&path_ext).is_empty() {
             [".exe", ".bat", ".cmd", ".com"]
                 .iter()
-                .map(|ext| ext.to_string())
+                .map(ToString::to_string)
                 .collect()
         } else {
             path_ext
@@ -720,10 +720,15 @@ pub fn default_replacer(destination: &str, bytes: &[u8]) -> Result<(), ReplaceEr
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        if std::fs::set_permissions(&temp, std::fs::Permissions::from_mode(0o755)).is_err() {
+        // Keep the installed binary's own permissions (an ordinary install
+        // is 0755), always owner-executable, never setuid or setgid.
+        let mode = std::fs::metadata(destination)
+            .map_or(0o700, |metadata| metadata.permissions().mode() & 0o777)
+            | 0o100;
+        if std::fs::set_permissions(&temp, std::fs::Permissions::from_mode(mode)).is_err() {
             let _ = std::fs::remove_file(&temp);
             return Err(ReplaceError::Other(format!(
-                "could not chmod 755 on {temp}"
+                "could not chmod {mode:o} on {temp}"
             )));
         }
     }
@@ -1398,8 +1403,27 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let destination = dir.join("dw");
         std::fs::write(&destination, b"old").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&destination, std::fs::Permissions::from_mode(0o4755))
+                .unwrap();
+        }
         assert!(default_replacer(&destination.to_string_lossy(), b"new").is_ok());
         assert_eq!(std::fs::read(&destination).unwrap(), b"new");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            // The installed mode is kept, without setuid.
+            assert_eq!(
+                std::fs::metadata(&destination)
+                    .unwrap()
+                    .permissions()
+                    .mode()
+                    & 0o7777,
+                0o755
+            );
+        }
         assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 1);
         let missing = dir.join("missing").join("dw");
         assert!(

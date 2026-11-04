@@ -11,7 +11,7 @@
 mod external_task;
 mod input_envelope;
 mod request_contract;
-mod version;
+pub mod version;
 
 pub use external_task::{input_diagnostic, result_diagnostic};
 pub use request_contract::RequestContract;

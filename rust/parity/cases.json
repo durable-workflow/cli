@@ -1875,6 +1875,597 @@
    ]
   },
   {
+   "name": "completion bash",
+   "argv": [
+    "completion",
+    "bash"
+   ]
+  },
+  {
+   "name": "completion zsh",
+   "argv": [
+    "completion",
+    "zsh"
+   ]
+  },
+  {
+   "name": "completion fish",
+   "argv": [
+    "completion",
+    "fish"
+   ]
+  },
+  {
+   "name": "completion from SHELL",
+   "argv": [
+    "completion"
+   ],
+   "env": {
+    "SHELL": "/usr/bin/zsh"
+   }
+  },
+  {
+   "name": "completion with SHELL unset",
+   "argv": [
+    "completion"
+   ],
+   "env": {
+    "SHELL": ""
+   }
+  },
+  {
+   "name": "completion unsupported shell",
+   "argv": [
+    "completion",
+    "tcsh"
+   ]
+  },
+  {
+   "name": "completion quiet",
+   "argv": [
+    "completion",
+    "bash",
+    "-q"
+   ]
+  },
+  {
+   "name": "_complete bash: commands before one is typed",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c1",
+    "-a1",
+    "-idw"
+   ]
+  },
+  {
+   "name": "_complete bash: option names of a command",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-iupgrade",
+    "-i--"
+   ]
+  },
+  {
+   "name": "_complete bash: global option names before a command",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c1",
+    "-a1",
+    "-idw",
+    "-i--"
+   ]
+  },
+  {
+   "name": "_complete bash: help's command_name",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-ihelp"
+   ]
+  },
+  {
+   "name": "_complete zsh: commands before one is typed",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-szsh",
+    "-c1",
+    "-a1",
+    "-idw"
+   ]
+  },
+  {
+   "name": "_complete zsh: option names of a command",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-szsh",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-iupgrade",
+    "-i--"
+   ]
+  },
+  {
+   "name": "_complete zsh: global option names before a command",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-szsh",
+    "-c1",
+    "-a1",
+    "-idw",
+    "-i--"
+   ]
+  },
+  {
+   "name": "_complete zsh: help's command_name",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-szsh",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-ihelp"
+   ]
+  },
+  {
+   "name": "_complete fish: commands before one is typed",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sfish",
+    "-c1",
+    "-a1",
+    "-idw"
+   ]
+  },
+  {
+   "name": "_complete fish: option names of a command",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sfish",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-iupgrade",
+    "-i--"
+   ]
+  },
+  {
+   "name": "_complete fish: global option names before a command",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sfish",
+    "-c1",
+    "-a1",
+    "-idw",
+    "-i--"
+   ]
+  },
+  {
+   "name": "_complete fish: help's command_name",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sfish",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-ihelp"
+   ]
+  },
+  {
+   "name": "_complete bash: an ambiguous partial command",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c1",
+    "-a1",
+    "-idw",
+    "-iwor"
+   ]
+  },
+  {
+   "name": "_complete bash: a unique partial command expands",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c1",
+    "-a1",
+    "-idw",
+    "-iupg"
+   ]
+  },
+  {
+   "name": "_complete bash: an alias",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c1",
+    "-a1",
+    "-idw",
+    "-iworkflows:li"
+   ]
+  },
+  {
+   "name": "_complete bash: option value with =",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-iupgrade",
+    "-i--output="
+   ]
+  },
+  {
+   "name": "_complete bash: option value with = and a prefix",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-iworkflow:list",
+    "-i--output=js"
+   ]
+  },
+  {
+   "name": "_complete bash: option value after a separate option",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c3",
+    "-a1",
+    "-idw",
+    "-iworkflow:list",
+    "-i--output"
+   ]
+  },
+  {
+   "name": "_complete bash: option value after a separate option with a prefix",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c3",
+    "-a1",
+    "-idw",
+    "-iworkflow:list",
+    "-i--output",
+    "-ij"
+   ]
+  },
+  {
+   "name": "_complete bash: an option without suggestions",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-iworkflow:list",
+    "-i--namespace="
+   ]
+  },
+  {
+   "name": "_complete bash: a short option value",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-iworkflow:list",
+    "-i-s"
+   ]
+  },
+  {
+   "name": "_complete bash: a flag is not completed",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c3",
+    "-a1",
+    "-idw",
+    "-iupgrade",
+    "-i--dry-run"
+   ]
+  },
+  {
+   "name": "_complete bash: a negatable option name",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-iupgrade",
+    "-i--no-"
+   ]
+  },
+  {
+   "name": "_complete bash: global options before the command",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c3",
+    "-a1",
+    "-idw",
+    "-i-v",
+    "-iupgrade",
+    "-i--output="
+   ]
+  },
+  {
+   "name": "_complete bash: an option value before the command",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c3",
+    "-a1",
+    "-idw",
+    "-i--ansi",
+    "-iactivity:fail",
+    "-i--failure-kind="
+   ]
+  },
+  {
+   "name": "_complete bash: list namespace",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-ilist"
+   ]
+  },
+  {
+   "name": "_complete bash: list format",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-ilist",
+    "-i--format="
+   ]
+  },
+  {
+   "name": "_complete bash: help format",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-ihelp",
+    "-i--format="
+   ]
+  },
+  {
+   "name": "_complete bash: completion shell argument",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-icompletion"
+   ]
+  },
+  {
+   "name": "_complete bash: a second argument",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c3",
+    "-a1",
+    "-idw",
+    "-iworkflow:signal",
+    "-iwf"
+   ]
+  },
+  {
+   "name": "_complete bash: after all arguments",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c3",
+    "-a1",
+    "-idw",
+    "-ienv:use",
+    "-iprod"
+   ]
+  },
+  {
+   "name": "_complete bash: after a double dash",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c3",
+    "-a1",
+    "-idw",
+    "-iupgrade",
+    "-i--",
+    "-i--out"
+   ]
+  },
+  {
+   "name": "_complete bash: an unknown command",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-inope:nope"
+   ]
+  },
+  {
+   "name": "_complete bash: an unknown command's options",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c2",
+    "-a1",
+    "-idw",
+    "-inope:nope",
+    "-i--"
+   ]
+  },
+  {
+   "name": "_complete bash: cursor on the first token",
+   "argv": [
+    "_complete",
+    "--no-interaction",
+    "-sbash",
+    "-c1",
+    "-a1",
+    "-idw",
+    "-iupgrade"
+   ]
+  },
+  {
+   "name": "_complete: unsupported API version",
+   "argv": [
+    "_complete",
+    "-sbash",
+    "-c1",
+    "-a0",
+    "-idw"
+   ]
+  },
+  {
+   "name": "_complete: deprecated symfony flag",
+   "argv": [
+    "_complete",
+    "-sbash",
+    "-c1",
+    "-S5.4",
+    "-idw"
+   ]
+  },
+  {
+   "name": "_complete: missing shell",
+   "argv": [
+    "_complete",
+    "-c1",
+    "-a1",
+    "-idw"
+   ]
+  },
+  {
+   "name": "_complete: unsupported shell",
+   "argv": [
+    "_complete",
+    "-stcsh",
+    "-c1",
+    "-a1",
+    "-idw"
+   ]
+  },
+  {
+   "name": "_complete: missing current",
+   "argv": [
+    "_complete",
+    "-sbash",
+    "-a1",
+    "-idw"
+   ]
+  },
+  {
+   "name": "_complete: zero current",
+   "argv": [
+    "_complete",
+    "-sbash",
+    "-c0",
+    "-a1",
+    "-idw"
+   ]
+  },
+  {
+   "name": "_complete: non-numeric current",
+   "argv": [
+    "_complete",
+    "-sbash",
+    "-cx",
+    "-a1",
+    "-idw"
+   ]
+  },
+  {
+   "name": "_complete: current beyond the tokens",
+   "argv": [
+    "_complete",
+    "-sbash",
+    "-c5",
+    "-a1",
+    "-idw"
+   ]
+  },
+  {
+   "name": "_complete: no tokens",
+   "argv": [
+    "_complete",
+    "-sbash",
+    "-c1",
+    "-a1"
+   ]
+  },
+  {
+   "name": "_complete: an API version older than 1",
+   "argv": [
+    "_complete",
+    "-sbash",
+    "-c1",
+    "-a0.9",
+    "-idw"
+   ]
+  },
+  {
    "name": "doctor JSON",
    "argv": [
     "doctor",

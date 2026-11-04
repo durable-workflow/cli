@@ -43,6 +43,13 @@ jobs:
           - asset: dw-macos-aarch64
             target: aarch64-apple-darwin
             runner: macos-15
+            macos_deployment: '11.0'
+          # Intel Macs: cross-built on the Apple Silicon runner and smoke
+          # tested there under Rosetta.
+          - asset: dw-macos-x86_64
+            target: x86_64-apple-darwin
+            runner: macos-15
+            macos_deployment: '10.12'
           - asset: dw-windows-x86_64.exe
             target: x86_64-pc-windows-msvc
             runner: windows-2022
@@ -105,7 +112,7 @@ jobs:
           TARGET: ${{ matrix.target }}
           DW_CLI_VERSION: ${{ inputs.version }}
           DW_CLI_COMMIT: ${{ inputs.commit }}
-          MACOSX_DEPLOYMENT_TARGET: '11.0'
+          MACOSX_DEPLOYMENT_TARGET: ${{ matrix.macos_deployment || '11.0' }}
         run: |
           set -euo pipefail
           # The build date is the commit time, so a rebuild of the same tag
@@ -153,6 +160,17 @@ jobs:
               exit 1
               ;;
           esac
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            description="$(file -b "dist/$ASSET")"
+            echo "$description"
+            case "$TARGET:$description" in
+              x86_64-apple-darwin:*x86_64*|aarch64-apple-darwin:*arm64*) ;;
+              *)
+                echo "::error::$ASSET is not a $TARGET Mach-O binary"
+                exit 1
+                ;;
+            esac
+          fi
           if [ "$RUNNER_OS" = "Linux" ]; then
             description="$(file -b "dist/$ASSET")"
             echo "$description"
@@ -258,9 +276,10 @@ jobs:
         run: |
           set -euo pipefail
           expected="$(printf '%s\n' \
-            dw-linux-x86_64 dw-linux-aarch64 dw-macos-aarch64 dw-windows-x86_64.exe \
+            dw-linux-x86_64 dw-linux-aarch64 dw-macos-aarch64 dw-macos-x86_64 dw-windows-x86_64.exe \
             dw-linux-x86_64.dependencies.json dw-linux-aarch64.dependencies.json \
-            dw-macos-aarch64.dependencies.json dw-windows-x86_64.dependencies.json \
+            dw-macos-aarch64.dependencies.json dw-macos-x86_64.dependencies.json \
+            dw-windows-x86_64.dependencies.json \
             dw.rb install.sh install.ps1 verify-release.sh | LC_ALL=C sort)"
           actual="$(find . -mindepth 1 -maxdepth 1 -printf '%f\n' | LC_ALL=C sort)"
           if [ "$expected" != "$actual" ]; then

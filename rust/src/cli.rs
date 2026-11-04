@@ -109,6 +109,35 @@ pub fn first_argument(tokens: &[String]) -> Option<(usize, &str)> {
     None
 }
 
+/// Parses until the first usage error and keeps what was bound before it,
+/// as Symfony does for commands that ignore validation errors (`help`).
+/// Required arguments are not enforced.
+pub fn parse_lenient(spec: &CommandSpec, tokens: &[String]) -> Input {
+    let mut lenient = spec.clone();
+    lenient.args.iter_mut().for_each(|arg| arg.required = false);
+    let mut bound: Vec<String> = Vec::new();
+    for token in tokens {
+        bound.push(token.clone());
+        match parse(&lenient, &bound) {
+            Ok(_) => {}
+            // The next token may still supply the value.
+            Err(error) if error.message.ends_with("option requires a value.") => {}
+            Err(_) => {
+                bound.pop();
+                break;
+            }
+        }
+    }
+    loop {
+        match parse(&lenient, &bound) {
+            Ok(input) => return input,
+            Err(_) => {
+                bound.pop();
+            }
+        }
+    }
+}
+
 pub fn parse(spec: &CommandSpec, tokens: &[String]) -> Result<Input, UsageError> {
     let usage = |message: String| UsageError {
         message,
@@ -367,6 +396,21 @@ mod tests {
             error.synopsis.as_deref(),
             Some("env:use [--output OUTPUT] [--json] [--] <name>")
         );
+    }
+
+    #[test]
+    fn lenient_parsing_keeps_what_came_before_the_first_error() {
+        let help = crate::catalog::spec("help").unwrap();
+        let input = parse_lenient(
+            &help,
+            &tokens(&["env:use", "--format=json", "--bogus", "--raw"]),
+        );
+        assert_eq!(input.arg("command_name"), Some("env:use"));
+        assert_eq!(input.opt_str("format"), Some("json"));
+        assert!(!input.flag("raw"));
+        let input = parse_lenient(&help, &tokens(&["--bogus", "env:use"]));
+        assert_eq!(input.arg("command_name"), None);
+        assert_eq!(input.opt_str("format"), Some("txt"));
     }
 
     #[test]

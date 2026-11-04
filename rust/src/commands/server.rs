@@ -4,6 +4,7 @@ use crate::client;
 use crate::commands::info;
 use crate::compat::RequestContract;
 use crate::error::CliError;
+use crate::formatter::writeln_out;
 use crate::output::{format_status, print_json, render_table};
 use serde_json::Value;
 
@@ -58,10 +59,13 @@ pub fn health(context: &client::Context) -> Result<i32, CliError> {
         return Ok(0);
     }
 
-    println!("Server is {}", format_status(result.get("status")));
+    writeln_out(&format!(
+        "Server is {}",
+        format_status(result.get("status"))
+    ));
     // Native Server's health response has no timestamp.
     if let Some(timestamp) = result.get("timestamp").and_then(scalar_text) {
-        println!("Timestamp: {timestamp}");
+        writeln_out(&format!("Timestamp: {timestamp}"));
     }
 
     let mut unhealthy = Vec::new();
@@ -89,17 +93,17 @@ pub fn health(context: &client::Context) -> Result<i32, CliError> {
                 ]
             })
             .collect();
-        println!("{}", render_table(&["Check", "Status", "Action"], &rows));
+        writeln_out(&render_table(&["Check", "Status", "Action"], &rows));
     }
 
     if !unhealthy.is_empty() {
-        println!();
-        println!("Next steps:");
-        println!("  - Run `dw doctor` with the same --env or --server options for connection and auth context.");
-        println!(
+        writeln_out("");
+        writeln_out("<comment>Next steps:</comment>");
+        writeln_out("  - Run `dw doctor` with the same --env or --server options for connection and auth context.");
+        writeln_out(&format!(
             "  - Inspect server logs and dependencies for: {}.",
             unhealthy.join(", ")
-        );
+        ));
     }
     Ok(0)
 }
@@ -112,7 +116,7 @@ pub fn info(context: &client::Context) -> Result<i32, CliError> {
         return Ok(0);
     }
     let contract = RequestContract::from_cluster_info(&cluster_info).ok();
-    println!("{}", info::render(&cluster_info, contract.as_ref()));
+    writeln_out(&info::render(&cluster_info, contract.as_ref()));
     Ok(0)
 }
 

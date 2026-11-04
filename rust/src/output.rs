@@ -89,8 +89,11 @@ pub fn encode_pretty(value: &Value) -> String {
     escape_non_ascii(String::from_utf8(buffer).expect("serde_json writes UTF-8"))
 }
 
+/// JSON goes out unformatted, and not at all when quiet, as in 2.x.
 pub fn print_json(value: &Value) {
-    println!("{}", encode(value));
+    if crate::formatter::verbosity() == crate::formatter::Verbosity::Normal {
+        crate::formatter::emit(crate::formatter::Stream::Stdout, &(encode(value) + "\n"));
+    }
 }
 
 /// A list envelope: one item per line for jsonl, the whole envelope otherwise
@@ -107,14 +110,35 @@ pub fn print_json_list(mode: Mode, envelope: &Value, items_key: &str) {
     print_json(envelope);
 }
 
-/// The 2.x status text. Terminal colors are not applied yet.
+/// The 2.x status text, styled by its meaning: `formatStatus()`.
 pub fn format_status(status: Option<&Value>) -> String {
-    match status {
+    let value = match status {
         Some(Value::String(text)) if !text.is_empty() => text.clone(),
         Some(Value::Number(number)) => number.to_string(),
         Some(Value::Bool(true)) => "1".into(),
-        _ => "-".into(),
-    }
+        _ => return "-".into(),
+    };
+    let token = value
+        .split(|c: char| c.is_whitespace() || c == '(' || c == ':')
+        .next()
+        .unwrap_or(&value)
+        .to_lowercase();
+    let normalized: String = token
+        .split(|c: char| !c.is_ascii_alphanumeric())
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join("_");
+    let tag = match normalized.as_str() {
+        "active" | "accepted" | "accepting" | "completed" | "healthy" | "ok" | "ready"
+        | "success" | "succeeded" => "info",
+        "backoff" | "degraded" | "draining" | "expired" | "full" | "no_slots" | "paused"
+        | "pending" | "running" | "saturated" | "stale" | "throttled" | "unavailable"
+        | "warning" => "comment",
+        "cancelled" | "canceled" | "error" | "failed" | "failure" | "no_active_workers"
+        | "timed_out" | "timeout" | "terminated" => "error",
+        _ => return value,
+    };
+    format!("<{tag}>{value}</{tag}>")
 }
 
 fn width(text: &str) -> usize {
@@ -122,12 +146,19 @@ fn width(text: &str) -> usize {
 }
 
 /// Symfony Console's default table style.
+/// Visible width of styled cell text.
+fn visible_width(text: &str) -> usize {
+    width(&crate::formatter::format(text, false))
+}
+
+/// Symfony Console's default table style. Headers are `<info>`; cells keep
+/// their styles.
 pub fn render_table(headers: &[&str], rows: &[Vec<String>]) -> String {
     let columns = headers.len();
     let mut widths: Vec<usize> = headers.iter().map(|header| width(header)).collect();
     for row in rows {
         for (index, cell) in row.iter().enumerate().take(columns) {
-            widths[index] = widths[index].max(width(cell));
+            widths[index] = widths[index].max(visible_width(cell));
         }
     }
     let border = format!(
@@ -138,20 +169,30 @@ pub fn render_table(headers: &[&str], rows: &[Vec<String>]) -> String {
             .collect::<Vec<_>>()
             .join("+")
     );
-    let line = |cells: Vec<&str>| {
-        let padded: Vec<String> = cells
-            .iter()
-            .enumerate()
-            .map(|(index, cell)| format!(" {}{} ", cell, " ".repeat(widths[index] - width(cell))))
-            .collect();
-        format!("|{}|", padded.join("|"))
+    // Symfony pads each cell inside the row format (" %s "); a header's
+    // style wraps the padded text, a body cell's own styles wrap its value.
+    let pad = |index: usize, cell: &str| {
+        format!(
+            " {}{} ",
+            cell,
+            " ".repeat(widths[index] - visible_width(cell))
+        )
     };
-    let mut lines = vec![border.clone(), line(headers.to_vec()), border.clone()];
+    let header: Vec<String> = headers
+        .iter()
+        .enumerate()
+        .map(|(index, header)| format!("<info>{}</info>", pad(index, header)))
+        .collect();
+    let mut lines = vec![
+        border.clone(),
+        format!("|{}|", header.join("|")),
+        border.clone(),
+    ];
     for row in rows {
-        let cells: Vec<&str> = (0..columns)
-            .map(|index| row.get(index).map(String::as_str).unwrap_or(""))
+        let cells: Vec<String> = (0..columns)
+            .map(|index| pad(index, row.get(index).map(String::as_str).unwrap_or("")))
             .collect();
-        lines.push(line(cells));
+        lines.push(format!("|{}|", cells.join("|")));
     }
     lines.push(border);
     lines.join("\n")
@@ -195,7 +236,10 @@ mod tests {
 
     #[test]
     fn table_matches_symfony_layout() {
-        let table = render_table(&["Field", "Value"], &[vec!["name".into(), "dev".into()]]);
+        let table = crate::formatter::format(
+            &render_table(&["Field", "Value"], &[vec!["name".into(), "dev".into()]]),
+            false,
+        );
         assert_eq!(table, "+-------+-------+\n| Field | Value |\n+-------+-------+\n| name  | dev   |\n+-------+-------+");
     }
 }

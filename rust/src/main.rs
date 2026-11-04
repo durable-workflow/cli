@@ -363,7 +363,7 @@ fn raw_option(tokens: &[String], long: &str, short: Option<char>) -> Option<Stri
             return iter
                 .peek()
                 .filter(|next| !next.is_empty() && !next.starts_with('-'))
-                .map(|next| next.to_string());
+                .map(|next| (*next).clone());
         }
         if let Some(value) = short_flag
             .as_deref()

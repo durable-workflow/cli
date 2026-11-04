@@ -15,7 +15,7 @@ spl_autoload_register(static function (string $class) use ($srcDir): void {
     if (str_starts_with($class, $prefix)) {
         $path = $srcDir.'/'.str_replace('\\', '/', substr($class, strlen($prefix))).'.php';
         if (is_file($path)) {
-            require $path;
+            require_once $path;
         }
     }
 });

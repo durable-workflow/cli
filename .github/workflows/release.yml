@@ -1805,17 +1805,21 @@ jobs:
           EOF
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228  # v3
-        with:
-          tag_name: ${{ needs.resolve-release.outputs.tag }}
-          name: ${{ needs.resolve-release.outputs.tag }}
-          body_path: release-notes.md
-          files: |
-            dist/*
-          generate_release_notes: true
-          fail_on_unmatched_files: true
-          prerelease: ${{ needs.resolve-release.outputs.prerelease }}
-          make_latest: ${{ needs.resolve-release.outputs.make_latest }}
+        # gh creates the release as a draft, uploads every asset, then
+        # publishes it, prereleases included, so a release is complete when it
+        # becomes visible and immutable releases accept it.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.resolve-release.outputs.tag }}
+          PRERELEASE: ${{ needs.resolve-release.outputs.prerelease }}
+          MAKE_LATEST: ${{ needs.resolve-release.outputs.make_latest }}
+        run: |
+          set -euo pipefail
+          flags=(--verify-tag --title "$RELEASE_TAG" --notes-file release-notes.md --generate-notes "--latest=$MAKE_LATEST")
+          if [ "$PRERELEASE" = "true" ]; then
+            flags+=(--prerelease)
+          fi
+          gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" "${flags[@]}" dist/*
 
   verify-release:
     name: Verify published release

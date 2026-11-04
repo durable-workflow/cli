@@ -70,16 +70,12 @@ test('the release action consumes metadata from the resolved tag', () => {
     workflow.indexOf('- name: Create GitHub Release'),
     workflow.indexOf('- name: Verify public release downloads'),
   );
-  assert.match(
-    releaseAction,
-    /prerelease: \$\{\{ needs\.resolve-release\.outputs\.prerelease \}\}/,
-  );
-  assert.match(
-    releaseAction,
-    /make_latest: \$\{\{ needs\.resolve-release\.outputs\.make_latest \}\}/,
-  );
-  assert.match(releaseAction, /body_path: release-notes\.md/);
-  assert.match(releaseAction, /files: \|\n\s+dist\/\*/);
+  assert.match(releaseAction, /PRERELEASE: \$\{\{ needs\.resolve-release\.outputs\.prerelease \}\}/);
+  assert.match(releaseAction, /MAKE_LATEST: \$\{\{ needs\.resolve-release\.outputs\.make_latest \}\}/);
+  assert.match(releaseAction, /--notes-file release-notes\.md --generate-notes "--latest=\$MAKE_LATEST"/);
+  assert.match(releaseAction, /flags\+=\(--prerelease\)/);
+  assert.match(releaseAction, /gh release create "\$RELEASE_TAG" --repo "\$GITHUB_REPOSITORY" "\$\{flags\[@\]\}" dist\/\*/);
+  assert.doesNotMatch(workflow, /softprops\/action-gh-release/);
 });
 
 test('metadata reconciliation can only write from the main branch', () => {

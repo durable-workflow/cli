@@ -49,6 +49,7 @@ VERSION_LINE = re.compile(r"dw \S+ \(commit [^,]+, built [^)]+\)")
 BUILD_IDENTITY = re.compile(r"\(commit [^,]+, built [^)]+\)")
 MARKDOWN_TITLE = re.compile(r"^(dw <version>)\n=+$", re.M)
 TRANSPORT_LINE = re.compile(r"^(Server unreachable|Request timed out): .*$", re.M)
+DOCTOR_TRANSPORT_LINE = re.compile(r"^(  Error: )(Server unreachable|Request timed out): .*$", re.M)
 LOOPBACK_PORT = re.compile(r"127\.0\.0\.1:\d+")
 SERVER_LABEL = re.compile(r"[a-z][a-z0-9-]{0,31}")
 # Transport errors name the HTTP stack that failed; only the category is
@@ -75,11 +76,28 @@ def substitute(text, case):
     return text
 
 
-def own_version(binary):
-    """The bare version a binary reports, which its messages embed."""
+def own_identity(binary):
+    """Build metadata from this binary, rather than a different release."""
     output = subprocess.run([binary, "--version"], capture_output=True, text=True, timeout=60, check=False).stdout
-    match = re.match(r"dw (\S+) ", output)
-    return match.group(1) if match else None
+    match = re.match(r"dw (\S+) \(commit ([^,]+), built ([^)]+)\)", output)
+    return dict(zip(("version", "commit", "build_date"), match.groups())) if match else {}
+
+
+def normalize_doctor_identity(stdout_json, stdout_text, identity):
+    """Normalize only metadata that agrees with the binary's --version.
+
+    A wrong diagnostic commit or build date remains a comparison failure.
+    """
+    for key, label in (("commit", "Commit"), ("build_date", "Built")):
+        if key not in identity:
+            continue
+        replacement = f"<{key}>"
+        stdout_text = re.sub(r"^  " + label + ": " + re.escape(identity[key]) + r"$",
+                             f"  {label}: {replacement}", stdout_text, flags=re.M)
+        for item in stdout_json or []:
+            if isinstance(item, dict) and isinstance(item.get("dw"), dict) and item["dw"].get(key) == identity[key]:
+                item["dw"][key] = replacement
+    return stdout_json, stdout_text
 
 
 def normalize_text(text, config_dir, version=None):
@@ -93,6 +111,7 @@ def normalize_text(text, config_dir, version=None):
     text = MARKDOWN_TITLE.sub(r"\1\n<underline>", text)
     text = TIME.sub("<time>", text)
     text = TRANSPORT_LINE.sub("<transport error>", text)
+    text = DOCTOR_TRANSPORT_LINE.sub(r"\1<transport error>", text)
     text = LOOPBACK_PORT.sub("127.0.0.1:<port>", text)
     return ULID.sub("<id>", text)
 
@@ -138,7 +157,9 @@ def read_config(config_dir):
         return normalize_text(handle.read(), config_dir)
 
 
-def run_case(binary, case, env_base, version=None):
+def run_case(binary, case, env_base, identity=None):
+    identity = identity or {}
+    version = identity.get("version")
     config_dir = tempfile.mkdtemp(prefix="dw-parity-")
     try:
         env = dict(env_base)
@@ -156,10 +177,13 @@ def run_case(binary, case, env_base, version=None):
         completed = subprocess.run([binary] + argv, env=env, stdin=subprocess.DEVNULL, capture_output=True,
                                    text=True, timeout=60, check=False, cwd=project)
         stdout_json = parse_json_lines(completed.stdout)
+        stdout_text = completed.stdout
+        if argv and argv[0] == "doctor":
+            stdout_json, stdout_text = normalize_doctor_identity(stdout_json, stdout_text, identity)
         return {
             "exit_code": completed.returncode,
             "stdout_json": normalize_value(stdout_json, config_dir, version) if stdout_json is not None else None,
-            "stdout_text": None if stdout_json is not None else normalize_text(completed.stdout, config_dir, version),
+            "stdout_text": None if stdout_json is not None else normalize_text(stdout_text, config_dir, version),
             "stderr_category": stderr_category(completed.stderr),
             "stderr": normalize_text(completed.stderr, config_dir, version),
             "config": read_config(config_dir),
@@ -294,7 +318,14 @@ def help_cases():
     """`--help` for every 2.x command, ported or not, from the catalog."""
     with open(os.path.join(CRATE, "src", "catalog.json"), encoding="utf-8") as handle:
         names = [command["name"] for command in json.load(handle)["commands"]]
-    return [{"name": f"--help for {name}", "argv": [name, "--help"]} for name in names]
+    cases = [{"name": f"--help for {name}", "argv": [name, "--help"]} for name in names]
+    for case in cases:
+        if case["argv"][0] == "runtime:check":
+            case["expected_difference"] = {"*": {
+                "fields": ["stdout_text"],
+                "reason": "The Rust-native runtime:check help describes build identity and target instead of PHP extensions (cli#72).",
+            }}
+    return cases
 
 
 def invocation_path(binary, role):
@@ -320,7 +351,7 @@ def run_all(candidate_binary, servers, verbose):
 
     reference_binary = invocation_path(REFERENCE, "reference")
     candidate_binary = invocation_path(candidate_binary, "candidate")
-    versions = {reference_binary: own_version(reference_binary), candidate_binary: own_version(candidate_binary)}
+    identities = {reference_binary: own_identity(reference_binary), candidate_binary: own_identity(candidate_binary)}
     results = []
     for case in expand_cases(cases, servers):
         uses_mock = "mock" in case or "mock_routes" in case
@@ -328,8 +359,8 @@ def run_all(candidate_binary, servers, verbose):
         if mock:
             case = dict(case, vars={**case.get("vars", {}), "mock": mock.url})
         try:
-            reference = run_case(reference_binary, case, env_base, versions[reference_binary])
-            candidate = run_case(candidate_binary, case, env_base, versions[candidate_binary])
+            reference = run_case(reference_binary, case, env_base, identities[reference_binary])
+            candidate = run_case(candidate_binary, case, env_base, identities[candidate_binary])
         finally:
             if mock:
                 mock.close()

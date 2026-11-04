@@ -11,6 +11,12 @@ fn collect(dir: &Path, root: &Path, files: &mut Vec<(String, PathBuf)>) {
         .collect();
     entries.sort();
     for path in entries {
+        // Never follow a symlink out of schemas/.
+        let metadata = std::fs::symlink_metadata(&path)
+            .unwrap_or_else(|error| panic!("cannot stat {}: {error}", path.display()));
+        if metadata.file_type().is_symlink() {
+            continue;
+        }
         if path.is_dir() {
             collect(&path, root, files);
         } else if path
@@ -25,6 +31,10 @@ fn collect(dir: &Path, root: &Path, files: &mut Vec<(String, PathBuf)>) {
 }
 
 fn main() {
+    println!(
+        "cargo:rustc-env=DW_CLI_TARGET={}",
+        std::env::var("TARGET").expect("set by cargo")
+    );
     let crate_dir = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").expect("set by cargo"));
     let root = crate_dir
         .parent()

@@ -22,8 +22,10 @@ every command group reaches parity.
 | `server:health`, `server:info` (and `cluster:info`) | Ported |
 | Compatibility preflight, session and `--version` warnings, exit 8 refusals | Ported |
 | `server:start-dev`: local Laravel launch, Compose prerequisites and Unix signal cleanup | Ported |
+| `runtime:check`: native build identity and compilation target | Ported, intentional output/help difference |
+| `doctor`: redacted connection sources, server metadata, warnings and next steps | Ported |
 | Workflow, namespace and schedule commands | Next slices |
-| `--tls-verify=false` against HTTPS | Refused until durable-workflow/sdk-rust#180 |
+| `--tls-verify=false` against HTTPS | CLI support pending |
 
 Server calls go through the published `durable-workflow` crate, pinned to
 the latest qualified release.

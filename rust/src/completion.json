@@ -1,0 +1,1362 @@
+{
+ "source": "dw 2.3.5",
+ "application": [
+  {
+   "value": "help",
+   "description": "Display help for a command"
+  },
+  {
+   "value": "list",
+   "description": "List commands"
+  },
+  {
+   "value": "completion",
+   "description": "Dump the shell completion script"
+  },
+  {
+   "value": "server:health",
+   "description": "Check the health of the Durable Workflow server"
+  },
+  {
+   "value": "server:info",
+   "description": "Display server version, capabilities, and role topology"
+  },
+  {
+   "value": "cluster:info",
+   "description": "Display server version, capabilities, and role topology"
+  },
+  {
+   "value": "server:start-dev",
+   "description": "Serve an existing Laravel project for local development"
+  },
+  {
+   "value": "doctor",
+   "description": "Diagnose the resolved dw connection and server compatibility state"
+  },
+  {
+   "value": "debug",
+   "description": "Run one-shot diagnostics for a workflow"
+  },
+  {
+   "value": "upgrade",
+   "description": "Upgrade the standalone dw binary to the latest stable (or a pinned) release"
+  },
+  {
+   "value": "workflow:start",
+   "description": "Start a new workflow execution"
+  },
+  {
+   "value": "workflow:list",
+   "description": "List workflow executions"
+  },
+  {
+   "value": "workflows:list",
+   "description": "List workflow executions"
+  },
+  {
+   "value": "workflow:describe",
+   "description": "Show detailed information about a workflow execution"
+  },
+  {
+   "value": "workflow:signal",
+   "description": "Send a signal to a running workflow"
+  },
+  {
+   "value": "workflow:query",
+   "description": "Query a workflow's state"
+  },
+  {
+   "value": "workflow:update",
+   "description": "Send an update to a workflow"
+  },
+  {
+   "value": "workflow:cancel",
+   "description": "Close a workflow as cancelled"
+  },
+  {
+   "value": "workflow:terminate",
+   "description": "Terminate a workflow immediately"
+  },
+  {
+   "value": "workflow:repair",
+   "description": "Request repair of a workflow run"
+  },
+  {
+   "value": "workflow:redrive",
+   "description": "Continue a failed workflow run from its failed activity"
+  },
+  {
+   "value": "workflow:archive",
+   "description": "Archive a terminal workflow run"
+  },
+  {
+   "value": "workflow:list-runs",
+   "description": "List all runs for a workflow execution"
+  },
+  {
+   "value": "workflow:show-run",
+   "description": "Show detailed information about a specific workflow run"
+  },
+  {
+   "value": "workflow:history",
+   "description": "Show event history for a workflow run"
+  },
+  {
+   "value": "workflow:history-export",
+   "description": "Export a workflow run history as a replay bundle"
+  },
+  {
+   "value": "workflow:migrate-v1",
+   "description": "Project a Waterline v1 workflow into standalone read-only visibility"
+  },
+  {
+   "value": "service-call:describe",
+   "description": "Inspect a durable Nexus service call and its original target"
+  },
+  {
+   "value": "env:list",
+   "description": "List configured dw environment profiles"
+  },
+  {
+   "value": "env:set",
+   "description": "Create or update a dw environment profile"
+  },
+  {
+   "value": "env:use",
+   "description": "Set the default dw environment profile"
+  },
+  {
+   "value": "env:show",
+   "description": "Show details for a dw environment profile"
+  },
+  {
+   "value": "env:delete",
+   "description": "Delete a dw environment profile"
+  },
+  {
+   "value": "namespace:list",
+   "description": "List all namespaces"
+  },
+  {
+   "value": "namespace:create",
+   "description": "Create a new namespace"
+  },
+  {
+   "value": "namespace:describe",
+   "description": "Show details of a namespace"
+  },
+  {
+   "value": "namespace:update",
+   "description": "Update a namespace"
+  },
+  {
+   "value": "namespace:delete",
+   "description": "Delete a namespace and its runtime state"
+  },
+  {
+   "value": "namespace:set-storage-driver",
+   "description": "Configure external payload storage for a namespace"
+  },
+  {
+   "value": "storage:test",
+   "description": "Run an external payload storage round-trip diagnostic"
+  },
+  {
+   "value": "activity:list",
+   "description": "List standalone activity executions"
+  },
+  {
+   "value": "activities:list",
+   "description": "List standalone activity executions"
+  },
+  {
+   "value": "activity:describe",
+   "description": "Show detailed information about a standalone activity execution"
+  },
+  {
+   "value": "activities:describe",
+   "description": "Show detailed information about a standalone activity execution"
+  },
+  {
+   "value": "activity:complete",
+   "description": "Complete an activity task externally"
+  },
+  {
+   "value": "activity:fail",
+   "description": "Fail an activity task externally"
+  },
+  {
+   "value": "bridge:webhook",
+   "description": "Send a bounded webhook bridge adapter event"
+  },
+  {
+   "value": "schedule:list",
+   "description": "List schedules with visibility filters and cursor paging"
+  },
+  {
+   "value": "schedule:create",
+   "description": "Create a new schedule"
+  },
+  {
+   "value": "schedule:describe",
+   "description": "Show details of a schedule"
+  },
+  {
+   "value": "schedule:delete",
+   "description": "Delete a schedule"
+  },
+  {
+   "value": "schedule:pause",
+   "description": "Pause a schedule"
+  },
+  {
+   "value": "schedule:resume",
+   "description": "Resume a paused schedule"
+  },
+  {
+   "value": "schedule:trigger",
+   "description": "Trigger a schedule execution immediately"
+  },
+  {
+   "value": "schedule:update",
+   "description": "Update a schedule"
+  },
+  {
+   "value": "schedule:backfill",
+   "description": "Backfill missed schedule executions"
+  },
+  {
+   "value": "schedule:history",
+   "description": "Show the audit history stream for a schedule"
+  },
+  {
+   "value": "worker:register",
+   "description": "Register a diagnostic worker with the server"
+  },
+  {
+   "value": "worker:list",
+   "description": "List registered workers"
+  },
+  {
+   "value": "worker:describe",
+   "description": "Show details of a registered worker"
+  },
+  {
+   "value": "worker:deregister",
+   "description": "Deregister a worker from the server"
+  },
+  {
+   "value": "workflow-task:poll",
+   "description": "Poll and lease one workflow task"
+  },
+  {
+   "value": "workflow-task:complete",
+   "description": "Complete a leased workflow task"
+  },
+  {
+   "value": "workflow-task:fail",
+   "description": "Fail a leased workflow task"
+  },
+  {
+   "value": "workflow-task:history",
+   "description": "Fetch the next history page for a leased workflow task"
+  },
+  {
+   "value": "query-task:poll",
+   "description": "Poll and lease one routed workflow query task"
+  },
+  {
+   "value": "query-task:complete",
+   "description": "Complete a leased routed workflow query task"
+  },
+  {
+   "value": "query-task:fail",
+   "description": "Fail a leased routed workflow query task"
+  },
+  {
+   "value": "task-queue:list",
+   "description": "List task queues with active pollers"
+  },
+  {
+   "value": "task-queue:describe",
+   "description": "Show task queue details including pollers and backlog"
+  },
+  {
+   "value": "task-queue:build-ids",
+   "description": "Show worker build-id rollout state for a task queue"
+  },
+  {
+   "value": "task-queue:promote",
+   "description": "Promote a build_id cohort for new workflow starts"
+  },
+  {
+   "value": "task-queue:drain",
+   "description": "Mark a build_id cohort as draining for a task queue"
+  },
+  {
+   "value": "task-queue:resume",
+   "description": "Clear drain intent from a build_id cohort on a task queue"
+  },
+  {
+   "value": "search-attribute:list",
+   "description": "List search attribute definitions"
+  },
+  {
+   "value": "search-attributes:list",
+   "description": "List search attribute definitions"
+  },
+  {
+   "value": "search-attribute:create",
+   "description": "Register a custom search attribute"
+  },
+  {
+   "value": "search-attributes:create",
+   "description": "Register a custom search attribute"
+  },
+  {
+   "value": "search-attribute:delete",
+   "description": "Remove a custom search attribute"
+  },
+  {
+   "value": "search-attributes:delete",
+   "description": "Remove a custom search attribute"
+  },
+  {
+   "value": "system:operator-metrics",
+   "description": "Show the rollout-safety coordination health snapshot"
+  },
+  {
+   "value": "system:repair-status",
+   "description": "Show task repair candidate diagnostics and policy"
+  },
+  {
+   "value": "system:repair-pass",
+   "description": "Run one task repair sweep on the server"
+  },
+  {
+   "value": "system:activity-timeout-status",
+   "description": "Show expired activity execution diagnostics"
+  },
+  {
+   "value": "system:activity-timeout-pass",
+   "description": "Run one activity timeout enforcement sweep on the server"
+  },
+  {
+   "value": "system:retention-status",
+   "description": "Show history retention diagnostics for the current namespace"
+  },
+  {
+   "value": "system:retention-pass",
+   "description": "Run one history retention enforcement sweep on the server"
+  },
+  {
+   "value": "schema:list",
+   "description": "List published JSON schemas"
+  },
+  {
+   "value": "schema:show",
+   "description": "Print a published JSON schema"
+  },
+  {
+   "value": "schema:manifest",
+   "description": "Print the bundled JSON schema manifest"
+  },
+  {
+   "value": "watch",
+   "description": "Watch long-running resources and print state changes"
+  }
+ ],
+ "values": {
+  "completion": {
+   "arguments": {
+    "shell": [
+     "bash",
+     "fish",
+     "zsh"
+    ]
+   }
+  },
+  "debug": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "doctor": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "help": {
+   "options": {
+    "format": [
+     "txt",
+     "xml",
+     "json",
+     "md",
+     "rst"
+    ]
+   },
+   "arguments": {
+    "command_name": [
+     "completion",
+     "debug",
+     "doctor",
+     "help",
+     "list",
+     "upgrade",
+     "watch",
+     "activity:complete",
+     "activity:describe",
+     "activity:fail",
+     "activity:list",
+     "bridge:webhook",
+     "env:delete",
+     "env:list",
+     "env:set",
+     "env:show",
+     "env:use",
+     "namespace:create",
+     "namespace:delete",
+     "namespace:describe",
+     "namespace:list",
+     "namespace:set-storage-driver",
+     "namespace:update",
+     "query-task:complete",
+     "query-task:fail",
+     "query-task:poll",
+     "schedule:backfill",
+     "schedule:create",
+     "schedule:delete",
+     "schedule:describe",
+     "schedule:history",
+     "schedule:list",
+     "schedule:pause",
+     "schedule:resume",
+     "schedule:trigger",
+     "schedule:update",
+     "schema:list",
+     "schema:manifest",
+     "schema:show",
+     "search-attribute:create",
+     "search-attribute:delete",
+     "search-attribute:list",
+     "server:health",
+     "server:info",
+     "server:start-dev",
+     "service-call:describe",
+     "storage:test",
+     "system:activity-timeout-pass",
+     "system:activity-timeout-status",
+     "system:operator-metrics",
+     "system:repair-pass",
+     "system:repair-status",
+     "system:retention-pass",
+     "system:retention-status",
+     "task-queue:build-ids",
+     "task-queue:describe",
+     "task-queue:drain",
+     "task-queue:list",
+     "task-queue:promote",
+     "task-queue:resume",
+     "worker:deregister",
+     "worker:describe",
+     "worker:list",
+     "worker:register",
+     "workflow:archive",
+     "workflow:cancel",
+     "workflow:describe",
+     "workflow:history",
+     "workflow:history-export",
+     "workflow:list",
+     "workflow:list-runs",
+     "workflow:migrate-v1",
+     "workflow:query",
+     "workflow:redrive",
+     "workflow:repair",
+     "workflow:show-run",
+     "workflow:signal",
+     "workflow:start",
+     "workflow:terminate",
+     "workflow:update",
+     "workflow-task:complete",
+     "workflow-task:fail",
+     "workflow-task:history",
+     "workflow-task:poll"
+    ]
+   }
+  },
+  "list": {
+   "options": {
+    "format": [
+     "txt",
+     "xml",
+     "json",
+     "md",
+     "rst"
+    ]
+   },
+   "arguments": {
+    "namespace": [
+     "_global",
+     "activities",
+     "activity",
+     "bridge",
+     "cluster",
+     "env",
+     "namespace",
+     "query-task",
+     "runtime",
+     "schedule",
+     "schema",
+     "search-attribute",
+     "search-attributes",
+     "server",
+     "service-call",
+     "storage",
+     "system",
+     "task-queue",
+     "worker",
+     "workflow",
+     "workflow-task",
+     "workflows"
+    ]
+   }
+  },
+  "upgrade": {
+   "options": {
+    "output": [
+     "table",
+     "json"
+    ]
+   }
+  },
+  "watch": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "activity:complete": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ],
+    "input-encoding": [
+     "json",
+     "raw",
+     "base64"
+    ]
+   }
+  },
+  "activity:describe": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "activity:fail": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ],
+    "failure-kind": [
+     "application",
+     "timeout",
+     "cancellation",
+     "malformed_output",
+     "handler_crash",
+     "decode_failure",
+     "unsupported_payload"
+    ],
+    "timeout-type": [
+     "schedule_to_start",
+     "start_to_close",
+     "schedule_to_close",
+     "heartbeat",
+     "deadline_exceeded"
+    ]
+   }
+  },
+  "activity:list": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ],
+    "status": [
+     "running",
+     "completed",
+     "failed"
+    ]
+   }
+  },
+  "bridge:webhook": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ],
+    "input-encoding": [
+     "json",
+     "raw",
+     "base64"
+    ]
+   }
+  },
+  "env:delete": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "env:list": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "env:set": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "env:show": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "env:use": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "namespace:create": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "namespace:delete": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "namespace:describe": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "namespace:list": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "namespace:set-storage-driver": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   },
+   "arguments": {
+    "driver": [
+     "local",
+     "s3",
+     "gcs",
+     "azure"
+    ]
+   }
+  },
+  "namespace:update": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "query-task:complete": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "query-task:fail": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "query-task:poll": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "schedule:backfill": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ],
+    "overlap-policy": [
+     "skip",
+     "buffer_one",
+     "buffer_all",
+     "cancel_other",
+     "terminate_other",
+     "allow_all"
+    ]
+   }
+  },
+  "schedule:create": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ],
+    "overlap-policy": [
+     "skip",
+     "buffer_one",
+     "buffer_all",
+     "cancel_other",
+     "terminate_other",
+     "allow_all"
+    ],
+    "input-encoding": [
+     "json",
+     "raw",
+     "base64"
+    ]
+   }
+  },
+  "schedule:delete": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "schedule:describe": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "schedule:history": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "schedule:list": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ],
+    "status": [
+     "active",
+     "paused"
+    ]
+   }
+  },
+  "schedule:pause": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "schedule:resume": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "schedule:trigger": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ],
+    "overlap-policy": [
+     "skip",
+     "buffer_one",
+     "buffer_all",
+     "cancel_other",
+     "terminate_other",
+     "allow_all"
+    ]
+   }
+  },
+  "schedule:update": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ],
+    "overlap-policy": [
+     "skip",
+     "buffer_one",
+     "buffer_all",
+     "cancel_other",
+     "terminate_other",
+     "allow_all"
+    ],
+    "input-encoding": [
+     "json",
+     "raw",
+     "base64"
+    ]
+   }
+  },
+  "search-attribute:create": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   },
+   "arguments": {
+    "type": [
+     "keyword",
+     "text",
+     "int",
+     "double",
+     "bool",
+     "datetime",
+     "keyword_list"
+    ]
+   }
+  },
+  "search-attribute:delete": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "search-attribute:list": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "server:health": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "server:info": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "server:start-dev": {
+   "options": {
+    "db": [
+     "sqlite",
+     "mysql",
+     "pgsql"
+    ]
+   }
+  },
+  "service-call:describe": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "storage:test": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ],
+    "driver": [
+     "local",
+     "s3",
+     "gcs",
+     "azure"
+    ]
+   }
+  },
+  "system:activity-timeout-pass": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "system:activity-timeout-status": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "system:operator-metrics": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "system:repair-pass": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "system:repair-status": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "system:retention-pass": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "system:retention-status": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "task-queue:build-ids": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "task-queue:describe": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "task-queue:drain": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "task-queue:list": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "task-queue:promote": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "task-queue:resume": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "worker:deregister": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "worker:describe": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "worker:list": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ],
+    "status": [
+     "active",
+     "stale",
+     "draining"
+    ]
+   }
+  },
+  "worker:register": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "workflow:archive": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "workflow:cancel": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ],
+    "status": [
+     "running",
+     "completed",
+     "failed"
+    ]
+   }
+  },
+  "workflow:describe": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "workflow:history": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "workflow:history-export": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "workflow:list": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ],
+    "status": [
+     "running",
+     "completed",
+     "failed"
+    ]
+   }
+  },
+  "workflow:list-runs": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "workflow:migrate-v1": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "workflow:query": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ],
+    "input-encoding": [
+     "json",
+     "raw",
+     "base64"
+    ]
+   }
+  },
+  "workflow:redrive": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "workflow:repair": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "workflow:show-run": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "workflow:signal": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ],
+    "input-encoding": [
+     "json",
+     "raw",
+     "base64"
+    ]
+   }
+  },
+  "workflow:start": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ],
+    "duplicate-policy": [
+     "fail",
+     "use-existing"
+    ],
+    "input-encoding": [
+     "json",
+     "raw",
+     "base64"
+    ]
+   }
+  },
+  "workflow:terminate": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "workflow:update": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ],
+    "wait": [
+     "accepted",
+     "completed"
+    ],
+    "input-encoding": [
+     "json",
+     "raw",
+     "base64"
+    ]
+   }
+  },
+  "workflow-task:complete": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "workflow-task:fail": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "workflow-task:history": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "workflow-task:poll": {
+   "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  }
+ }
+}

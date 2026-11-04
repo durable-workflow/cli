@@ -688,12 +688,18 @@ abstract class BaseCommand extends Command
 
         $explicit = $input->hasOption('request-id') ? $input->getOption('request-id') : null;
 
-        if (is_scalar($explicit) && trim((string) $explicit) !== '') {
+        if ($explicit !== null || $input->hasParameterOption('--request-id', true)) {
+            if (! is_scalar($explicit)) {
+                throw new InvalidOptionException('--request-id must not be empty or whitespace-only.');
+            }
             $explicit = (string) $explicit;
 
             $characters = preg_match_all('/./us', $explicit);
             if ($characters === false) {
                 throw new InvalidOptionException('--request-id must be valid UTF-8.');
+            }
+            if ($this->isBlankCommandRequestId($explicit)) {
+                throw new InvalidOptionException('--request-id must not be empty or whitespace-only.');
             }
             if ($characters > self::COMMAND_REQUEST_ID_MAX_CHARACTERS) {
                 throw new InvalidOptionException(sprintf(
@@ -707,6 +713,11 @@ abstract class BaseCommand extends Command
         }
 
         return $this->commandRequestId = sprintf('cli-%s-%s', $commandKind, bin2hex(random_bytes(16)));
+    }
+
+    private function isBlankCommandRequestId(string $value): bool
+    {
+        return trim($value) === '' || preg_match('/\A[\s\p{Z}]*\z/u', $value) === 1;
     }
 
     /**
@@ -1503,7 +1514,7 @@ abstract class BaseCommand extends Command
 
         $requestId = (string) $requestId;
 
-        return trim($requestId) === '' || preg_match('//u', $requestId) !== 1 ? null : $requestId;
+        return $this->isBlankCommandRequestId($requestId) || preg_match('//u', $requestId) !== 1 ? null : $requestId;
     }
 
     /**
@@ -1665,10 +1676,7 @@ abstract class BaseCommand extends Command
         $target->writeln('Next steps:');
 
         foreach ($recommendations as $recommendation) {
-            $message = $recommendation['id'] === 'request_id.retry'
-                ? 'The outcome of this command is unknown. Retry it unchanged, passing the same exact request ID with --request-id. Use --json for an exact copy of the key.'
-                : $recommendation['message'];
-            $target->writeln('  - '.$this->humanOutputText($message));
+            $target->writeln('  - '.$this->humanOutputText($recommendation['message']));
 
             if (isset($recommendation['command'])) {
                 $target->writeln('    Try: '.$this->humanOutputText($recommendation['command']));
@@ -1699,8 +1707,8 @@ abstract class BaseCommand extends Command
 
     /**
      * When the outcome of a keyed signal or update is unknown (transport
-     * failure or a server-side error), tell the operator which key to reuse so
-     * the retry reads the original receipt instead of recording a new command.
+     * failure or a server-side error), default to inspection. A transport
+     * failure does not establish the Server's retained-admission capability.
      *
      * @return array{id: string, severity: string, message: string}|null
      */
@@ -1721,10 +1729,7 @@ abstract class BaseCommand extends Command
         return [
             'id' => 'request_id.retry',
             'severity' => 'error',
-            'message' => sprintf(
-                'The outcome of this command is unknown. Retry it unchanged with --request-id=%s so the server returns the original receipt instead of recording a second command.',
-                $this->commandRequestId,
-            ),
+            'message' => 'The outcome of this command is unknown. Inspect workflow history and command receipts before retrying. Keep the exact request ID; use --json for an exact copy. Retry with the same key only if the Server advertises retained command admission; a request ID alone does not prevent duplicates.',
         ];
     }
 

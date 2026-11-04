@@ -71,7 +71,7 @@ final class WorkflowCommandRequestIdTest extends TestCase
                 if ($scenario !== 'success') { self::assertSame($message, $decoded['error']); }
                 if ($scenario === 'uncertain') {
                     $retry = array_values(array_filter($decoded['recommendations'], static fn (array $item): bool => $item['id'] === 'request_id.retry'));
-                    self::assertStringContainsString('--request-id='.$value, $retry[0]['message']);
+                    self::assertStringNotContainsString('--request-id=', $retry[0]['message']);
                 }
                 continue;
             }
@@ -458,7 +458,8 @@ final class WorkflowCommandRequestIdTest extends TestCase
 
         self::assertStringContainsString('Server unreachable: connection reset', $display);
         self::assertStringContainsString('Request ID: '.$key, $display);
-        self::assertStringContainsString('exact request ID with --request-id', $display);
+        self::assertStringContainsString('exact request ID', $display);
+        self::assertMatchesRegularExpression('/inspect[^.]*before retry/i', $display);
         self::assertStringNotContainsString('--request-id=', $display);
     }
 
@@ -495,7 +496,8 @@ final class WorkflowCommandRequestIdTest extends TestCase
             static fn (array $recommendation): bool => $recommendation['id'] === 'request_id.retry',
         ));
         self::assertCount(1, $retry);
-        self::assertStringContainsString('--request-id='.$key, $retry[0]['message']);
+        self::assertStringNotContainsString('--request-id=', $retry[0]['message']);
+        self::assertMatchesRegularExpression('/inspect[^.]*before retry/i', $retry[0]['message']);
     }
 
     public function test_update_server_error_json_includes_the_retry_key(): void

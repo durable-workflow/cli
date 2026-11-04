@@ -516,21 +516,30 @@ dw workflow:history order-123 01HXYZ
 dw workflow:history order-123 01HXYZ --follow
 ```
 
-`workflow:signal` and `workflow:update` send a durable command key as the
+`workflow:signal` and `workflow:update` send a caller command key as the
 `request_id` body field. The CLI generates `cli-signal-<hex>` or
-`cli-update-<hex>` once per invocation unless `--request-id` (1-255 bytes,
-opaque, case-sensitive) is given, and prints the key it used as `Request ID`
-in human output and as `request_id` in `--json` output, including in error
-envelopes after a timeout or network failure. Retrying the same command with
-that key returns the original receipt instead of recording a second signal or
-update; the response then carries `retained: true`, and `intent_verified`
-reports whether the server could compare the retry against the retained
-intent. A retry that reuses the key with a different name, arguments or run
-target fails with HTTP 409 and `reason: request_id_conflict`; the error names
-the key, the retained command (`retained_command_id`, `retained_command_type`,
-`retained_outcome`) and the mismatched `conflict` parts. Servers that predate
-keyed signals accept the field and omit the `retained`/`intent_verified`
-flags.
+`cli-update-<hex>` once per invocation only when `--request-id` is omitted.
+Explicit empty or whitespace-only keys are refused before POST. Keys contain
+1-255 Unicode code points (up to 1020 UTF-8 bytes), without normalization,
+truncation or case conversion. The key is shown safely in human output and
+preserved exactly in JSON/JSONL, including after a timeout or network failure.
+
+After a lost response the admission outcome is unknown. Inspect workflow
+history and command receipts before retrying; a key alone does not establish
+retry safety. Rely on the complete retained-admission and canonical-intent
+guarantee only when the Server advertises that published capability. Ordinary
+request-key storage and partial update receipt lookup do not supply the full
+signal/update guarantee. No currently qualified published Server tuple
+advertises that complete capability.
+
+When the Server reports receipt metadata, `retained: true` identifies an
+original receipt and `intent_verified` reports whether its intent was
+verified. Preserve its original status and exact target. A qualified
+retained-admission contract may refuse a different typed intent with HTTP 409
+and `reason: request_id_conflict`; the response identifies the retained
+command and conflict parts. Legacy receipts with unverified intent never
+authorize a new command. Deduplicated admission does not make external effects
+exactly once.
 
 Batch cancellation with `--all-matching` cancels the exact run each listed
 workflow had when it was selected. If that run has continued as new, been

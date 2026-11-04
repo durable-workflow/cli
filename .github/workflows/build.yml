@@ -212,7 +212,9 @@ jobs:
       - name: Fetch the pinned 2.x reference CLI
         run: parity/fetch-reference.sh
       - name: Compare against the 2.x CLI
-        run: python3 parity/parity.py --verbose
+        run: |
+          python3 -m unittest discover -s parity -p 'test_*.py'
+          python3 parity/parity.py --verbose
 
   target-branch-qualification:
     name: Target branch qualification

@@ -21,9 +21,11 @@
     "argv": {
       "workflow-id": "wf-polyglot-231",
       "signal-name": "approval.received",
+      "--request-id": "cli-signal-polyglot-231",
       "--input": "[{\"approved_by\":\"ada\",\"approved\":true,\"notes\":\"ship it\"}]"
     },
     "expected_body": {
+      "request_id": "cli-signal-polyglot-231",
       "input": [
         {
           "approved_by": "ada",

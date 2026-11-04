@@ -487,6 +487,7 @@ dw watch workflow order-123 --run-id=01HXYZ --interval=5 --max-polls=60
 
 # Send a signal
 dw workflow:signal order-123 payment-received --input='{"amount":99.99}'
+dw workflow:signal order-123 payment-received --input='{"amount":99.99}' --request-id=payment-order-123-2026-10-20
 dw workflow:signal counter-1 increment --input='["not-an-int"]' --output=json
 # {"error":"Server error: Signal argument validation failed.","exit_code":2,"status_code":422,"reason":"invalid_signal_arguments",...}
 
@@ -497,6 +498,7 @@ dw workflow:query counter-1 current-at --input='["not-an-int"]' --output=json
 
 # Send an update
 dw workflow:update order-123 approve --input='{"approver":"admin"}'
+dw workflow:update order-123 approve --input='{"approver":"admin"}' --wait=completed --request-id=approve-order-123-2026-10-20
 
 # Send an integration event through a bounded bridge adapter
 dw bridge:webhook stripe --action=start_workflow --idempotency-key=stripe-event-1001 --target='{"workflow_type":"orders.fulfillment","task_queue":"external-workflows","business_key":"order-1001"}' --input='{"order_id":"order-1001"}'
@@ -513,6 +515,31 @@ dw workflow:terminate order-123 --reason="Stuck workflow"
 dw workflow:history order-123 01HXYZ
 dw workflow:history order-123 01HXYZ --follow
 ```
+
+`workflow:signal` and `workflow:update` send a caller command key as the
+`request_id` body field. The CLI generates `cli-signal-<hex>` or
+`cli-update-<hex>` once per invocation only when `--request-id` is omitted.
+Explicit empty or whitespace-only keys are refused before POST. Keys contain
+1-255 Unicode code points (up to 1020 UTF-8 bytes), without normalization,
+truncation or case conversion. The key is shown safely in human output and
+preserved exactly in JSON/JSONL, including after a timeout or network failure.
+
+After a lost response the admission outcome is unknown. Inspect workflow
+history and command receipts before retrying; a key alone does not establish
+retry safety. Rely on the complete retained-admission and canonical-intent
+guarantee only when the Server advertises that published capability. Ordinary
+request-key storage and partial update receipt lookup do not supply the full
+signal/update guarantee. No currently qualified published Server tuple
+advertises that complete capability.
+
+When the Server reports receipt metadata, `retained: true` identifies an
+original receipt and `intent_verified` reports whether its intent was
+verified. Preserve its original status and exact target. A qualified
+retained-admission contract may refuse a different typed intent with HTTP 409
+and `reason: request_id_conflict`; the response identifies the retained
+command and conflict parts. Legacy receipts with unverified intent never
+authorize a new command. Deduplicated admission does not make external effects
+exactly once.
 
 Batch cancellation with `--all-matching` cancels the exact run each listed
 workflow had when it was selected. If that run has continued as new, been

@@ -106,7 +106,7 @@ final class ControlPlaneRequestContract
         $rejectedAliases = $this->stringMap($definition['rejected_aliases'] ?? null);
 
         if (array_key_exists($value, $rejectedAliases)) {
-            throw new \RuntimeException(sprintf(
+            throw new InvalidOptionException(sprintf(
                 'Server contract rejects %s value [%s]; use [%s].',
                 $displayField,
                 $value,
@@ -120,7 +120,7 @@ final class ControlPlaneRequestContract
             return;
         }
 
-        throw new \RuntimeException(sprintf(
+        throw new InvalidOptionException(sprintf(
             'Server contract expects %s to be one of [%s]; got [%s].',
             $displayField,
             implode(', ', $canonicalValues),

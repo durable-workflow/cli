@@ -452,7 +452,7 @@ module.exports = {
   ASSETS, PLATFORMS, CELL_MILLISECONDS, releaseIdentity, childEnvironment, nativePlatform,
   checksums, verifyEmbeddedPhar, verifyNativeBinary, remaining, tagCommit, verifyBundle, publicResponse,
   assertPackageIdentity, assertVerifiedInputs, assertInstalledInspection,
-  readState, cleanup, verify, exercise, install,
+  readState, cleanup, verify, exercise, install, packageMetadata,
 };
 
 async function main() {

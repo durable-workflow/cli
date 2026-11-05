@@ -5773,6 +5773,1143 @@
      }
     }
    }
+  },
+  {
+   "name": "namespace create JSON",
+   "argv": [
+    "namespace:create",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "method": "POST",
+     "status": 200,
+     "body": {
+      "name": "billing",
+      "message": "retained"
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace create JSONL",
+   "argv": [
+    "namespace:create",
+    "billing",
+    "--server={mock}",
+    "--output=jsonl"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "method": "POST",
+     "status": 200,
+     "body": {
+      "name": "billing",
+      "message": "retained"
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace create human",
+   "argv": [
+    "namespace:create",
+    "billing",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "method": "POST",
+     "status": 200,
+     "body": {
+      "name": "billing",
+      "message": "retained"
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace create HTTP 401",
+   "argv": [
+    "namespace:create",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "method": "POST",
+     "status": 401,
+     "body": {
+      "message": "Namespace operation refused.",
+      "reason": "fixture"
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace create HTTP 403",
+   "argv": [
+    "namespace:create",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "method": "POST",
+     "status": 403,
+     "body": {
+      "message": "Namespace operation refused.",
+      "reason": "fixture"
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace create HTTP 404",
+   "argv": [
+    "namespace:create",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "method": "POST",
+     "status": 404,
+     "body": {
+      "message": "Namespace operation refused.",
+      "reason": "fixture"
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace create HTTP 422",
+   "argv": [
+    "namespace:create",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "method": "POST",
+     "status": 422,
+     "body": {
+      "message": "Namespace operation refused.",
+      "reason": "fixture"
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace create HTTP 500",
+   "argv": [
+    "namespace:create",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "method": "POST",
+     "status": 500,
+     "body": {
+      "message": "Namespace operation refused.",
+      "reason": "fixture"
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace create HTTP 503",
+   "argv": [
+    "namespace:create",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "method": "POST",
+     "status": 503,
+     "body": {
+      "message": "Namespace operation refused.",
+      "reason": "fixture"
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace create empty successful response",
+   "argv": [
+    "namespace:create",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "method": "POST",
+     "status": 204,
+     "body": ""
+    }
+   }
+  },
+  {
+   "name": "namespace create redirect is refused without following",
+   "argv": [
+    "namespace:create",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "method": "POST",
+     "status": 302,
+     "body": {
+      "message": "redirected"
+     },
+     "headers": {
+      "Location": "/no-replay"
+     }
+    }
+   },
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "exit_code",
+      "stdout_json"
+     ],
+     "reason": "The SDK makes one target attempt without following redirects. Rust refuses the initial 3xx; the PHP reference follows the redirect and receives a different refusal. Use the actual Server URL (cli#72)."
+    }
+   }
+  },
+  {
+   "name": "namespace update JSON",
+   "argv": [
+    "namespace:update",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "method": "PUT",
+     "status": 200,
+     "body": {
+      "name": "billing",
+      "message": "retained"
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace update JSONL",
+   "argv": [
+    "namespace:update",
+    "billing",
+    "--server={mock}",
+    "--output=jsonl"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "method": "PUT",
+     "status": 200,
+     "body": {
+      "name": "billing",
+      "message": "retained"
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace update human",
+   "argv": [
+    "namespace:update",
+    "billing",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "method": "PUT",
+     "status": 200,
+     "body": {
+      "name": "billing",
+      "message": "retained"
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace update HTTP 401",
+   "argv": [
+    "namespace:update",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "method": "PUT",
+     "status": 401,
+     "body": {
+      "message": "Namespace operation refused.",
+      "reason": "fixture"
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace update HTTP 403",
+   "argv": [
+    "namespace:update",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "method": "PUT",
+     "status": 403,
+     "body": {
+      "message": "Namespace operation refused.",
+      "reason": "fixture"
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace update HTTP 404",
+   "argv": [
+    "namespace:update",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "method": "PUT",
+     "status": 404,
+     "body": {
+      "message": "Namespace operation refused.",
+      "reason": "fixture"
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace update HTTP 422",
+   "argv": [
+    "namespace:update",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "method": "PUT",
+     "status": 422,
+     "body": {
+      "message": "Namespace operation refused.",
+      "reason": "fixture"
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace update HTTP 500",
+   "argv": [
+    "namespace:update",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "method": "PUT",
+     "status": 500,
+     "body": {
+      "message": "Namespace operation refused.",
+      "reason": "fixture"
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace update HTTP 503",
+   "argv": [
+    "namespace:update",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "method": "PUT",
+     "status": 503,
+     "body": {
+      "message": "Namespace operation refused.",
+      "reason": "fixture"
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace update empty successful response",
+   "argv": [
+    "namespace:update",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "method": "PUT",
+     "status": 204,
+     "body": ""
+    }
+   }
+  },
+  {
+   "name": "namespace update redirect is refused without following",
+   "argv": [
+    "namespace:update",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "method": "PUT",
+     "status": 302,
+     "body": {
+      "message": "redirected"
+     },
+     "headers": {
+      "Location": "/no-replay"
+     }
+    }
+   },
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "exit_code",
+      "stdout_json"
+     ],
+     "reason": "The SDK makes one target attempt without following redirects. Rust refuses the initial 3xx; the PHP reference follows the redirect and receives a different refusal. Use the actual Server URL (cli#72)."
+    }
+   }
+  },
+  {
+   "name": "namespace delete JSON",
+   "argv": [
+    "namespace:delete",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "method": "DELETE",
+     "status": 200,
+     "body": {
+      "name": "billing",
+      "message": "retained"
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace delete JSONL",
+   "argv": [
+    "namespace:delete",
+    "billing",
+    "--server={mock}",
+    "--output=jsonl"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "method": "DELETE",
+     "status": 200,
+     "body": {
+      "name": "billing",
+      "message": "retained"
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace delete human",
+   "argv": [
+    "namespace:delete",
+    "billing",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "method": "DELETE",
+     "status": 200,
+     "body": {
+      "name": "billing",
+      "message": "retained"
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace delete HTTP 401",
+   "argv": [
+    "namespace:delete",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "method": "DELETE",
+     "status": 401,
+     "body": {
+      "message": "Namespace operation refused.",
+      "reason": "fixture"
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace delete HTTP 403",
+   "argv": [
+    "namespace:delete",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "method": "DELETE",
+     "status": 403,
+     "body": {
+      "message": "Namespace operation refused.",
+      "reason": "fixture"
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace delete HTTP 404",
+   "argv": [
+    "namespace:delete",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "method": "DELETE",
+     "status": 404,
+     "body": {
+      "message": "Namespace operation refused.",
+      "reason": "fixture"
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace delete HTTP 422",
+   "argv": [
+    "namespace:delete",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "method": "DELETE",
+     "status": 422,
+     "body": {
+      "message": "Namespace operation refused.",
+      "reason": "fixture"
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace delete HTTP 500",
+   "argv": [
+    "namespace:delete",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "method": "DELETE",
+     "status": 500,
+     "body": {
+      "message": "Namespace operation refused.",
+      "reason": "fixture"
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace delete HTTP 503",
+   "argv": [
+    "namespace:delete",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "method": "DELETE",
+     "status": 503,
+     "body": {
+      "message": "Namespace operation refused.",
+      "reason": "fixture"
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace delete empty successful response",
+   "argv": [
+    "namespace:delete",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "method": "DELETE",
+     "status": 204,
+     "body": ""
+    }
+   }
+  },
+  {
+   "name": "namespace delete redirect is refused without following",
+   "argv": [
+    "namespace:delete",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "method": "DELETE",
+     "status": 302,
+     "body": {
+      "message": "redirected"
+     },
+     "headers": {
+      "Location": "/no-replay"
+     }
+    }
+   },
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "exit_code",
+      "stdout_json"
+     ],
+     "reason": "The SDK makes one target attempt without following redirects. Rust refuses the initial 3xx; the PHP reference follows the redirect and receives a different refusal. Use the actual Server URL (cli#72)."
+    }
+   }
+  },
+  {
+   "name": "namespace create exact request body 0",
+   "argv": [
+    "namespace:create",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "method": "POST",
+     "status": 200,
+     "body": {},
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "namespace create exact request body 1",
+   "argv": [
+    "namespace:create",
+    "billing",
+    "--server={mock}",
+    "--description=",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "method": "POST",
+     "status": 200,
+     "body": {},
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "namespace create exact request body 2",
+   "argv": [
+    "namespace:create",
+    "billing",
+    "--server={mock}",
+    "--description",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "method": "POST",
+     "status": 200,
+     "body": {},
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "namespace create exact request body 3",
+   "argv": [
+    "namespace:create",
+    "billing",
+    "--server={mock}",
+    "--description=changed",
+    "--retention=-4",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "method": "POST",
+     "status": 200,
+     "body": {},
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "namespace create exact request body 4",
+   "argv": [
+    "namespace:create",
+    "billing",
+    "--server={mock}",
+    "--retention",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "method": "POST",
+     "status": 200,
+     "body": {},
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "namespace create exact request body 5",
+   "argv": [
+    "namespace:create",
+    "billing",
+    "--server={mock}",
+    "--retention=",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "method": "POST",
+     "status": 200,
+     "body": {},
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "namespace create exact request body 6",
+   "argv": [
+    "namespace:create",
+    "billing",
+    "--server={mock}",
+    "--retention=0",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "method": "POST",
+     "status": 200,
+     "body": {},
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "namespace create exact request body 7",
+   "argv": [
+    "namespace:create",
+    "billing",
+    "--server={mock}",
+    "--retention=0.0",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "method": "POST",
+     "status": 200,
+     "body": {},
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "namespace create exact request body 8",
+   "argv": [
+    "namespace:create",
+    "billing",
+    "--server={mock}",
+    "--retention=7.9days",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "method": "POST",
+     "status": 200,
+     "body": {},
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "namespace create exact request body 9",
+   "argv": [
+    "namespace:create",
+    "billing",
+    "--server={mock}",
+    "--retention=1e3",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "method": "POST",
+     "status": 200,
+     "body": {},
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "namespace create exact request body 10",
+   "argv": [
+    "namespace:create",
+    "billing",
+    "--server={mock}",
+    "--retention=9999999999999999999999999",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "method": "POST",
+     "status": 200,
+     "body": {},
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "namespace create exact request body 11",
+   "argv": [
+    "namespace:create",
+    "billing",
+    "--server={mock}",
+    "--retention=noise",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "method": "POST",
+     "status": 200,
+     "body": {},
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "namespace update exact request body 0",
+   "argv": [
+    "namespace:update",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "method": "PUT",
+     "status": 200,
+     "body": {},
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "namespace update exact request body 1",
+   "argv": [
+    "namespace:update",
+    "billing",
+    "--server={mock}",
+    "--description=",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "method": "PUT",
+     "status": 200,
+     "body": {},
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "namespace update exact request body 2",
+   "argv": [
+    "namespace:update",
+    "billing",
+    "--server={mock}",
+    "--description",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "method": "PUT",
+     "status": 200,
+     "body": {},
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "namespace update exact request body 3",
+   "argv": [
+    "namespace:update",
+    "billing",
+    "--server={mock}",
+    "--description=changed",
+    "--retention=-4",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "method": "PUT",
+     "status": 200,
+     "body": {},
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "namespace update exact request body 4",
+   "argv": [
+    "namespace:update",
+    "billing",
+    "--server={mock}",
+    "--retention",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "method": "PUT",
+     "status": 200,
+     "body": {},
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "namespace update exact request body 5",
+   "argv": [
+    "namespace:update",
+    "billing",
+    "--server={mock}",
+    "--retention=",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "method": "PUT",
+     "status": 200,
+     "body": {},
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "namespace update exact request body 6",
+   "argv": [
+    "namespace:update",
+    "billing",
+    "--server={mock}",
+    "--retention=0",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "method": "PUT",
+     "status": 200,
+     "body": {},
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "namespace update exact request body 7",
+   "argv": [
+    "namespace:update",
+    "billing",
+    "--server={mock}",
+    "--retention=0.0",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "method": "PUT",
+     "status": 200,
+     "body": {},
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "namespace update exact request body 8",
+   "argv": [
+    "namespace:update",
+    "billing",
+    "--server={mock}",
+    "--retention=7.9days",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "method": "PUT",
+     "status": 200,
+     "body": {},
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "namespace update exact request body 9",
+   "argv": [
+    "namespace:update",
+    "billing",
+    "--server={mock}",
+    "--retention=1e3",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "method": "PUT",
+     "status": 200,
+     "body": {},
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "namespace update exact request body 10",
+   "argv": [
+    "namespace:update",
+    "billing",
+    "--server={mock}",
+    "--retention=9999999999999999999999999",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "method": "PUT",
+     "status": 200,
+     "body": {},
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "namespace update exact request body 11",
+   "argv": [
+    "namespace:update",
+    "billing",
+    "--server={mock}",
+    "--retention=noise",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "method": "PUT",
+     "status": 200,
+     "body": {},
+     "echo_request": true
+    }
+   }
   }
  ]
 }

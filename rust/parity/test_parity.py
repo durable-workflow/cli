@@ -3,8 +3,41 @@ import hashlib
 import json
 from pathlib import Path
 import unittest
+import urllib.error
+import urllib.request
 
 import parity
+
+
+class NamespaceRequestFixtureTest(unittest.TestCase):
+    def test_lifecycle_fixtures_echo_method_and_json_without_mutating_state(self):
+        routes = {"/" + method.lower(): {"method": method, "echo_request": True}
+                  for method in ("POST", "PUT", "DELETE")}
+        server = parity.MockServer({}, routes)
+        try:
+            for method, body in (("POST", {"description": "é", "retention_days": 0}),
+                                 ("PUT", []), ("DELETE", None)):
+                data = json.dumps(body).encode() if body is not None else None
+                request = urllib.request.Request(server.url + "/" + method.lower(), data=data, method=method)
+                with urllib.request.urlopen(request, timeout=3) as response:
+                    self.assertEqual({"request": {"method": method, "body": body}}, json.load(response))
+            with self.assertRaises(urllib.error.HTTPError) as error:
+                urllib.request.urlopen(server.url + "/post", timeout=3)
+            self.assertEqual(404, error.exception.code)
+            error.exception.close()
+        finally:
+            server.close()
+
+    def test_echo_body_is_bounded(self):
+        server = parity.MockServer({}, {"/bounded": {"method": "POST", "echo_request": True}})
+        try:
+            request = urllib.request.Request(server.url + "/bounded", data=b"x" * 65537, method="POST")
+            with self.assertRaises(urllib.error.HTTPError) as error:
+                urllib.request.urlopen(request, timeout=3)
+            self.assertEqual(413, error.exception.code)
+            error.exception.close()
+        finally:
+            server.close()
 
 
 class SchemaManifestParityTest(unittest.TestCase):

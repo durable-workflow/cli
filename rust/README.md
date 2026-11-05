@@ -25,12 +25,17 @@ every command group reaches parity.
 | `runtime:check`: native build identity and compilation target | Ported, intentional output/help difference |
 | `doctor`: redacted connection sources, server metadata, warnings and next steps | Ported |
 | `workflow:list`: one namespace/page, filters, Server envelopes, JSON and JSONL | Ported |
-| `namespace:list`, `namespace:describe`: visible namespaces/configuration, JSON and JSONL | Ported |
+| `namespace:list`, `namespace:describe`, `namespace:create`, `namespace:update`, `namespace:delete`: configuration and lifecycle, JSON and JSONL | Ported |
 | Workflow, namespace and schedule commands | Next slices |
 | `--tls-verify=false` against HTTPS | CLI support pending |
 
 Server calls go through the published `durable-workflow` crate, pinned to
 the latest qualified release.
+
+Namespace lifecycle requests make one target attempt and refuse HTTP redirects.
+Use the actual Server URL; a redirect is not reported as a completed creation,
+update or deletion. A lost response remains uncertain and is not automatically
+submitted again.
 
 ## Build and test
 

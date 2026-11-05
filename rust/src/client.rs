@@ -93,14 +93,26 @@ impl Context {
 
     /// One namespace visibility request over the SDK's configured transport.
     pub fn namespace_list(&self) -> Result<Value, CliError> {
-        self.namespace_read(RawRequest::get(["namespaces"]))
+        self.namespace_request(RawRequest::get(["namespaces"]))
     }
 
     pub fn namespace_describe(&self, name: &str) -> Result<Value, CliError> {
-        self.namespace_read(RawRequest::get(["namespaces", name]))
+        self.namespace_request(RawRequest::get(["namespaces", name]))
     }
 
-    fn namespace_read(&self, request: RawRequest) -> Result<Value, CliError> {
+    pub fn namespace_create(&self, body: Value) -> Result<Value, CliError> {
+        self.namespace_request(RawRequest::post(["namespaces"]).json(body))
+    }
+
+    pub fn namespace_update(&self, name: &str, body: Value) -> Result<Value, CliError> {
+        self.namespace_request(RawRequest::put(["namespaces", name]).json(body))
+    }
+
+    pub fn namespace_delete(&self, name: &str) -> Result<Value, CliError> {
+        self.namespace_request(RawRequest::delete(["namespaces", name]))
+    }
+
+    fn namespace_request(&self, request: RawRequest) -> Result<Value, CliError> {
         let request = request
             .protocol_version(compat::worker_protocol_version())
             .control_plane_version(compat::control_plane_version());
@@ -114,7 +126,7 @@ impl Context {
         let body = Value::Object(crate::php::array_map(
             response.json().unwrap_or(Value::Null),
         ));
-        if response.status() >= 400 {
+        if !response.is_success() {
             return Err(self.http_error(response.status(), &body));
         }
         Ok(body)

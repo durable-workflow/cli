@@ -72,6 +72,20 @@ impl Scratch {
             .output()
             .unwrap()
     }
+
+    fn mutation(&self, url: &str, verb: &str, name: &str, args: &[&str]) -> Output {
+        self.command_named(&format!("namespace:{verb}"))
+            .args([
+                name,
+                "--server",
+                url,
+                "--namespace=selected",
+                "--token=fixture-token",
+            ])
+            .args(args)
+            .output()
+            .unwrap()
+    }
 }
 impl Drop for Scratch {
     fn drop(&mut self) {
@@ -112,6 +126,20 @@ impl Server {
                                 Ok(size) => bytes.extend_from_slice(&buffer[..size]),
                             }
                         }
+                        if let Some(end) = bytes.windows(4).position(|part| part == b"\r\n\r\n") {
+                            let length = String::from_utf8_lossy(&bytes[..end])
+                                .lines()
+                                .filter_map(|line| line.split_once(':'))
+                                .find(|(name, _)| name.eq_ignore_ascii_case("content-length"))
+                                .and_then(|(_, length)| length.trim().parse::<usize>().ok())
+                                .unwrap_or(0);
+                            while bytes.len() < end + 4 + length && bytes.len() < 65536 {
+                                match stream.read(&mut buffer) {
+                                    Ok(0) | Err(_) => break,
+                                    Ok(size) => bytes.extend_from_slice(&buffer[..size]),
+                                }
+                            }
+                        }
                         let request = String::from_utf8(bytes).unwrap();
                         let cluster = request
                             .lines()
@@ -125,7 +153,12 @@ impl Server {
                             body.clone()
                         };
                         let status = if cluster { 200 } else { status };
-                        let headers = format!("HTTP/1.1 {status} Test\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", payload.len());
+                        let location = if (300..400).contains(&status) {
+                            "Location: /unexpected-redirect\r\n"
+                        } else {
+                            ""
+                        };
+                        let headers = format!("HTTP/1.1 {status} Test\r\n{location}Content-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", payload.len());
                         let _ = stream.write_all(headers.as_bytes());
                         let _ = stream.write_all(payload.as_bytes());
                     }
@@ -166,6 +199,22 @@ impl Server {
             .unwrap()
             .iter()
             .filter(|request| request.starts_with("GET /prefix/api/namespaces/"))
+            .cloned()
+            .collect()
+    }
+
+    fn resource_requests(&self) -> Vec<String> {
+        self.requests
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|request| {
+                request
+                    .lines()
+                    .next()
+                    .unwrap_or("")
+                    .contains("/api/namespaces")
+            })
             .cloned()
             .collect()
     }
@@ -492,4 +541,197 @@ fn namespace_describe_refuses_invalid_path_segments_before_the_target_request() 
         .output()
         .unwrap();
     assert_eq!(output.status.code(), Some(1));
+}
+
+fn request_body(request: &str) -> Value {
+    serde_json::from_str(request.split_once("\r\n\r\n").unwrap().1).unwrap()
+}
+
+#[test]
+fn namespace_create_posts_the_exact_php_payload_once_with_sdk_auth() {
+    let scratch = Scratch::new();
+    for (args, expected) in [
+        (
+            vec![],
+            json!({"name":"billing", "description":null, "retention_days":30}),
+        ),
+        (
+            vec!["--description=", "--retention=0"],
+            json!({"name":"billing", "description":"", "retention_days":0}),
+        ),
+        (
+            vec!["--description", "--retention"],
+            json!({"name":"billing", "description":null, "retention_days":0}),
+        ),
+        (
+            vec!["-d", "details", "-r", "7.9days"],
+            json!({"name":"billing", "description":"details", "retention_days":7}),
+        ),
+    ] {
+        let server = Server::new(info(), 201, r#"{"message":"created","retained":"value"}"#);
+        let mut flags = args;
+        flags.push("--json");
+        let result = success(scratch.mutation(&server.url, "create", "billing", &flags));
+        assert_eq!(result["namespace"], "billing");
+        assert_eq!(result["retained"], "value");
+        let requests = server.resource_requests();
+        assert_eq!(requests.len(), 1);
+        assert!(requests[0].starts_with("POST /prefix/api/namespaces HTTP/1.1"));
+        assert!(requests[0].contains("Bearer fixture-token") && requests[0].contains("selected"));
+        assert_eq!(request_body(&requests[0]), expected);
+    }
+}
+
+#[test]
+fn namespace_update_sends_only_php_selected_fields_and_keeps_the_empty_array_body() {
+    let scratch = Scratch::new();
+    for (flags, expected) in [
+        (vec![], json!([])),
+        (vec!["--description"], json!([])),
+        (vec!["--description="], json!({"description":""})),
+        (vec!["--retention=0"], json!([])),
+        (vec!["--retention="], json!([])),
+        (vec!["--retention=0.0"], json!({"retention_days":0})),
+        (vec!["--retention=noise"], json!({"retention_days":0})),
+        (
+            vec!["--retention=-4", "--description=changed"],
+            json!({"retention_days":-4,"description":"changed"}),
+        ),
+    ] {
+        let server = Server::new(info(), 200, "{}");
+        let mut flags = flags;
+        flags.push("--output=jsonl");
+        assert_eq!(
+            success(scratch.mutation(&server.url, "update", "bill /?#é", &flags))["namespace"],
+            "bill /?#é"
+        );
+        let requests = server.resource_requests();
+        assert_eq!(requests.len(), 1);
+        assert!(requests[0]
+            .to_lowercase()
+            .starts_with("put /prefix/api/namespaces/bill%20%2f%3f%23%c3%a9 http/1.1"));
+        assert_eq!(request_body(&requests[0]), expected);
+    }
+}
+
+#[test]
+fn namespace_delete_uses_one_encoded_bodyless_request_and_literal_result_text() {
+    let scratch = Scratch::new();
+    let attack = "<error>remote</error>\nFORGED\u{1b}[2J";
+    let server = Server::new(info(), 200, &json!({"namespace":attack}).to_string());
+    let output = scratch.mutation(&server.url, "delete", "bill /?#é", &[]);
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        "Namespace deleted: <error>remote</error>\\nFORGED\\u{001b}[2J\n"
+    );
+    let requests = server.resource_requests();
+    assert_eq!(requests.len(), 1);
+    assert!(requests[0]
+        .to_lowercase()
+        .starts_with("delete /prefix/api/namespaces/bill%20%2f%3f%23%c3%a9 http/1.1"));
+    assert_eq!(requests[0].split_once("\r\n\r\n").unwrap().1, "");
+}
+
+#[test]
+fn namespace_writes_do_not_retry_or_insert_a_selected_namespace_on_http_refusal() {
+    let scratch = Scratch::new();
+    for verb in ["create", "update", "delete"] {
+        for (status, exit) in [(401, 4), (403, 4), (404, 5), (422, 2), (500, 6), (503, 6)] {
+            let server = Server::new(
+                info(),
+                status,
+                r#"{"message":"lifecycle refused","reason":"fixture"}"#,
+            );
+            let output = scratch.mutation(&server.url, verb, "billing", &["--json"]);
+            assert_eq!(output.status.code(), Some(exit));
+            let result: Value = serde_json::from_slice(&output.stdout).unwrap();
+            assert!(result.get("namespace").is_none());
+            assert_eq!(result["reason"], "fixture");
+            assert_eq!(result["command"], format!("namespace:{verb}"));
+            assert_eq!(server.resource_requests().len(), 1);
+        }
+    }
+}
+
+#[test]
+fn namespace_writes_refuse_usage_path_tls_and_compatibility_errors_before_mutation() {
+    let scratch = Scratch::new();
+    for verb in ["create", "update", "delete"] {
+        let server = Server::new(info(), 200, "{}");
+        assert_eq!(
+            scratch
+                .mutation(&server.url, verb, "billing", &["--unknown"])
+                .status
+                .code(),
+            Some(1)
+        );
+        assert!(server.requests.lock().unwrap().is_empty());
+        for name in ["", ".", ".."] {
+            if verb != "create" {
+                assert_eq!(
+                    scratch
+                        .mutation(&server.url, verb, name, &["--json"])
+                        .status
+                        .code(),
+                    Some(2)
+                );
+                assert!(server.resource_requests().is_empty());
+            }
+        }
+        let https = server.url.replacen("http:", "https:", 1);
+        assert_eq!(
+            scratch
+                .mutation(&https, verb, "billing", &["--tls-verify=false", "--json"])
+                .status
+                .code(),
+            Some(2)
+        );
+        assert!(server.resource_requests().is_empty());
+        let mut incompatible = info();
+        incompatible["control_plane"]["version"] = json!("99");
+        let server = Server::new(incompatible, 200, "{}");
+        assert_eq!(
+            scratch
+                .mutation(&server.url, verb, "billing", &["--json"])
+                .status
+                .code(),
+            Some(8)
+        );
+        assert!(server.resource_requests().is_empty());
+    }
+}
+
+#[test]
+fn namespace_writes_refuse_redirects_without_following_or_claiming_a_completed_operation() {
+    let scratch = Scratch::new();
+    for verb in ["create", "update", "delete"] {
+        for status in [301, 302, 303, 307, 308] {
+            let server = Server::new(
+                info(),
+                status,
+                r#"{"message":"redirected","name":"billing"}"#,
+            );
+            let output = scratch.mutation(&server.url, verb, "billing", &["--json"]);
+            assert_eq!(output.status.code(), Some(1));
+            let result: Value = serde_json::from_slice(&output.stdout).unwrap();
+            assert_eq!(result["exit_code"], 1);
+            assert_eq!(server.resource_requests().len(), 1);
+            assert!(
+                server.requests.lock().unwrap().iter().all(|request| {
+                    request
+                        .lines()
+                        .next()
+                        .unwrap_or("")
+                        .contains("/api/cluster/info ")
+                        || request
+                            .lines()
+                            .next()
+                            .unwrap_or("")
+                            .contains("/api/namespaces")
+                }),
+                "a redirect must not select another target route"
+            );
+        }
+    }
 }

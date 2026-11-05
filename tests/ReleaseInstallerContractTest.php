@@ -259,13 +259,13 @@ SH;
     {
         $releaseWorkflow = self::readRepoFile('.github/workflows/release.yml');
 
-        self::assertSame(2, substr_count($releaseWorkflow, "SPC_VERSION: '2.8.5'"));
-        self::assertSame(2, substr_count(
+        self::assertSame(2, preg_match_all("/^      SPC_VERSION: '2\.8\.5'$/m", $releaseWorkflow));
+        self::assertSame(2, preg_match_all(
+            '/^      SPC_REVISION: 4318ef8fa32a02460ec1554746674a7bc42b49fa$/m',
             $releaseWorkflow,
-            'SPC_REVISION: 4318ef8fa32a02460ec1554746674a7bc42b49fa',
         ));
-        self::assertSame(1, substr_count($releaseWorkflow, "PHP_VERSION: '8.4.27'"));
-        self::assertSame(1, substr_count($releaseWorkflow, "PHP_VERSION_WINDOWS: '8.4.27'"));
+        self::assertSame(1, preg_match_all("/^      PHP_VERSION: '8\.4\.27'$/m", $releaseWorkflow));
+        self::assertSame(1, preg_match_all("/^      PHP_VERSION_WINDOWS: '8\.4\.27'$/m", $releaseWorkflow));
         self::assertStringContainsString(
             'spc_sha256: 523ba4279c54c7a377156c0dd3a36adf92ee64b01e9a7f5e9e2ec084b8e458e5',
             $releaseWorkflow,
@@ -341,13 +341,16 @@ SH;
             'release-toolchain-control\.github\workflows\release.yml',
             $releaseWorkflow,
         );
-        self::assertSame(4, substr_count($releaseWorkflow, 'schema=durable-workflow.phpmicro-cache/v1'));
+        self::assertStringNotContainsString('schema=durable-workflow.phpmicro-cache/v1', $releaseWorkflow);
+        self::assertSame(2, substr_count($releaseWorkflow, "PHPMICRO_CACHE_SCHEMA: 'v2-cli-micro'"));
+        self::assertSame(2, substr_count($releaseWorkflow, 'cache-check '));
+        self::assertSame(2, substr_count($releaseWorkflow, 'cache-write '));
         self::assertSame(2, substr_count($releaseWorkflow, 'cache_valid=true'));
         self::assertSame(5, substr_count(
             $releaseWorkflow,
             "if: steps.verify-phpmicro-cache.outputs.cache_valid != 'true'",
         ));
-        self::assertStringContainsString('Discarding untrusted or invalid phpmicro cache', $releaseWorkflow);
+        self::assertStringContainsString('No complete CLI+micro cache matches this exact recipe', $releaseWorkflow);
         self::assertStringContainsString('rm -rf source buildroot', $releaseWorkflow);
         self::assertStringNotContainsString('rm -rf downloads source buildroot', $releaseWorkflow);
         self::assertStringContainsString(

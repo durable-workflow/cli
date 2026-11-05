@@ -41,11 +41,6 @@ on:
 permissions:
   contents: read
 
-env:
-  VERIFIER_PHP_VERSION: '8.4.27'
-  VERIFIER_SPC_VERSION: '2.8.5'
-  VERIFIER_SPC_REVISION: 4318ef8fa32a02460ec1554746674a7bc42b49fa
-
 concurrency:
   group: >-
     ${{
@@ -1766,6 +1761,9 @@ jobs:
     outputs:
       tools: ${{ steps.bind.outputs.tools }}
     env:
+      VERIFIER_PHP_VERSION: '8.4.27'
+      VERIFIER_SPC_VERSION: '2.8.5'
+      VERIFIER_SPC_REVISION: 4318ef8fa32a02460ec1554746674a7bc42b49fa
       RELEASE_CONTROL_COMMIT: ${{ needs.resolve-release.outputs.control_commit }}
       VERIFIED_SOURCE_SHA: ${{ needs.resolve-release.outputs.commit }}
       VERIFIER_ARTIFACT_DIRECTORY: private-verifier-artifacts
@@ -2082,6 +2080,9 @@ jobs:
           - name: windows-x86_64
             runner: windows-2022
     env:
+      VERIFIER_PHP_VERSION: '8.4.27'
+      VERIFIER_SPC_VERSION: '2.8.5'
+      VERIFIER_SPC_REVISION: 4318ef8fa32a02460ec1554746674a7bc42b49fa
       RELEASE_TAG: ${{ needs.resolve-release.outputs.tag }}
       VERIFIED_SOURCE_SHA: ${{ needs.resolve-release.outputs.commit }}
       RELEASE_CONTROL_REF: ${{ needs.resolve-release.outputs.control_ref }}
@@ -2185,6 +2186,9 @@ jobs:
           - name: windows-x86_64
             runner: windows-2022
     env:
+      VERIFIER_PHP_VERSION: '8.4.27'
+      VERIFIER_SPC_VERSION: '2.8.5'
+      VERIFIER_SPC_REVISION: 4318ef8fa32a02460ec1554746674a7bc42b49fa
       RELEASE_TAG: ${{ needs.resolve-release.outputs.tag }}
       VERIFIED_SOURCE_SHA: ${{ needs.resolve-release.outputs.commit }}
       RELEASE_CONTROL_REF: ${{ needs.resolve-release.outputs.control_ref }}

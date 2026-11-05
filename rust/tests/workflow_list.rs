@@ -450,8 +450,12 @@ fn malformed_success_is_refused_and_remote_human_values_are_not_terminal_instruc
 #[test]
 fn runs_encodes_one_identifier_with_sdk_auth_and_preserves_the_exact_envelope() {
     let scratch = Scratch::new();
-    let server = Server::new(info(), 200, Some("2"), runs_body());
-    let output = scratch.run_command("workflow:list-runs", &server.url, &["order /?#é", "--json"]);
+    let id = "order /?#é";
+    let mut response = runs_body();
+    response["workflow_id"] = json!(id);
+    response["control_plane"]["workflow_id"] = json!(id);
+    let server = Server::new(info(), 200, Some("2"), response);
+    let output = scratch.run_command("workflow:list-runs", &server.url, &[id, "--json"]);
     let result = success(&output);
     assert_eq!(result["namespace"], "orders");
     assert_eq!(result["runs"][0]["namespace"], "orders");
@@ -592,6 +596,8 @@ fn runs_contract_errors_name_the_requested_path_and_human_values_stay_literal() 
     response["runs"][0]["run_id"] = json!(attack);
     response["runs"][0]["status"] = json!(attack);
     response["run_count"] = json!(attack);
+    response["workflow_id"] = json!(attack);
+    response["control_plane"]["workflow_id"] = json!(attack);
     let server = Server::new(info(), 200, Some("2"), response);
     let output = scratch.run_command("workflow:list-runs", &server.url, &[attack]);
     assert_eq!(output.status.code(), Some(0));
@@ -603,4 +609,64 @@ fn runs_contract_errors_name_the_requested_path_and_human_values_stay_literal() 
     let result =
         success(&scratch.run_command("workflow:list-runs", &server.url, &[attack, "--json"]));
     assert_eq!(result["runs"][0]["run_id"], attack);
+}
+
+#[test]
+fn runs_success_must_match_the_requested_workflow_operation_and_present_row_identities() {
+    let scratch = Scratch::new();
+    let mut cases = Vec::new();
+    let mut foreign = runs_body();
+    foreign["workflow_id"] = json!("foreign");
+    foreign["control_plane"]["workflow_id"] = json!("foreign");
+    cases.push(foreign);
+    for value in [json!("foreign"), json!(null), json!(42)] {
+        let mut response = runs_body();
+        response["runs"][0]["workflow_id"] = value;
+        cases.push(response);
+    }
+    let mut wrong_operation = runs_body();
+    wrong_operation["control_plane"]["operation"] = json!("describe");
+    cases.push(wrong_operation);
+    let mut wrong_projection = runs_body();
+    wrong_projection["control_plane_operation"] = json!("describe");
+    cases.push(wrong_projection);
+    let mut scalar_run = runs_body();
+    scalar_run["runs"][0] = json!("not a run record");
+    cases.push(scalar_run);
+    let expected = vec![Some(1); cases.len()];
+    let mut codes = Vec::new();
+    for response in cases {
+        let server = Server::new(info(), 200, Some("2"), response);
+        let output = scratch.run_command("workflow:list-runs", &server.url, &["wf-runs", "--json"]);
+        codes.push(output.status.code());
+        if output.status.code() == Some(1) {
+            let error: Value = serde_json::from_slice(&output.stdout).unwrap();
+            assert_eq!(error["workflow_id"], "wf-runs");
+            assert!(error.get("runs").is_none());
+        }
+        assert_eq!(server.runs_requests().len(), 1);
+    }
+    assert_eq!(codes, expected);
+}
+
+#[test]
+fn runs_accepts_the_published_php_shape_and_matching_explicit_row_identities() {
+    let scratch = Scratch::new();
+    for explicit in [false, true] {
+        let mut response = runs_body();
+        if explicit {
+            for row in response["runs"].as_array_mut().unwrap() {
+                row["workflow_id"] = json!("wf-runs");
+            }
+        }
+        let server = Server::new(info(), 200, Some("2"), response);
+        let result = success(&scratch.run_command(
+            "workflow:list-runs",
+            &server.url,
+            &["wf-runs", "--json"],
+        ));
+        assert_eq!(result["runs"][0].get("workflow_id").is_some(), explicit);
+        assert_eq!(result["next_page_token"], "retained-without-following");
+        assert_eq!(server.runs_requests().len(), 1);
+    }
 }

@@ -102,10 +102,11 @@ impl Context {
 
     /// Read one workflow's runs. The SDK encodes the identifier as one segment.
     pub fn workflow_runs(&self, workflow_id: &str) -> Result<Value, CliError> {
-        self.workflow_read(
+        let result = self.workflow_read(
             RawRequest::get(["workflows", workflow_id, "runs"]),
             &format!("/workflows/{workflow_id}/runs"),
-        )
+        )?;
+        workflow_response::bind_runs(result, workflow_id).map_err(CliError::Failure)
     }
 
     fn workflow_read(&self, request: RawRequest, path: &str) -> Result<Value, CliError> {

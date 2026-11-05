@@ -192,6 +192,41 @@ pub fn normalize(
     Ok(Value::Object(body))
 }
 
+/// Bind a successful read to its request before any run data is printed.
+pub fn bind_runs(body: Value, workflow_id: &str) -> Result<Value, String> {
+    let path = format!("/workflows/{workflow_id}/runs");
+    let contract = body.get("control_plane").unwrap_or(&Value::Null);
+    if body.get("workflow_id").and_then(Value::as_str) != Some(workflow_id)
+        || contract.get("workflow_id").and_then(Value::as_str) != Some(workflow_id)
+    {
+        return Err(format!("Server error: run-list response for [{path}] does not match the requested workflow identity."));
+    }
+    if contract.get("operation").and_then(Value::as_str) != Some("list_runs")
+        || body.get("control_plane_operation").and_then(Value::as_str) != Some("list_runs")
+    {
+        return Err(format!(
+            "Server error: run-list response for [{path}] does not describe operation [list_runs]."
+        ));
+    }
+    let records = body.get("runs").and_then(Value::as_array).ok_or_else(|| {
+        format!("Server error: run-list response for [{path}] must contain run records.")
+    })?;
+    for record in records {
+        let fields = record.as_object().ok_or_else(|| {
+            format!("Server error: run-list response for [{path}] contains an invalid run record.")
+        })?;
+        // Published PHP Server 2.11.8 omits this field. Such rows inherit the
+        // verified envelope; any explicit identity must match without coercion.
+        if fields
+            .get("workflow_id")
+            .is_some_and(|value| value.as_str() != Some(workflow_id))
+        {
+            return Err(format!("Server error: run-list response for [{path}] contains a run for a different or unknown workflow."));
+        }
+    }
+    Ok(body)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

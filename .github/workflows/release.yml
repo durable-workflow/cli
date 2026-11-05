@@ -1867,6 +1867,9 @@ jobs:
               MAKE_LATEST=false
             fi
           fi
+          # Keep the accepted default until all four installed checks pass.
+          # Later promotion is a separate reviewed operation.
+          MAKE_LATEST=false
           flags=(--verify-tag --title "$RELEASE_TAG" --notes-file release-notes.md --generate-notes "--latest=$MAKE_LATEST")
           if [ "$PRERELEASE" = "true" ]; then
             flags+=(--prerelease)

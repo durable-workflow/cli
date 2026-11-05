@@ -7,7 +7,7 @@ const http = require('node:http');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
-const {execFile} = require('node:child_process');
+const {execFile, spawnSync} = require('node:child_process');
 const {promisify} = require('node:util');
 const {ASSETS} = require('./verify-installed-release');
 const {RUST_REQUIRED_ASSETS} = require('./verify-cli-release-channel');
@@ -146,7 +146,7 @@ test('capture refuses drifting Latest and unknown release/asset identities', t =
 test('workflow delivers one exact private snapshot only to build smoke, with no credential in execution', () => {
   const workflow = fs.readFileSync(path.join(__dirname, '../../.github/workflows/release.yml'), 'utf8');
   const controller = workflow.split('\n  resolve-release:')[1].split('\n  release-preflight:')[0];
-  assert.equal(controller.split('run-upgrade-smoke.js capture').length - 1, 1);
+  assert.equal(controller.split('run-upgrade-smoke.mjs capture').length - 1, 1);
   assert.match(controller, /GH_TOKEN: \$\{\{ github.token \}\}/);
   assert.match(controller, /archive: false\n\s+name: upgrade-smoke-metadata/);
   assert.match(controller, /smoke_metadata_digest: \$\{\{ steps.smoke_metadata.outputs.artifact-digest \}\}/);
@@ -158,14 +158,32 @@ test('workflow delivers one exact private snapshot only to build smoke, with no 
     const smoke = job.split('      - name: Smoke test binary')[1]
       .split('      - name: Retain deterministic upgrade build-smoke evidence')[0];
     assert.match(smoke, /EXPECTED_METADATA_SHA256: \$\{\{ needs.resolve-release.outputs.smoke_metadata_digest \}\}/);
-    assert.doesNotMatch(smoke, /GH_TOKEN|GITHUB_TOKEN|github.token/);
-    assert.match(smoke, /run-upgrade-smoke.js exercise/);
+    for (const name of ['GH_TOKEN', 'GITHUB_TOKEN', 'GH_ENTERPRISE_TOKEN', 'GITHUB_ENTERPRISE_TOKEN']) {
+      assert.match(smoke, new RegExp(`^          ${name}: ''$`, 'm'));
+    }
+    assert.doesNotMatch(smoke, /github.token|secrets\./);
+    assert.match(smoke, /run-upgrade-smoke.mjs exercise/);
+  }
+  const launcher = unix.split('      - name: Qualify direct signals in the packaged POSIX launcher')[1]
+    .split('      - name: Retain the verified standalone dependency inventory')[0];
+  for (const name of ['GH_TOKEN', 'GITHUB_TOKEN', 'GH_ENTERPRISE_TOKEN', 'GITHUB_ENTERPRISE_TOKEN']) {
+    assert.match(launcher, new RegExp(`^          ${name}: ''$`, 'm'));
   }
   const installed = workflow.split('\n  verify-release:')[1];
   assert.doesNotMatch(installed, /run-upgrade-smoke|smoke_metadata|DURABLE_WORKFLOW_RELEASE_API_URL/);
   assert.match(installed, /run-public-release-verifier.mjs exercise/);
   const handoff = workflow.split('\n  bundle-release:')[1].split('\n  release:')[0];
   assert.match(handoff, /pattern: dw-\*/);
+});
+
+test('the actual entrypoint refuses a credential in its own parent environment before reading inputs', () => {
+  const result = spawnSync(process.execPath, [path.join(__dirname, 'run-upgrade-smoke.mjs'),
+    'exercise', 'missing-metadata', 'missing-binary', 'missing-evidence'], {
+    env: {...source, GITHUB_TOKEN: 'synthetic-inherited-job-token'}, encoding: 'utf8', timeout: 5000,
+  });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /execution credentials must be absent/);
+  assert.doesNotMatch(result.stderr, /synthetic-inherited-job-token|ENOENT/);
 });
 
 test('a cyclic annotated stable tag is bounded and cannot create a snapshot', t => {
@@ -191,7 +209,7 @@ test('snapshot must match its immutable producer digest and exact source/control
   const original = JSON.parse(fs.readFileSync(input.metadata));
   for (const mutate of [value => { value.source.commit = 'd'.repeat(40); },
     value => { value.baseline.assets[0].digest = `sha256:${'e'.repeat(64)}`; },
-    value => { value.body += ' '; }, value => { value.authority = 'http://example.invalid'; },
+    value => { value.body += ' '; }, value => { value.authority = 'https://example.invalid'; },
     value => { value.captured_at = '2000-01-01T00:00:00Z'; }]) {
     const snapshot = structuredClone(original); mutate(snapshot);
     fs.writeFileSync(input.metadata, JSON.stringify(snapshot));
@@ -202,13 +220,13 @@ test('snapshot must match its immutable producer digest and exact source/control
 
 test('execution refuses credentials or an inherited authority override before starting a command', async t => {
   const input = fixture(t);
-  for (const name of ['GH_TOKEN', 'GITHUB_TOKEN', 'GH_ENTERPRISE_TOKEN', 'GITHUB_ENTERPRISE_TOKEN',
-    'DURABLE_WORKFLOW_RELEASE_API_URL']) {
+  await Promise.all(['GH_TOKEN', 'GITHUB_TOKEN', 'GH_ENTERPRISE_TOKEN', 'GITHUB_ENTERPRISE_TOKEN',
+    'DURABLE_WORKFLOW_RELEASE_API_URL'].map(async name => {
     let calls = 0;
     await assert.rejects(exercise(input.metadata, input.binary, input.evidence,
       {...input.environment, [name]: 'synthetic'}, {invoke: () => { calls += 1; }}), /credentials|authority/);
     assert.equal(calls, 0);
-  }
+  }));
 });
 
 for (const failure of ['http403', 'wrong-target', 'downgrade', 'invalid-json', 'no-request', 'changed-binary']) {

@@ -192,7 +192,7 @@ jobs:
           RELEASE_CONTROL_COMMIT: ${{ steps.resolve.outputs.control_commit }}
           RELEASE_INITIATOR: ${{ steps.resolve.outputs.initiator }}
           OBSERVED_LATEST: ${{ steps.resolve.outputs.observed_latest }}
-        run: node scripts/ci/run-upgrade-smoke.js capture
+        run: node scripts/ci/run-upgrade-smoke.mjs capture
 
       - name: Bind exact build-smoke metadata artifact
         id: smoke_metadata
@@ -1094,6 +1094,10 @@ jobs:
       - name: Smoke test binary
         if: needs.resolve-release.outputs.cache_warm != 'true'
         env:
+          GH_TOKEN: ''
+          GITHUB_TOKEN: ''
+          GH_ENTERPRISE_TOKEN: ''
+          GITHUB_ENTERPRISE_TOKEN: ''
           RELEASE_TAG: ${{ needs.resolve-release.outputs.tag }}
           VERIFIED_SOURCE_SHA: ${{ needs.resolve-release.outputs.commit }}
           RELEASE_CONTROL_REF: ${{ needs.resolve-release.outputs.control_ref }}
@@ -1106,7 +1110,7 @@ jobs:
           ./build/dw-${{ matrix.name }} --version
           ./build/dw-${{ matrix.name }} runtime:check
           ./build/dw-${{ matrix.name }} list
-          node release-toolchain-control/scripts/ci/run-upgrade-smoke.js exercise upgrade-smoke-input/upgrade-smoke-metadata.json build/dw-${{ matrix.name }} upgrade-smoke-evidence.json
+          node release-toolchain-control/scripts/ci/run-upgrade-smoke.mjs exercise upgrade-smoke-input/upgrade-smoke-metadata.json build/dw-${{ matrix.name }} upgrade-smoke-evidence.json
 
       - name: Retain deterministic upgrade build-smoke evidence
         if: always() && needs.resolve-release.outputs.cache_warm != 'true'
@@ -1127,6 +1131,11 @@ jobs:
       - name: Qualify direct signals in the packaged POSIX launcher
         if: needs.resolve-release.outputs.cache_warm != 'true'
         timeout-minutes: 3
+        env:
+          GH_TOKEN: ''
+          GITHUB_TOKEN: ''
+          GH_ENTERPRISE_TOKEN: ''
+          GITHUB_ENTERPRISE_TOKEN: ''
         run: |
           php scripts/ci/test-start-dev-signals.php "$GITHUB_WORKSPACE/build/dw-${{ matrix.name }}"
 
@@ -1651,6 +1660,10 @@ jobs:
         if: needs.resolve-release.outputs.cache_warm != 'true'
         shell: pwsh
         env:
+          GH_TOKEN: ''
+          GITHUB_TOKEN: ''
+          GH_ENTERPRISE_TOKEN: ''
+          GITHUB_ENTERPRISE_TOKEN: ''
           RELEASE_TAG: ${{ needs.resolve-release.outputs.tag }}
           VERIFIED_SOURCE_SHA: ${{ needs.resolve-release.outputs.commit }}
           RELEASE_CONTROL_REF: ${{ needs.resolve-release.outputs.control_ref }}
@@ -1662,7 +1675,7 @@ jobs:
           .\build\dw-windows-x86_64.exe --version
           .\build\dw-windows-x86_64.exe runtime:check
           .\build\dw-windows-x86_64.exe list
-          node release-toolchain-control/scripts/ci/run-upgrade-smoke.js exercise upgrade-smoke-input/upgrade-smoke-metadata.json build/dw-windows-x86_64.exe upgrade-smoke-evidence.json
+          node release-toolchain-control/scripts/ci/run-upgrade-smoke.mjs exercise upgrade-smoke-input/upgrade-smoke-metadata.json build/dw-windows-x86_64.exe upgrade-smoke-evidence.json
 
       - name: Retain deterministic upgrade build-smoke evidence
         if: always() && needs.resolve-release.outputs.cache_warm != 'true'

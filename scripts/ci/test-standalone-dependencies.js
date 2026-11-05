@@ -110,7 +110,7 @@ test('native build smoke binds captured metadata while installed qualification r
   for (const job of [unix, windows]) {
     assert.match(job, /artifact-ids: \$\{\{ needs\.resolve-release\.outputs\.smoke_metadata_id \}\}/);
     assert.match(job, /EXPECTED_METADATA_SHA256: \$\{\{ needs\.resolve-release\.outputs\.smoke_metadata_digest \}\}/);
-    assert.match(job, /run-upgrade-smoke\.js exercise/);
-    assert.ok(job.indexOf('run-upgrade-smoke.js exercise') < job.indexOf('Retain the verified standalone dependency inventory'));
+    assert.match(job, /run-upgrade-smoke\.mjs exercise/);
+    assert.ok(job.indexOf('run-upgrade-smoke.mjs exercise') < job.indexOf('Retain the verified standalone dependency inventory'));
   }
 });

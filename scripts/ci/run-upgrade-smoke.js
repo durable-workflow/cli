@@ -20,7 +20,7 @@ const hash = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 
 function binding(environment) {
   const run = {id: environment.GITHUB_RUN_ID, attempt: environment.GITHUB_RUN_ATTEMPT};
-  if (!/^[1-9][0-9]*$/.test(run.id) || !/^[1-9][0-9]*$/.test(run.attempt)) {
+  if (!/^[1-9]\d*$/.test(run.id) || !/^[1-9]\d*$/.test(run.attempt)) {
     throw new Error('build smoke requires an exact controller run and attempt');
   }
   const source = {...releaseIdentity(environment.RELEASE_TAG, environment.VERIFIED_SOURCE_SHA),
@@ -203,16 +203,16 @@ async function exercise(filename, binary, evidencePath, environment = process.en
   return evidence;
 }
 
-module.exports = {AUTHORITY, UPGRADE_ARGS, baseline, capture, readSnapshot, exercise};
+async function main() {
+  const [phase, ...args] = process.argv.slice(2);
+  if (phase === 'capture' && args.length === 0) return capture('upgrade-smoke-metadata.json');
+  if (phase === 'exercise' && args.length === 3) return exercise(...args);
+  throw new Error('usage: run-upgrade-smoke.mjs capture|exercise METADATA BINARY EVIDENCE');
+}
+
+module.exports = {AUTHORITY, UPGRADE_ARGS, baseline, capture, readSnapshot, exercise, main};
 
 if (require.main === module) {
-  (async () => {
-    const [phase, ...args] = process.argv.slice(2);
-    if (phase === 'capture' && args.length === 0) return capture('upgrade-smoke-metadata.json');
-    if (phase === 'exercise' && args.length === 3) return exercise(...args);
-    throw new Error('usage: run-upgrade-smoke.js capture|exercise METADATA BINARY EVIDENCE');
-  })().catch(error => {
-    process.stderr.write(`Required upgrade build-smoke control failed: ${error.message}\n`);
-    process.exitCode = 1;
-  });
+  process.stderr.write('Use run-upgrade-smoke.mjs to invoke the build-smoke control.\n');
+  process.exitCode = 1;
 }

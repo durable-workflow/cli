@@ -71,14 +71,15 @@ test('release evidence preserves the resolved control authority without inventin
     RELEASE_CONTROL_REF: 'refs/heads/main', RELEASE_CONTROL_COMMIT: 'b'.repeat(40)}, '2.3.7'), {
     initiator: 'workflow_dispatch', control: {ref: 'refs/heads/main', commit: 'b'.repeat(40)},
   });
-  for (const invalid of [{}, {...environment, RELEASE_INITIATOR: 'schedule'},
+  const invalidAuthorities = [{}, {...environment, RELEASE_INITIATOR: 'schedule'},
     {...environment, RELEASE_CONTROL_REF: 'refs/heads/main'},
-    {...environment, RELEASE_CONTROL_COMMIT: 'main'}]) {
+    {...environment, RELEASE_CONTROL_COMMIT: 'main'}];
+  await Promise.all(invalidAuthorities.map(async invalid => {
     let calls = 0;
     await assert.rejects(verify({tag: '2.3.7', commit: COMMIT, platform: 'linux-x86_64'}, invalid,
       {run() { calls += 1; }}), /control authority/);
     assert.equal(calls, 0);
-  }
+  }));
 });
 
 test('installed children receive private config and no verification/runtime credentials', () => {
@@ -88,9 +89,12 @@ test('installed children receive private config and no verification/runtime cred
     SSL_CERT_FILE: '/public-ca.pem'}, '/temporary-cell', ['/temporary-cell/bin']);
   assert.equal(value.PATH, ['/temporary-cell/bin', '/tools'].join(path.delimiter));
   assert.equal(value.DW_CONFIG_HOME, path.join('/temporary-cell', 'config'));
+  assert.equal(value.HOME, path.join('/temporary-cell', 'home'));
+  assert.equal(value.USERPROFILE, value.HOME);
+  for (const key of ['TMPDIR', 'TMP', 'TEMP']) assert.equal(value[key], path.join('/temporary-cell', 'tmp'));
   assert.equal(value.SSL_CERT_FILE, '/public-ca.pem');
   for (const key of ['GH_TOKEN', 'GITHUB_TOKEN', 'ACTIONS_ID_TOKEN_REQUEST_TOKEN',
-    'DURABLE_WORKFLOW_TOKEN', 'DW_CLI_VERSION', 'NODE_OPTIONS', 'HOME']) assert.equal(value[key], undefined);
+    'DURABLE_WORKFLOW_TOKEN', 'DW_CLI_VERSION', 'NODE_OPTIONS']) assert.equal(value[key], undefined);
 });
 
 for (const [name, platform] of Object.entries(PLATFORMS)) {
@@ -199,14 +203,25 @@ test('package identity uses every production pin and refuses dev/source/version 
   const {lock, metadata} = packageFixture();
   const expected = {tag: '2.3.7', commit: COMMIT};
   assertPackageIdentity(metadata, lock, expected);
-  for (const mutation of ['version', 'commit', 'package', 'dev']) {
+  for (const mutation of ['version', 'commit', 'package', 'dev', 'extra']) {
     const changed = structuredClone(metadata);
     if (mutation === 'version') changed.version = '2.3.6';
     if (mutation === 'commit') changed.commit = 'b'.repeat(40);
     if (mutation === 'package') changed.packages['symfony/http-client'].reference = 'b'.repeat(40);
     if (mutation === 'dev') changed.packages[lock['packages-dev'][0].name] = {};
+    if (mutation === 'extra') changed.packages['unexpected/library'] = {pretty_version: '1.0.0', reference: COMMIT};
     assert.throws(() => assertPackageIdentity(changed, lock, expected));
   }
+});
+
+test('Composer application metadata is distinct from the exact locked dependency inventory', () => {
+  const {lock, metadata} = packageFixture();
+  const application = {name: 'durable-workflow/cli', type: 'project', pretty_version: 'dev-main', reference: COMMIT};
+  metadata.application = application;
+  metadata.packages[application.name] = {...application};
+  assertPackageIdentity(metadata, lock, {tag: '2.3.7', commit: COMMIT});
+  metadata.packages[application.name].reference = 'b'.repeat(40);
+  assert.throws(() => assertPackageIdentity(metadata, lock, {tag: '2.3.7', commit: COMMIT}));
 });
 
 test('installed inspection refuses an absent command or a changed schema', () => {
@@ -274,6 +289,10 @@ function isNativeFixtureProbe(command, args) {
 function writeSyntheticInstall(environment, platform, releaseBytes, channelBytes) {
   const windows = platform.startsWith('windows');
   if (windows) assert.equal(environment.DURABLE_WORKFLOW_INSTALL_NO_PATH_UPDATE, '1');
+  assert.equal(environment.DURABLE_WORKFLOW_INSTALL_EXPECTED_SHA256,
+    hash(environment.VERSION ? releaseBytes : channelBytes));
+  assert.equal(fs.statSync(environment.HOME).isDirectory(), true);
+  assert.equal(fs.statSync(environment.TMPDIR).isDirectory(), true);
   const filename = path.join(environment.DURABLE_WORKFLOW_INSTALL_DIR, windows ? 'dw.exe' : 'dw');
   fs.writeFileSync(filename, environment.VERSION ? releaseBytes : channelBytes);
   return '';
@@ -342,12 +361,14 @@ for (const [platform, observation] of Object.entries(PLATFORMS)) {
   });
 }
 
-for (const mutation of ['missing', 'source', 'hash', 'attestation', 'embedded']) {
+for (const mutation of ['missing', 'extra', 'duplicate', 'source', 'hash', 'attestation', 'embedded']) {
   test(`public input refusal before execution: ${mutation}`, async () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'dw-refusal-fixture-'));
     try {
       const input = fixture();
       if (mutation === 'missing') input.metadata.assets.pop();
+      if (mutation === 'extra') input.metadata.assets.push({name: 'unverified-extra.bin'});
+      if (mutation === 'duplicate') input.metadata.assets.push({...input.metadata.assets[0]});
       if (mutation === 'source') {
         const original = input.run; input.run = (command, args) => args[1].includes('/git/ref/')
           ? JSON.stringify({object: {type: 'commit', sha: 'b'.repeat(40)}}) : original(command, args);

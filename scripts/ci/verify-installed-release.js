@@ -54,6 +54,11 @@ function childEnvironment(environment, directory, binDirectories = []) {
     if (environment[key]) child[key] = environment[key];
   }
   child.PATH = [...binDirectories, child.PATH || ''].join(path.delimiter);
+  child.HOME = path.join(directory, 'home');
+  child.USERPROFILE = child.HOME;
+  child.TMPDIR = path.join(directory, 'tmp');
+  child.TEMP = child.TMPDIR;
+  child.TMP = child.TMPDIR;
   child.DW_CONFIG_HOME = path.join(directory, 'config');
   child.NO_COLOR = '1';
   return child;
@@ -204,8 +209,9 @@ function attest(filename, tag, commit, environment, state, execute = run) {
 
 function validateAssets(release) {
   const names = new Set(release.assets?.map(asset => asset.name));
-  if (names.size !== release.assets?.length || ASSETS.some(name => !names.has(name))) {
-    throw new Error('published release is missing a required asset or has duplicate names');
+  if (names.size !== ASSETS.length || names.size !== release.assets?.length ||
+      ASSETS.some(name => !names.has(name))) {
+    throw new Error('published release does not match the exact required asset inventory');
   }
 }
 
@@ -302,6 +308,12 @@ function assertInstallerSource(directory) {
   }
 }
 
+function preparePrivateDirectories(directory) {
+  for (const name of ['home', 'tmp']) {
+    fs.mkdirSync(path.join(directory, name), {recursive: true, mode: 0o700});
+  }
+}
+
 async function verify(options, environment = process.env, dependencies = {}) {
   releaseIdentity(options.tag, options.commit);
   const authority = releaseAuthority(environment, options.tag);
@@ -317,6 +329,7 @@ async function verify(options, environment = process.env, dependencies = {}) {
   state.tools = {node: process.version, php: phpVersion, gh: ghVersion};
   const base = fs.realpathSync(environment.RUNNER_TEMP || os.tmpdir());
   const directory = fs.mkdtempSync(path.join(base, 'dw-public-release-'));
+  preparePrivateDirectories(directory);
   fs.writeFileSync(path.join(directory, 'state.json'), JSON.stringify(state), {mode: 0o600});
   if (environment.GITHUB_OUTPUT) fs.appendFileSync(environment.GITHUB_OUTPUT, `directory=${directory}\n`);
   try {
@@ -358,6 +371,23 @@ function assertPackageIdentity(metadata, lock, state) {
   if (metadata.version !== state.tag || metadata.commit !== state.commit) {
     throw new Error('published PHAR build identity does not match the exact version/source');
   }
+  const expectedNames = lock.packages.map(item => item.name);
+  // Composer records the application itself separately from its locked
+  // dependencies. Bind that one project record; never treat it as an extra library.
+  if (metadata.application) {
+    const application = metadata.application;
+    const installed = metadata.packages?.[application.name];
+    if (application.name !== 'durable-workflow/cli' || application.type !== 'project' ||
+        installed?.type !== application.type || installed.reference !== application.reference ||
+        installed.pretty_version !== application.pretty_version) {
+      throw new Error('published PHAR has invalid application package metadata');
+    }
+    expectedNames.push(application.name);
+  }
+  expectedNames.sort();
+  if (!isDeepStrictEqual(Object.keys(metadata.packages || {}).sort(), expectedNames)) {
+    throw new Error('published PHAR does not match the exact production package inventory');
+  }
   for (const item of lock.packages) {
     const installed = metadata.packages?.[item.name];
     const version = item.version.replace(/^v/, '');
@@ -378,6 +408,7 @@ function packageMetadata(filename, environment, state, execute = run) {
 $installed = require 'phar://'.$argv[1].'/vendor/composer/installed.php';
 require 'phar://'.$argv[1].'/src/GeneratedBuildInfo.php';
 echo json_encode(['packages' => $installed['versions'],
+    'application' => $installed['root'] ?? null,
     'version' => \DurableWorkflow\Cli\GeneratedBuildInfo::VERSION,
     'commit' => \DurableWorkflow\Cli\GeneratedBuildInfo::COMMIT], JSON_THROW_ON_ERROR);
 `;
@@ -389,6 +420,8 @@ function install(directory, destination, state, environment, exact, execute = ru
   const child = childEnvironment(environment, directory, [destination]);
   child.DURABLE_WORKFLOW_INSTALL_DIR = destination;
   child.DURABLE_WORKFLOW_INSTALL_OUTPUT = 'json';
+  child.DURABLE_WORKFLOW_INSTALL_EXPECTED_SHA256 = exact
+    ? state.release.digests[assetName(state.platform)] : state.channel.digest;
   child.DURABLE_WORKFLOW_RELEASE_BASE_URL = `https://github.com/${REPOSITORY}/releases`;
   if (exact) child.VERSION = state.tag;
   const installer = path.join(directory, 'release', state.platform.startsWith('windows') ? 'install.ps1' : 'install.sh');
@@ -424,7 +457,7 @@ function assertInstalledInspection(commands, schema, expectedSchema) {
   }
 }
 
-function exercise(directory, evidencePath, environment = process.env, execute = run, observed) {
+function exercise(directory, evidencePath, environment = process.env, execute = run, observed = null) {
   for (const key of ['GH_TOKEN', 'GITHUB_TOKEN', 'GH_ENTERPRISE_TOKEN', 'GITHUB_ENTERPRISE_TOKEN']) {
     if (environment[key]) throw new Error('verification credentials must be absent from the execution step');
   }
@@ -435,6 +468,7 @@ function exercise(directory, evidencePath, environment = process.env, execute = 
     }
     assertVerifiedInputs(directory, state);
     nativePlatform(state.platform, observed ?? {os: process.platform, arch: process.arch}, execute);
+    preparePrivateDirectories(directory);
     const child = childEnvironment(environment, directory);
     const lock = JSON.parse(fs.readFileSync(path.join(__dirname, '../../composer.lock'), 'utf8'));
     const expectedSchema = JSON.parse(fs.readFileSync(path.join(__dirname, '../../schemas/output/workflow-list.schema.json'), 'utf8'));

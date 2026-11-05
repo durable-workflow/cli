@@ -99,8 +99,10 @@ jobs:
           python scripts/ci/test-native-prerequisites.py
           node --test scripts/ci/test-release-workflow-metadata.js
           node --test scripts/ci/test-installed-release.js
+          node --test scripts/ci/test-installer-pinned-download.js
           DW_TEST_PHP_BINARY="$(command -v php)" node --test scripts/ci/test-phar-metadata.js
           pwsh -NoProfile -File scripts/ci/test-windows-installer-path.ps1
+          pwsh -NoProfile -File scripts/ci/test-windows-installer-digest.ps1
           node --test scripts/ci/test-standalone-runtime.js
           node --test scripts/ci/test-standalone-dependencies.js
           node --test scripts/ci/test-cli-release-channel.js
@@ -137,6 +139,8 @@ jobs:
         uses: durable-workflow/.github/.github/actions/verify-composer-trust@75587fc33ff40c34f32ef777293dad56bb6f48c7  # clean-trust
       - run: composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
       - run: box compile --no-parallel
+      - name: Verify the actual source-built PHAR package inventory
+        run: DW_TEST_PHP_BINARY="$(command -v php)" DW_TEST_PRODUCTION_PHAR=build/dw.phar node --test scripts/ci/test-phar-metadata.js
       - run: box info build/dw.phar
       - run: php build/dw.phar list
 

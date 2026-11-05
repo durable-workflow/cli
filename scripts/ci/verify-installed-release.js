@@ -75,7 +75,7 @@ function run(command, args, options = {}) {
   return result.stdout;
 }
 
-const PHP_AUTHORITY_PROBE = String.raw`
+const PHP_AUTHORITY_PROBE = `
 if (PHP_VERSION_ID < 80200 || !extension_loaded('phar')) exit(1);
 echo json_encode(['version' => PHP_VERSION, 'binary' => realpath(PHP_BINARY)], JSON_THROW_ON_ERROR);
 `;

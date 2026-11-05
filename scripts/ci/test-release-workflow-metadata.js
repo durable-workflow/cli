@@ -312,6 +312,9 @@ test('public release verification runs read-only after publication', () => {
   assert.match(verify, /ref: \$\{\{ github\.sha \}\}/);
   assert.doesNotMatch(verify, /ref: \$\{\{ needs\./);
   assert.match(verify, /VERIFIED_SOURCE_SHA: \$\{\{ needs\.resolve-release\.outputs\.commit \}\}/);
+  assert.match(verify, /RELEASE_CONTROL_REF: \$\{\{ needs\.resolve-release\.outputs\.control_ref \}\}/);
+  assert.match(verify, /RELEASE_CONTROL_COMMIT: \$\{\{ needs\.resolve-release\.outputs\.control_commit \}\}/);
+  assert.match(verify, /RELEASE_INITIATOR: \$\{\{ needs\.resolve-release\.outputs\.initiator \}\}/);
 
   assert.match(verify, /persist-credentials: false/);
   assert.match(verify, /- name: Verify public release downloads/);

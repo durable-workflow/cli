@@ -8,16 +8,17 @@ const path = require('node:path');
 const {spawnSync} = require('node:child_process');
 const test = require('node:test');
 const {
-  ASSETS, PLATFORMS, CELL_MILLISECONDS, releaseIdentity, childEnvironment, nativePlatform,
+  ASSETS, PLATFORMS, CELL_MILLISECONDS, releaseIdentity, releaseAuthority, childEnvironment, nativePlatform,
   checksums, verifyEmbeddedPhar, verifyNativeBinary, remaining, tagCommit, verifyBundle, publicResponse,
-  assertPackageIdentity, assertInstalledInspection, assertVerifiedInputs, exercise,
+  assertPackageIdentity, assertInstalledInspection, assertVerifiedInputs, verify, exercise,
 } = require('./verify-installed-release');
 
 const COMMIT = 'a'.repeat(40);
 const hash = value => crypto.createHash('sha256').update(value).digest('hex');
 const state = () => {
   const started = Date.now();
-  return {started, deadline: started + CELL_MILLISECONDS};
+  return {started, deadline: started + CELL_MILLISECONDS,
+    initiator: 'push', control: {ref: 'refs/tags/2.3.7', commit: COMMIT}};
 };
 
 function fixture() {
@@ -58,6 +59,26 @@ test('release identity refuses malformed tags and nonexact source hashes', () =>
     assert.throws(() => releaseIdentity(tag, COMMIT));
   }
   assert.throws(() => releaseIdentity('2.3.7', 'main'));
+});
+
+test('release evidence preserves the resolved control authority without inventing defaults', async () => {
+  const environment = {RELEASE_INITIATOR: 'push', RELEASE_CONTROL_REF: 'refs/tags/2.3.7',
+    RELEASE_CONTROL_COMMIT: COMMIT};
+  assert.deepEqual(releaseAuthority(environment, '2.3.7'), {
+    initiator: 'push', control: {ref: 'refs/tags/2.3.7', commit: COMMIT},
+  });
+  assert.deepEqual(releaseAuthority({...environment, RELEASE_INITIATOR: 'workflow_dispatch',
+    RELEASE_CONTROL_REF: 'refs/heads/main', RELEASE_CONTROL_COMMIT: 'b'.repeat(40)}, '2.3.7'), {
+    initiator: 'workflow_dispatch', control: {ref: 'refs/heads/main', commit: 'b'.repeat(40)},
+  });
+  for (const invalid of [{}, {...environment, RELEASE_INITIATOR: 'schedule'},
+    {...environment, RELEASE_CONTROL_REF: 'refs/heads/main'},
+    {...environment, RELEASE_CONTROL_COMMIT: 'main'}]) {
+    let calls = 0;
+    await assert.rejects(verify({tag: '2.3.7', commit: COMMIT, platform: 'linux-x86_64'}, invalid,
+      {run() { calls += 1; }}), /control authority/);
+    assert.equal(calls, 0);
+  }
 });
 
 test('installed children receive private config and no verification/runtime credentials', () => {
@@ -303,6 +324,15 @@ for (const [platform, observation] of Object.entries(PLATFORMS)) {
       assert.equal(fs.existsSync(directory), false);
       const result = JSON.parse(fs.readFileSync(evidence));
       assert.equal(result.outcome, 'pass');
+      assert.equal(result.tag, '2.3.7');
+      assert.equal(result.commit, COMMIT);
+      assert.equal(result.initiator, 'push');
+      assert.deepEqual(result.control, {ref: 'refs/tags/2.3.7', commit: COMMIT});
+      assert.deepEqual(result.artifact_versions, {cli: '2.3.7'});
+      assert.deepEqual(result.installable_artifacts, {verified_public_downloads: true, version: '2.3.7'});
+      assert.ok(Number.isFinite(Date.parse(result.verified_at)));
+      assert.deepEqual(result.assets, ASSETS.map(name => ({name,
+        url: `https://github.com/durable-workflow/cli/releases/download/2.3.7/${name}`})));
       assert.equal(result.channel, '2.3.6', 'default selection must not imply promotion');
       assert.equal(calls.filter(call => call.args[0] === 'upgrade').length, 2);
       assert.equal(calls.some(call => call.command === 'gh'), false);

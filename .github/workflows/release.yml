@@ -1900,6 +1900,9 @@ jobs:
     env:
       RELEASE_TAG: ${{ needs.resolve-release.outputs.tag }}
       VERIFIED_SOURCE_SHA: ${{ needs.resolve-release.outputs.commit }}
+      RELEASE_CONTROL_REF: ${{ needs.resolve-release.outputs.control_ref }}
+      RELEASE_CONTROL_COMMIT: ${{ needs.resolve-release.outputs.control_commit }}
+      RELEASE_INITIATOR: ${{ needs.resolve-release.outputs.initiator }}
       VERIFIER_PLATFORM: ${{ matrix.name }}
     steps:
       - name: Check out the release control source

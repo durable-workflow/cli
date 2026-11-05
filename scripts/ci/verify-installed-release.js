@@ -36,6 +36,17 @@ function releaseIdentity(tag, commit) {
   return {tag, commit};
 }
 
+function releaseAuthority(environment, tag) {
+  const initiator = environment.RELEASE_INITIATOR;
+  const control = {ref: environment.RELEASE_CONTROL_REF, commit: environment.RELEASE_CONTROL_COMMIT};
+  const expectedRef = initiator === 'push' ? `refs/tags/${tag}` : 'refs/heads/main';
+  if (!['push', 'workflow_dispatch'].includes(initiator) || control.ref !== expectedRef ||
+      !/^[a-f0-9]{40}$/.test(control.commit)) {
+    throw new Error('verification requires the resolved release control authority');
+  }
+  return {initiator, control};
+}
+
 function childEnvironment(environment, directory, binDirectories = []) {
   const child = {};
   for (const key of ['PATH', 'SystemRoot', 'WINDIR', 'COMSPEC', 'PATHEXT', 'TEMP', 'TMP', 'TMPDIR', 'LANG',
@@ -267,6 +278,8 @@ function statePath(directory) {
 function readState(directory) {
   const state = JSON.parse(regularBytes(statePath(directory)).toString('utf8'));
   releaseIdentity(state.tag, state.commit);
+  releaseAuthority({RELEASE_INITIATOR: state.initiator,
+    RELEASE_CONTROL_REF: state.control?.ref, RELEASE_CONTROL_COMMIT: state.control?.commit}, state.tag);
   if (!Object.hasOwn(PLATFORMS, state.platform) || !/^[a-f0-9]{32}$/.test(state.owner)) {
     throw new Error('verification state has an invalid identity');
   }
@@ -291,8 +304,10 @@ function assertInstallerSource(directory) {
 
 async function verify(options, environment = process.env, dependencies = {}) {
   releaseIdentity(options.tag, options.commit);
+  const authority = releaseAuthority(environment, options.tag);
   const started = Date.now();
   const state = {tag: options.tag, commit: options.commit, platform: options.platform,
+    ...authority,
     started, deadline: started + CELL_MILLISECONDS, owner: crypto.randomBytes(16).toString('hex')};
   const execute = dependencies.run || run;
   state.native = nativePlatform(options.platform, {os: process.platform, arch: process.arch}, execute);
@@ -440,6 +455,12 @@ function exercise(directory, evidencePath, environment = process.env, execute = 
       ? state.channel.digest : state.release.digests[assetName(state.platform)];
     if (hash(regularBytes(exact.binary)) !== upgradedDigest) throw new Error('upgrade result does not match the preverified channel artifact');
     fs.writeFileSync(evidencePath, JSON.stringify({schema: 'durable-workflow.cli.public-install/v1',
+      tag: state.tag, initiator: state.initiator, control: state.control,
+      artifact_versions: {cli: state.tag},
+      installable_artifacts: {verified_public_downloads: true, version: state.tag},
+      verified_at: new Date().toISOString(),
+      assets: ASSETS.map(name => ({name,
+        url: `https://github.com/${REPOSITORY}/releases/download/${state.tag}/${name}`})),
       version: state.tag, commit: state.commit, native: state.native, tools: state.tools, channel: state.channel.tag,
       digests: state.release.digests, package_count: lock.packages.length,
       exact_install: true, default_install: Boolean(selected.binary), upgrades, outcome: 'pass'}, null, 2),
@@ -450,7 +471,7 @@ function exercise(directory, evidencePath, environment = process.env, execute = 
 }
 
 module.exports = {
-  ASSETS, PLATFORMS, CELL_MILLISECONDS, releaseIdentity, childEnvironment, nativePlatform,
+  ASSETS, PLATFORMS, CELL_MILLISECONDS, releaseIdentity, releaseAuthority, childEnvironment, nativePlatform,
   checksums, verifyEmbeddedPhar, verifyNativeBinary, remaining, tagCommit, verifyBundle, publicResponse,
   assertPackageIdentity, assertVerifiedInputs, assertInstalledInspection,
   readState, cleanup, verify, exercise, install, packageMetadata, main,

@@ -114,6 +114,20 @@ pub fn values(value: &Value) -> Vec<&Value> {
     }
 }
 
+/// A decoded PHP array after a string-key assignment. Numeric list keys
+/// keep their order alongside the appended string fields.
+pub fn array_map(value: Value) -> serde_json::Map<String, Value> {
+    match value {
+        Value::Object(map) => map,
+        Value::Array(items) => items
+            .into_iter()
+            .enumerate()
+            .map(|(index, value)| (index.to_string(), value))
+            .collect(),
+        _ => serde_json::Map::new(),
+    }
+}
+
 /// PHP `ctype_digit()` for a string argument.
 pub fn ctype_digit(value: &str) -> bool {
     !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit())

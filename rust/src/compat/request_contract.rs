@@ -55,9 +55,6 @@ impl RequestContract {
         &self.operations
     }
 
-    /// Reserved for the list commands' filter checks (`validateControlPlaneOption`),
-    /// ported in the next slice.
-    #[allow(dead_code)]
     /// `assertCanonicalValue`: rejects a declared alias or a value outside a
     /// declared canonical set. `option_name` (such as `--duplicate-policy`)
     /// replaces the field name in the message.
@@ -92,7 +89,6 @@ impl RequestContract {
         ))
     }
 
-    #[allow(dead_code)]
     fn field_definition(&self, operation: &str, field: &str) -> Option<&Value> {
         let operation =
             php::get(&self.operations, operation).filter(|value| php::is_array(value))?;
@@ -103,7 +99,6 @@ impl RequestContract {
 
 /// `stringMap()` lookup: string keys and values, both trimmed; integer-like
 /// keys are integers in PHP and are skipped. The last duplicate wins.
-#[allow(dead_code)]
 fn rejected_alias<'a>(aliases: Option<&'a Value>, value: &str) -> Option<&'a str> {
     let Some(Value::Object(map)) = aliases else {
         return None;
@@ -123,7 +118,6 @@ fn rejected_alias<'a>(aliases: Option<&'a Value>, value: &str) -> Option<&'a str
 }
 
 /// `stringList()`: trimmed non-empty strings.
-#[allow(dead_code)]
 fn string_list(value: Option<&Value>) -> Vec<&str> {
     value
         .filter(|value| php::is_array(value))

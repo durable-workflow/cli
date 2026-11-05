@@ -22,7 +22,7 @@ use output::Mode;
 use std::io::{BufRead, Write};
 
 type Run = fn(&Input) -> Result<i32, CliError>;
-type RunWithServer = fn(&client::Context) -> Result<i32, CliError>;
+type RunWithServer = fn(&client::Context, &Input) -> Result<i32, CliError>;
 
 enum Handler {
     Local(Run),
@@ -32,7 +32,9 @@ enum Handler {
 /// Commands ported so far. Every other catalog command is recognized and
 /// reported as not yet available.
 fn handler(name: &str) -> Option<Handler> {
-    use commands::{completion, doctor, env, runtime, schema, server, start_dev, upgrade};
+    use commands::{
+        completion, doctor, env, runtime, schema, server, start_dev, upgrade, workflow,
+    };
     Some(match name {
         "completion" => Handler::Local(completion::completion),
         "_complete" => Handler::Local(completion::complete),
@@ -45,6 +47,7 @@ fn handler(name: &str) -> Option<Handler> {
         "upgrade" => Handler::Local(upgrade::run),
         "server:health" => Handler::Server(server::health),
         "server:info" => Handler::Server(server::info),
+        "workflow:list" => Handler::Server(workflow::list),
         "env:list" => Handler::Local(env::list),
         "env:set" => Handler::Local(env::set),
         "env:use" => Handler::Local(env::use_env),
@@ -54,9 +57,8 @@ fn handler(name: &str) -> Option<Handler> {
     })
 }
 
-/// Commands whose errors carry the resolved namespace. None of the commands
-/// ported so far are namespace scoped.
-const NAMESPACE_SCOPED: &[&str] = &[];
+/// Commands whose errors carry the resolved namespace.
+const NAMESPACE_SCOPED: &[&str] = &["workflow:list"];
 
 /// Verbs of a group and the command each one names.
 type GroupVerbs = &'static [(&'static str, &'static str)];
@@ -545,7 +547,7 @@ fn run(raw: Vec<String>) -> i32 {
             if !matches!(command.as_str(), "doctor" | "server:start-dev") {
                 context.warn_if_incompatible(client::uses_worker_protocol(&command));
             }
-            run(&context)
+            run(&context, &input)
         }),
     };
     match result {

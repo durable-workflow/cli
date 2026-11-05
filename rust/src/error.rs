@@ -403,20 +403,29 @@ fn next_step_lines(next: &[Value]) -> Vec<String> {
 
 /// Human error text for stderr.
 pub fn human(error: &CliError, context: &ErrorContext) -> String {
-    let mut lines = vec![format!("<error>{}</error>", error.message())];
+    let display = crate::formatter::display_text;
+    let mut lines = vec![format!("<error>{}</error>", display(error.message()))];
     if let Some(namespace) = &context.namespace {
-        lines.push(format!("Namespace: {namespace}"));
+        lines.push(format!("Namespace: {}", display(namespace)));
     }
     if let Some(reason) = error.reason() {
-        lines.push(format!("Reason: {reason}"));
+        lines.push(format!("Reason: {}", display(reason)));
     }
     if let Some(body) = error.body() {
-        lines.extend(body_code_lines(body));
+        lines.extend(body_code_lines(body).into_iter().map(|line| display(&line)));
     }
     if let Some(errors) = error.validation_errors() {
-        lines.extend(validation_lines(errors));
+        lines.extend(
+            validation_lines(errors)
+                .into_iter()
+                .map(|line| display(&line)),
+        );
     }
-    lines.extend(next_step_lines(&recommendations(error, context)));
+    lines.extend(
+        next_step_lines(&recommendations(error, context))
+            .into_iter()
+            .map(|line| display(&line)),
+    );
     lines.join("\n")
 }
 

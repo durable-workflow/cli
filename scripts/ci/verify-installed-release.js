@@ -506,6 +506,9 @@ function exercise(directory, evidencePath, environment = process.env, execute = 
   for (const key of ['GH_TOKEN', 'GITHUB_TOKEN', 'GH_ENTERPRISE_TOKEN', 'GITHUB_ENTERPRISE_TOKEN']) {
     if (environment[key]) throw new Error('verification credentials must be absent from the execution step');
   }
+  if (environment.DURABLE_WORKFLOW_RELEASE_API_URL) {
+    throw new Error('installed qualification requires the native live default HTTPS authority');
+  }
   const state = readState(directory);
   try {
     if (environment.VERIFIER_PLATFORM && environment.VERIFIER_PLATFORM !== state.platform) {
@@ -542,7 +545,9 @@ function exercise(directory, evidencePath, environment = process.env, execute = 
         url: `https://github.com/${REPOSITORY}/releases/download/${state.tag}/${name}`})),
       version: state.tag, commit: state.commit, native: state.native, tools: state.tools, channel: state.channel.tag,
       digests: state.release.digests, package_count: lock.packages.length,
-      exact_install: true, default_install: Boolean(selected.binary), upgrades, outcome: 'pass'}, null, 2),
+      exact_install: true, default_install: Boolean(selected.binary), upgrades,
+      live_default_lookup: {authority: 'https://api.github.com/repos/durable-workflow/cli/releases/latest',
+        credential_free: true, dry_run: true, apply: true}, outcome: 'pass'}, null, 2),
     {flag: 'wx', mode: 0o600});
   } finally {
     cleanup(directory);

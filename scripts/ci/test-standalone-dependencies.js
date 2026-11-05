@@ -103,12 +103,14 @@ test('all four public dependency inventories use the ordinary required-asset and
   assert.match(publication, /subject-path: dist\/\*/);
 });
 
-test('each native platform exercises read-only outbound HTTPS before its release artifact is handed off', () => {
+test('native build smoke binds captured metadata while installed qualification retains live HTTPS', () => {
   const workflow = fs.readFileSync(path.join(__dirname, '../../.github/workflows/release.yml'), 'utf8');
   const unix = workflow.split('\n  build-binary:')[1].split('\n  build-binary-windows:')[0];
   const windows = workflow.split('\n  build-binary-windows:')[1].split('\n  bundle-release:')[0];
   for (const job of [unix, windows]) {
-    assert.match(job, /upgrade --dry-run --output=json/);
-    assert.ok(job.indexOf('upgrade --dry-run --output=json') < job.indexOf('Retain the verified standalone dependency inventory'));
+    assert.match(job, /artifact-ids: \$\{\{ needs\.resolve-release\.outputs\.smoke_metadata_id \}\}/);
+    assert.match(job, /EXPECTED_METADATA_SHA256: \$\{\{ needs\.resolve-release\.outputs\.smoke_metadata_digest \}\}/);
+    assert.match(job, /run-upgrade-smoke\.mjs exercise/);
+    assert.ok(job.indexOf('run-upgrade-smoke.mjs exercise') < job.indexOf('Retain the verified standalone dependency inventory'));
   }
 });

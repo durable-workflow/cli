@@ -322,7 +322,8 @@ function writeSyntheticInstall(environment, platform, releaseBytes, channelBytes
 }
 
 for (const [platform, observation] of Object.entries(PLATFORMS)) {
-  test(`temporary install execution wiring for ${platform} uses no credentials or registry: synthetic fixtures only`, () => {
+  for (const failedLookup of [false, true]) {
+  test(`temporary ${platform} live-default lookup ${failedLookup ? '403 fails qualification' : 'success qualifies'}: synthetic fixtures only`, () => {
     const base = fs.realpathSync(process.env.RUNNER_TEMP || os.tmpdir());
     const directory = fs.mkdtempSync(path.join(base, 'dw-public-release-'));
     const evidence = path.join(base, `dw-evidence-fixture-${crypto.randomBytes(8).toString('hex')}.json`);
@@ -340,6 +341,9 @@ for (const [platform, observation] of Object.entries(PLATFORMS)) {
     fs.writeFileSync(path.join(directory, 'state.json'), JSON.stringify(cell));
     const schema = JSON.parse(fs.readFileSync(path.join(__dirname, '../../schemas/output/workflow-list.schema.json'), 'utf8'));
     const calls = [];
+    const upgradeEvidence = failedLookup
+      ? {current_version: '2.3.7', target_version: null, status: 'error', reason: 'HTTP 403 rate limit exceeded'}
+      : {current_version: '2.3.7', target_version: '2.3.6', status: 'newer'};
     function execute(command, args, options = {}) {
       calls.push({command, args});
       for (const key of ['GH_TOKEN', 'GITHUB_TOKEN', 'DURABLE_WORKFLOW_TOKEN']) assert.equal(options.env?.[key], undefined);
@@ -358,10 +362,20 @@ for (const [platform, observation] of Object.entries(PLATFORMS)) {
       }
       if (args[0] === 'list') return JSON.stringify({commands: ['workflow:list', 'schema:show', 'upgrade', 'doctor'].map(value => ({name: value}))});
       if (args[0] === 'schema:show') return JSON.stringify(schema);
-      if (args[0] === 'upgrade') return JSON.stringify({current_version: '2.3.7', target_version: '2.3.6', status: 'newer'});
+      if (args[0] === 'upgrade') {
+        assert.equal(options.env.DURABLE_WORKFLOW_RELEASE_API_URL, undefined);
+        assert.equal(args.includes('--tag'), false);
+        return JSON.stringify(upgradeEvidence);
+      }
       throw new Error(`unmocked command ${command}`);
     }
     try {
+      if (failedLookup) {
+        assert.throws(() => exercise(directory, evidence, {PATH: '/fixture-tools'}, execute, observation), /resolved null/);
+        assert.equal(fs.existsSync(directory), false);
+        assert.equal(fs.existsSync(evidence), false);
+        return;
+      }
       exercise(directory, evidence, {PATH: '/fixture-tools'}, execute, observation);
       assert.equal(fs.existsSync(directory), false);
       const result = JSON.parse(fs.readFileSync(evidence));
@@ -376,12 +390,17 @@ for (const [platform, observation] of Object.entries(PLATFORMS)) {
       assert.deepEqual(result.assets, ASSETS.map(name => ({name,
         url: `https://github.com/durable-workflow/cli/releases/download/2.3.7/${name}`})));
       assert.equal(result.channel, '2.3.6', 'default selection must not imply promotion');
+      assert.deepEqual(result.live_default_lookup, {
+        authority: 'https://api.github.com/repos/durable-workflow/cli/releases/latest',
+        credential_free: true, dry_run: true, apply: true,
+      });
       assert.equal(calls.filter(call => call.args[0] === 'upgrade').length, 2);
       assert.equal(calls.some(call => call.command === 'gh'), false);
     } finally {
       fs.rmSync(directory, {recursive: true, force: true}); fs.rmSync(evidence, {force: true});
     }
   });
+  }
 }
 
 for (const mutation of ['missing', 'extra', 'duplicate', 'source', 'hash', 'attestation', 'embedded']) {
@@ -409,3 +428,10 @@ for (const mutation of ['missing', 'extra', 'duplicate', 'source', 'hash', 'atte
     } finally { fs.rmSync(directory, {recursive: true, force: true}); }
   });
 }
+
+test('installed qualification refuses a snapshot authority before any distribution execution', () => {
+  let calls = 0;
+  assert.throws(() => exercise('unused', 'unused', {DURABLE_WORKFLOW_RELEASE_API_URL: 'http://127.0.0.1/snapshot'},
+    () => { calls += 1; }), /native live default HTTPS/);
+  assert.equal(calls, 0);
+});

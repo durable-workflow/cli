@@ -150,6 +150,7 @@ fn first_validation_message(body: &Map<String, Value>) -> Option<String> {
 pub struct ErrorContext<'a> {
     pub command: &'a str,
     pub namespace: Option<String>,
+    pub workflow_id: Option<String>,
     pub server_flag: Option<String>,
     pub env_flag: Option<String>,
 }
@@ -339,6 +340,11 @@ pub fn envelope(error: &CliError, context: &ErrorContext) -> Value {
     if let CliError::Http { status, body, .. } = error {
         add_http_details(&mut envelope, error, *status, body.as_ref());
     }
+    if let Some(workflow_id) = &context.workflow_id {
+        envelope
+            .entry("workflow_id")
+            .or_insert_with(|| json!(workflow_id));
+    }
     if let CliError::Compatibility(failure) = error {
         envelope.insert(
             "compatibility".into(),
@@ -404,7 +410,7 @@ fn next_step_lines(next: &[Value]) -> Vec<String> {
 /// Human error text for stderr.
 pub fn human(error: &CliError, context: &ErrorContext) -> String {
     let display = |text: &str| {
-        if context.command == "workflow:list" {
+        if matches!(context.command, "workflow:list" | "workflow:list-runs") {
             crate::formatter::display_text(text)
         } else {
             text.to_owned()
@@ -443,6 +449,7 @@ mod tests {
         ErrorContext {
             command: "workflow:cancel",
             namespace: Some("default".into()),
+            workflow_id: None,
             server_flag: None,
             env_flag: None,
         }
@@ -507,6 +514,7 @@ mod tests {
         let context = ErrorContext {
             command: "server:health",
             namespace: None,
+            workflow_id: None,
             server_flag: Some("http://127.0.0.1:1".into()),
             env_flag: None,
         };

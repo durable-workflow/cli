@@ -48,6 +48,7 @@ fn handler(name: &str) -> Option<Handler> {
         "server:health" => Handler::Server(server::health),
         "server:info" => Handler::Server(server::info),
         "workflow:list" => Handler::Server(workflow::list),
+        "workflow:list-runs" => Handler::Server(workflow::list_runs),
         "env:list" => Handler::Local(env::list),
         "env:set" => Handler::Local(env::set),
         "env:use" => Handler::Local(env::use_env),
@@ -58,7 +59,7 @@ fn handler(name: &str) -> Option<Handler> {
 }
 
 /// Commands whose errors carry the resolved namespace.
-const NAMESPACE_SCOPED: &[&str] = &["workflow:list"];
+const NAMESPACE_SCOPED: &[&str] = &["workflow:list", "workflow:list-runs"];
 
 /// Verbs of a group and the command each one names.
 type GroupVerbs = &'static [(&'static str, &'static str)];
@@ -310,6 +311,11 @@ fn report(error: &CliError, input: &Input, server_command: bool) -> i32 {
     let context = ErrorContext {
         command: &input.command,
         namespace,
+        workflow_id: input
+            .arg("workflow-id")
+            .map(php::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_owned),
         server_flag: input.opt_str("server").map(str::to_string),
         env_flag: input.opt_str("env").map(str::to_string),
     };
@@ -547,7 +553,7 @@ fn run(raw: Vec<String>) -> i32 {
             if !matches!(command.as_str(), "doctor" | "server:start-dev") {
                 context.warn_if_incompatible(
                     client::uses_worker_protocol(&command),
-                    command == "workflow:list",
+                    NAMESPACE_SCOPED.contains(&command.as_str()),
                 );
             }
             run(&context, &input)

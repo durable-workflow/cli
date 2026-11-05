@@ -431,17 +431,19 @@ $responseInputs[] = with($listResponse, ['control_plane', 'operation'], 'update'
 $responseInputs[] = with(end($responseInputs), ['control_plane', 'update_id'], ' update-one ');
 $listResponseOut = [];
 foreach ($responseInputs as $index => $body) {
-    foreach ([200, 404] as $status) {
-        $result = null;
-        $error = null;
-        try {
-            $result = ControlPlaneResponse::normalize('GET', '/workflows', $body, $status);
-            $result['control_plane_version'] ??= '2';
-        } catch (RuntimeException $exception) {
-            $error = $exception->getMessage();
+    foreach (['/workflows', '/workflows/wf-runs/runs'] as $path) {
+        foreach ([200, 404] as $status) {
+            $result = null;
+            $error = null;
+            try {
+                $result = ControlPlaneResponse::normalize('GET', $path, $body, $status);
+                $result['control_plane_version'] ??= '2';
+            } catch (RuntimeException $exception) {
+                $error = $exception->getMessage();
+            }
+            $listResponseOut[] = ['case' => $index, 'path' => $path, 'body' => $body, 'status' => $status,
+                'result_json' => $result === null ? null : enc($result), 'error' => $error];
         }
-        $listResponseOut[] = ['case' => $index, 'body' => $body, 'status' => $status,
-            'result_json' => $result === null ? null : enc($result), 'error' => $error];
     }
 }
 

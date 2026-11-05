@@ -93,12 +93,25 @@ impl Context {
 
     /// One SDK request, with the PHP CLI's workflow response contract.
     pub fn workflow_list(&self, query: &[(String, String)]) -> Result<Value, CliError> {
-        let mut request = RawRequest::get(["workflows"])
-            .protocol_version(compat::worker_protocol_version())
-            .control_plane_version(compat::control_plane_version());
+        let mut request = RawRequest::get(["workflows"]);
         for (name, value) in query {
             request = request.query(name, value);
         }
+        self.workflow_read(request, "/workflows")
+    }
+
+    /// Read one workflow's runs. The SDK encodes the identifier as one segment.
+    pub fn workflow_runs(&self, workflow_id: &str) -> Result<Value, CliError> {
+        self.workflow_read(
+            RawRequest::get(["workflows", workflow_id, "runs"]),
+            &format!("/workflows/{workflow_id}/runs"),
+        )
+    }
+
+    fn workflow_read(&self, request: RawRequest, path: &str) -> Result<Value, CliError> {
+        let request = request
+            .protocol_version(compat::worker_protocol_version())
+            .control_plane_version(compat::control_plane_version());
         let response = self.runtime.block_on(async {
             self.sdk()?
                 .control_plane_request(request)
@@ -107,8 +120,12 @@ impl Context {
         })?;
         let status = response.status();
         let body = response.json().unwrap_or(Value::Null);
-        let normalized =
-            workflow_response::normalize(body.clone(), response.control_plane_version(), status);
+        let normalized = workflow_response::normalize(
+            body.clone(),
+            response.control_plane_version(),
+            status,
+            path,
+        );
         if status >= 400 {
             let payload = if status == 401 || status == 403 {
                 body
@@ -193,6 +210,7 @@ pub fn map_error(error: SdkError) -> CliError {
         SdkError::InvalidBaseUrl => CliError::Invalid(
             "Invalid server URL: pass the Server or Cloud runtime base URL without the /api suffix.".into(),
         ),
+        SdkError::InvalidRawRequest(message) => CliError::Invalid(message),
         other => CliError::Failure(other.to_string()),
     }
 }

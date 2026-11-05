@@ -34,9 +34,13 @@ impl Scratch {
     }
 
     fn run(&self, url: &str, args: &[&str]) -> Output {
+        self.run_command("workflow:list", url, args)
+    }
+
+    fn run_command(&self, command: &str, url: &str, args: &[&str]) -> Output {
         Command::new(env!("CARGO_BIN_EXE_dw"))
             .args([
-                "workflow:list",
+                command,
                 "--server",
                 url,
                 "--namespace=orders",
@@ -135,6 +139,16 @@ impl Server {
             .cloned()
             .collect()
     }
+
+    fn runs_requests(&self) -> Vec<String> {
+        self.requests
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|request| request.starts_with("GET /prefix/api/workflows/"))
+            .cloned()
+            .collect()
+    }
 }
 
 impl Drop for Server {
@@ -165,6 +179,21 @@ fn body() -> Value {
             "required_fields": [], "success_fields": []}
     });
     body
+}
+
+fn runs_body() -> Value {
+    json!({"workflow_id": "wf-runs", "runs": [
+        {"run_id": "run-one", "run_number": 1, "workflow_type": "orders.process",
+            "status": "completed", "task_queue": "orders", "started_at": "first", "closed_at": "done"},
+        {"run_id": "run-two", "run_number": 2, "workflow_type": "orders.process",
+            "status": "running", "task_queue": "orders", "started_at": "second", "closed_at": null}
+    ], "next_page_token": "retained-without-following", "control_plane": {
+        "schema": "durable-workflow.v2.control-plane-response", "version": 1, "operation": "list_runs",
+        "workflow_id": "wf-runs", "run_count": 2,
+        "contract": {"schema": "durable-workflow.v2.control-plane-response.contract", "version": 1,
+            "legacy_field_policy": "reject_non_canonical", "legacy_fields": {},
+            "required_fields": [], "success_fields": ["run_count"]}
+    }})
 }
 
 fn success(output: &Output) -> Value {
@@ -416,4 +445,162 @@ fn malformed_success_is_refused_and_remote_human_values_are_not_terminal_instruc
         .any(|character| character.is_control() && character != '\n'));
     let machine = success(&scratch.run(&server.url, &["--json"]));
     assert_eq!(machine["workflows"][0]["workflow_id"], attack);
+}
+
+#[test]
+fn runs_encodes_one_identifier_with_sdk_auth_and_preserves_the_exact_envelope() {
+    let scratch = Scratch::new();
+    let server = Server::new(info(), 200, Some("2"), runs_body());
+    let output = scratch.run_command("workflow:list-runs", &server.url, &["order /?#é", "--json"]);
+    let result = success(&output);
+    assert_eq!(result["namespace"], "orders");
+    assert_eq!(result["runs"][0]["namespace"], "orders");
+    assert_eq!(result["run_count"], 2);
+    assert_eq!(result["next_page_token"], "retained-without-following");
+    assert_eq!(result["control_plane_version"], "2");
+    assert_eq!(result["control_plane_operation"], "list_runs");
+    let requests = server.runs_requests();
+    assert_eq!(requests.len(), 1);
+    let request = requests[0].to_lowercase();
+    assert!(request.starts_with("get /prefix/api/workflows/order%20%2f%3f%23%c3%a9/runs "));
+    for header in [
+        "x-namespace: orders",
+        "authorization: bearer fixture-token",
+        "x-durable-workflow-protocol-version: 1.0",
+        "x-durable-workflow-control-plane-version: 2",
+    ] {
+        assert!(request.contains(header), "missing {header}: {request}");
+    }
+}
+
+#[test]
+fn runs_jsonl_preserves_existing_namespaces_and_never_follows_a_cursor() {
+    let scratch = Scratch::new();
+    let mut response = runs_body();
+    response["namespace"] = json!("server-orders");
+    response["runs"][0]["namespace"] = json!("item-orders");
+    let server = Server::new(info(), 200, Some("2"), response);
+    let output = scratch.run_command(
+        "workflow:list-runs",
+        &server.url,
+        &["wf-runs", "--output=jsonl"],
+    );
+    assert_eq!(output.status.code(), Some(0));
+    let items: Vec<Value> = String::from_utf8(output.stdout)
+        .unwrap()
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    assert_eq!(items.len(), 2);
+    assert_eq!(items[0]["namespace"], "item-orders");
+    assert_eq!(items[1]["namespace"], "server-orders");
+    assert_eq!(server.runs_requests().len(), 1);
+}
+
+#[test]
+fn runs_human_count_empty_result_and_table_follow_php() {
+    let scratch = Scratch::new();
+    for count in [json!(null), json!(0), json!("server-count")] {
+        let mut response = runs_body();
+        response["run_count"] = count.clone();
+        let server = Server::new(info(), 200, Some("2"), response);
+        let output = scratch.run_command("workflow:list-runs", &server.url, &["wf-runs"]);
+        assert_eq!(output.status.code(), Some(0));
+        let human = String::from_utf8(output.stdout).unwrap();
+        let expected = match count {
+            Value::Null => "2".into(),
+            value => value.to_string().trim_matches('"').to_owned(),
+        };
+        assert!(
+            human.starts_with(&format!(
+                "Workflow: wf-runs\nNamespace: orders\nRun Count: {expected}\n\n"
+            )),
+            "{human}"
+        );
+        assert!(
+            human.contains("Run ID") && human.contains("Task Queue") && human.contains("run-two")
+        );
+    }
+    let mut response = runs_body();
+    response["runs"] = json!([]);
+    let server = Server::new(info(), 200, Some("2"), response);
+    let output = scratch.run_command("workflow:list-runs", &server.url, &["wf-runs"]);
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        "No runs found.\nNamespace: orders\n"
+    );
+}
+
+#[test]
+fn runs_http_failures_are_not_retried_or_masked_by_response_contracts() {
+    let scratch = Scratch::new();
+    for (status, exit) in [(401, 4), (403, 4), (404, 5), (422, 2), (500, 6)] {
+        let server = Server::new(
+            info(),
+            status,
+            None,
+            json!({"message": "run rejection", "workflow_id": "server-workflow", "reason": "fixture"}),
+        );
+        let output = scratch.run_command("workflow:list-runs", &server.url, &["wf-runs", "--json"]);
+        assert_eq!(output.status.code(), Some(exit));
+        let error: Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(error["namespace"], "orders");
+        assert_eq!(error["command"], "workflow:list-runs");
+        assert_eq!(error["workflow_id"], "server-workflow");
+        assert_eq!(error["reason"], "fixture");
+        assert_eq!(server.runs_requests().len(), 1);
+    }
+}
+
+#[test]
+fn runs_usage_and_sdk_path_validation_send_no_target_request() {
+    let scratch = Scratch::new();
+    let server = Server::new(info(), 200, Some("2"), runs_body());
+    assert_eq!(
+        scratch
+            .run_command("workflow:list-runs", &server.url, &[])
+            .status
+            .code(),
+        Some(1)
+    );
+    assert!(server.requests.lock().unwrap().is_empty());
+    for id in ["", ".", ".."] {
+        let output = scratch.run_command("workflow:list-runs", &server.url, &[id, "--json"]);
+        assert_eq!(output.status.code(), Some(2));
+        let error: Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(error["exit_code"], 2);
+        assert_eq!(error["namespace"], "orders");
+    }
+    assert!(server.runs_requests().is_empty());
+}
+
+#[test]
+fn runs_contract_errors_name_the_requested_path_and_human_values_stay_literal() {
+    let scratch = Scratch::new();
+    let server = Server::new(info(), 200, None, runs_body());
+    let output = scratch.run_command("workflow:list-runs", &server.url, &["wf-runs", "--json"]);
+    assert_eq!(output.status.code(), Some(1));
+    let error: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert!(error["error"]
+        .as_str()
+        .unwrap()
+        .contains("[/workflows/wf-runs/runs]"));
+    assert_eq!(error["workflow_id"], "wf-runs");
+    let attack = "<error>UNTRUSTED</error>\nFORGED\u{1b}[2J";
+    let mut response = runs_body();
+    response["runs"][0]["run_id"] = json!(attack);
+    response["runs"][0]["status"] = json!(attack);
+    response["run_count"] = json!(attack);
+    let server = Server::new(info(), 200, Some("2"), response);
+    let output = scratch.run_command("workflow:list-runs", &server.url, &[attack]);
+    assert_eq!(output.status.code(), Some(0));
+    let human = String::from_utf8(output.stdout).unwrap();
+    assert!(human.contains("<error>UNTRUSTED</error>\\nFORGED\\u{001b}[2J"));
+    assert!(!human
+        .chars()
+        .any(|character| character.is_control() && character != '\n'));
+    let result =
+        success(&scratch.run_command("workflow:list-runs", &server.url, &[attack, "--json"]));
+    assert_eq!(result["runs"][0]["run_id"], attack);
 }

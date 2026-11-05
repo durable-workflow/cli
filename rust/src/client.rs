@@ -91,6 +91,27 @@ impl Context {
             .block_on(async { client.cluster_info().await.map_err(map_error) })
     }
 
+    /// One namespace visibility request over the SDK's configured transport.
+    pub fn namespace_list(&self) -> Result<Value, CliError> {
+        let request = RawRequest::get(["namespaces"])
+            .protocol_version(compat::worker_protocol_version())
+            .control_plane_version(compat::control_plane_version());
+        let response = self.runtime.block_on(async {
+            self.sdk()?
+                .control_plane_request(request)
+                .await
+                .map_err(map_error)
+        })?;
+        // The PHP Server client decodes non-array or invalid JSON as an empty array.
+        let body = Value::Object(crate::php::array_map(
+            response.json().unwrap_or(Value::Null),
+        ));
+        if response.status() >= 400 {
+            return Err(self.http_error(response.status(), &body));
+        }
+        Ok(body)
+    }
+
     /// One SDK request, with the PHP CLI's workflow response contract.
     pub fn workflow_list(&self, query: &[(String, String)]) -> Result<Value, CliError> {
         let mut request = RawRequest::get(["workflows"])
@@ -115,15 +136,19 @@ impl Context {
             } else {
                 normalized.unwrap_or(body)
             };
-            let mut error = CliError::from_http(status, &crate::php::json_encode(&payload));
-            if status == 403 && self.managed_namespace() {
-                if let CliError::Http { message, .. } = &mut error {
-                    message.push_str(" This client/control-plane operation requires a client runtime credential; worker runtime credentials are limited to worker-protocol operations.");
-                }
-            }
-            return Err(error);
+            return Err(self.http_error(status, &payload));
         }
         normalized.map_err(CliError::Failure)
+    }
+
+    fn http_error(&self, status: u16, body: &Value) -> CliError {
+        let mut error = CliError::from_http(status, &crate::php::json_encode(body));
+        if status == 403 && self.managed_namespace() {
+            if let CliError::Http { message, .. } = &mut error {
+                message.push_str(" This client/control-plane operation requires a client runtime credential; worker runtime credentials are limited to worker-protocol operations.");
+            }
+        }
+        error
     }
 
     fn managed_namespace(&self) -> bool {

@@ -334,7 +334,12 @@ for (const [platform, observation] of Object.entries(PLATFORMS)) {
     const channelBytes = Buffer.from('different synthetic default artifact');
     fs.mkdirSync(path.join(directory, 'channel'));
     fs.writeFileSync(path.join(directory, 'channel', name), channelBytes);
+    const phpBinary = path.join(directory, 'synthetic-php-tool');
+    fs.writeFileSync(phpBinary, 'synthetic tool, never executed');
+    const phpAuthority = {version: '8.4.27', binary: fs.realpathSync(phpBinary),
+      sha256: hash(fs.readFileSync(phpBinary))};
     const cell = {...state(), tag: '2.3.7', commit: COMMIT, platform, owner: 'c'.repeat(32),
+      tools: {php: phpAuthority.version, php_authority: phpAuthority},
       verified: true, native: {platform}, release: {tag: '2.3.7', commit: COMMIT,
         digests: Object.fromEntries([...input.bytes].map(([key, value]) => [key, hash(value)]))},
       channel: {tag: '2.3.6', commit: 'b'.repeat(40), digest: hash(channelBytes)}};
@@ -349,7 +354,7 @@ for (const [platform, observation] of Object.entries(PLATFORMS)) {
       for (const key of ['GH_TOKEN', 'GITHUB_TOKEN', 'DURABLE_WORKFLOW_TOKEN']) assert.equal(options.env?.[key], undefined);
       if (isNativeFixtureProbe(command, args)) return observation.machine;
       if (command === 'sysctl') return '1';
-      if (command === 'php') return JSON.stringify(packageFixture().metadata);
+      if (command === phpAuthority.binary) return JSON.stringify(packageFixture().metadata);
       if (args.includes('-File') || args[0]?.endsWith('install.sh')) {
         return writeSyntheticInstall(options.env, platform, input.bytes.get(name), channelBytes);
       }

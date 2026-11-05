@@ -9,6 +9,7 @@ const {spawnSync} = require('node:child_process');
 const {parseReleaseVersion, releaseImplementation} = require('./release-version');
 const {validateReleaseMetadata, validateChannel} = require('./verify-cli-release-channel');
 const {verifyUpgradeResult} = require('./verify-cli-upgrade-result');
+const privateTool = require('./private-verifier-tool');
 
 const REPOSITORY = 'durable-workflow/cli';
 const PLATFORMS = Object.freeze({
@@ -69,9 +70,40 @@ function run(command, args, options = {}) {
     encoding: 'utf8', maxBuffer: 4 * 1024 * 1024, timeout: 60000, ...options,
   });
   if (result.error || result.status !== 0) {
-    throw new Error(`required command ${path.basename(command)} failed (${result.status ?? 'unavailable'})`);
+    throw new Error(`required command ${path.basename(command)} failed (${result.status ?? 'unavailable'})`,
+      {cause: result.error});
   }
   return result.stdout;
+}
+
+const PHP_AUTHORITY_PROBE = `
+if (PHP_VERSION_ID < 80200 || !extension_loaded('phar')) exit(1);
+echo json_encode(['version' => PHP_VERSION, 'binary' => realpath(PHP_BINARY)], JSON_THROW_ON_ERROR);
+`;
+
+function inspectPhpAuthority(executable, execute = run, arguments_ = []) {
+  if (!isDeepStrictEqual(arguments_, []) && !isDeepStrictEqual(arguments_, ['-n'])) {
+    throw new Error('verifier PHP arguments are outside the fixed inspection policy');
+  }
+  const value = JSON.parse(execute(executable, [...arguments_, '-r', PHP_AUTHORITY_PROBE], {timeout: 10000}));
+  if (!/^\d+\.\d+\.\d+$/.test(value.version) || typeof value.binary !== 'string' ||
+      !path.isAbsolute(value.binary) || /[\r\n\0]/.test(value.binary)) {
+    throw new Error('verifier PHP authority has an invalid version or executable path');
+  }
+  const binary = fs.realpathSync(value.binary);
+  return {version: value.version, binary, sha256: hash(regularBytes(binary)),
+    ...(arguments_.length ? {arguments: arguments_} : {})};
+}
+
+function assertPhpAuthority(authority) {
+  if (!authority || !/^\d+\.\d+\.\d+$/.test(authority.version) ||
+      typeof authority.binary !== 'string' || !path.isAbsolute(authority.binary) ||
+      /[\r\n\0]/.test(authority.binary) || !/^[a-f0-9]{64}$/.test(authority.sha256) ||
+      fs.realpathSync(authority.binary) !== authority.binary || hash(regularBytes(authority.binary)) !== authority.sha256 ||
+      (authority.arguments !== undefined && !isDeepStrictEqual(authority.arguments, ['-n']))) {
+    throw new Error('verifier PHP executable differs from the captured authority');
+  }
+  return authority;
 }
 
 function nativePlatform(name, observed, execute = run) {
@@ -160,6 +192,18 @@ function tagCommit(tag, environment, state, execute = run) {
   return object.sha;
 }
 
+function safeSystemFailure(error) {
+  const nested = Array.isArray(error?.cause?.errors) ? error.cause.errors.slice(0, 4) : [];
+  const causes = [error, error?.cause, ...nested].filter(Boolean);
+  const codes = [...new Set(causes.map(value => value.code)
+    .filter(value => typeof value === 'string' && /^[A-Z][A-Z0-9_]{0,63}$/.test(value)))];
+  const errno = [...new Set(causes.map(value => value.errno)
+    .filter(value => Number.isInteger(value) && Math.abs(value) <= 2147483647))];
+  const syscall = [...new Set(causes.map(value => value.syscall)
+    .filter(value => ['connect', 'read', 'write', 'open', 'getaddrinfo'].includes(value)))];
+  return {codes, errno, syscall};
+}
+
 async function publicResponse(url, state, fetchImpl, hop = 0) {
   if (!Number.isInteger(hop) || hop < 0 || hop >= 6) throw new Error('public download exceeded its redirect bound');
   const hosts = new Set(['github.com', 'release-assets.githubusercontent.com', 'objects.githubusercontent.com']);
@@ -168,9 +212,11 @@ async function publicResponse(url, state, fetchImpl, hop = 0) {
       target.username || target.password || (target.port && target.port !== '443')) {
     throw new Error('public download redirected outside the approved HTTPS release hosts');
   }
+  state.download = {...state.download, host: target.hostname, hop, status: null};
   const response = await fetchImpl(target.href, {
     signal: AbortSignal.timeout(remaining(state)), redirect: 'manual',
   });
+  state.download.status = Number.isInteger(response.status) ? response.status : null;
   if (![301, 302, 303, 307, 308].includes(response.status)) return response;
   const location = response.headers.get('location');
   await response.body?.cancel();
@@ -180,20 +226,27 @@ async function publicResponse(url, state, fetchImpl, hop = 0) {
 
 async function download(tag, name, destination, state, fetchImpl = fetch) {
   const url = `https://github.com/${REPOSITORY}/releases/download/${tag}/${name}`;
-  const response = await publicResponse(url, state, fetchImpl);
-  if (!response.ok) throw new Error(`public download failed for ${name}`);
-  const file = fs.openSync(destination, 'wx', 0o600);
-  let length = 0;
+  state.download = {asset: ASSETS.includes(name) ? name : null, host: null, hop: 0, status: null};
   try {
-    for await (const chunk of response.body) {
-      length += chunk.length;
-      if (length > MAX_ASSET_BYTES) throw new Error(`public asset ${name} exceeds the size bound`);
-      fs.writeSync(file, chunk);
+    const response = await publicResponse(url, state, fetchImpl);
+    if (!response.ok) throw new Error(`public download failed for ${name}`);
+    const file = fs.openSync(destination, 'wx', 0o600);
+    let length = 0;
+    try {
+      for await (const chunk of response.body) {
+        length += chunk.length;
+        if (length > MAX_ASSET_BYTES) throw new Error(`public asset ${name} exceeds the size bound`);
+        fs.writeSync(file, chunk);
+      }
+    } finally {
+      fs.closeSync(file);
     }
-  } finally {
-    fs.closeSync(file);
+    if (length === 0) throw new Error(`public asset ${name} is empty`);
+  } catch (error) {
+    const system = safeSystemFailure(error);
+    throw Object.assign(new Error(`public download failed for ${name} (${system.codes.join(',') || 'input failure'})`),
+      {publicDownload: {...state.download, ...system}});
   }
-  if (length === 0) throw new Error(`public asset ${name} is empty`);
 }
 
 function attest(filename, tag, commit, environment, state, execute = run) {
@@ -300,10 +353,17 @@ function cleanup(directory) {
   }
 }
 
-function assertInstallerSource(directory) {
+function assertInstallerSource(directory, controlCommit, execute = run, root = path.join(__dirname, '../..')) {
+  if (!/^[a-f0-9]{40}$/.test(controlCommit) ||
+      execute('git', ['-C', root, 'rev-parse', 'HEAD']).trim() !== controlCommit) {
+    throw new Error('qualified installer control Git identity differs');
+  }
   for (const name of ['install.sh', 'install.ps1']) {
-    if (!regularBytes(path.join(directory, name)).equals(fs.readFileSync(path.join(__dirname, '..', name)))) {
-      throw new Error('published installer differs from the qualified control source');
+    const expected = Buffer.from(execute('git', ['-C', root, 'show', `${controlCommit}:scripts/${name}`]), 'utf8');
+    const actual = regularBytes(path.join(directory, name));
+    if (!actual.equals(expected)) {
+      throw Object.assign(new Error(`published installer ${name} differs from the qualified control Git blob`),
+        {installer: {name, control_commit: controlCommit, expected_sha256: hash(expected), actual_sha256: hash(actual)}});
     }
   }
 }
@@ -314,6 +374,18 @@ function preparePrivateDirectories(directory) {
   }
 }
 
+function inputFailureEvidence(filename, state, error, allocated, removed) {
+  if (!filename) return;
+  fs.writeFileSync(filename, JSON.stringify({schema: 'durable-workflow.cli.public-install/v1',
+    tag: state.tag, commit: state.commit, platform: state.platform, initiator: state.initiator,
+    control: state.control, native: state.native, tools: state.tools,
+    verified_at: new Date().toISOString(), outcome: 'fail', phase: state.phase,
+    public_inputs_verified: false, distribution_executed: false,
+    failure: {system: safeSystemFailure(error), download: error.publicDownload, installer: error.installer},
+    cleanup: {private_state_allocated: allocated, private_state_removed: removed}}, null, 2),
+  {flag: 'wx', mode: 0o600});
+}
+
 async function verify(options, environment = process.env, dependencies = {}) {
   releaseIdentity(options.tag, options.commit);
   const authority = releaseAuthority(environment, options.tag);
@@ -322,33 +394,53 @@ async function verify(options, environment = process.env, dependencies = {}) {
     ...authority,
     started, deadline: started + CELL_MILLISECONDS, owner: crypto.randomBytes(16).toString('hex')};
   const execute = dependencies.run || run;
-  state.native = nativePlatform(options.platform, {os: process.platform, arch: process.arch}, execute);
-  const phpVersion = execute('php', ['-r', 'if (PHP_VERSION_ID < 80200 || !extension_loaded("phar")) exit(1); echo PHP_VERSION;']).trim();
-  const ghVersion = execute('gh', ['--version']).split('\n')[0];
-  execute('gh', ['attestation', 'verify', '--help']);
-  state.tools = {node: process.version, php: phpVersion, gh: ghVersion};
-  const base = fs.realpathSync(environment.RUNNER_TEMP || os.tmpdir());
-  const directory = fs.mkdtempSync(path.join(base, 'dw-public-release-'));
-  preparePrivateDirectories(directory);
-  fs.writeFileSync(path.join(directory, 'state.json'), JSON.stringify(state), {mode: 0o600});
-  if (environment.GITHUB_OUTPUT) fs.appendFileSync(environment.GITHUB_OUTPUT, `directory=${directory}\n`);
+  let directory;
   try {
+    state.phase = 'prerequisites';
+    state.native = nativePlatform(options.platform, {os: process.platform, arch: process.arch}, execute);
+    const php = assertPhpAuthority(JSON.parse(environment.VERIFIER_PHP_AUTHORITY || 'null'));
+    if (!isDeepStrictEqual(inspectPhpAuthority(php.binary, execute, php.arguments || []), php)) {
+      throw new Error('verifier PHP authority changed after bootstrap');
+    }
+    const binding = dependencies.validateToolBinding ? dependencies.validateToolBinding(php) :
+      privateTool.validateBinding(JSON.parse(environment.VERIFIER_TOOL_BINDING || 'null'),
+        JSON.parse(environment.VERIFIER_TOOL_INDEX || 'null'), options.platform,
+        privateTool.context(environment, execute), php);
+    const ghVersion = execute('gh', ['--version']).split('\n')[0];
+    execute('gh', ['attestation', 'verify', '--help']);
+    state.tools = {node: process.version, php: php.version, php_authority: php, verifier_tool: binding, gh: ghVersion};
+    state.phase = 'private-state';
+    const base = fs.realpathSync(environment.RUNNER_TEMP || os.tmpdir());
+    directory = fs.mkdtempSync(path.join(base, 'dw-public-release-'));
+    preparePrivateDirectories(directory);
+    fs.writeFileSync(path.join(directory, 'state.json'), JSON.stringify(state), {mode: 0o600});
+    if (environment.GITHUB_OUTPUT) fs.appendFileSync(environment.GITHUB_OUTPUT, `directory=${directory}\n`);
     const verificationEnvironment = childEnvironment(environment, directory);
     verificationEnvironment.GH_TOKEN = environment.GH_TOKEN;
     verificationEnvironment.GH_PROMPT_DISABLED = '1';
     verificationEnvironment.GH_CONFIG_DIR = path.join(directory, 'gh-config');
     verificationEnvironment.XDG_CACHE_HOME = path.join(directory, 'cache');
     verificationEnvironment.LOCALAPPDATA = path.join(directory, 'cache');
+    state.phase = 'release-bundle';
     state.release = await verifyBundle(options.tag, options.commit, path.join(directory, 'release'), verificationEnvironment, state, dependencies);
-    assertInstallerSource(path.join(directory, 'release'));
+    state.phase = 'installer-source';
+    assertInstallerSource(path.join(directory, 'release'), state.control.commit, execute);
+    state.phase = 'native-artifact';
     verifyNativeBinary(options.platform, path.join(directory, 'release', assetName(options.platform)), execute);
+    state.phase = 'default-channel';
     state.channel = await verifyDefault(options.platform, path.join(directory, 'channel'), verificationEnvironment, state, dependencies);
     verifyNativeBinary(options.platform, path.join(directory, 'channel', assetName(options.platform)), execute);
     state.verified = true;
     fs.writeFileSync(statePath(directory), JSON.stringify(state), {mode: 0o600});
     return directory;
   } catch (error) {
-    cleanup(directory);
+    let removed = false;
+    try {
+      cleanup(directory);
+      removed = true;
+    } finally {
+      inputFailureEvidence(options.evidencePath, state, error, Boolean(directory), removed);
+    }
     throw error;
   }
 }
@@ -458,7 +550,8 @@ echo json_encode(['packages' => $installed['versions'],
     'version' => \DurableWorkflow\Cli\GeneratedBuildInfo::VERSION,
     'commit' => \DurableWorkflow\Cli\GeneratedBuildInfo::COMMIT], JSON_THROW_ON_ERROR);
 `;
-  return JSON.parse(execute('php', ['-r', code, filename], {env: environment, timeout: remaining(state)}));
+  const php = assertPhpAuthority(state.tools?.php_authority);
+  return JSON.parse(execute(php.binary, [...(php.arguments || []), '-r', code, filename], {env: environment, timeout: remaining(state)}));
 }
 
 function install(directory, destination, state, environment, exact, execute = run) {
@@ -559,20 +652,54 @@ module.exports = {
   checksums, verifyEmbeddedPhar, verifyNativeBinary, remaining, tagCommit, verifyBundle, publicResponse,
   assertPackageIdentity, assertVerifiedInputs, assertInstalledInspection,
   readState, cleanup, verify, exercise, install, packageMetadata, main,
+  inspectPhpAuthority, assertPhpAuthority, assertInstallerSource,
+  safeSystemFailure,
 };
+
+function privatePhpAuthority() {
+  if (!process.env.GITHUB_OUTPUT) throw new Error('PHP authority capture requires the owned workflow output');
+  try {
+    privateTool.noCredentials(process.env);
+    const base = privateTool.context();
+    const result = privateTool.consume(process.env.VERIFIER_ARTIFACT_DIRECTORY,
+      JSON.parse(process.env.VERIFIER_TOOL_INDEX), process.env.VERIFIER_PLATFORM, base);
+    try {
+      privateTool.output(process.env, 'authority', JSON.stringify(result.authority));
+      privateTool.output(process.env, 'binding', JSON.stringify(result.binding));
+      privateTool.output(process.env, 'tool-directory', result.directory);
+    } catch (error) { privateTool.cleanup(result.directory); throw error; }
+    return result.authority;
+  } catch (error) {
+    const platform = process.env.VERIFIER_PLATFORM;
+    if (Object.hasOwn(PLATFORMS, platform)) {
+      inputFailureEvidence(path.resolve(`release-public-download-evidence-${platform}.json`),
+        {tag: process.env.RELEASE_TAG, commit: process.env.VERIFIED_SOURCE_SHA, platform,
+          phase: 'private-verifier-tool', control: {ref: process.env.RELEASE_CONTROL_REF,
+            commit: process.env.RELEASE_CONTROL_COMMIT}}, error, false, true);
+    }
+    throw error;
+  }
+}
 
 async function main() {
   const [phase, ...extra] = process.argv.slice(2);
-  if (extra.length || !['verify', 'exercise', 'cleanup'].includes(phase)) {
-    throw new Error('usage: run-public-release-verifier.mjs verify|exercise|cleanup');
+  if (extra.length || !['authority', 'verify', 'exercise', 'cleanup'].includes(phase)) {
+    throw new Error('usage: run-public-release-verifier.mjs authority|verify|exercise|cleanup');
   }
-  if (phase === 'cleanup') return cleanup(process.env.VERIFIER_DIRECTORY);
+  if (phase === 'authority') return privatePhpAuthority();
+  if (phase === 'cleanup') {
+    try { cleanup(process.env.VERIFIER_DIRECTORY); }
+    finally { privateTool.cleanup(process.env.VERIFIER_TOOL_DIRECTORY); }
+    return;
+  }
   if (phase === 'verify') {
+    if (!Object.hasOwn(PLATFORMS, process.env.VERIFIER_PLATFORM)) throw new Error('missing exact verification platform');
     if (process.env.GITHUB_REPOSITORY !== REPOSITORY || !process.env.GH_TOKEN) {
       throw new Error('verification requires the owning repository read token');
     }
     return verify({tag: process.env.RELEASE_TAG, commit: process.env.VERIFIED_SOURCE_SHA,
-      platform: process.env.VERIFIER_PLATFORM});
+      platform: process.env.VERIFIER_PLATFORM,
+      evidencePath: path.resolve(`release-public-download-evidence-${process.env.VERIFIER_PLATFORM}.json`)});
   }
   const platform = process.env.VERIFIER_PLATFORM;
   if (!Object.hasOwn(PLATFORMS, platform)) throw new Error('missing exact verification platform');

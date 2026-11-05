@@ -92,7 +92,7 @@ function verifyStandaloneRuntime(evidence, expectedVersion) {
   });
 }
 
-module.exports = {verifyStandaloneRuntime};
+module.exports = {verifyStandaloneRuntime, verifyRuntimeDependencies};
 
 if (require.main === module) {
   try {

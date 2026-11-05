@@ -32,36 +32,36 @@ def binary_name(name: str) -> str:
 def pack(executable: Path, manifest: Path, destination: Path, name: str) -> None:
     members = ((binary_name(name), regular_bytes(executable, MAX_BINARY)),
                (MANIFEST, regular_bytes(manifest, MAX_MANIFEST)))
-    with destination.open("xb") as output:
-        with tarfile.open(fileobj=output, mode="w", format=tarfile.USTAR_FORMAT) as archive:
-            for member, contents in members:
-                info = tarfile.TarInfo(member)
-                info.size = len(contents)
-                info.mode = 0o755 if member == name else 0o644
-                archive.addfile(info, io.BytesIO(contents))
+    with destination.open("xb") as output, tarfile.open(
+        fileobj=output, mode="w", format=tarfile.USTAR_FORMAT,
+    ) as archive:
+        for member, contents in members:
+            info = tarfile.TarInfo(member)
+            info.size = len(contents)
+            info.mode = 0o755 if member == name else 0o644
+            archive.addfile(info, io.BytesIO(contents))
 
 
 def read(filename: Path, name: str) -> dict[str, bytes]:
     contents = regular_bytes(filename, MAX_ARCHIVE)
     expected = {binary_name(name): MAX_BINARY, MANIFEST: MAX_MANIFEST}
     members = {}
-    with io.BytesIO(contents) as source:
-        with tarfile.open(fileobj=source, mode="r:") as archive:
-            for member in archive:
-                if (member.name not in expected or member.name in members or not member.isreg()
-                        or member.pax_headers or member.issparse()
-                        or not 0 < member.size <= expected[member.name]):
-                    raise ValueError("Private tool archive does not have the closed regular-file inventory")
-                entry = archive.extractfile(member)
-                if entry is None:
-                    raise ValueError("Private tool archive member cannot be read")
-                with entry:
-                    data = entry.read(expected[member.name] + 1)
-                if len(data) != member.size:
-                    raise ValueError("Private tool archive member size differs")
-                members[member.name] = data
-            if set(members) != set(expected) or any(source.read()):
-                raise ValueError("Private tool archive has missing members or nonzero trailing data")
+    with io.BytesIO(contents) as source, tarfile.open(fileobj=source, mode="r:") as archive:
+        for member in archive:
+            if (member.name not in expected or member.name in members or not member.isreg()
+                    or member.pax_headers or member.issparse()
+                    or not 0 < member.size <= expected[member.name]):
+                raise ValueError("Private tool archive does not have the closed regular-file inventory")
+            entry = archive.extractfile(member)
+            if entry is None:
+                raise ValueError("Private tool archive member cannot be read")
+            with entry:
+                data = entry.read(expected[member.name] + 1)
+            if len(data) != member.size:
+                raise ValueError("Private tool archive member size differs")
+            members[member.name] = data
+        if set(members) != set(expected) or any(source.read()):
+            raise ValueError("Private tool archive has missing members or nonzero trailing data")
     return members
 
 

@@ -6,8 +6,8 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
-const {execFileSync} = require('node:child_process');
-const {ASSETS, PLATFORMS, CELL_MILLISECONDS, capturePhpAuthority,
+const {execFileSync, spawnSync} = require('node:child_process');
+const {ASSETS, PLATFORMS, CELL_MILLISECONDS, inspectPhpAuthority,
   assertPhpAuthority, assertInstallerSource, verifyBundle, verify} = require('./verify-installed-release');
 
 const hash = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
@@ -30,27 +30,15 @@ function syntheticPhp(directory) {
   }};
 }
 
-test('PHP authority binds the exact bootstrap result and executable bytes without a patch-pin claim', t => {
+test('PHP inspection authority binds exact executable bytes and fixed no-ini arguments', t => {
   const fixture = syntheticPhp(scratch(t));
-  const environment = {VERIFIER_PHP_SERIES: '8.4', BOOTSTRAPPED_PHP_VERSION: '8.4.27'};
-  assert.deepEqual(capturePhpAuthority(environment, fixture.execute), fixture.authority);
-  assert.throws(() => capturePhpAuthority({...environment, BOOTSTRAPPED_PHP_VERSION: '8.4.28'}, fixture.execute));
-  assert.throws(() => capturePhpAuthority({...environment, VERIFIER_PHP_SERIES: '8.3'}, fixture.execute));
-  assert.throws(() => capturePhpAuthority({...environment, BOOTSTRAPPED_PHP_VERSION: ''}, fixture.execute));
+  assert.deepEqual(inspectPhpAuthority(fixture.authority.binary, fixture.execute, ['-n']),
+    {...fixture.authority, arguments: ['-n']});
   assert.deepEqual(assertPhpAuthority(fixture.authority), fixture.authority);
+  assert.throws(() => inspectPhpAuthority(fixture.authority.binary, fixture.execute, ['-d', 'unsafe=1']));
+  assert.throws(() => assertPhpAuthority({...fixture.authority, arguments: ['-c', 'ambient.ini']}));
   fs.appendFileSync(fixture.authority.binary, 'changed');
   assert.throws(() => assertPhpAuthority(fixture.authority), /captured authority/);
-});
-
-test('PHP authority capture refuses inherited credentials before executing any tool', t => {
-  const fixture = syntheticPhp(scratch(t));
-  for (const name of ['GH_TOKEN', 'GITHUB_TOKEN', 'GH_ENTERPRISE_TOKEN', 'GITHUB_ENTERPRISE_TOKEN']) {
-    let calls = 0;
-    assert.throws(() => capturePhpAuthority({VERIFIER_PHP_SERIES: '8.4',
-      BOOTSTRAPPED_PHP_VERSION: '8.4.27', [name]: 'synthetic-read-token'}, () => { calls += 1; }));
-    assert.equal(calls, 0);
-  }
-  assert.ok(fixture.authority.sha256);
 });
 
 test('real autocrlf checkout cannot change immutable installer authority or admit transformed public bytes', t => {
@@ -147,7 +135,7 @@ test('failed public preparation retains sanitized evidence and exact private-sta
     GITHUB_OUTPUT: output, RELEASE_INITIATOR: 'push', RELEASE_CONTROL_REF: 'refs/tags/2.3.7',
     RELEASE_CONTROL_COMMIT: COMMIT, GH_TOKEN: 'synthetic-read-token'};
   await assert.rejects(verify({tag: '2.3.7', commit: COMMIT, platform: fixture.platform, evidencePath: evidence},
-    environment, {run: fixture.execute, fetch: failedDownload()}));
+    environment, {run: fixture.execute, fetch: failedDownload(), validateToolBinding() { return {synthetic: true}; }}));
   const result = JSON.parse(fs.readFileSync(evidence));
   assert.equal(result.outcome, 'fail');
   assert.equal(result.phase, 'release-bundle');
@@ -172,3 +160,23 @@ test('missing PHP authority retains failure before allocating private state', as
   assert.deepEqual(result.cleanup, {private_state_allocated: false, private_state_removed: true});
 });
 
+test('actual authority parent refuses inherited credentials before any tool or artifact access', t => {
+  const directory = scratch(t);
+  const result = spawnSync(process.execPath, [path.join(__dirname, 'run-public-release-verifier.mjs'), 'authority'], {
+    cwd: directory, encoding: 'utf8', timeout: 10000,
+    env: {...process.env, PATH: directory, GH_TOKEN: 'synthetic-read-token', GITHUB_TOKEN: '',
+      GH_ENTERPRISE_TOKEN: '', GITHUB_ENTERPRISE_TOKEN: '', GITHUB_OUTPUT: path.join(directory, 'outputs'),
+      VERIFIER_PLATFORM: 'linux-x86_64', VERIFIER_TOOL_INDEX: 'deliberately invalid JSON',
+      VERIFIER_ARTIFACT_DIRECTORY: path.join(directory, 'absent')},
+  });
+  assert.ifError(result.error);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /credential-free execution/);
+  assert.doesNotMatch(result.stderr, /synthetic-read-token/);
+  assert.equal(fs.existsSync(path.join(directory, 'outputs')), false);
+  const evidence = JSON.parse(fs.readFileSync(path.join(directory, 'release-public-download-evidence-linux-x86_64.json')));
+  assert.equal(evidence.outcome, 'fail');
+  assert.equal(evidence.phase, 'private-verifier-tool');
+  assert.equal(evidence.distribution_executed, false);
+  assert.deepEqual(evidence.cleanup, {private_state_allocated: false, private_state_removed: true});
+});

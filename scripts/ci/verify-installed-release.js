@@ -9,6 +9,7 @@ const {spawnSync} = require('node:child_process');
 const {parseReleaseVersion, releaseImplementation} = require('./release-version');
 const {validateReleaseMetadata, validateChannel} = require('./verify-cli-release-channel');
 const {verifyUpgradeResult} = require('./verify-cli-upgrade-result');
+const privateTool = require('./private-verifier-tool');
 
 const REPOSITORY = 'durable-workflow/cli';
 const PLATFORMS = Object.freeze({
@@ -80,35 +81,26 @@ if (PHP_VERSION_ID < 80200 || !extension_loaded('phar')) exit(1);
 echo json_encode(['version' => PHP_VERSION, 'binary' => realpath(PHP_BINARY)], JSON_THROW_ON_ERROR);
 `;
 
-function inspectPhpAuthority(executable, execute = run) {
-  const value = JSON.parse(execute(executable, ['-r', PHP_AUTHORITY_PROBE], {timeout: 10000}));
+function inspectPhpAuthority(executable, execute = run, arguments_ = []) {
+  if (!isDeepStrictEqual(arguments_, []) && !isDeepStrictEqual(arguments_, ['-n'])) {
+    throw new Error('verifier PHP arguments are outside the fixed inspection policy');
+  }
+  const value = JSON.parse(execute(executable, [...arguments_, '-r', PHP_AUTHORITY_PROBE], {timeout: 10000}));
   if (!/^\d+\.\d+\.\d+$/.test(value.version) || typeof value.binary !== 'string' ||
       !path.isAbsolute(value.binary) || /[\r\n\0]/.test(value.binary)) {
     throw new Error('verifier PHP authority has an invalid version or executable path');
   }
   const binary = fs.realpathSync(value.binary);
-  return {version: value.version, binary, sha256: hash(regularBytes(binary))};
-}
-
-function capturePhpAuthority(environment = process.env, execute = run) {
-  for (const name of ['GH_TOKEN', 'GITHUB_TOKEN', 'GH_ENTERPRISE_TOKEN', 'GITHUB_ENTERPRISE_TOKEN']) {
-    if (environment[name]) throw new Error('PHP authority capture requires credential-free execution');
-  }
-  const version = environment.BOOTSTRAPPED_PHP_VERSION;
-  const series = environment.VERIFIER_PHP_SERIES;
-  if (!/^\d+\.\d+$/.test(series) || !/^\d+\.\d+\.\d+$/.test(version) || !version.startsWith(`${series}.`)) {
-    throw new Error('verifier PHP bootstrap did not provide an exact resolved version');
-  }
-  const authority = inspectPhpAuthority('php', execute);
-  if (authority.version !== version) throw new Error('verifier PHP differs from the trusted bootstrap version');
-  return authority;
+  return {version: value.version, binary, sha256: hash(regularBytes(binary)),
+    ...(arguments_.length ? {arguments: arguments_} : {})};
 }
 
 function assertPhpAuthority(authority) {
   if (!authority || !/^\d+\.\d+\.\d+$/.test(authority.version) ||
       typeof authority.binary !== 'string' || !path.isAbsolute(authority.binary) ||
       /[\r\n\0]/.test(authority.binary) || !/^[a-f0-9]{64}$/.test(authority.sha256) ||
-      fs.realpathSync(authority.binary) !== authority.binary || hash(regularBytes(authority.binary)) !== authority.sha256) {
+      fs.realpathSync(authority.binary) !== authority.binary || hash(regularBytes(authority.binary)) !== authority.sha256 ||
+      (authority.arguments !== undefined && !isDeepStrictEqual(authority.arguments, ['-n']))) {
     throw new Error('verifier PHP executable differs from the captured authority');
   }
   return authority;
@@ -407,12 +399,16 @@ async function verify(options, environment = process.env, dependencies = {}) {
     state.phase = 'prerequisites';
     state.native = nativePlatform(options.platform, {os: process.platform, arch: process.arch}, execute);
     const php = assertPhpAuthority(JSON.parse(environment.VERIFIER_PHP_AUTHORITY || 'null'));
-    if (!isDeepStrictEqual(inspectPhpAuthority(php.binary, execute), php)) {
+    if (!isDeepStrictEqual(inspectPhpAuthority(php.binary, execute, php.arguments || []), php)) {
       throw new Error('verifier PHP authority changed after bootstrap');
     }
+    const binding = dependencies.validateToolBinding ? dependencies.validateToolBinding(php) :
+      privateTool.validateBinding(JSON.parse(environment.VERIFIER_TOOL_BINDING || 'null'),
+        JSON.parse(environment.VERIFIER_TOOL_INDEX || 'null'), options.platform,
+        privateTool.context(environment, execute), php);
     const ghVersion = execute('gh', ['--version']).split('\n')[0];
     execute('gh', ['attestation', 'verify', '--help']);
-    state.tools = {node: process.version, php: php.version, php_authority: php, gh: ghVersion};
+    state.tools = {node: process.version, php: php.version, php_authority: php, verifier_tool: binding, gh: ghVersion};
     state.phase = 'private-state';
     const base = fs.realpathSync(environment.RUNNER_TEMP || os.tmpdir());
     directory = fs.mkdtempSync(path.join(base, 'dw-public-release-'));
@@ -555,7 +551,7 @@ echo json_encode(['packages' => $installed['versions'],
     'commit' => \DurableWorkflow\Cli\GeneratedBuildInfo::COMMIT], JSON_THROW_ON_ERROR);
 `;
   const php = assertPhpAuthority(state.tools?.php_authority);
-  return JSON.parse(execute(php.binary, ['-r', code, filename], {env: environment, timeout: remaining(state)}));
+  return JSON.parse(execute(php.binary, [...(php.arguments || []), '-r', code, filename], {env: environment, timeout: remaining(state)}));
 }
 
 function install(directory, destination, state, environment, exact, execute = run) {
@@ -656,7 +652,7 @@ module.exports = {
   checksums, verifyEmbeddedPhar, verifyNativeBinary, remaining, tagCommit, verifyBundle, publicResponse,
   assertPackageIdentity, assertVerifiedInputs, assertInstalledInspection,
   readState, cleanup, verify, exercise, install, packageMetadata, main,
-  inspectPhpAuthority, capturePhpAuthority, assertPhpAuthority, assertInstallerSource,
+  inspectPhpAuthority, assertPhpAuthority, assertInstallerSource,
   safeSystemFailure,
 };
 
@@ -667,11 +663,33 @@ async function main() {
   }
   if (phase === 'authority') {
     if (!process.env.GITHUB_OUTPUT) throw new Error('PHP authority capture requires the owned workflow output');
-    const authority = capturePhpAuthority();
-    fs.appendFileSync(process.env.GITHUB_OUTPUT, `authority=${JSON.stringify(authority)}\n`);
-    return authority;
+    try {
+      privateTool.noCredentials(process.env);
+      const base = privateTool.context();
+      const result = privateTool.consume(process.env.VERIFIER_ARTIFACT_DIRECTORY,
+        JSON.parse(process.env.VERIFIER_TOOL_INDEX), process.env.VERIFIER_PLATFORM, base);
+      try {
+        privateTool.output(process.env, 'authority', JSON.stringify(result.authority));
+        privateTool.output(process.env, 'binding', JSON.stringify(result.binding));
+        privateTool.output(process.env, 'tool-directory', result.directory);
+      } catch (error) { privateTool.cleanup(result.directory); throw error; }
+      return result.authority;
+    } catch (error) {
+      const platform = process.env.VERIFIER_PLATFORM;
+      if (Object.hasOwn(PLATFORMS, platform)) {
+        inputFailureEvidence(path.resolve(`release-public-download-evidence-${platform}.json`),
+          {tag: process.env.RELEASE_TAG, commit: process.env.VERIFIED_SOURCE_SHA, platform,
+            phase: 'private-verifier-tool', control: {ref: process.env.RELEASE_CONTROL_REF,
+              commit: process.env.RELEASE_CONTROL_COMMIT}}, error, false, true);
+      }
+      throw error;
+    }
   }
-  if (phase === 'cleanup') return cleanup(process.env.VERIFIER_DIRECTORY);
+  if (phase === 'cleanup') {
+    try { cleanup(process.env.VERIFIER_DIRECTORY); }
+    finally { privateTool.cleanup(process.env.VERIFIER_TOOL_DIRECTORY); }
+    return;
+  }
   if (phase === 'verify') {
     if (!Object.hasOwn(PLATFORMS, process.env.VERIFIER_PLATFORM)) throw new Error('missing exact verification platform');
     if (process.env.GITHUB_REPOSITORY !== REPOSITORY || !process.env.GH_TOKEN) {

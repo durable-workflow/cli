@@ -19,7 +19,9 @@ function qualifiedPhp() {
     if (result.status !== 0) throw new Error('PHAR metadata source control failed');
     return result.stdout;
   };
-  return {php, execute, authority: inspectPhpAuthority(php, execute)};
+  const arguments_ = process.env.DW_TEST_PHP_NO_INI ? ['-n'] : [];
+  if (process.env.DW_TEST_PHP_NO_INI) assert.equal(process.env.DW_TEST_PHP_NO_INI, '1');
+  return {php, execute, authority: inspectPhpAuthority(php, execute, arguments_)};
 }
 
 function privateEnvironment(directory) {
@@ -42,7 +44,7 @@ $phar->setSignatureAlgorithm(Phar::SHA256);
 $phar->stopBuffering();
 `;
     const environment = privateEnvironment(directory);
-    const created = spawnSync(php, ['-d', 'phar.readonly=0', '-r', source, filename], {
+    const created = spawnSync(php, [...(authority.arguments || []), '-d', 'phar.readonly=0', '-r', source, filename], {
       env: environment, encoding: 'utf8', timeout: 10000,
     });
     assert.ifError(created.error);
@@ -70,7 +72,7 @@ if (process.env.DW_TEST_PRODUCTION_PHAR) {
       const code = String.raw`require $argv[1]; echo json_encode([
         'tag' => \DurableWorkflow\Cli\GeneratedBuildInfo::VERSION,
         'commit' => \DurableWorkflow\Cli\GeneratedBuildInfo::COMMIT], JSON_THROW_ON_ERROR);`;
-      const expected = JSON.parse(execute(php, ['-r', code, path.join(__dirname, '../../src/GeneratedBuildInfo.php')],
+      const expected = JSON.parse(execute(php, [...(authority.arguments || []), '-r', code, path.join(__dirname, '../../src/GeneratedBuildInfo.php')],
         {env: environment, timeout: 10000}));
       const actual = packageMetadata(fs.realpathSync(process.env.DW_TEST_PRODUCTION_PHAR), environment, state, execute);
       const lock = JSON.parse(fs.readFileSync(path.join(__dirname, '../../composer.lock'), 'utf8'));

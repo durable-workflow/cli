@@ -303,9 +303,9 @@ test('public release verification runs read-only after publication', () => {
   const workflow = fs.readFileSync(workflowPath, 'utf8');
   const verify = workflowJob(workflow, 'verify-release');
 
-  assert.match(verify, /needs: \[resolve-release, release\]/);
+  assert.match(verify, /needs: \[resolve-release, release, bundle-verifier-tools\]/);
   assert.match(verify, /needs\.release\.result == 'success'/);
-  assert.match(verify, /permissions:\n\s+contents: read\n/);
+  assert.match(verify, /permissions:\n\s+actions: read\n\s+contents: read\n/);
   assert.match(verify, /attestations: read/);
   assert.doesNotMatch(verify, /contents: write|id-token|attestations: write|environment:|secrets\./);
   // Verification code comes from the workflow's own commit, not a job output.
@@ -323,18 +323,21 @@ test('public release verification runs read-only after publication', () => {
   assert.match(verify, /name: release-evidence/);
 });
 
-test('verifier PHP is established and bound before the public-input read token is available', () => {
+test('the exact private verifier artifact is bound before the public-input read token is available', () => {
   const verify = workflowJob(fs.readFileSync(workflowPath, 'utf8'), 'verify-release');
-  const bootstrap = verify.indexOf('- name: Establish trusted verifier PHP');
-  const capture = verify.indexOf('- name: Capture exact verifier PHP authority');
+  const select = verify.indexOf("- name: Select this platform's exact original private tool");
+  const download = verify.indexOf('- name: Download only the bound private verifier artifact');
+  const capture = verify.indexOf('- name: Bind the private verifier executable');
   const inputs = verify.indexOf('- name: Verify public release downloads');
-  assert.ok(bootstrap >= 0 && capture > bootstrap && inputs > capture);
-  const trustedTools = verify.slice(bootstrap, inputs);
-  assert.match(trustedTools, /shivammathur\/setup-php@f3e473d116dcccaddc5834248c87452386958240/);
-  assert.match(trustedTools, /BOOTSTRAPPED_PHP_VERSION: \$\{\{ steps\.verifier-php\.outputs\.php-version \}\}/);
+  assert.ok(select >= 0 && download > select && capture > download && inputs > capture);
+  const trustedTools = verify.slice(capture, inputs);
   assert.match(trustedTools, /run: node scripts\/ci\/run-public-release-verifier\.mjs authority/);
   assert.doesNotMatch(trustedTools, /github\.token|secrets\./);
+  assert.match(verify.slice(download, capture), /artifact-ids: \$\{\{ steps\.verifier-tool\.outputs\.artifact-id \}\}/);
+  assert.match(verify.slice(download, capture), /digest-mismatch: error/);
+  assert.doesNotMatch(verify, /setup-php|BOOTSTRAPPED_PHP_VERSION/);
   assert.match(verify.slice(inputs), /VERIFIER_PHP_AUTHORITY: \$\{\{ steps\.verifier-php-authority\.outputs\.authority \}\}/);
+  assert.match(verify.slice(inputs), /VERIFIER_TOOL_BINDING:/);
 });
 
 test('public installation cells retain exactly the four existing native producer platforms', () => {

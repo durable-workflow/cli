@@ -8,7 +8,7 @@ const path = require('node:path');
 const {execFileSync} = require('node:child_process');
 const test = require('node:test');
 const tool = require('./private-verifier-tool');
-const {nativePlatform} = require('./verify-installed-release');
+const {nativePlatform, PLATFORMS} = require('./verify-installed-release');
 const hash = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 
 function fixture(t) {
@@ -133,6 +133,72 @@ test('CLI+micro cache refuses old schema, missing CLI, changed bytes, wrong reci
   assert.throws(() => tool.validateCache(cache, manifest, 'linux-x86_64', 'c'.repeat(64)));
 });
 
+test('the four-tool index binds every original artifact and refuses substitution or missing platforms', t => {
+  const f = fixture(t);
+  const directory = path.join(f.root, 'handoff'); fs.mkdirSync(directory);
+  const artifacts = [];
+  let id = 456;
+  for (const platform of Object.keys(tool.PLATFORMS)) {
+    const expected = {...f.expected, platform};
+    const manifest = tool.createManifest(f.executable, expected, 'c'.repeat(64), f.authority);
+    const archive = tool.pack(f.executable, manifest, path.join(f.root, platform));
+    fs.copyFileSync(archive.filename, path.join(directory, tool.archiveName(platform)));
+    artifacts.push({id: id++, expired: false, name: tool.archiveName(platform),
+      digest: 'sha256:' + archive.sha256,
+      workflow_run: {id: 123, repository_id: 789, head_sha: 'a'.repeat(40)}});
+  }
+  const index = tool.bindArtifacts(directory, artifacts, f.expected, '789');
+  assert.deepEqual(tool.indexedTool(index, 'linux-x86_64', f.expected).manifest, f.manifest);
+  assert.throws(() => tool.indexedTool({...index, producer: {...index.producer, run_attempt: '2'}},
+    'linux-x86_64', f.expected));
+  const missing = structuredClone(index); delete missing.tools['macos-aarch64'];
+  assert.throws(() => tool.indexedTool(missing, 'linux-x86_64', f.expected));
+  const duplicate = structuredClone(index);
+  duplicate.tools['macos-aarch64'].artifact.id = duplicate.tools['linux-x86_64'].artifact.id;
+  assert.throws(() => tool.indexedTool(duplicate, 'linux-x86_64', f.expected));
+  assert.throws(() => tool.bindArtifacts(directory, [...artifacts, artifacts[0]], f.expected, '789'));
+  fs.writeFileSync(path.join(directory, 'extra.tar'), 'inert');
+  assert.throws(() => tool.bindArtifacts(directory, artifacts, f.expected, '789'));
+});
+
+test('static PHP inspection uses only the bound executable with no ini or inherited service credentials', t => {
+  const f = fixture(t);
+  const [platform, native] = Object.entries(PLATFORMS).find(([, value]) =>
+    value.os === process.platform && value.arch === process.arch);
+  if (platform === 'windows-x86_64') {
+    const pe = Buffer.alloc(256); pe.writeUInt16LE(0x5a4d); pe.writeUInt32LE(128, 60);
+    pe.writeUInt32LE(0x4550, 128); pe.writeUInt16LE(0x8664, 132); fs.writeFileSync(f.executable, pe);
+  }
+  const expected = {...f.expected, platform};
+  const basic = {version: '8.4.27', binary: fs.realpathSync(f.executable), sapi: 'cli', int_size: 8, phar: true};
+  const runtime = {php_version: '8.4.27', sapi: 'cli', os_family: {linux:'Linux',darwin:'Darwin',win32:'Windows'}[process.platform],
+    openssl_version: 'OpenSSL 3.5.9', openssl_header_version: 'OpenSSL 3.5.9',
+    curl: platform === 'windows-x86_64' ? null : {version:'8.23.0',ssl_version:'OpenSSL/3.5.9'}};
+  const descriptions = {'linux-x86_64':'ELF 64-bit LSB executable, x86-64,',
+    'linux-aarch64':'ELF 64-bit LSB executable, ARM aarch64,', 'macos-aarch64':'Mach-O 64-bit executable arm64'};
+  let home;
+  const execute = (command, args, options) => {
+    if (command === 'uname' || command === 'pwsh') return native.machine;
+    if (command === 'sysctl') return '1';
+    if (command === 'file') return descriptions[platform];
+    assert.equal(fs.realpathSync(command), fs.realpathSync(f.executable));
+    assert.equal(args[0], '-n');
+    assert.equal(options.env.ACTIONS_RUNTIME_TOKEN, undefined);
+    home = options.env.HOME;
+    assert.equal(fs.existsSync(home), true);
+    return JSON.stringify(args.includes('-r') ? basic : runtime);
+  };
+  const result = tool.inspectStaticPhp(f.executable, expected, {ACTIONS_RUNTIME_TOKEN:'synthetic-service-token'}, execute);
+  assert.deepEqual(result.authority.arguments, ['-n']);
+  assert.equal(result.runtime.openssl.version, '3.5.9');
+  assert.equal(fs.existsSync(home), false);
+  for (const field of ['version', 'binary', 'sapi', 'phar']) {
+    const bad = {...basic, [field]: null};
+    assert.throws(() => tool.inspectStaticPhp(f.executable, expected, {}, (command, args, options) =>
+      command === f.executable && args.includes('-r') ? JSON.stringify(bad) : execute(command, args, options)));
+  }
+});
+
 test('private tool inspection refuses all four inherited GitHub credentials', () => {
   for (const name of ['GH_TOKEN', 'GITHUB_TOKEN', 'GH_ENTERPRISE_TOKEN', 'GITHUB_ENTERPRISE_TOKEN']) {
     assert.throws(() => tool.noCredentials({[name]: 'synthetic-read-token'}));
@@ -147,3 +213,109 @@ test('native source cell records archive-reader authority without fetching or bu
     const python = tool.pythonAuthority();
     t.diagnostic(JSON.stringify({native, archive_reader: python, private_php_build_qualified: false}));
   });
+
+function nativeToolFixture(t) {
+  const f = fixture(t);
+  const [platform, native] = Object.entries(PLATFORMS).find(([, value]) =>
+    value.os === process.platform && value.arch === process.arch);
+  if (platform === 'windows-x86_64') {
+    const pe = Buffer.alloc(256); pe.writeUInt16LE(0x5a4d); pe.writeUInt32LE(128, 60);
+    pe.writeUInt32LE(0x4550, 128); pe.writeUInt16LE(0x8664, 132); fs.writeFileSync(f.executable, pe);
+    f.authority.sha256 = hash(pe);
+  }
+  const directory = path.join(f.root, 'four-tools'); fs.mkdirSync(directory);
+  const artifacts = [];
+  let id = 456;
+  for (const name of Object.keys(tool.PLATFORMS)) {
+    const manifest = tool.createManifest(f.executable, {...f.expected, platform: name}, 'c'.repeat(64), f.authority);
+    const archive = tool.pack(f.executable, manifest, path.join(f.root, name));
+    fs.copyFileSync(archive.filename, path.join(directory, tool.archiveName(name)));
+    artifacts.push({id: id++, expired: false, name: tool.archiveName(name), digest: 'sha256:' + archive.sha256,
+      workflow_run: {id: 123, repository_id: 789, head_sha: 'a'.repeat(40)}});
+  }
+  const index = tool.bindArtifacts(directory, artifacts, f.expected, '789');
+  const selected = path.join(f.root, 'selected'); fs.mkdirSync(selected);
+  fs.copyFileSync(path.join(directory, tool.archiveName(platform)), path.join(selected, tool.archiveName(platform)));
+  let phpCalls = 0;
+  const execute = (command, args, options = {}) => {
+    if (command === 'git') return f.expected.producer.head;
+    if (command === 'uname' || command === 'pwsh') return native.machine;
+    if (command === 'sysctl') return '1';
+    if (command === 'file') return {'linux-x86_64':'ELF 64-bit LSB executable, x86-64,',
+      'linux-aarch64':'ELF 64-bit LSB executable, ARM aarch64,',
+      'macos-aarch64':'Mach-O 64-bit executable arm64'}[platform];
+    if (path.basename(command) === tool.PLATFORMS[platform].name) {
+      phpCalls++;
+      assert.equal(args[0], '-n');
+      return JSON.stringify(args.includes('-r')
+        ? {version:'8.4.27', binary:fs.realpathSync(command), sapi:'cli', int_size:8, phar:true}
+        : {php_version:'8.4.27', sapi:'cli',
+          os_family:{linux:'Linux',darwin:'Darwin',win32:'Windows'}[process.platform],
+          openssl_version:'OpenSSL 3.5.9', openssl_header_version:'OpenSSL 3.5.9',
+          curl: platform === 'windows-x86_64' ? null : {version:'8.23.0', ssl_version:'OpenSSL/3.5.9'}});
+    }
+    return execFileSync(command, args, {encoding:'utf8', timeout:10000, ...options});
+  };
+  return {...f, platform, directory, selected, artifacts, index, execute, phpCalls: () => phpCalls};
+}
+
+test('consumer binds original bytes before mocked native inspection, then refuses a tampered archive before PHP', t => {
+  const f = nativeToolFixture(t);
+  const result = tool.consume(f.selected, f.index, f.platform, f.expected, {}, f.execute);
+  t.after(() => tool.cleanup(result.directory));
+  assert.equal(f.phpCalls(), 2);
+  assert.equal(tool.validateBinding(result.binding, f.index, f.platform, f.expected, result.authority), result.binding);
+  assert.throws(() => tool.validateBinding(result.binding, f.index, f.platform, f.expected,
+    {...result.authority, arguments: []}));
+  const before = fs.readdirSync(path.dirname(result.directory)).filter(name => name.startsWith('cli-verifier-tool-'));
+  fs.appendFileSync(path.join(f.selected, tool.archiveName(f.platform)), 'tamper');
+  assert.throws(() => tool.consume(f.selected, f.index, f.platform, f.expected, {}, f.execute), /digest differs/);
+  assert.equal(f.phpCalls(), 2);
+  assert.deepEqual(fs.readdirSync(path.dirname(result.directory)).filter(name => name.startsWith('cli-verifier-tool-')), before);
+  assert.throws(() => tool.cleanup(f.root), /unowned path/);
+  assert.equal(fs.existsSync(f.root), true);
+});
+
+test('producer context and CLI phases refuse foreign checkout, missing native output and inherited credentials', t => {
+  const f = fixture(t);
+  assert.throws(() => tool.context(f.environment, () => 'f'.repeat(40)), /policy checkout/);
+  assert.throws(() => tool.prepare({...f.environment, GITHUB_JOB:'foreign', VERIFIER_PLATFORM:'linux-x86_64'},
+    () => f.expected.producer.head), /native producer job/);
+  let calls = 0;
+  for (const phase of [tool.prepare, tool.select]) {
+    assert.throws(() => phase({...f.environment, GH_TOKEN:'synthetic-token'}, () => { calls++; }), /credential-free/);
+  }
+  assert.equal(calls, 0);
+  assert.throws(() => tool.prepare({...f.environment, GITHUB_JOB:'build-binary', VERIFIER_PLATFORM:'linux-x86_64',
+    VERIFIER_BUILD_PHP:path.join(f.root, 'missing')}, () => f.expected.producer.head));
+});
+
+test('qualification receipts report only actual bound private-tool proof and retain changed-executable failure', t => {
+  const f = nativeToolFixture(t);
+  const result = tool.consume(f.selected, f.index, f.platform, f.expected, {}, f.execute);
+  t.after(() => tool.cleanup(result.directory));
+  const environment = {...f.environment, VERIFIER_PLATFORM:f.platform,
+    PRIVATE_TOOL_AUTHORITY_OUTCOME:'success', PHAR_INSPECTION_OUTCOME:'success',
+    VERIFIER_PHP_AUTHORITY:JSON.stringify(result.authority), VERIFIER_TOOL_BINDING:JSON.stringify(result.binding),
+    VERIFIER_TOOL_INDEX:JSON.stringify(f.index)};
+  const receipt = path.join(f.root, `verifier-tool-proof-${f.platform}.json`);
+  const passed = tool.qualificationProof(environment, f.execute, f.root);
+  assert.equal(passed.outcome, 'pass');
+  assert.equal(passed.distribution_executed, false);
+  assert.equal(passed.live_https_qualified, false);
+  assert.deepEqual(passed.producer, result.binding.manifest.producer);
+  assert.deepEqual(passed.artifact, result.binding.artifact);
+  assert.deepEqual(passed.archive_members, [tool.PLATFORMS[f.platform].name, 'verifier-tool.json']);
+  fs.unlinkSync(receipt);
+  fs.appendFileSync(result.authority.binary, 'changed');
+  assert.throws(() => tool.qualificationProof(environment, f.execute, f.root), /no longer matches/);
+  const failed = JSON.parse(fs.readFileSync(receipt));
+  assert.equal(failed.outcome, 'fail');
+  assert.equal(failed.executable, undefined);
+  assert.equal(failed.live_https_qualified, false);
+  fs.unlinkSync(receipt);
+  const skipped = tool.qualificationProof({...environment, PRIVATE_TOOL_AUTHORITY_OUTCOME:'failure',
+    PHAR_INSPECTION_OUTCOME:'skipped'}, f.execute, f.root);
+  assert.equal(skipped.outcome, 'fail');
+  assert.equal(skipped.producer, undefined);
+});

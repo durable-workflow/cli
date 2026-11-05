@@ -183,6 +183,57 @@ class ReleaseCachePolicyTest(unittest.TestCase):
                 self.assertNotEqual(0, result.returncode)
                 self.assertEqual({}, values)
 
+    def test_private_tool_qualification_requires_its_exact_trusted_control_and_no_tag(self) -> None:
+        for ref in ("refs/heads/main", "refs/heads/maintenance/2.3.6-base"):
+            result, values, sha = self.resolve(
+                "workflow_dispatch", ref, "verifier-tool-qualification", MAIN
+            )
+            self.assertEqual(0, result.returncode, result.stderr)
+            self.assertEqual("true", values["tool_qualification"])
+            self.assertEqual("false", values["cache_warm"])
+            self.assertEqual("false", values["make_latest"])
+            self.assertEqual("false", values["recheck_latest"])
+            self.assertEqual("", values["tag"])
+            self.assertEqual("", values["observed_latest"])
+            self.assertEqual(sha, values["commit"])
+            self.assertEqual(sha, values["control_commit"])
+        for ref, commit, tag in (
+            ("refs/heads/agent/cli/topic", MAIN, ""),
+            ("refs/heads/maintenance/foreign", MAIN, ""),
+            ("refs/tags/2.3.9", RELEASE, ""),
+            ("refs/heads/main", RELEASE, ""),
+            ("refs/heads/main", "", ""),
+            ("refs/heads/main", MAIN, "2.3.10"),
+        ):
+            result, values, _ = self.resolve(
+                "workflow_dispatch", ref, "verifier-tool-qualification", commit, tag
+            )
+            self.assertNotEqual(0, result.returncode)
+            self.assertEqual({}, values)
+
+    def test_private_tool_mode_cannot_build_or_publish_product_assets_or_save_cache(self) -> None:
+        jobs = self.workflow["jobs"]
+        for name in ("release-preflight", "reconcile-existing-release-metadata",
+                     "build-phar", "bundle-release", "release"):
+            self.assertIn("needs.resolve-release.outputs.tool_qualification != 'true'", jobs[name]["if"])
+        for job in self.native_jobs():
+            self.assertIn("needs.resolve-release.outputs.tool_qualification == 'true'", job["if"])
+            for step in job["steps"]:
+                name = step.get("name", "")
+                if (name in ("Download PHAR artifact", "Smoke test binary")
+                        or step.get("with", {}).get("name", "").startswith("dw-")):
+                    self.assertIn("needs.resolve-release.outputs.tool_qualification != 'true'", step["if"])
+            # Cache saves require cache_warm=true, independently refused above.
+            for step in job["steps"]:
+                if step.get("uses", "").startswith("actions/cache/save@"):
+                    self.assertIn("needs.resolve-release.outputs.cache_warm == 'true'", step["if"])
+        for name in ("bundle-verifier-tools", "qualify-verifier-tools"):
+            self.assertNotIn("tool_qualification != 'true'", jobs[name]["if"])
+            self.assertNotIn("write", jobs[name]["permissions"].values())
+        self.assertEqual(2, jobs["build-binary"]["strategy"]["max-parallel"])
+        self.assertIn("build-binary", jobs["build-binary-windows"]["needs"])
+        self.assertEqual(2, jobs["qualify-verifier-tools"]["strategy"]["max-parallel"])
+
 
 if __name__ == "__main__":
     unittest.main()

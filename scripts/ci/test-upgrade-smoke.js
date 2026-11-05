@@ -131,7 +131,7 @@ function materializeToolchainCheckout(job, directory) {
   const checkout = path.join(directory, 'release-toolchain-control');
   const options = {encoding: 'utf8', timeout: 10000,
     env: {...source, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: os.devNull}};
-  const git = process.platform === 'win32' ? 'C:\\Program Files\\Git\\cmd\\git.exe' : '/usr/bin/git';
+  const git = process.platform === 'win32' ? String.raw`C:\Program Files\Git\cmd\git.exe` : '/usr/bin/git';
   execFileSync(git, ['clone', '--quiet', '--shared', '--no-checkout', root, checkout], options);
   execFileSync(git, ['-C', checkout, 'sparse-checkout', 'set', '--no-cone', '--stdin'],
     {...options, input: patterns[1].replace(/^ {12}/gm, '')});

@@ -25,12 +25,26 @@ every command group reaches parity.
 | `runtime:check`: native build identity and compilation target | Ported, intentional output/help difference |
 | `doctor`: redacted connection sources, server metadata, warnings and next steps | Ported |
 | `workflow:list`: one namespace/page, filters, Server envelopes, JSON and JSONL | Ported |
+| `workflow:list-runs`: one workflow response page, envelope/cursor, JSON and JSONL | Ported |
 | `namespace:list`, `namespace:describe`: visible namespaces/configuration, JSON and JSONL | Ported |
 | Workflow, namespace and schedule commands | Next slices |
 | `--tls-verify=false` against HTTPS | CLI support pending |
 
 Server calls go through the published `durable-workflow` crate, pinned to
 the latest qualified release.
+
+`workflow:list-runs` sends its workflow ID as one percent-encoded SDK path
+segment. IDs containing slashes, query delimiters or fragments stay within
+that segment; they cannot select another route. Empty IDs and `.` or `..`
+are refused with exit 2 before the runs request. This deliberately replaces
+the PHP command's interpolation of the ID into the request path.
+
+The command returns one Server response and leaves any `next_page_token`
+unconsumed. JSON preserves that envelope and cursor; JSONL emits only the
+returned records. Successful responses must identify the requested workflow
+and `list_runs` operation. Explicit row workflow IDs must match; omitted IDs
+in the published PHP Server shape inherit the verified envelope without
+adding fields. Contradictory identities or operations are refused.
 
 ## Build and test
 
@@ -85,6 +99,12 @@ option definitions and help text), generated from the pinned reference by
 `parity/update-catalog.sh`. Lookup, listings, help pages and usage errors
 read it, so they match 2.x even for commands not ported yet. The harness
 also checks `--help` for every catalog command.
+
+Catalog regeneration applies the reviewed description/help changes in
+`parity/catalog-updates.json`. Comparisons reconcile only those exact fields
+on descriptor surfaces; command-result JSON and unrelated definitions remain
+unchanged. The run-list help describes one response page instead of promising
+that every run has been retrieved.
 
 A case can record an intentional difference with a reason and the exact
 fields it excuses; any other differing field still fails. One exists today:

@@ -1,0 +1,12 @@
+{
+  "workflow:list-runs": {
+    "description": {
+      "reference": "List all runs for a workflow execution",
+      "candidate": "List a page of runs for a workflow execution"
+    },
+    "help": {
+      "reference": "List every run (including retries and continue-as-new successors) for a\nworkflow ID, oldest first.\n\n<comment>Examples:</comment>\n\n  <info>dw workflow:list-runs chk-42</info>\n  <info>dw workflow:list-runs chk-42 --json</info>",
+      "candidate": "Return one Server response page for a workflow ID, in the Server's order.\nThis command sends one request and does not follow next_page_token.\nJSON keeps the response envelope and any cursor; JSONL emits only the\nreturned run records. The page may include retries and continue-as-new\nsuccessors. Use --json to inspect whether the Server returned a cursor.\n\n<comment>Examples:</comment>\n\n  <info>dw workflow:list-runs chk-42</info>\n  <info>dw workflow:list-runs chk-42 --json</info>"
+    }
+  }
+}

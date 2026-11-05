@@ -10,7 +10,7 @@ reference="$crate/target/dw-reference"
 
 # Help texts embed the invoked path (%command.full_name%). Store placeholders
 # that the CLI fills from its own argv[0], never this machine's path.
-DW_CONFIG_HOME="$(mktemp -d)" "$reference" list --format=json | DW_REFERENCE="$reference" python3 -c '
+DW_CONFIG_HOME="$(mktemp -d)" "$reference" list --format=json | DW_REFERENCE="$reference" DW_CATALOG_UPDATES="$crate/parity/catalog-updates.json" python3 -c '
 import json, os, sys
 reference = os.environ["DW_REFERENCE"]
 
@@ -24,6 +24,8 @@ def placeholders(value):
     return value
 
 listing = placeholders(json.load(sys.stdin))
+with open(os.environ["DW_CATALOG_UPDATES"], encoding="utf-8") as handle:
+    updates = json.load(handle)
 commands = []
 for command in listing["commands"]:
     usage = command["usage"]
@@ -36,6 +38,10 @@ for command in listing["commands"]:
         "help": command["help"],
         "definition": command["definition"],
     })
+    for field, update in updates.get(command["name"], {}).items():
+        if commands[-1][field] != update["reference"]:
+            raise SystemExit("Reference catalog metadata changed: " + command["name"] + ":" + field)
+        commands[-1][field] = update["candidate"]
 json.dump({"source": "dw " + listing["application"]["version"].split(" ")[0], "commands": commands},
           sys.stdout, indent=1, sort_keys=False)
 print()

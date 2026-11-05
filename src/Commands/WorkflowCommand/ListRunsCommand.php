@@ -17,10 +17,13 @@ class ListRunsCommand extends BaseCommand
     {
         parent::configure();
         $this->setName('workflow:list-runs')
-            ->setDescription('List all runs for a workflow execution')
+            ->setDescription('List a page of runs for a workflow execution')
             ->setHelp(<<<'HELP'
-List every run (including retries and continue-as-new successors) for a
-workflow ID, oldest first.
+Return one Server response page for a workflow ID, in the Server's order.
+This command sends one request and does not follow next_page_token.
+JSON keeps the response envelope and any cursor; JSONL emits only the
+returned run records. The page may include retries and continue-as-new
+successors. Use --json to inspect whether the Server returned a cursor.
 
 <comment>Examples:</comment>
 

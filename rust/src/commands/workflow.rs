@@ -1,4 +1,4 @@
-//! The first workflow port: one visibility page from `workflow:list`.
+//! Read-only workflow visibility through the published SDK transport.
 
 use crate::cli::Input;
 use crate::client::Context;
@@ -33,6 +33,7 @@ pub fn list(context: &Context, input: &Input) -> Result<i32, CliError> {
     let result = with_namespace(
         context.workflow_list(&query)?,
         &context.connection.namespace,
+        "workflows",
     );
     if context.mode.machine_readable() {
         output::print_json_list(context.mode, &result, "workflows");
@@ -81,16 +82,76 @@ fn nonempty_scalar(value: Option<&Value>) -> bool {
     php::is_scalar(value) && !php::trim(&php::to_string(value)).is_empty()
 }
 
-fn with_namespace(value: Value, fallback: &str) -> Value {
+pub fn list_runs(context: &Context, input: &Input) -> Result<i32, CliError> {
+    context.preflight(false)?;
+    let workflow_id = input.arg("workflow-id").unwrap_or_default();
+    let result = with_namespace(
+        context.workflow_runs(workflow_id)?,
+        &context.connection.namespace,
+        "runs",
+    );
+    if context.mode.machine_readable() {
+        output::print_json_list(context.mode, &result, "runs");
+        return Ok(0);
+    }
+    let namespace = formatter::display_text(&php::to_string(result.get("namespace")));
+    let runs = result.get("runs").map(php::values).unwrap_or_default();
+    if runs.is_empty() {
+        formatter::writeln_out("<comment>No runs found.</comment>");
+        formatter::writeln_out(&format!("Namespace: {namespace}"));
+        return Ok(0);
+    }
+    formatter::writeln_out(&format!(
+        "<info>Workflow: {}</info>",
+        formatter::display_text(workflow_id),
+    ));
+    formatter::writeln_out(&format!("Namespace: {namespace}"));
+    let count = result
+        .get("run_count")
+        .filter(|value| !value.is_null())
+        .map(|value| php::to_string(Some(value)))
+        .unwrap_or_else(|| runs.len().to_string());
+    formatter::writeln_out(&format!("Run Count: {}", formatter::display_text(&count)));
+    formatter::writeln_out("");
+    let rows = runs
+        .into_iter()
+        .map(|run| {
+            [
+                "run_id",
+                "run_number",
+                "workflow_type",
+                "status",
+                "task_queue",
+                "started_at",
+                "closed_at",
+            ]
+            .into_iter()
+            .map(|name| cell(run, name))
+            .collect()
+        })
+        .collect::<Vec<Vec<String>>>();
+    formatter::writeln_out(&output::render_table(
+        &[
+            "Run ID",
+            "#",
+            "Type",
+            "Status",
+            "Task Queue",
+            "Started",
+            "Closed",
+        ],
+        &rows,
+    ));
+    Ok(0)
+}
+
+fn with_namespace(value: Value, fallback: &str, items_key: &str) -> Value {
     let mut body = php::array_map(value);
     if !nonempty_scalar(body.get("namespace")) {
         body.insert("namespace".into(), json!(fallback));
     }
     let namespace = php::to_string(body.get("namespace"));
-    if let Some(workflows) = body
-        .get_mut("workflows")
-        .filter(|value| php::is_array(value))
-    {
+    if let Some(workflows) = body.get_mut(items_key).filter(|value| php::is_array(value)) {
         let enrich = |workflow: &mut Value| {
             if php::is_array(workflow) && !nonempty_scalar(php::get(workflow, "namespace")) {
                 let mut fields = php::array_map(workflow.take());

@@ -20,6 +20,7 @@ without a recorded reason.
 
 import argparse
 import copy
+import html
 import http.server
 import json
 import os
@@ -238,12 +239,53 @@ def compare(reference, candidate, case):
     differences = []
     for field in fields:
         left, right = reference[field], candidate[field]
+        if field in {"stdout_text", "stdout_json"}:
+            left = normalize_catalog_metadata(left, case, "reference")
+            right = normalize_catalog_metadata(right, case, "candidate")
         if field == "stdout_text" and case.get("schema_sha256_updates"):
             left = normalize_schema_manifest(left, case, "reference")
             right = normalize_schema_manifest(right, case, "candidate")
         if left != right:
             differences.append(field)
     return differences
+
+
+def normalize_catalog_metadata(value, case, side, updates=None):
+    """Reconcile exact reviewed help fields on descriptor surfaces only."""
+    argv = case.get("argv", [])
+    if argv and argv[0] not in {"list", "help"} and not any(flag in argv for flag in ["--help", "-h"]):
+        return value
+    if updates is None:
+        with open(os.path.join(CRATE, "parity", "catalog-updates.json"), encoding="utf-8") as handle:
+            updates = json.load(handle)
+
+    def visit(item):
+        if isinstance(item, list):
+            return [visit(child) for child in item]
+        if isinstance(item, dict):
+            result = {key: visit(child) for key, child in item.items()}
+            command = item.get("name")
+            if (isinstance(command, str) and command in updates
+                    and ("definition" in item or "--short" in argv)):
+                for field, update in updates[command].items():
+                    if item.get(field) == update[side]:
+                        result[field] = f"<reviewed-catalog:{command}:{field}>"
+            return result
+        return item
+
+    if isinstance(value, str):
+        for command, fields in updates.items():
+            if command not in value:
+                continue
+            for field, update in fields.items():
+                text = update[side]
+                plain = re.sub(r"</?(?:info|comment)>", "", text)
+                for rendered in dict.fromkeys([text, html.escape(text, quote=False), plain]):
+                    if value.count(rendered) == 1:
+                        value = value.replace(rendered, f"<reviewed-catalog:{command}:{field}>")
+                        break
+        return value
+    return visit(value)
 
 
 def patched_cluster_info(patches):
@@ -354,6 +396,11 @@ def help_cases():
             case["expected_difference"] = {"*": {
                 "fields": ["stdout_text"],
                 "reason": "The Rust-native runtime:check help describes build identity and target instead of PHP extensions (cli#72).",
+            }}
+        if case["argv"][0] == "workflow:list-runs":
+            case["expected_difference"] = {"*": {
+                "fields": ["stdout_text"],
+                "reason": "The help accurately describes one Server response page and an unconsumed cursor (cli#113).",
             }}
     return cases
 

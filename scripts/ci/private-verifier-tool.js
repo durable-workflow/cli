@@ -63,11 +63,14 @@ function expectedProducer(environment) {
   return producer;
 }
 
-function expectedRecipe(root, environment) {
+function expectedRecipe(root, environment, execute = run) {
+  // Checkout newline conversion is platform dependent. The recipe binds the
+  // source blobs, while the platform-specific cache ID retains its full recipe.
+  const sourceHash = name => sha256(Buffer.from(execute('git', ['-C', root, 'show', `HEAD:${name}`]), 'utf8'));
   const recipe = {cache_schema: CACHE_SCHEMA, php_version: environment.VERIFIER_PHP_VERSION,
     spc_version: environment.VERIFIER_SPC_VERSION, spc_revision: environment.VERIFIER_SPC_REVISION,
-    workflow_sha256: sha256(regularBytes(path.join(root, WORKFLOW))),
-    dependencies_sha256: sha256(regularBytes(path.join(root, 'scripts/ci/standalone-dependencies.json')))};
+    workflow_sha256: sourceHash(WORKFLOW),
+    dependencies_sha256: sourceHash('scripts/ci/standalone-dependencies.json')};
   if (!/^\d+\.\d+\.\d+$/.test(recipe.php_version) ||
       !/^\d+\.\d+\.\d+$/.test(recipe.spc_version) || !commit(recipe.spc_revision)) {
     throw new Error('private verifier recipe must use the exact approved toolchain pins');
@@ -186,7 +189,7 @@ function context(environment = process.env, execute = run, root = path.join(__di
   if (execute('git', ['-C', root, 'rev-parse', 'HEAD']).trim() !== producer.head) {
     throw new Error('private verifier policy checkout differs from the original producer head');
   }
-  return {producer, recipe: expectedRecipe(root, environment)};
+  return {producer, recipe: expectedRecipe(root, environment, execute)};
 }
 
 function bindArtifacts(directory, artifacts, base, repositoryId, execute = run) {

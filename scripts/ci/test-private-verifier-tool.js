@@ -238,7 +238,7 @@ function nativeToolFixture(t) {
   fs.copyFileSync(path.join(directory, tool.archiveName(platform)), path.join(selected, tool.archiveName(platform)));
   let phpCalls = 0;
   const execute = (command, args, options = {}) => {
-    if (command === 'git') return f.expected.producer.head;
+    if (command === 'git' && args.includes('rev-parse')) return f.expected.producer.head;
     if (command === 'uname' || command === 'pwsh') return native.machine;
     if (command === 'sysctl') return '1';
     if (command === 'file') return {'linux-x86_64':'ELF 64-bit LSB executable, x86-64,',

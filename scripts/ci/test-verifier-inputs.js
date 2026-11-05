@@ -62,6 +62,10 @@ test('real autocrlf checkout cannot change immutable installer authority or admi
     assert.notDeepEqual(working, blob, 'the real Git checkout must reproduce the original byte mismatch');
     fs.writeFileSync(path.join(downloaded, name), blob);
   }
+  const recipeEnvironment = {VERIFIER_PHP_VERSION:'8.4.27', VERIFIER_SPC_VERSION:'2.8.5',
+    VERIFIER_SPC_REVISION:'4318ef8fa32a02460ec1554746674a7bc42b49fa'};
+  const {expectedRecipe} = require('./private-verifier-tool');
+  assert.deepEqual(expectedRecipe(checkout, recipeEnvironment, execute), expectedRecipe(root, recipeEnvironment, execute));
   assertInstallerSource(downloaded, commit, execute, checkout);
   fs.copyFileSync(path.join(checkout, 'scripts/install.ps1'), path.join(downloaded, 'install.ps1'));
   assert.throws(() => assertInstallerSource(downloaded, commit, execute, checkout), error => {

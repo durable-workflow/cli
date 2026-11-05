@@ -403,20 +403,35 @@ fn next_step_lines(next: &[Value]) -> Vec<String> {
 
 /// Human error text for stderr.
 pub fn human(error: &CliError, context: &ErrorContext) -> String {
-    let mut lines = vec![format!("<error>{}</error>", error.message())];
+    let display = |text: &str| {
+        if context.command == "workflow:list" {
+            crate::formatter::display_text(text)
+        } else {
+            text.to_owned()
+        }
+    };
+    let mut lines = vec![format!("<error>{}</error>", display(error.message()))];
     if let Some(namespace) = &context.namespace {
-        lines.push(format!("Namespace: {namespace}"));
+        lines.push(format!("Namespace: {}", display(namespace)));
     }
     if let Some(reason) = error.reason() {
-        lines.push(format!("Reason: {reason}"));
+        lines.push(format!("Reason: {}", display(reason)));
     }
     if let Some(body) = error.body() {
-        lines.extend(body_code_lines(body));
+        lines.extend(body_code_lines(body).into_iter().map(|line| display(&line)));
     }
     if let Some(errors) = error.validation_errors() {
-        lines.extend(validation_lines(errors));
+        lines.extend(
+            validation_lines(errors)
+                .into_iter()
+                .map(|line| display(&line)),
+        );
     }
-    lines.extend(next_step_lines(&recommendations(error, context)));
+    lines.extend(
+        next_step_lines(&recommendations(error, context))
+            .into_iter()
+            .map(|line| display(&line)),
+    );
     lines.join("\n")
 }
 
@@ -478,6 +493,13 @@ mod tests {
             crate::formatter::format(&human(&error, &context()), false),
             "Server error: Invalid.\nNamespace: default\nReason: bad_input\nError code: E1\nValidation: name: Required.\nValidation: type: Unknown.\nNext steps:\n  - Inspect the request options and retry in JSON mode if support needs the exact error envelope.\n    Try: dw workflow:cancel --output=json"
         );
+    }
+
+    #[test]
+    fn existing_commands_keep_their_ansi_placeholder_boundaries() {
+        let error = CliError::Invalid("Use <name>.".into());
+        let rendered = crate::formatter::format(&human(&error, &context()), true);
+        assert!(rendered.contains("\u{1b}[39;49m\u{1b}[37;41m<name>\u{1b}[39;49m\u{1b}[37;41m"));
     }
 
     #[test]

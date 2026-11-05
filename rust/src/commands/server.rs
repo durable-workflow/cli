@@ -49,7 +49,7 @@ fn scalar_text(value: &Value) -> Option<String> {
     }
 }
 
-pub fn health(context: &client::Context) -> Result<i32, CliError> {
+pub fn health(context: &client::Context, _input: &crate::cli::Input) -> Result<i32, CliError> {
     let result = context
         .runtime()
         .block_on(async { context.sdk()?.health().await.map_err(client::map_error) })?;
@@ -109,7 +109,7 @@ pub fn health(context: &client::Context) -> Result<i32, CliError> {
 }
 
 /// `server:info`: cluster info after the compatibility preflight.
-pub fn info(context: &client::Context) -> Result<i32, CliError> {
+pub fn info(context: &client::Context, _input: &crate::cli::Input) -> Result<i32, CliError> {
     let cluster_info = context.preflight(false)?;
     if context.mode.machine_readable() {
         print_json(&cluster_info);

@@ -24,6 +24,7 @@ every command group reaches parity.
 | `server:start-dev`: local Laravel launch, Compose prerequisites and Unix signal cleanup | Ported |
 | `runtime:check`: native build identity and compilation target | Ported, intentional output/help difference |
 | `doctor`: redacted connection sources, server metadata, warnings and next steps | Ported |
+| `workflow:list`: one namespace/page, filters, Server envelopes, JSON and JSONL | Ported |
 | Workflow, namespace and schedule commands | Next slices |
 | `--tls-verify=false` against HTTPS | CLI support pending |
 

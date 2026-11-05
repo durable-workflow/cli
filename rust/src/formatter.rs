@@ -320,6 +320,25 @@ pub fn escape(text: &str) -> String {
     out
 }
 
+/// Render remote values as data. Only trusted templates may create markup
+/// or terminal layout; machine JSON keeps the original values.
+pub fn display_text(text: &str) -> String {
+    use std::fmt::Write as _;
+    let mut safe = String::new();
+    for character in text.chars() {
+        match character {
+            '\n' => safe.push_str("\\n"),
+            '\r' => safe.push_str("\\r"),
+            '\t' => safe.push_str("\\t"),
+            character if character.is_control() || matches!(character, '\u{2028}' | '\u{2029}') => {
+                write!(safe, "\\u{{{:04x}}}", u32::from(character)).expect("write to string");
+            }
+            character => safe.push(character),
+        }
+    }
+    escape(&safe)
+}
+
 /// PHP's `strip_tags`, used by 2.x's raw text help and listing.
 pub fn strip_tags(text: &str) -> String {
     let mut out = String::with_capacity(text.len());

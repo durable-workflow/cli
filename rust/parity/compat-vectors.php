@@ -23,6 +23,7 @@ spl_autoload_register(static function (string $class) use ($srcDir): void {
 use DurableWorkflow\Cli\Support\CompatibilityDiagnostics;
 use DurableWorkflow\Cli\Support\CompatibilityException;
 use DurableWorkflow\Cli\Support\ControlPlaneRequestContract;
+use DurableWorkflow\Cli\Support\ControlPlaneResponse;
 use DurableWorkflow\Cli\Support\ExternalTaskInputContract;
 use DurableWorkflow\Cli\Support\ExternalTaskResultContract;
 use DurableWorkflow\Cli\Support\ServerClient;
@@ -382,6 +383,68 @@ foreach (['"1"', '" 1"', '"1abc"', '"1e3"', '"1.9"', '"abc"', '""', '"  "', '"99
     $intOut[] = [$raw, (int) dec($raw)];
 }
 
+// Workflow-list response projection, using the same PHP boundary as dw.
+$listResponse = [
+    'workflows' => [],
+    'control_plane' => [
+        'schema' => 'durable-workflow.v2.control-plane-response', 'version' => 1,
+        'operation' => 'list', 'workflow_count' => 0, 'next_page_token' => null,
+        'contract' => [
+            'schema' => 'durable-workflow.v2.control-plane-response.contract', 'version' => 1,
+            'legacy_field_policy' => 'reject_non_canonical',
+            'legacy_fields' => ['query' => 'query_name'], 'required_fields' => [], 'success_fields' => [],
+        ],
+    ],
+];
+$responseInputs = [$listResponse, [], ['workflows' => []]];
+foreach ([
+    ['control_plane'], ['control_plane', 'schema'], ['control_plane', 'version'],
+    ['control_plane', 'operation'], ['control_plane', 'contract'],
+    ['control_plane', 'contract', 'schema'], ['control_plane', 'contract', 'version'],
+    ['control_plane', 'contract', 'legacy_field_policy'],
+] as $path) {
+    foreach ([null, [], '', ' ', 0, -1, true, 1.5, '1', '01', '1.0'] as $value) {
+        $responseInputs[] = with($listResponse, $path, $value);
+    }
+}
+foreach (['required_fields', 'success_fields'] as $field) {
+    foreach ([null, 'x', [1], [''], [' '], [' missing '], ['workflow_count'], ['next_page_token']] as $value) {
+        $responseInputs[] = with($listResponse, ['control_plane', 'contract', $field], $value);
+    }
+}
+foreach ([null, 'x', [], ['0' => 'x'], [' ' => 'x'], ['x' => ' '], ['x' => 1]] as $value) {
+    $responseInputs[] = with($listResponse, ['control_plane', 'contract', 'legacy_fields'], $value);
+}
+foreach ([null, '', 'x'] as $value) {
+    $responseInputs[] = with($listResponse, ['query'], $value);
+    foreach (['control_plane_schema', 'control_plane_schema_version', 'control_plane_operation', 'control_plane_version'] as $field) {
+        $responseInputs[] = with($listResponse, [$field], $value);
+    }
+}
+foreach (['workflow_id', 'run_id', 'update_id'] as $field) {
+    $responseInputs[] = with(with($listResponse, ['control_plane', $field], 'one'), [$field], 'two');
+    $responseInputs[] = with(with($listResponse, ['control_plane', $field], ' one '), [$field], 'one');
+}
+$responseInputs[] = with(with($listResponse, ['control_plane', 'operation_name_field'], 'query_name'), ['control_plane', 'operation_name'], 'status');
+$responseInputs[] = with(end($responseInputs), ['query_name'], 'different');
+$responseInputs[] = with($listResponse, ['control_plane', 'operation'], 'update');
+$responseInputs[] = with(end($responseInputs), ['control_plane', 'update_id'], ' update-one ');
+$listResponseOut = [];
+foreach ($responseInputs as $index => $body) {
+    foreach ([200, 404] as $status) {
+        $result = null;
+        $error = null;
+        try {
+            $result = ControlPlaneResponse::normalize('GET', '/workflows', $body, $status);
+            $result['control_plane_version'] ??= '2';
+        } catch (RuntimeException $exception) {
+            $error = $exception->getMessage();
+        }
+        $listResponseOut[] = ['case' => $index, 'body' => $body, 'status' => $status,
+            'result_json' => $result === null ? null : enc($result), 'error' => $error];
+    }
+}
+
 file_put_contents($outFile, json_encode([
     'php_version' => PHP_VERSION,
     'cluster' => $clusterOut,
@@ -393,5 +456,6 @@ file_put_contents($outFile, json_encode([
     'json_encode' => $encodeOut,
     'float_string' => $stringOut,
     'int_cast' => $intOut,
+    'workflow_list_response' => $listResponseOut,
 ], JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE)."\n");
 echo "ok ".count($clusterOut)." cluster vectors\n";

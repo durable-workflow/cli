@@ -3392,6 +3392,1043 @@
    "env": {
     "DW_DEV_PHP_SIGNAL": "15"
    }
+  },
+  {
+   "name": "workflow list JSON preserved envelope",
+   "argv": [
+    "workflow:list",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflows": [
+       {
+        "workflow_id": "wf-polyglot-list-1",
+        "run_id": "run-polyglot-list-1",
+        "workflow_type": "orders.process",
+        "business_key": "order-42",
+        "status": "running",
+        "task_queue": "orders",
+        "started_at": "2026-04-22T05:00:00Z",
+        "closed_at": null
+       },
+       {
+        "workflow_id": "wf-polyglot-list-2",
+        "run_id": "run-polyglot-list-2",
+        "workflow_type": "orders.process",
+        "business_key": "order-43",
+        "status": "running",
+        "task_queue": "orders",
+        "started_at": "2026-04-22T05:01:00Z",
+        "closed_at": null
+       }
+      ],
+      "next_page_token": "next-polyglot-page",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "list",
+       "workflow_count": 2,
+       "next_page_token": "next-polyglot-page",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow list JSONL items",
+   "argv": [
+    "workflow:list",
+    "--server={mock}",
+    "--output=jsonl"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflows": [
+       {
+        "workflow_id": "wf-polyglot-list-1",
+        "run_id": "run-polyglot-list-1",
+        "workflow_type": "orders.process",
+        "business_key": "order-42",
+        "status": "running",
+        "task_queue": "orders",
+        "started_at": "2026-04-22T05:00:00Z",
+        "closed_at": null
+       },
+       {
+        "workflow_id": "wf-polyglot-list-2",
+        "run_id": "run-polyglot-list-2",
+        "workflow_type": "orders.process",
+        "business_key": "order-43",
+        "status": "running",
+        "task_queue": "orders",
+        "started_at": "2026-04-22T05:01:00Z",
+        "closed_at": null
+       }
+      ],
+      "next_page_token": "next-polyglot-page",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "list",
+       "workflow_count": 2,
+       "next_page_token": "next-polyglot-page",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow list human table",
+   "argv": [
+    "workflow:list",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflows": [
+       {
+        "workflow_id": "wf-polyglot-list-1",
+        "run_id": "run-polyglot-list-1",
+        "workflow_type": "orders.process",
+        "business_key": "order-42",
+        "status": "running",
+        "task_queue": "orders",
+        "started_at": "2026-04-22T05:00:00Z",
+        "closed_at": null
+       },
+       {
+        "workflow_id": "wf-polyglot-list-2",
+        "run_id": "run-polyglot-list-2",
+        "workflow_type": "orders.process",
+        "business_key": "order-43",
+        "status": "running",
+        "task_queue": "orders",
+        "started_at": "2026-04-22T05:01:00Z",
+        "closed_at": null
+       }
+      ],
+      "next_page_token": "next-polyglot-page",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "list",
+       "workflow_count": 2,
+       "next_page_token": "next-polyglot-page",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow list all filters and page size",
+   "argv": [
+    "workflow:list",
+    "--server={mock}",
+    "--type=orders.process",
+    "--status=running",
+    "--query=CustomerId=\"42\"",
+    "--limit=25",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflows": [
+       {
+        "workflow_id": "wf-polyglot-list-1",
+        "run_id": "run-polyglot-list-1",
+        "workflow_type": "orders.process",
+        "business_key": "order-42",
+        "status": "running",
+        "task_queue": "orders",
+        "started_at": "2026-04-22T05:00:00Z",
+        "closed_at": null
+       },
+       {
+        "workflow_id": "wf-polyglot-list-2",
+        "run_id": "run-polyglot-list-2",
+        "workflow_type": "orders.process",
+        "business_key": "order-43",
+        "status": "running",
+        "task_queue": "orders",
+        "started_at": "2026-04-22T05:01:00Z",
+        "closed_at": null
+       }
+      ],
+      "next_page_token": "next-polyglot-page",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "list",
+       "workflow_count": 2,
+       "next_page_token": "next-polyglot-page",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow list PHP page size cast",
+   "argv": [
+    "workflow:list",
+    "--server={mock}",
+    "--limit=25tail",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflows": [
+       {
+        "workflow_id": "wf-polyglot-list-1",
+        "run_id": "run-polyglot-list-1",
+        "workflow_type": "orders.process",
+        "business_key": "order-42",
+        "status": "running",
+        "task_queue": "orders",
+        "started_at": "2026-04-22T05:00:00Z",
+        "closed_at": null
+       },
+       {
+        "workflow_id": "wf-polyglot-list-2",
+        "run_id": "run-polyglot-list-2",
+        "workflow_type": "orders.process",
+        "business_key": "order-43",
+        "status": "running",
+        "task_queue": "orders",
+        "started_at": "2026-04-22T05:01:00Z",
+        "closed_at": null
+       }
+      ],
+      "next_page_token": "next-polyglot-page",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "list",
+       "workflow_count": 2,
+       "next_page_token": "next-polyglot-page",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow list empty query strings",
+   "argv": [
+    "workflow:list",
+    "--server={mock}",
+    "--type=",
+    "--query=",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflows": [
+       {
+        "workflow_id": "wf-polyglot-list-1",
+        "run_id": "run-polyglot-list-1",
+        "workflow_type": "orders.process",
+        "business_key": "order-42",
+        "status": "running",
+        "task_queue": "orders",
+        "started_at": "2026-04-22T05:00:00Z",
+        "closed_at": null
+       },
+       {
+        "workflow_id": "wf-polyglot-list-2",
+        "run_id": "run-polyglot-list-2",
+        "workflow_type": "orders.process",
+        "business_key": "order-43",
+        "status": "running",
+        "task_queue": "orders",
+        "started_at": "2026-04-22T05:01:00Z",
+        "closed_at": null
+       }
+      ],
+      "next_page_token": "next-polyglot-page",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "list",
+       "workflow_count": 2,
+       "next_page_token": "next-polyglot-page",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow list empty namespace human",
+   "argv": [
+    "workflow:list",
+    "--server={mock}",
+    "--namespace=orders"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflows": [],
+      "next_page_token": "next-polyglot-page",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "list",
+       "workflow_count": 0,
+       "next_page_token": "next-polyglot-page",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow list empty JSONL",
+   "argv": [
+    "workflow:list",
+    "--server={mock}",
+    "--output=jsonl"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflows": [],
+      "next_page_token": "next-polyglot-page",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "list",
+       "workflow_count": 0,
+       "next_page_token": "next-polyglot-page",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow list preserve response namespaces",
+   "argv": [
+    "workflow:list",
+    "--server={mock}",
+    "--namespace=flag-space",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflows": [
+       {
+        "workflow_id": "wf-polyglot-list-1",
+        "run_id": "run-polyglot-list-1",
+        "workflow_type": "orders.process",
+        "business_key": "order-42",
+        "status": "running",
+        "task_queue": "orders",
+        "started_at": "2026-04-22T05:00:00Z",
+        "closed_at": null,
+        "namespace": "item-space"
+       },
+       {
+        "workflow_id": "wf-polyglot-list-2",
+        "run_id": "run-polyglot-list-2",
+        "workflow_type": "orders.process",
+        "business_key": "order-43",
+        "status": "running",
+        "task_queue": "orders",
+        "started_at": "2026-04-22T05:01:00Z",
+        "closed_at": null
+       }
+      ],
+      "next_page_token": "next-polyglot-page",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "list",
+       "workflow_count": 2,
+       "next_page_token": "next-polyglot-page",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      },
+      "namespace": "server-space"
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow list missing version header",
+   "argv": [
+    "workflow:list",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "status": 200,
+     "headers": {},
+     "body": {
+      "workflows": [
+       {
+        "workflow_id": "wf-polyglot-list-1",
+        "run_id": "run-polyglot-list-1",
+        "workflow_type": "orders.process",
+        "business_key": "order-42",
+        "status": "running",
+        "task_queue": "orders",
+        "started_at": "2026-04-22T05:00:00Z",
+        "closed_at": null
+       },
+       {
+        "workflow_id": "wf-polyglot-list-2",
+        "run_id": "run-polyglot-list-2",
+        "workflow_type": "orders.process",
+        "business_key": "order-43",
+        "status": "running",
+        "task_queue": "orders",
+        "started_at": "2026-04-22T05:01:00Z",
+        "closed_at": null
+       }
+      ],
+      "next_page_token": "next-polyglot-page",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "list",
+       "workflow_count": 2,
+       "next_page_token": "next-polyglot-page",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow list wrong version header",
+   "argv": [
+    "workflow:list",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "99"
+     },
+     "body": {
+      "workflows": [
+       {
+        "workflow_id": "wf-polyglot-list-1",
+        "run_id": "run-polyglot-list-1",
+        "workflow_type": "orders.process",
+        "business_key": "order-42",
+        "status": "running",
+        "task_queue": "orders",
+        "started_at": "2026-04-22T05:00:00Z",
+        "closed_at": null
+       },
+       {
+        "workflow_id": "wf-polyglot-list-2",
+        "run_id": "run-polyglot-list-2",
+        "workflow_type": "orders.process",
+        "business_key": "order-43",
+        "status": "running",
+        "task_queue": "orders",
+        "started_at": "2026-04-22T05:01:00Z",
+        "closed_at": null
+       }
+      ],
+      "next_page_token": "next-polyglot-page",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "list",
+       "workflow_count": 2,
+       "next_page_token": "next-polyglot-page",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow list missing success contract",
+   "argv": [
+    "workflow:list",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflows": []
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow list missing shared definition",
+   "argv": [
+    "workflow:list",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflows": [
+       {
+        "workflow_id": "wf-polyglot-list-1",
+        "run_id": "run-polyglot-list-1",
+        "workflow_type": "orders.process",
+        "business_key": "order-42",
+        "status": "running",
+        "task_queue": "orders",
+        "started_at": "2026-04-22T05:00:00Z",
+        "closed_at": null
+       },
+       {
+        "workflow_id": "wf-polyglot-list-2",
+        "run_id": "run-polyglot-list-2",
+        "workflow_type": "orders.process",
+        "business_key": "order-43",
+        "status": "running",
+        "task_queue": "orders",
+        "started_at": "2026-04-22T05:01:00Z",
+        "closed_at": null
+       }
+      ],
+      "next_page_token": "next-polyglot-page",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "list",
+       "workflow_count": 2,
+       "next_page_token": "next-polyglot-page"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow list legacy field refusal",
+   "argv": [
+    "workflow:list",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflows": [
+       {
+        "workflow_id": "wf-polyglot-list-1",
+        "run_id": "run-polyglot-list-1",
+        "workflow_type": "orders.process",
+        "business_key": "order-42",
+        "status": "running",
+        "task_queue": "orders",
+        "started_at": "2026-04-22T05:00:00Z",
+        "closed_at": null
+       },
+       {
+        "workflow_id": "wf-polyglot-list-2",
+        "run_id": "run-polyglot-list-2",
+        "workflow_type": "orders.process",
+        "business_key": "order-43",
+        "status": "running",
+        "task_queue": "orders",
+        "started_at": "2026-04-22T05:01:00Z",
+        "closed_at": null
+       }
+      ],
+      "next_page_token": "next-polyglot-page",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "list",
+       "workflow_count": 2,
+       "next_page_token": "next-polyglot-page",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      },
+      "query": null
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow list response identity mismatch",
+   "argv": [
+    "workflow:list",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflows": [
+       {
+        "workflow_id": "wf-polyglot-list-1",
+        "run_id": "run-polyglot-list-1",
+        "workflow_type": "orders.process",
+        "business_key": "order-42",
+        "status": "running",
+        "task_queue": "orders",
+        "started_at": "2026-04-22T05:00:00Z",
+        "closed_at": null
+       },
+       {
+        "workflow_id": "wf-polyglot-list-2",
+        "run_id": "run-polyglot-list-2",
+        "workflow_type": "orders.process",
+        "business_key": "order-43",
+        "status": "running",
+        "task_queue": "orders",
+        "started_at": "2026-04-22T05:01:00Z",
+        "closed_at": null
+       }
+      ],
+      "next_page_token": "next-polyglot-page",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "list",
+       "workflow_count": 2,
+       "next_page_token": "next-polyglot-page",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "two"
+      },
+      "workflow_id": "one"
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow list HTTP 401",
+   "argv": [
+    "workflow:list",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "status": 401,
+     "headers": {},
+     "body": {
+      "message": "fixture rejection",
+      "reason": "fixture"
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow list HTTP 403",
+   "argv": [
+    "workflow:list",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "status": 403,
+     "headers": {},
+     "body": {
+      "message": "fixture rejection",
+      "reason": "fixture"
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow list HTTP 404",
+   "argv": [
+    "workflow:list",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "status": 404,
+     "headers": {},
+     "body": {
+      "message": "fixture rejection",
+      "reason": "fixture"
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow list HTTP 422",
+   "argv": [
+    "workflow:list",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "status": 422,
+     "headers": {},
+     "body": {
+      "message": "fixture rejection",
+      "reason": "fixture"
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow list HTTP 500",
+   "argv": [
+    "workflow:list",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "status": 500,
+     "headers": {},
+     "body": {
+      "message": "fixture rejection",
+      "reason": "fixture"
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow list invalid status filter",
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "stderr_category",
+      "stderr",
+      "stdout_json",
+      "stdout_text"
+     ],
+     "reason": "Published PHP 2.3.5 writes canonical-filter validation failures to stderr even with --json. This port follows accepted PHP main's structured JSON error, exit 2 and namespace context (cli#61/#72); focused tests assert the exact envelope and zero list requests."
+    }
+   },
+   "argv": [
+    "workflow:list",
+    "--server={mock}",
+    "--status=bogus",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflows": [
+       {
+        "workflow_id": "wf-polyglot-list-1",
+        "run_id": "run-polyglot-list-1",
+        "workflow_type": "orders.process",
+        "business_key": "order-42",
+        "status": "running",
+        "task_queue": "orders",
+        "started_at": "2026-04-22T05:00:00Z",
+        "closed_at": null
+       },
+       {
+        "workflow_id": "wf-polyglot-list-2",
+        "run_id": "run-polyglot-list-2",
+        "workflow_type": "orders.process",
+        "business_key": "order-43",
+        "status": "running",
+        "task_queue": "orders",
+        "started_at": "2026-04-22T05:01:00Z",
+        "closed_at": null
+       }
+      ],
+      "next_page_token": "next-polyglot-page",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "list",
+       "workflow_count": 2,
+       "next_page_token": "next-polyglot-page",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow list incompatible preflight",
+   "argv": [
+    "workflow:list",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [
+    [
+     [
+      "control_plane",
+      "version"
+     ],
+     "99"
+    ]
+   ],
+   "mock_routes": {
+    "/api/workflows": {
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflows": [
+       {
+        "workflow_id": "wf-polyglot-list-1",
+        "run_id": "run-polyglot-list-1",
+        "workflow_type": "orders.process",
+        "business_key": "order-42",
+        "status": "running",
+        "task_queue": "orders",
+        "started_at": "2026-04-22T05:00:00Z",
+        "closed_at": null
+       },
+       {
+        "workflow_id": "wf-polyglot-list-2",
+        "run_id": "run-polyglot-list-2",
+        "workflow_type": "orders.process",
+        "business_key": "order-43",
+        "status": "running",
+        "task_queue": "orders",
+        "started_at": "2026-04-22T05:01:00Z",
+        "closed_at": null
+       }
+      ],
+      "next_page_token": "next-polyglot-page",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "list",
+       "workflow_count": 2,
+       "next_page_token": "next-polyglot-page",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
   }
  ]
 }

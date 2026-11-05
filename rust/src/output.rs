@@ -100,8 +100,11 @@ pub fn print_json(value: &Value) {
 /// so counts and cursors survive.
 pub fn print_json_list(mode: Mode, envelope: &Value, items_key: &str) {
     if mode == Mode::Jsonl {
-        if let Some(items) = envelope.get(items_key).and_then(Value::as_array) {
-            for item in items {
+        if let Some(items) = envelope
+            .get(items_key)
+            .filter(|value| crate::php::is_array(value))
+        {
+            for item in crate::php::values(items) {
                 print_json(item);
             }
         }

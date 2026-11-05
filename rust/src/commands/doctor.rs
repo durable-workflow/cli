@@ -214,19 +214,7 @@ fn text(value: &Value, fallback: &str) -> String {
 /// Only trusted render templates may create terminal formatting or layout.
 /// Keep remote/control text visible as data without changing machine JSON.
 fn display(value: &Value, fallback: &str) -> String {
-    let mut safe = String::new();
-    for character in text(value, fallback).chars() {
-        match character {
-            '\n' => safe.push_str("\\n"),
-            '\r' => safe.push_str("\\r"),
-            '\t' => safe.push_str("\\t"),
-            character if character.is_control() || matches!(character, '\u{2028}' | '\u{2029}') => {
-                write!(safe, "\\u{{{:04x}}}", u32::from(character)).expect("write to string");
-            }
-            character => safe.push(character),
-        }
-    }
-    formatter::escape(&safe)
+    formatter::display_text(&text(value, fallback))
 }
 
 fn line(out: &mut String, label: &str, value: &Value) {

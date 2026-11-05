@@ -7,7 +7,7 @@ const http = require('node:http');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
-const {execFile, spawnSync} = require('node:child_process');
+const {execFile, execFileSync, spawnSync} = require('node:child_process');
 const {promisify} = require('node:util');
 const {ASSETS} = require('./verify-installed-release');
 const {RUST_REQUIRED_ASSETS} = require('./verify-cli-release-channel');
@@ -100,10 +100,8 @@ test('the original unauthenticated 403 fails, while exact captured metadata exer
   await assert.rejects(fetch(endpoint, {signal: AbortSignal.timeout(500)}));
 });
 
-test('the default executor runs a credential-free synthetic executable with the exact upgrade arguments',
-  {skip: process.platform === 'win32'}, async t => {
-    const input = fixture(t);
-    fs.writeFileSync(input.binary, `#!/usr/bin/env node
+function writeSyntheticExecutable(filename) {
+  fs.writeFileSync(filename, `#!/usr/bin/env node
 const assert = require('node:assert/strict');
 assert.deepEqual(process.argv.slice(2), ['upgrade', '--dry-run', '--output=json']);
 assert.equal(process.env.GH_TOKEN, undefined);
@@ -112,11 +110,57 @@ fetch(process.env.DURABLE_WORKFLOW_RELEASE_API_URL).then(response => response.js
   console.log(JSON.stringify({current_version: '2.3.8', target_version: value.tag_name, status: 'newer'}));
 }).catch(() => { process.exitCode = 1; });
 `);
-    fs.chmodSync(input.binary, 0o700);
+  fs.chmodSync(filename, 0o700);
+}
+
+test('the default executor runs a credential-free synthetic executable with the exact upgrade arguments',
+  {skip: process.platform === 'win32'}, async t => {
+    const input = fixture(t);
+    writeSyntheticExecutable(input.binary);
     const result = await exercise(input.metadata, input.binary, input.evidence, input.environment);
     assert.equal(result.outcome, 'pass');
     assert.equal(result.live_https_qualified, false);
   });
+
+function materializeToolchainCheckout(job, directory) {
+  const root = path.resolve(__dirname, '../..');
+  const workflow = fs.readFileSync(path.join(root, '.github/workflows/release.yml'), 'utf8');
+  const definition = workflow.split(`\n  ${job}:`)[1].split(/\n {2}\S/)[0];
+  const patterns = /^ {10}sparse-checkout: \|\n((?: {12}.+\n)+)/m.exec(definition);
+  assert.ok(patterns, `missing sparse checkout for ${job}`);
+  const checkout = path.join(directory, 'release-toolchain-control');
+  const options = {encoding: 'utf8', timeout: 10000,
+    env: {...source, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: os.devNull}};
+  const git = process.platform === 'win32' ? String.raw`C:\Program Files\Git\cmd\git.exe` : '/usr/bin/git';
+  execFileSync(git, ['clone', '--quiet', '--shared', '--no-checkout', root, checkout], options);
+  execFileSync(git, ['-C', checkout, 'sparse-checkout', 'set', '--no-cone', '--stdin'],
+    {...options, input: patterns[1].replace(/^ {12}/gm, '')});
+  execFileSync(git, ['-C', checkout, 'checkout', '--quiet', '--detach', 'HEAD'], options);
+  return path.join(checkout, 'scripts/ci/run-upgrade-smoke.mjs');
+}
+
+for (const job of ['build-binary', 'build-binary-windows']) {
+  test(`${job} sparse checkout loads the actual smoke parent and its complete imports`, t => {
+    const input = fixture(t);
+    const entrypoint = materializeToolchainCheckout(job, input.directory);
+    const args = [entrypoint, 'exercise', input.metadata, input.binary, input.evidence];
+    const options = {cwd: input.directory, encoding: 'utf8', timeout: 10000};
+    const refused = spawnSync(process.execPath, args, {...options,
+      env: {...input.environment, GITHUB_TOKEN: 'synthetic-inherited-job-token'}});
+    assert.equal(refused.status, 1);
+    assert.match(refused.stderr, /execution credentials must be absent/);
+    assert.doesNotMatch(refused.stderr, /MODULE_NOT_FOUND|synthetic-inherited-job-token/);
+    assert.equal(fs.existsSync(input.evidence), false);
+    if (process.platform === 'win32') return;
+    writeSyntheticExecutable(input.binary);
+    const executed = spawnSync(process.execPath, args, {...options, env: input.environment});
+    assert.equal(executed.status, 0, executed.stderr);
+    const result = JSON.parse(fs.readFileSync(input.evidence));
+    assert.equal(result.outcome, 'pass');
+    assert.equal(result.live_https_qualified, false);
+    assert.deepEqual(result.cleanup, {responder_closed: true, private_state_removed: true});
+  });
+}
 
 test('a failed authenticated metadata read never falls back to a synthetic successful snapshot', t => {
   const input = fixture(t);

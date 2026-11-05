@@ -125,16 +125,17 @@ test('the default executor runs a credential-free synthetic executable with the 
 function materializeToolchainCheckout(job, directory) {
   const root = path.resolve(__dirname, '../..');
   const workflow = fs.readFileSync(path.join(root, '.github/workflows/release.yml'), 'utf8');
-  const definition = workflow.split(`\n  ${job}:`)[1].split(/\n  \S/)[0];
-  const patterns = /^          sparse-checkout: \|\n((?:            .+\n)+)/m.exec(definition);
+  const definition = workflow.split(`\n  ${job}:`)[1].split(/\n {2}\S/)[0];
+  const patterns = /^ {10}sparse-checkout: \|\n((?: {12}.+\n)+)/m.exec(definition);
   assert.ok(patterns, `missing sparse checkout for ${job}`);
   const checkout = path.join(directory, 'release-toolchain-control');
   const options = {encoding: 'utf8', timeout: 10000,
     env: {...source, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: os.devNull}};
-  execFileSync('git', ['clone', '--quiet', '--shared', '--no-checkout', root, checkout], options);
-  execFileSync('git', ['-C', checkout, 'sparse-checkout', 'set', '--no-cone', '--stdin'],
-    {...options, input: patterns[1].replace(/^            /gm, '')});
-  execFileSync('git', ['-C', checkout, 'checkout', '--quiet', '--detach', 'HEAD'], options);
+  const git = process.platform === 'win32' ? 'C:\\Program Files\\Git\\cmd\\git.exe' : '/usr/bin/git';
+  execFileSync(git, ['clone', '--quiet', '--shared', '--no-checkout', root, checkout], options);
+  execFileSync(git, ['-C', checkout, 'sparse-checkout', 'set', '--no-cone', '--stdin'],
+    {...options, input: patterns[1].replace(/^ {12}/gm, '')});
+  execFileSync(git, ['-C', checkout, 'checkout', '--quiet', '--detach', 'HEAD'], options);
   return path.join(checkout, 'scripts/ci/run-upgrade-smoke.mjs');
 }
 

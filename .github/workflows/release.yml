@@ -1914,18 +1914,18 @@ jobs:
         id: public-inputs
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node scripts/ci/verify-installed-release.js verify
+        run: node scripts/ci/run-public-release-verifier.mjs verify
 
       - name: Exercise verified temporary installations
         env:
           VERIFIER_DIRECTORY: ${{ steps.public-inputs.outputs.directory }}
-        run: node scripts/ci/verify-installed-release.js exercise
+        run: node scripts/ci/run-public-release-verifier.mjs exercise
 
       - name: Remove temporary verification state
         if: always()
         env:
           VERIFIER_DIRECTORY: ${{ steps.public-inputs.outputs.directory }}
-        run: node scripts/ci/verify-installed-release.js cleanup
+        run: node scripts/ci/run-public-release-verifier.mjs cleanup
 
       - name: Upload release evidence
         if: always()

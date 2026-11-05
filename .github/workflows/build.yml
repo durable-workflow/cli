@@ -99,7 +99,7 @@ jobs:
           python scripts/ci/test-native-prerequisites.py
           node --test scripts/ci/test-release-workflow-metadata.js
           node --test scripts/ci/test-installed-release.js
-          node --test scripts/ci/test-phar-metadata.js
+          DW_TEST_PHP_BINARY="$(command -v php)" node --test scripts/ci/test-phar-metadata.js
           pwsh -NoProfile -File scripts/ci/test-windows-installer-path.ps1
           node --test scripts/ci/test-standalone-runtime.js
           node --test scripts/ci/test-standalone-dependencies.js

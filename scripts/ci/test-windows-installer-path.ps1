@@ -28,7 +28,7 @@ function Set-FakeUserPath($value) {
     $script:writes += 1
     $script:writtenPath = $value
 }
-function Write-Host { param($Object, $ForegroundColor) }
+function Write-FixtureMessage { param($Object, $ForegroundColor) }
 
 function Invoke-RecordedPolicy([string]$source, [string]$flag, [string]$existing) {
     if ([regex]::Matches($source, [regex]::Escape($readCall)).Count -ne 1 -or
@@ -37,6 +37,7 @@ function Invoke-RecordedPolicy([string]$source, [string]$flag, [string]$existing
     }
     $mocked = $source.Replace($readCall, '(Get-FakeUserPath)').Replace(
         $writeCall, 'Set-FakeUserPath (($paths + $installDir) -join '';'')')
+    $mocked = $mocked.Replace('Write-Host ', 'Write-FixtureMessage ')
     if ($mocked -match '\[(?:System\.)?Environment\]\s*::') { throw 'Unmocked environment access in PATH control' }
     $script:reads = 0
     $script:writes = 0

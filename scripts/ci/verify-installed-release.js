@@ -76,7 +76,7 @@ function nativePlatform(name, observed, execute = run) {
 function checksums(text, assets = ASSETS) {
   const result = new Map();
   for (const line of text.trim().split('\n')) {
-    const match = /^([a-f0-9]{64})  ([A-Za-z0-9._-]+)\r?$/.exec(line);
+    const match = /^([a-f0-9]{64}) {2}([A-Za-z0-9._-]+)\r?$/.exec(line);
     if (!match || !assets.includes(match[2]) || match[2] === 'SHA256SUMS' || result.has(match[2])) {
       throw new Error('release checksum manifest contains an invalid or duplicate entry');
     }
@@ -95,7 +95,7 @@ function regularBytes(filename) {
 }
 
 function verifyEmbeddedPhar(binary, phar) {
-  if (binary.indexOf(phar) < 0) throw new Error('standalone does not contain the exact verified PHAR');
+  if (!binary.includes(phar)) throw new Error('standalone does not contain the exact verified PHAR');
 }
 
 function verifyNativeBinary(name, filename, execute = run) {
@@ -144,24 +144,22 @@ function tagCommit(tag, environment, state, execute = run) {
   return object.sha;
 }
 
-async function publicResponse(url, state, fetchImpl) {
+async function publicResponse(url, state, fetchImpl, hop = 0) {
+  if (!Number.isInteger(hop) || hop < 0 || hop >= 6) throw new Error('public download exceeded its redirect bound');
   const hosts = new Set(['github.com', 'release-assets.githubusercontent.com', 'objects.githubusercontent.com']);
-  for (let hop = 0; hop < 6; hop += 1) {
-    const target = new URL(url);
-    if (target.protocol !== 'https:' || !hosts.has(target.hostname) ||
-        target.username || target.password || (target.port && target.port !== '443')) {
-      throw new Error('public download redirected outside the approved HTTPS release hosts');
-    }
-    const response = await fetchImpl(target.href, {
-      signal: AbortSignal.timeout(remaining(state)), redirect: 'manual',
-    });
-    if (![301, 302, 303, 307, 308].includes(response.status)) return response;
-    const location = response.headers.get('location');
-    await response.body?.cancel();
-    if (!location) throw new Error('public download redirect has no destination');
-    url = new URL(location, target).href;
+  const target = new URL(url);
+  if (target.protocol !== 'https:' || !hosts.has(target.hostname) ||
+      target.username || target.password || (target.port && target.port !== '443')) {
+    throw new Error('public download redirected outside the approved HTTPS release hosts');
   }
-  throw new Error('public download exceeded its redirect bound');
+  const response = await fetchImpl(target.href, {
+    signal: AbortSignal.timeout(remaining(state)), redirect: 'manual',
+  });
+  if (![301, 302, 303, 307, 308].includes(response.status)) return response;
+  const location = response.headers.get('location');
+  await response.body?.cancel();
+  if (!location) throw new Error('public download redirect has no destination');
+  return publicResponse(new URL(location, target).href, state, fetchImpl, hop + 1);
 }
 
 async function download(tag, name, destination, state, fetchImpl = fetch) {
@@ -200,6 +198,12 @@ function validateAssets(release) {
   }
 }
 
+async function downloadAssets(names, tag, directory, state, fetchImpl, index = 0) {
+  if (index >= names.length) return;
+  await download(tag, names[index], path.join(directory, names[index]), state, fetchImpl);
+  return downloadAssets(names, tag, directory, state, fetchImpl, index + 1);
+}
+
 async function verifyBundle(tag, commit, directory, environment, state, dependencies = {}) {
   releaseIdentity(tag, commit);
   const execute = dependencies.run || run;
@@ -207,9 +211,7 @@ async function verifyBundle(tag, commit, directory, environment, state, dependen
   validateAssets(release);
   if (tagCommit(tag, environment, state, execute) !== commit) throw new Error('public tag source differs from the planned commit');
   fs.mkdirSync(directory, {mode: 0o700});
-  for (const name of ASSETS) {
-    await download(tag, name, path.join(directory, name), state, dependencies.fetch || fetch);
-  }
+  await downloadAssets(ASSETS, tag, directory, state, dependencies.fetch || fetch);
   attest(path.join(directory, 'SHA256SUMS'), tag, commit, environment, state, execute);
   const manifest = checksums(regularBytes(path.join(directory, 'SHA256SUMS')).toString('utf8'));
   const digests = {};
@@ -242,10 +244,10 @@ async function verifyDefault(platform, directory, environment, state, dependenci
   }
   fs.mkdirSync(directory, {mode: 0o700});
   const name = assetName(platform);
-  for (const asset of ['SHA256SUMS', name]) {
-    await download(tag, asset, path.join(directory, asset), state, dependencies.fetch || fetch);
-    attest(path.join(directory, asset), tag, commit, environment, state, execute);
-  }
+  await download(tag, 'SHA256SUMS', path.join(directory, 'SHA256SUMS'), state, dependencies.fetch || fetch);
+  attest(path.join(directory, 'SHA256SUMS'), tag, commit, environment, state, execute);
+  await download(tag, name, path.join(directory, name), state, dependencies.fetch || fetch);
+  attest(path.join(directory, name), tag, commit, environment, state, execute);
   const manifest = checksums(regularBytes(path.join(directory, 'SHA256SUMS')).toString('utf8'), names);
   const digest = hash(regularBytes(path.join(directory, name)));
   if (digest !== manifest.get(name)) throw new Error('default channel asset checksum mismatch');
@@ -407,8 +409,7 @@ function assertInstalledInspection(commands, schema, expectedSchema) {
   }
 }
 
-function exercise(directory, evidencePath, environment = process.env, execute = run,
-  observed = {os: process.platform, arch: process.arch}) {
+function exercise(directory, evidencePath, environment = process.env, execute = run, observed) {
   for (const key of ['GH_TOKEN', 'GITHUB_TOKEN', 'GH_ENTERPRISE_TOKEN', 'GITHUB_ENTERPRISE_TOKEN']) {
     if (environment[key]) throw new Error('verification credentials must be absent from the execution step');
   }
@@ -418,7 +419,7 @@ function exercise(directory, evidencePath, environment = process.env, execute = 
       throw new Error('verification and execution platform identities differ');
     }
     assertVerifiedInputs(directory, state);
-    nativePlatform(state.platform, observed, execute);
+    nativePlatform(state.platform, observed ?? {os: process.platform, arch: process.arch}, execute);
     const child = childEnvironment(environment, directory);
     const lock = JSON.parse(fs.readFileSync(path.join(__dirname, '../../composer.lock'), 'utf8'));
     const expectedSchema = JSON.parse(fs.readFileSync(path.join(__dirname, '../../schemas/output/workflow-list.schema.json'), 'utf8'));
@@ -452,13 +453,13 @@ module.exports = {
   ASSETS, PLATFORMS, CELL_MILLISECONDS, releaseIdentity, childEnvironment, nativePlatform,
   checksums, verifyEmbeddedPhar, verifyNativeBinary, remaining, tagCommit, verifyBundle, publicResponse,
   assertPackageIdentity, assertVerifiedInputs, assertInstalledInspection,
-  readState, cleanup, verify, exercise, install, packageMetadata,
+  readState, cleanup, verify, exercise, install, packageMetadata, main,
 };
 
 async function main() {
   const [phase, ...extra] = process.argv.slice(2);
   if (extra.length || !['verify', 'exercise', 'cleanup'].includes(phase)) {
-    throw new Error('usage: verify-installed-release.js verify|exercise|cleanup');
+    throw new Error('usage: run-public-release-verifier.mjs verify|exercise|cleanup');
   }
   if (phase === 'cleanup') return cleanup(process.env.VERIFIER_DIRECTORY);
   if (phase === 'verify') {
@@ -475,8 +476,6 @@ async function main() {
 }
 
 if (require.main === module) {
-  main().catch(error => {
-    process.stderr.write(`Public CLI verification failed: ${error.message}\n`);
-    process.exitCode = 1;
-  });
+  process.stderr.write('Use run-public-release-verifier.mjs to invoke the verifier.\n');
+  process.exitCode = 1;
 }

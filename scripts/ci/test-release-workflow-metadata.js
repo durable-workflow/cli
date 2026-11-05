@@ -270,8 +270,8 @@ test('installed code executes only after the credentialed verification step exit
   const inputs = verify.slice(verificationStart, executionStart);
   const execution = verify.slice(executionStart, cleanupStart);
   assert.match(inputs, /GH_TOKEN: \$\{\{ github\.token \}\}/);
-  assert.match(inputs, /run: node scripts\/ci\/verify-installed-release\.js verify/);
-  assert.match(execution, /run: node scripts\/ci\/verify-installed-release\.js exercise/);
+  assert.match(inputs, /run: node scripts\/ci\/run-public-release-verifier\.mjs verify/);
+  assert.match(execution, /run: node scripts\/ci\/run-public-release-verifier\.mjs exercise/);
   assert.match(execution, /VERIFIER_DIRECTORY: \$\{\{ steps\.public-inputs\.outputs\.directory \}\}/);
   assert.doesNotMatch(execution, /GH_TOKEN|GITHUB_TOKEN|github\.token|secrets\./);
   assert.match(verify.slice(cleanupStart), /if: always\(\)/);
@@ -315,7 +315,7 @@ test('public release verification runs read-only after publication', () => {
 
   assert.match(verify, /persist-credentials: false/);
   assert.match(verify, /- name: Verify public release downloads/);
-  assert.match(verify, /run: node scripts\/ci\/verify-installed-release\.js exercise/);
+  assert.match(verify, /run: node scripts\/ci\/run-public-release-verifier\.mjs exercise/);
   assert.match(verify, /timeout-minutes: 15/);
   assert.match(verify, /name: release-evidence/);
 });
@@ -332,5 +332,5 @@ test('public installation cells retain exactly the four existing native producer
   assert.match(verify, /fail-fast: false/);
   const jobEnvironment = verify.split('\n    env:\n')[1].split('\n    steps:\n')[0];
   assert.doesNotMatch(jobEnvironment, /TOKEN|secrets\./);
-  assert.match(verify, /run: node scripts\/ci\/verify-installed-release\.js cleanup/);
+  assert.match(verify, /run: node scripts\/ci\/run-public-release-verifier\.mjs cleanup/);
 });

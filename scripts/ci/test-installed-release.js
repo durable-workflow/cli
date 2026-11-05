@@ -5,6 +5,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const {spawnSync} = require('node:child_process');
 const test = require('node:test');
 const {
   ASSETS, PLATFORMS, CELL_MILLISECONDS, releaseIdentity, childEnvironment, nativePlatform,
@@ -122,7 +123,9 @@ test('public redirects never send authentication or leave approved HTTPS hosts',
   let calls = 0;
   const fetchImpl = async (url, options) => {
     calls += 1; assert.equal(options.headers, undefined);
-    return new Response(null, {status: 302, headers: {location: 'http://github.com/unsafe'}});
+    const downgrade = new URL('https://github.com/unsafe');
+    downgrade.protocol = 'http:';
+    return new Response(null, {status: 302, headers: {location: downgrade.href}});
   };
   await assert.rejects(publicResponse('https://github.com/release', state(), fetchImpl), /HTTPS/);
   assert.equal(calls, 1);
@@ -201,8 +204,24 @@ test('execution step refuses credentials before reading state or running a comma
   assert.equal(calls, 0);
 });
 
+test('wrong or malformed entrypoint cannot silently report verification success', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'dw-entry-fixture-'));
+  try {
+    const environment = childEnvironment(process.env, directory);
+    environment.GITHUB_OUTPUT = path.join(directory, 'outputs');
+    for (const [filename, phase] of [['verify-installed-release.js', 'verify'],
+      ['run-public-release-verifier.mjs', 'invalid']]) {
+      const result = spawnSync(process.execPath, [path.join(__dirname, filename), phase], {
+        env: environment, encoding: 'utf8', timeout: 10000,
+      });
+      assert.equal(result.status, 1);
+      assert.equal(fs.existsSync(environment.GITHUB_OUTPUT), false);
+    }
+  } finally { fs.rmSync(directory, {recursive: true, force: true}); }
+});
+
 test('unverified phase state is refused and removed before any installed child starts', () => {
-  const directory = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), 'dw-public-release-'));
+  const directory = fs.mkdtempSync(path.join(fs.realpathSync(process.env.RUNNER_TEMP || os.tmpdir()), 'dw-public-release-'));
   const cell = {...state(), tag: '2.3.7', commit: COMMIT, platform: 'linux-x86_64', owner: 'c'.repeat(32)};
   fs.writeFileSync(path.join(directory, 'state.json'), JSON.stringify(cell));
   let calls = 0;
@@ -227,9 +246,21 @@ test('changed inputs cannot cross from verification to execution', () => {
   } finally { fs.rmSync(directory, {recursive: true, force: true}); }
 });
 
+function isNativeFixtureProbe(command, args) {
+  return command === 'uname' || command === 'pwsh' && args[2]?.includes('OSArchitecture');
+}
+
+function writeSyntheticInstall(environment, platform, releaseBytes, channelBytes) {
+  const windows = platform.startsWith('windows');
+  if (windows) assert.equal(environment.DURABLE_WORKFLOW_INSTALL_NO_PATH_UPDATE, '1');
+  const filename = path.join(environment.DURABLE_WORKFLOW_INSTALL_DIR, windows ? 'dw.exe' : 'dw');
+  fs.writeFileSync(filename, environment.VERSION ? releaseBytes : channelBytes);
+  return '';
+}
+
 for (const [platform, observation] of Object.entries(PLATFORMS)) {
   test(`temporary install execution wiring for ${platform} uses no credentials or registry: synthetic fixtures only`, () => {
-    const base = fs.realpathSync(os.tmpdir());
+    const base = fs.realpathSync(process.env.RUNNER_TEMP || os.tmpdir());
     const directory = fs.mkdtempSync(path.join(base, 'dw-public-release-'));
     const evidence = path.join(base, `dw-evidence-fixture-${crypto.randomBytes(8).toString('hex')}.json`);
     const input = fixture();
@@ -249,15 +280,11 @@ for (const [platform, observation] of Object.entries(PLATFORMS)) {
     function execute(command, args, options = {}) {
       calls.push({command, args});
       for (const key of ['GH_TOKEN', 'GITHUB_TOKEN', 'DURABLE_WORKFLOW_TOKEN']) assert.equal(options.env?.[key], undefined);
-      if (command === 'uname' || command === 'pwsh' && args[2]?.includes('OSArchitecture')) return observation.machine;
+      if (isNativeFixtureProbe(command, args)) return observation.machine;
       if (command === 'sysctl') return '1';
       if (command === 'php') return JSON.stringify(packageFixture().metadata);
       if (args.includes('-File') || args[0]?.endsWith('install.sh')) {
-        const destination = options.env.DURABLE_WORKFLOW_INSTALL_DIR;
-        if (platform.startsWith('windows')) assert.equal(options.env.DURABLE_WORKFLOW_INSTALL_NO_PATH_UPDATE, '1');
-        const bytes = options.env.VERSION ? input.bytes.get(name) : channelBytes;
-        fs.writeFileSync(path.join(destination, platform.startsWith('windows') ? 'dw.exe' : 'dw'), bytes);
-        return '';
+        return writeSyntheticInstall(options.env, platform, input.bytes.get(name), channelBytes);
       }
       if (args.includes('command -v dw') || args[2]?.includes('Get-Command')) {
         return path.join(options.env.DURABLE_WORKFLOW_INSTALL_DIR, platform.startsWith('windows') ? 'dw.exe' : 'dw');

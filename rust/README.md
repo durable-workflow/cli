@@ -26,7 +26,7 @@ every command group reaches parity.
 | `doctor`: redacted connection sources, server metadata, warnings and next steps | Ported |
 | `workflow:list`: one namespace/page, filters, Server envelopes, JSON and JSONL | Ported |
 | `workflow:list-runs`: one workflow response page, envelope/cursor, JSON and JSONL | Ported |
-| `namespace:list`, `namespace:describe`: visible namespaces/configuration, JSON and JSONL | Ported |
+| `namespace:list`, `namespace:describe`, `namespace:create`, `namespace:update`, `namespace:delete`: namespace configuration and lifecycle, JSON and JSONL | Ported |
 | Workflow, namespace and schedule commands | Next slices |
 | `--tls-verify=false` against HTTPS | CLI support pending |
 
@@ -48,6 +48,11 @@ adding fields. Contradictory identities or operations are refused.
 
 Namespace visibility requests make one target attempt and refuse redirects. Use
 the actual Server URL; a 3xx response is reported as a refusal.
+
+Namespace lifecycle requests make one target attempt and refuse HTTP redirects.
+Use the actual Server URL; a redirect is not reported as a completed creation,
+update or deletion. A lost response remains uncertain and is not automatically
+submitted again.
 
 ## Build and test
 

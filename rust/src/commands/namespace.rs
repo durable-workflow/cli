@@ -99,6 +99,69 @@ pub fn describe(context: &Context, input: &Input) -> Result<i32, CliError> {
     Ok(0)
 }
 
+pub fn create(context: &Context, input: &Input) -> Result<i32, CliError> {
+    context.preflight(false)?;
+    let name = input.arg("name").unwrap_or_default();
+    let body = json!({
+        "name": name,
+        "description": input.opt("description").flatten(),
+        "retention_days": php::string_to_int(input.opt("retention").flatten().unwrap_or_default()),
+    });
+    resource_result(context, input, context.namespace_create(body)?, "created")
+}
+
+pub fn update(context: &Context, input: &Input) -> Result<i32, CliError> {
+    context.preflight(false)?;
+    let name = input.arg("name").unwrap_or_default();
+    let mut fields = serde_json::Map::new();
+    if let Some(description) = input.opt("description").flatten() {
+        fields.insert("description".into(), json!(description));
+    }
+    if let Some(retention) = input.opt_str("retention").filter(|value| *value != "0") {
+        fields.insert(
+            "retention_days".into(),
+            json!(php::string_to_int(retention)),
+        );
+    }
+    // PHP's empty associative array is encoded as [], not {}.
+    let body = if fields.is_empty() {
+        json!([])
+    } else {
+        Value::Object(fields)
+    };
+    resource_result(
+        context,
+        input,
+        context.namespace_update(name, body)?,
+        "updated",
+    )
+}
+
+pub fn delete(context: &Context, input: &Input) -> Result<i32, CliError> {
+    context.preflight(false)?;
+    let name = input.arg("name").unwrap_or_default();
+    resource_result(context, input, context.namespace_delete(name)?, "deleted")
+}
+
+fn resource_result(
+    context: &Context,
+    input: &Input,
+    result: Value,
+    action: &str,
+) -> Result<i32, CliError> {
+    let name = input.arg("name").unwrap_or_default();
+    let result = with_resource_context(result, name);
+    if context.mode.machine_readable() {
+        output::print_json(&result);
+    } else {
+        formatter::writeln_out(&format!(
+            "<info>Namespace {action}: {}</info>",
+            cell(&result, "namespace")
+        ));
+    }
+    Ok(0)
+}
+
 fn with_resource_context(value: Value, fallback: &str) -> Value {
     let name = if nonempty_scalar(php::get(&value, "name")) {
         php::to_string(php::get(&value, "name"))

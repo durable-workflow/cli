@@ -50,6 +50,9 @@ fn handler(name: &str) -> Option<Handler> {
         "workflow:list" => Handler::Server(workflow::list),
         "namespace:list" => Handler::Server(namespace::list),
         "namespace:describe" => Handler::Server(namespace::describe),
+        "namespace:create" => Handler::Server(namespace::create),
+        "namespace:update" => Handler::Server(namespace::update),
+        "namespace:delete" => Handler::Server(namespace::delete),
         "workflow:list-runs" => Handler::Server(workflow::list_runs),
         "env:list" => Handler::Local(env::list),
         "env:set" => Handler::Local(env::set),
@@ -556,7 +559,14 @@ fn run(raw: Vec<String>) -> i32 {
                 context.warn_if_incompatible(
                     client::uses_worker_protocol(&command),
                     NAMESPACE_SCOPED.contains(&command.as_str())
-                        || matches!(command.as_str(), "namespace:list" | "namespace:describe"),
+                        || matches!(
+                            command.as_str(),
+                            "namespace:list"
+                                | "namespace:describe"
+                                | "namespace:create"
+                                | "namespace:update"
+                                | "namespace:delete"
+                        ),
                 );
             }
             run(&context, &input)

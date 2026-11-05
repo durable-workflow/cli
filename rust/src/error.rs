@@ -412,7 +412,13 @@ pub fn human(error: &CliError, context: &ErrorContext) -> String {
     let display = |text: &str| {
         if matches!(
             context.command,
-            "workflow:list" | "workflow:list-runs" | "namespace:list" | "namespace:describe"
+            "workflow:list"
+                | "workflow:list-runs"
+                | "namespace:list"
+                | "namespace:describe"
+                | "namespace:create"
+                | "namespace:update"
+                | "namespace:delete"
         ) {
             crate::formatter::display_text(text)
         } else {

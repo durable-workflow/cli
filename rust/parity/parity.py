@@ -315,25 +315,40 @@ class MockServer:
             content = route.get("body", "")
             content = content if isinstance(content, str) else json.dumps(content)
             headers = {"Content-Type": route.get("content_type", "application/json"), **route.get("headers", {})}
-            extra[path] = (route.get("status", 200), headers, content.encode())
+            extra[path] = (route.get("method", "GET"), route.get("status", 200), headers,
+                           content.encode(), route.get("echo_request", False))
 
         class Handler(http.server.BaseHTTPRequestHandler):
-            def do_GET(self):  # noqa: N802 (http.server API)
+            def respond(self):
                 path = self.path.split("?")[0]
-                if path in extra:
-                    status, headers, content = extra[path]
+                if path in extra and extra[path][0] == self.command:
+                    _, status, headers, content, echo = extra[path]
+                    if echo:
+                        self.connection.settimeout(2)
+                        length = int(self.headers.get("Content-Length", "0"))
+                        if length < 0 or length > 65536:
+                            self.send_error(413)
+                            return
+                        data = self.rfile.read(length)
+                        content = json.dumps({"request": {"method": self.command,
+                            "body": json.loads(data) if data else None}}).encode()
                     self.send_response(status)
                     for name, value in headers.items():
                         self.send_header(name, value)
                     self.end_headers()
                     self.wfile.write(content)
                     return
-                payload = {"/api/cluster/info": body, "/api/health": health}.get(path)
+                payload = {"/api/cluster/info": body, "/api/health": health}.get(path) if self.command == "GET" else None
                 self.send_response(200 if payload else 404)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("X-Durable-Workflow-Control-Plane-Version", "2")
                 self.end_headers()
                 self.wfile.write(payload or b'{"message":"Not found."}')
+
+            do_GET = respond
+            do_POST = respond
+            do_PUT = respond
+            do_DELETE = respond
 
             def log_message(self, *args):
                 # Keep request logs out of the compared stderr.

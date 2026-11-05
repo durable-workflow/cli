@@ -62,6 +62,7 @@ concurrency:
 jobs:
   resolve-release:
     name: Resolve release tag
+    timeout-minutes: 5
     if: >-
       github.event_name != 'workflow_dispatch' ||
       github.ref == 'refs/heads/main' ||

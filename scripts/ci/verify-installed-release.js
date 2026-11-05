@@ -656,35 +656,37 @@ module.exports = {
   safeSystemFailure,
 };
 
+function privatePhpAuthority() {
+  if (!process.env.GITHUB_OUTPUT) throw new Error('PHP authority capture requires the owned workflow output');
+  try {
+    privateTool.noCredentials(process.env);
+    const base = privateTool.context();
+    const result = privateTool.consume(process.env.VERIFIER_ARTIFACT_DIRECTORY,
+      JSON.parse(process.env.VERIFIER_TOOL_INDEX), process.env.VERIFIER_PLATFORM, base);
+    try {
+      privateTool.output(process.env, 'authority', JSON.stringify(result.authority));
+      privateTool.output(process.env, 'binding', JSON.stringify(result.binding));
+      privateTool.output(process.env, 'tool-directory', result.directory);
+    } catch (error) { privateTool.cleanup(result.directory); throw error; }
+    return result.authority;
+  } catch (error) {
+    const platform = process.env.VERIFIER_PLATFORM;
+    if (Object.hasOwn(PLATFORMS, platform)) {
+      inputFailureEvidence(path.resolve(`release-public-download-evidence-${platform}.json`),
+        {tag: process.env.RELEASE_TAG, commit: process.env.VERIFIED_SOURCE_SHA, platform,
+          phase: 'private-verifier-tool', control: {ref: process.env.RELEASE_CONTROL_REF,
+            commit: process.env.RELEASE_CONTROL_COMMIT}}, error, false, true);
+    }
+    throw error;
+  }
+}
+
 async function main() {
   const [phase, ...extra] = process.argv.slice(2);
   if (extra.length || !['authority', 'verify', 'exercise', 'cleanup'].includes(phase)) {
     throw new Error('usage: run-public-release-verifier.mjs authority|verify|exercise|cleanup');
   }
-  if (phase === 'authority') {
-    if (!process.env.GITHUB_OUTPUT) throw new Error('PHP authority capture requires the owned workflow output');
-    try {
-      privateTool.noCredentials(process.env);
-      const base = privateTool.context();
-      const result = privateTool.consume(process.env.VERIFIER_ARTIFACT_DIRECTORY,
-        JSON.parse(process.env.VERIFIER_TOOL_INDEX), process.env.VERIFIER_PLATFORM, base);
-      try {
-        privateTool.output(process.env, 'authority', JSON.stringify(result.authority));
-        privateTool.output(process.env, 'binding', JSON.stringify(result.binding));
-        privateTool.output(process.env, 'tool-directory', result.directory);
-      } catch (error) { privateTool.cleanup(result.directory); throw error; }
-      return result.authority;
-    } catch (error) {
-      const platform = process.env.VERIFIER_PLATFORM;
-      if (Object.hasOwn(PLATFORMS, platform)) {
-        inputFailureEvidence(path.resolve(`release-public-download-evidence-${platform}.json`),
-          {tag: process.env.RELEASE_TAG, commit: process.env.VERIFIED_SOURCE_SHA, platform,
-            phase: 'private-verifier-tool', control: {ref: process.env.RELEASE_CONTROL_REF,
-              commit: process.env.RELEASE_CONTROL_COMMIT}}, error, false, true);
-      }
-      throw error;
-    }
-  }
+  if (phase === 'authority') return privatePhpAuthority();
   if (phase === 'cleanup') {
     try { cleanup(process.env.VERIFIER_DIRECTORY); }
     finally { privateTool.cleanup(process.env.VERIFIER_TOOL_DIRECTORY); }

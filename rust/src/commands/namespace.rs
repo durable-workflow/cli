@@ -14,16 +14,13 @@ pub fn list(context: &Context, _input: &Input) -> Result<i32, CliError> {
         .filter(|value| php::is_array(value))
     {
         let enrich = |item: &mut Value| {
-            if php::is_array(item)
-                && nonempty_scalar(php::get(item, "name"))
-                && !nonempty_scalar(php::get(item, "namespace"))
-            {
-                let mut fields = php::array_map(item.take());
-                fields.insert(
-                    "namespace".into(),
-                    json!(php::to_string(fields.get("name"))),
-                );
-                *item = Value::Object(fields);
+            if php::is_array(item) {
+                let fallback = if php::is_scalar(php::get(item, "name")) {
+                    php::to_string(php::get(item, "name"))
+                } else {
+                    String::new()
+                };
+                *item = with_resource_context(item.take(), &fallback);
             }
         };
         match items {
@@ -67,23 +64,7 @@ pub fn list(context: &Context, _input: &Input) -> Result<i32, CliError> {
         .map(|item| {
             ["name", "description", "retention_days", "status"]
                 .into_iter()
-                .map(|field| {
-                    let value = php::get(item, field);
-                    let escaped = value
-                        .map(|value| json!(formatter::display_text(&php::to_string(Some(value)))));
-                    if field == "status" {
-                        let scalar = value.filter(|value| php::is_scalar(Some(value)));
-                        let escaped = scalar.map(|value| {
-                            json!(formatter::display_text(&php::to_string(Some(value))))
-                        });
-                        output::format_status(escaped.as_ref())
-                    } else {
-                        escaped
-                            .as_ref()
-                            .map(|value| php::to_string(Some(value)))
-                            .unwrap_or_else(|| if field == "name" { "" } else { "-" }.into())
-                    }
-                })
+                .map(|field| cell(item, field))
                 .collect()
         })
         .collect::<Vec<Vec<String>>>();
@@ -92,6 +73,63 @@ pub fn list(context: &Context, _input: &Input) -> Result<i32, CliError> {
         &rows,
     ));
     Ok(0)
+}
+
+pub fn describe(context: &Context, input: &Input) -> Result<i32, CliError> {
+    context.preflight(false)?;
+    let name = input.arg("name").unwrap_or_default();
+    let result = with_resource_context(context.namespace_describe(name)?, name);
+    if context.mode.machine_readable() {
+        output::print_json(&result);
+        return Ok(0);
+    }
+    formatter::writeln_out(&format!(
+        "<info>Namespace: {}</info>",
+        cell(&result, "namespace")
+    ));
+    for (label, key, suffix) in [
+        ("Description", "description", ""),
+        ("Retention", "retention_days", " days"),
+        ("Status", "status", ""),
+        ("Created", "created_at", ""),
+        ("Updated", "updated_at", ""),
+    ] {
+        formatter::writeln_out(&format!("  {label}: {}{suffix}", cell(&result, key)));
+    }
+    Ok(0)
+}
+
+fn with_resource_context(value: Value, fallback: &str) -> Value {
+    let name = if nonempty_scalar(php::get(&value, "name")) {
+        php::to_string(php::get(&value, "name"))
+    } else {
+        fallback.to_owned()
+    };
+    if php::trim(&name).is_empty() {
+        return value;
+    }
+    let mut fields = php::array_map(value);
+    if !nonempty_scalar(fields.get("name")) {
+        fields.insert("name".into(), json!(name));
+    }
+    if !nonempty_scalar(fields.get("namespace")) {
+        fields.insert("namespace".into(), json!(name));
+    }
+    Value::Object(fields)
+}
+
+fn cell(item: &Value, field: &str) -> String {
+    let value = php::get(item, field);
+    if field == "status" {
+        let escaped = value
+            .filter(|value| php::is_scalar(Some(value)))
+            .map(|value| json!(formatter::display_text(&php::to_string(Some(value)))));
+        output::format_status(escaped.as_ref())
+    } else {
+        value
+            .map(|value| formatter::display_text(&php::to_string(Some(value))))
+            .unwrap_or_else(|| if field == "name" { "" } else { "-" }.into())
+    }
 }
 
 fn nonempty_scalar(value: Option<&Value>) -> bool {

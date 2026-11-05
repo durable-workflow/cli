@@ -404,7 +404,10 @@ fn next_step_lines(next: &[Value]) -> Vec<String> {
 /// Human error text for stderr.
 pub fn human(error: &CliError, context: &ErrorContext) -> String {
     let display = |text: &str| {
-        if matches!(context.command, "workflow:list" | "namespace:list") {
+        if matches!(
+            context.command,
+            "workflow:list" | "namespace:list" | "namespace:describe"
+        ) {
             crate::formatter::display_text(text)
         } else {
             text.to_owned()

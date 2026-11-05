@@ -33,9 +33,13 @@ impl Scratch {
     }
 
     fn command(&self) -> Command {
+        self.command_named("namespace:list")
+    }
+
+    fn command_named(&self, name: &str) -> Command {
         let mut command = Command::new(env!("CARGO_BIN_EXE_dw"));
         command
-            .arg("namespace:list")
+            .arg(name)
             .env_clear()
             .env("HOME", &self.0)
             .env("DW_CONFIG_HOME", &self.0);
@@ -45,6 +49,20 @@ impl Scratch {
     fn run(&self, url: &str, args: &[&str]) -> Output {
         self.command()
             .args([
+                "--server",
+                url,
+                "--namespace=selected",
+                "--token=fixture-token",
+            ])
+            .args(args)
+            .output()
+            .unwrap()
+    }
+
+    fn describe(&self, url: &str, name: &str, args: &[&str]) -> Output {
+        self.command_named("namespace:describe")
+            .args([
+                name,
                 "--server",
                 url,
                 "--namespace=selected",
@@ -138,6 +156,16 @@ impl Server {
                     .unwrap_or("")
                     .ends_with("/api/namespaces HTTP/1.1")
             })
+            .cloned()
+            .collect()
+    }
+
+    fn describe_requests(&self) -> Vec<String> {
+        self.requests
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|request| request.starts_with("GET /prefix/api/namespaces/"))
             .cloned()
             .collect()
     }
@@ -362,4 +390,106 @@ fn namespace_usage_tls_and_compatibility_refusals_send_no_target_request() {
         Some(2)
     );
     assert!(server.requests.lock().unwrap().is_empty());
+}
+
+#[test]
+fn namespace_describe_encodes_the_name_and_preserves_the_resource() {
+    let scratch = Scratch::new();
+    let server = Server::new(
+        info(),
+        200,
+        r#"{"name":"billing","namespace":"server-billing","extra":"preserved"}"#,
+    );
+    let result = success(scratch.describe(&server.url, "bill /?#é", &["--json"]));
+    assert_eq!(result["namespace"], "server-billing");
+    assert_eq!(result["name"], "billing");
+    assert_eq!(result["extra"], "preserved");
+    let requests = server.describe_requests();
+    assert_eq!(requests.len(), 1);
+    assert!(requests[0]
+        .to_lowercase()
+        .starts_with("get /prefix/api/namespaces/bill%20%2f%3f%23%c3%a9 http/1.1"));
+    assert!(requests[0].contains("Bearer fixture-token"));
+}
+
+#[test]
+fn namespace_list_does_not_change_list_shaped_items_without_a_resource_name() {
+    let scratch = Scratch::new();
+    let payload = json!({"namespaces": [[], ["unnamed"], {"name": " "}]});
+    let server = Server::new(info(), 200, &payload.to_string());
+    assert_eq!(success(scratch.run(&server.url, &["--json"])), payload);
+}
+
+#[test]
+fn namespace_describe_jsonl_is_one_complete_resource_and_keeps_fallback_rules() {
+    let scratch = Scratch::new();
+    for body in [
+        r#"{}"#,
+        r#"{"name":null,"namespace":"preserved"}"#,
+        r#"{"name":"reported"}"#,
+    ] {
+        let server = Server::new(info(), 200, body);
+        let output = scratch.describe(&server.url, "requested", &["--output=jsonl"]);
+        assert_eq!(output.status.code(), Some(0));
+        let text = String::from_utf8(output.stdout).unwrap();
+        assert_eq!(text.lines().count(), 1);
+        let result: Value = serde_json::from_str(&text).unwrap();
+        let original: Value = serde_json::from_str(body).unwrap();
+        let expected_name = original
+            .get("name")
+            .and_then(Value::as_str)
+            .unwrap_or("requested");
+        assert_eq!(result["name"], expected_name);
+        assert_eq!(
+            result["namespace"],
+            original
+                .get("namespace")
+                .and_then(Value::as_str)
+                .unwrap_or(expected_name)
+        );
+    }
+}
+
+#[test]
+fn namespace_describe_human_fields_are_literal_and_errors_remain_global() {
+    let scratch = Scratch::new();
+    let attack = "<error>UNTRUSTED</error>\nFORGED\u{1b}[2J";
+    let server = Server::new(
+        info(),
+        200,
+        &json!({"name":attack,"description":attack,"status":attack}).to_string(),
+    );
+    let output = scratch.describe(&server.url, "billing", &[]);
+    assert_eq!(output.status.code(), Some(0));
+    let human = String::from_utf8(output.stdout).unwrap();
+    assert!(human.contains("<error>UNTRUSTED</error>\\nFORGED\\u{001b}[2J"));
+    assert!(!human
+        .chars()
+        .any(|value| value.is_control() && value != '\n'));
+    for (status, exit) in [(403, 4), (404, 5), (500, 6)] {
+        let server = Server::new(info(), status, r#"{"message":"describe refusal"}"#);
+        let output = scratch.describe(&server.url, "billing", &["--json"]);
+        assert_eq!(output.status.code(), Some(exit));
+        let result: Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert!(result.get("namespace").is_none());
+        assert_eq!(result["command"], "namespace:describe");
+        assert_eq!(server.describe_requests().len(), 1);
+    }
+}
+
+#[test]
+fn namespace_describe_refuses_invalid_path_segments_before_the_target_request() {
+    let scratch = Scratch::new();
+    let server = Server::new(info(), 200, "{}");
+    for name in ["", ".", ".."] {
+        let output = scratch.describe(&server.url, name, &["--json"]);
+        assert_eq!(output.status.code(), Some(2));
+        assert!(server.describe_requests().is_empty());
+    }
+    let output = scratch
+        .command_named("namespace:describe")
+        .args(["--server", &server.url])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(1));
 }

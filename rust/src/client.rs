@@ -93,7 +93,15 @@ impl Context {
 
     /// One namespace visibility request over the SDK's configured transport.
     pub fn namespace_list(&self) -> Result<Value, CliError> {
-        let request = RawRequest::get(["namespaces"])
+        self.namespace_read(RawRequest::get(["namespaces"]))
+    }
+
+    pub fn namespace_describe(&self, name: &str) -> Result<Value, CliError> {
+        self.namespace_read(RawRequest::get(["namespaces", name]))
+    }
+
+    fn namespace_read(&self, request: RawRequest) -> Result<Value, CliError> {
+        let request = request
             .protocol_version(compat::worker_protocol_version())
             .control_plane_version(compat::control_plane_version());
         let response = self.runtime.block_on(async {
@@ -218,6 +226,7 @@ pub fn map_error(error: SdkError) -> CliError {
         SdkError::InvalidBaseUrl => CliError::Invalid(
             "Invalid server URL: pass the Server or Cloud runtime base URL without the /api suffix.".into(),
         ),
+        SdkError::InvalidRawRequest(message) => CliError::Invalid(message),
         other => CliError::Failure(other.to_string()),
     }
 }

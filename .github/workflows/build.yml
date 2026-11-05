@@ -132,7 +132,6 @@ jobs:
           - name: windows-x86_64
             runner: windows-2022
     env:
-      VERIFIER_PHP_SERIES: '8.4'
       VERIFIER_PLATFORM: ${{ matrix.name }}
       GH_TOKEN: ''
       GITHUB_TOKEN: ''
@@ -142,26 +141,12 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
-      - name: Establish trusted verifier PHP
-        id: verifier-php
-        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
-        with:
-          php-version: ${{ env.VERIFIER_PHP_SERIES }}
-          extensions: phar
-          tools: none
-          coverage: none
+      - name: Check native archive custody, immutable Git bytes and synthetic failure evidence
         env:
-          fail-fast: 'true'
-      - name: Capture exact verifier PHP authority
-        id: verifier-php-authority
-        env:
-          BOOTSTRAPPED_PHP_VERSION: ${{ steps.verifier-php.outputs.php-version }}
-        run: node scripts/ci/run-public-release-verifier.mjs authority
-      - name: Check native tools, immutable Git bytes and synthetic failure evidence
-        env:
-          VERIFIER_PHP_AUTHORITY: ${{ steps.verifier-php-authority.outputs.authority }}
-          DW_REQUIRE_NATIVE_VERIFIER_AUTHORITY: '1'
-        run: node --test --test-concurrency=2 scripts/ci/test-verifier-inputs.js
+          DW_SOURCE_TOOL_CUSTODY: '1'
+        run: >-
+          node --test --test-concurrency=2
+          scripts/ci/test-verifier-inputs.js scripts/ci/test-private-verifier-tool.js
 
   build-phar:
     name: Build PHAR (smoke test)

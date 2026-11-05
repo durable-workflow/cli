@@ -7,8 +7,8 @@ const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
 const {execFileSync} = require('node:child_process');
-const {ASSETS, PLATFORMS, CELL_MILLISECONDS, capturePhpAuthority, inspectPhpAuthority,
-  assertPhpAuthority, assertInstallerSource, nativePlatform, verifyBundle, verify} = require('./verify-installed-release');
+const {ASSETS, PLATFORMS, CELL_MILLISECONDS, capturePhpAuthority,
+  assertPhpAuthority, assertInstallerSource, verifyBundle, verify} = require('./verify-installed-release');
 
 const hash = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 const COMMIT = 'a'.repeat(40);
@@ -172,11 +172,3 @@ test('missing PHP authority retains failure before allocating private state', as
   assert.deepEqual(result.cleanup, {private_state_allocated: false, private_state_removed: true});
 });
 
-test('native CI records and rechecks the actual bootstrapped PHP authority',
-  {skip: !process.env.DW_REQUIRE_NATIVE_VERIFIER_AUTHORITY}, t => {
-    assert.equal(process.env.DW_REQUIRE_NATIVE_VERIFIER_AUTHORITY, '1');
-    const native = nativePlatform(process.env.VERIFIER_PLATFORM, {os: process.platform, arch: process.arch});
-    const authority = assertPhpAuthority(JSON.parse(process.env.VERIFIER_PHP_AUTHORITY));
-    assert.deepEqual(inspectPhpAuthority(authority.binary), authority);
-    t.diagnostic(JSON.stringify({native, php: authority}));
-  });

@@ -196,6 +196,15 @@ function packageFixture() {
   const lock = JSON.parse(fs.readFileSync(path.join(__dirname, '../../composer.lock'), 'utf8'));
   const packages = Object.fromEntries(lock.packages.map(item => [item.name,
     {pretty_version: item.version, reference: item.source?.reference || item.dist?.reference}]));
+  // These are Composer's virtual records for this production lock, rather
+  // than additional installed libraries. The actual PHAR gets its own CI check.
+  Object.assign(packages, {
+    'psr/log-implementation': {dev_requirement: false, provided: ['1.0|2.0|3.0']},
+    'php-http/async-client-implementation': {dev_requirement: false, provided: ['*']},
+    'php-http/client-implementation': {dev_requirement: false, provided: ['*']},
+    'psr/http-client-implementation': {dev_requirement: false, provided: ['1.0']},
+    'symfony/http-client-implementation': {dev_requirement: false, provided: ['3.0']},
+  });
   return {lock, metadata: {version: '2.3.7', commit: COMMIT, packages}};
 }
 
@@ -211,6 +220,20 @@ test('package identity uses every production pin and refuses dev/source/version 
     if (mutation === 'dev') changed.packages[lock['packages-dev'][0].name] = {};
     if (mutation === 'extra') changed.packages['unexpected/library'] = {pretty_version: '1.0.0', reference: COMMIT};
     assert.throws(() => assertPackageIdentity(changed, lock, expected));
+  }
+});
+
+test('Composer virtual records cannot hide extra code, changed constraints or duplicate providers', () => {
+  const {lock, metadata} = packageFixture();
+  for (const mutation of ['code', 'constraint', 'duplicate', 'missing', 'extra']) {
+    const changed = structuredClone(metadata);
+    const virtual = changed.packages['psr/http-client-implementation'];
+    if (mutation === 'code') virtual.reference = COMMIT;
+    if (mutation === 'constraint') virtual.provided = ['2.0'];
+    if (mutation === 'duplicate') virtual.provided.push('1.0');
+    if (mutation === 'missing') delete changed.packages['psr/http-client-implementation'];
+    if (mutation === 'extra') changed.packages['unexpected/virtual'] = {dev_requirement: false, provided: ['*']};
+    assert.throws(() => assertPackageIdentity(changed, lock, {tag: '2.3.7', commit: COMMIT}));
   }
 });
 

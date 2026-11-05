@@ -367,11 +367,33 @@ function assertVerifiedInputs(directory, state) {
   }
 }
 
-function assertPackageIdentity(metadata, lock, state) {
-  if (metadata.version !== state.tag || metadata.commit !== state.commit) {
-    throw new Error('published PHAR build identity does not match the exact version/source');
+const compareNames = (left, right) => left.localeCompare(right);
+
+function addVirtualLinks(virtual, item, kind, key) {
+  for (const [name, value] of Object.entries(item[kind] || {})) {
+    // Composer excludes platform links (php, ext-*, lib-*) from its
+    // installed package table. Library links always have vendor/name.
+    if (!name.includes('/')) continue;
+    const entry = virtual.get(name) || {dev_requirement: false};
+    const values = entry[key] || [];
+    const constraint = value === 'self.version' ? item.version : value;
+    if (!values.includes(constraint)) values.push(constraint);
+    entry[key] = values.sort(compareNames);
+    virtual.set(name, entry);
   }
-  const expectedNames = lock.packages.map(item => item.name);
+}
+
+function expectedVirtualPackages(lock) {
+  const virtual = new Map();
+  for (const item of lock.packages) {
+    for (const [kind, key] of [['provide', 'provided'], ['replace', 'replaced']]) {
+      addVirtualLinks(virtual, item, kind, key);
+    }
+  }
+  return virtual;
+}
+
+function applicationPackageName(metadata) {
   // Composer records the application itself separately from its locked
   // dependencies. Bind that one project record; never treat it as an extra library.
   if (metadata.application) {
@@ -382,11 +404,31 @@ function assertPackageIdentity(metadata, lock, state) {
         installed.pretty_version !== application.pretty_version) {
       throw new Error('published PHAR has invalid application package metadata');
     }
-    expectedNames.push(application.name);
+    return [application.name];
   }
-  expectedNames.sort();
-  if (!isDeepStrictEqual(Object.keys(metadata.packages || {}).sort(), expectedNames)) {
-    throw new Error('published PHAR does not match the exact production package inventory');
+  return [];
+}
+
+function assertPackageIdentity(metadata, lock, state) {
+  if (metadata.version !== state.tag || metadata.commit !== state.commit) {
+    throw new Error('published PHAR build identity does not match the exact version/source');
+  }
+  const virtual = expectedVirtualPackages(lock);
+  const expectedNames = [...lock.packages.map(item => item.name), ...virtual.keys(), ...applicationPackageName(metadata)]
+    .sort(compareNames);
+  const actualNames = Object.keys(metadata.packages || {}).sort(compareNames);
+  if (!isDeepStrictEqual(actualNames, expectedNames)) {
+    throw new Error(`published PHAR does not match the exact production package inventory: ${JSON.stringify({
+      missing: expectedNames.filter(name => !actualNames.includes(name)),
+      extra: actualNames.filter(name => !expectedNames.includes(name)),
+    })}`);
+  }
+  for (const [name, expected] of virtual) {
+    const actual = structuredClone(metadata.packages[name]);
+    for (const key of ['provided', 'replaced']) {
+      if (Array.isArray(actual[key])) actual[key].sort(compareNames);
+    }
+    if (!isDeepStrictEqual(actual, expected)) throw new Error(`published Composer virtual-package metadata differs for ${name}`);
   }
   for (const item of lock.packages) {
     const installed = metadata.packages?.[item.name];
@@ -420,8 +462,8 @@ function install(directory, destination, state, environment, exact, execute = ru
   const child = childEnvironment(environment, directory, [destination]);
   child.DURABLE_WORKFLOW_INSTALL_DIR = destination;
   child.DURABLE_WORKFLOW_INSTALL_OUTPUT = 'json';
-  child.DURABLE_WORKFLOW_INSTALL_EXPECTED_SHA256 = exact
-    ? state.release.digests[assetName(state.platform)] : state.channel.digest;
+  const expected = exact ? state.release.digests[assetName(state.platform)] : state.channel.digest;
+  child.DURABLE_WORKFLOW_INSTALL_EXPECTED_SHA256 = expected;
   child.DURABLE_WORKFLOW_RELEASE_BASE_URL = `https://github.com/${REPOSITORY}/releases`;
   if (exact) child.VERSION = state.tag;
   const installer = path.join(directory, 'release', state.platform.startsWith('windows') ? 'install.ps1' : 'install.sh');
@@ -436,7 +478,6 @@ function install(directory, destination, state, environment, exact, execute = ru
   execute(command, args, {env: child, timeout: remaining(state, 120000)});
   const binary = path.join(destination, windows ? 'dw.exe' : 'dw');
   const digest = hash(regularBytes(binary));
-  const expected = exact ? state.release.digests[assetName(state.platform)] : state.channel.digest;
   if (digest !== expected) throw new Error('installed executable differs from its preverified public artifact');
   const lookupArgs = windows
     ? ['-NoProfile', '-Command', '(Get-Command dw -CommandType Application).Source']

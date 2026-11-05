@@ -25,7 +25,7 @@ function runInstaller(selected, pin, channel) {
   fs.writeFileSync(path.join(directory, 'SHA256SUMS'), `${hash(selected)}  ${asset}\n`);
   fs.writeFileSync(path.join(installed, 'dw-fixture'), 'original installed bytes');
   fs.writeFileSync(path.join(tools, 'uname'), '#!/bin/sh\ncase "$1" in -s) echo Linux;; -m) echo x86_64;; *) exit 88;; esac\n', {mode: 0o700});
-  fs.writeFileSync(path.join(tools, 'curl'), `#!/bin/sh
+  fs.writeFileSync(path.join(tools, 'curl'), String.raw`#!/bin/sh
 set -eu
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -36,7 +36,7 @@ while [ "$#" -gt 0 ]; do
     *) exit 88;;
   esac
 done
-printf '%s\\n' "$url" >> "$FIXTURE_ROOT/downloads"
+printf '%s\n' "$url" >> "$FIXTURE_ROOT/downloads"
 case "$url" in
   */SHA256SUMS) cp "$FIXTURE_ROOT/SHA256SUMS" "$destination";;
   */dw-linux-x86_64) cp "$FIXTURE_ROOT/payload" "$destination";;

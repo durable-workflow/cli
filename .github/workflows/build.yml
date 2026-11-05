@@ -98,6 +98,8 @@ jobs:
           python scripts/ci/test-sonar-wait-routing.py
           python scripts/ci/test-native-prerequisites.py
           node --test scripts/ci/test-release-workflow-metadata.js
+          node --test scripts/ci/test-installed-release.js
+          pwsh -NoProfile -File scripts/ci/test-windows-installer-path.ps1
           node --test scripts/ci/test-standalone-runtime.js
           node --test scripts/ci/test-standalone-dependencies.js
           node --test scripts/ci/test-cli-release-channel.js

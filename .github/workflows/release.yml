@@ -1874,177 +1874,63 @@ jobs:
           gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" "${flags[@]}" dist/*
 
   verify-release:
-    name: Verify published release
-    # Installs and runs the published dw, which bundles third-party code.
-    # This job only reads repository contents and has no release environment
-    # or OIDC permission, so nothing it runs can change the repository or
-    # mint attestation tokens (#75).
+    name: Verify published release (${{ matrix.name }})
     needs: [resolve-release, release]
     if: >-
       always() &&
       needs.resolve-release.result == 'success' &&
       needs.release.result == 'success'
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
     permissions:
       contents: read
+      attestations: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64
+            runner: ubuntu-24.04
+          - name: linux-aarch64
+            runner: ubuntu-24.04-arm
+          - name: macos-aarch64
+            runner: macos-15
+          - name: windows-x86_64
+            runner: windows-2022
+    env:
+      RELEASE_TAG: ${{ needs.resolve-release.outputs.tag }}
+      VERIFIED_SOURCE_SHA: ${{ needs.resolve-release.outputs.commit }}
+      VERIFIER_PLATFORM: ${{ matrix.name }}
     steps:
-      # Verification scripts come from this workflow's own commit (the
-      # release control commit), never from a job output, so the release
-      # under test cannot supply the code that judges it.
       - name: Check out the release control source
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
           ref: ${{ github.sha }}
 
+      # Only this trusted verification step receives the read token. It
+      # verifies inputs without executing the downloaded distribution.
       - name: Verify public release downloads
+        id: public-inputs
         env:
-          VERIFIED_SOURCE_SHA: ${{ needs.resolve-release.outputs.commit }}
-          RELEASE_CONTROL_REF: ${{ needs.resolve-release.outputs.control_ref }}
-          RELEASE_CONTROL_COMMIT: ${{ needs.resolve-release.outputs.control_commit }}
-          RELEASE_INITIATOR: ${{ needs.resolve-release.outputs.initiator }}
-        run: |
-          set -euo pipefail
-          tag="${{ needs.resolve-release.outputs.tag }}"
-          tag="${tag#v}"
-          release_repo="${DURABLE_WORKFLOW_REPO:-durable-workflow/cli}"
-          attempts="${DURABLE_WORKFLOW_RELEASE_ASSET_ATTEMPTS:-12}"
-          sleep_seconds="${DURABLE_WORKFLOW_RELEASE_ASSET_RETRY_SLEEP:-10}"
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/ci/verify-installed-release.js verify
 
-          case "$attempts" in
-            ''|*[!0-9]*)
-              echo "::error::DURABLE_WORKFLOW_RELEASE_ASSET_ATTEMPTS must be a positive integer"
-              exit 1
-              ;;
-            *) ;;
-          esac
-          case "$sleep_seconds" in
-            ''|*[!0-9]*)
-              echo "::error::DURABLE_WORKFLOW_RELEASE_ASSET_RETRY_SLEEP must be a non-negative integer"
-              exit 1
-              ;;
-            *) ;;
-          esac
-          if [ "$attempts" -lt 1 ]; then
-            echo "::error::DURABLE_WORKFLOW_RELEASE_ASSET_ATTEMPTS must be at least 1"
-            exit 1
-          fi
+      - name: Exercise verified temporary installations
+        env:
+          VERIFIER_DIRECTORY: ${{ steps.public-inputs.outputs.directory }}
+        run: node scripts/ci/verify-installed-release.js exercise
 
-          public_asset_url() {
-            printf 'https://github.com/%s/releases/download/%s/%s' "$release_repo" "$tag" "$1"
-          }
-
-          wait_for_asset() {
-            asset="$1"
-            url="$(public_asset_url "$asset")"
-            attempt=1
-
-            while [ "$attempt" -le "$attempts" ]; do
-              if curl -fsSLI --retry 3 --retry-all-errors --connect-timeout 10 "$url" >/dev/null; then
-                printf '%s: OK\n' "$asset"
-                return 0
-              fi
-
-              if [ "$attempt" -lt "$attempts" ]; then
-                printf 'Waiting for public release asset (%s/%s): %s\n' "$attempt" "$attempts" "$asset" >&2
-                sleep "$sleep_seconds"
-              fi
-
-              attempt=$((attempt + 1))
-            done
-
-            echo "::error::Public release asset is not downloadable: $url"
-            return 1
-          }
-
-          public_assets=(
-            dw.phar
-            dw-linux-x86_64
-            dw-linux-aarch64
-            dw-macos-aarch64
-            dw-windows-x86_64.exe
-            dw.rb
-            install.sh
-            install.ps1
-            verify-release.sh
-            SHA256SUMS
-          )
-
-          for asset in "${public_assets[@]}"; do
-            wait_for_asset "$asset"
-          done
-
-          evidence="release-public-download-evidence.json"
-          release_commit="$VERIFIED_SOURCE_SHA"
-          verified_at="$(date -u +%FT%TZ)"
-          {
-            printf '{\n'
-            printf '  "tag": "%s",\n' "$tag"
-            printf '  "commit": "%s",\n' "$release_commit"
-            printf '  "initiator": "%s",\n' "$RELEASE_INITIATOR"
-            printf '  "control": {"ref": "%s", "commit": "%s"},\n' \
-              "$RELEASE_CONTROL_REF" "$RELEASE_CONTROL_COMMIT"
-            printf '  "artifact_versions": {"cli": "%s"},\n' "$tag"
-            printf '  "installable_artifacts": {"verified_public_downloads": true, "version": "%s"},\n' "$tag"
-            printf '  "verified_at": "%s",\n' "$verified_at"
-            printf '  "outcome": "pass",\n'
-            printf '  "assets": [\n'
-            last_index=$((${#public_assets[@]} - 1))
-            for i in "${!public_assets[@]}"; do
-              asset="${public_assets[$i]}"
-              comma=","
-              if [ "$i" -eq "$last_index" ]; then
-                comma=""
-              fi
-              printf '    {"name": "%s", "url": "%s"}%s\n' "$asset" "$(public_asset_url "$asset")" "$comma"
-            done
-            printf '  ]\n'
-            printf '}\n'
-          } > "$evidence"
-
-          installer="$(mktemp)"
-          install_dir="$(mktemp -d)"
-          default_install_dir="$(mktemp -d)"
-          channel_evidence="$(mktemp)"
-          trap 'rm -rf "$installer" "$install_dir" "$default_install_dir" "$channel_evidence"' EXIT
-          curl -fsSL --retry 3 --retry-all-errors --connect-timeout 10 \
-            -o "$installer" "$(public_asset_url install.sh)"
-          export PATH="$install_dir:$default_install_dir:$PATH"
-          VERSION="$tag" DURABLE_WORKFLOW_INSTALL_DIR="$install_dir" \
-            DURABLE_WORKFLOW_INSTALL_OUTPUT=json \
-            DURABLE_WORKFLOW_RELEASE_BASE_URL="https://github.com/${release_repo}/releases" \
-            DURABLE_WORKFLOW_BIN_NAME=dw-release-check sh "$installer"
-          command -v dw-release-check
-          dw-release-check --version
-
-          node scripts/ci/verify-cli-release-channel.js --release-tag "$tag" \
-            | tee "$channel_evidence"
-          channel_version="$(jq -r '.channel_version' "$channel_evidence")"
-
-          DURABLE_WORKFLOW_INSTALL_DIR="$default_install_dir" \
-            DURABLE_WORKFLOW_RELEASE_BASE_URL="https://github.com/${release_repo}/releases" \
-            DURABLE_WORKFLOW_BIN_NAME=dw-channel-check sh scripts/install.sh
-          default_version="$("$default_install_dir/dw-channel-check" --version)"
-          case "$default_version" in
-            *"$channel_version"*) ;;
-            *)
-              echo "::error::Default installer resolved ${default_version}, expected channel ${channel_version}"
-              exit 1
-              ;;
-          esac
-
-          upgrade_dry_run_evidence="$("$install_dir/dw-release-check" upgrade --dry-run --output=json)"
-          printf '%s\n' "$upgrade_dry_run_evidence" | node scripts/ci/verify-cli-upgrade-result.js \
-            --mode dry-run --release-version "$tag" --channel-version "$channel_version"
-
-          upgrade_apply_evidence="$("$install_dir/dw-release-check" upgrade --output=json)"
-          printf '%s\n' "$upgrade_apply_evidence" | node scripts/ci/verify-cli-upgrade-result.js \
-            --mode apply --release-version "$tag" --channel-version "$channel_version"
+      - name: Remove temporary verification state
+        if: always()
+        env:
+          VERIFIER_DIRECTORY: ${{ steps.public-inputs.outputs.directory }}
+        run: node scripts/ci/verify-installed-release.js cleanup
 
       - name: Upload release evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: release-evidence
-          path: release-public-download-evidence.json
+          name: release-evidence-${{ matrix.name }}
+          path: release-public-download-evidence-${{ matrix.name }}.json
           if-no-files-found: warn

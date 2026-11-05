@@ -542,6 +542,12 @@ jobs:
             .github/workflows/release.yml
             scripts/ci/establish-native-prerequisites.sh
             scripts/ci/probe-standalone-runtime.php
+            scripts/ci/release-version.js
+            scripts/ci/run-upgrade-smoke.js
+            scripts/ci/run-upgrade-smoke.mjs
+            scripts/ci/verify-cli-release-channel.js
+            scripts/ci/verify-cli-upgrade-result.js
+            scripts/ci/verify-installed-release.js
             scripts/ci/verify-standalone-runtime.js
             scripts/ci/verify-standalone-dependencies.js
             scripts/ci/standalone-dependencies.json
@@ -1192,6 +1198,12 @@ jobs:
           sparse-checkout: |
             .github/workflows/release.yml
             scripts/ci/probe-standalone-runtime.php
+            scripts/ci/release-version.js
+            scripts/ci/run-upgrade-smoke.js
+            scripts/ci/run-upgrade-smoke.mjs
+            scripts/ci/verify-cli-release-channel.js
+            scripts/ci/verify-cli-upgrade-result.js
+            scripts/ci/verify-installed-release.js
             scripts/ci/verify-standalone-runtime.js
             scripts/ci/verify-standalone-dependencies.js
             scripts/ci/standalone-dependencies.json

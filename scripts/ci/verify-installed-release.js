@@ -409,6 +409,16 @@ function applicationPackageName(metadata) {
   return [];
 }
 
+function assertVirtualPackages(packages, virtual) {
+  for (const [name, expected] of virtual) {
+    const actual = structuredClone(packages[name]);
+    for (const key of ['provided', 'replaced']) {
+      if (Array.isArray(actual[key])) actual[key].sort(compareNames);
+    }
+    if (!isDeepStrictEqual(actual, expected)) throw new Error(`published Composer virtual-package metadata differs for ${name}`);
+  }
+}
+
 function assertPackageIdentity(metadata, lock, state) {
   if (metadata.version !== state.tag || metadata.commit !== state.commit) {
     throw new Error('published PHAR build identity does not match the exact version/source');
@@ -423,13 +433,7 @@ function assertPackageIdentity(metadata, lock, state) {
       extra: actualNames.filter(name => !expectedNames.includes(name)),
     })}`);
   }
-  for (const [name, expected] of virtual) {
-    const actual = structuredClone(metadata.packages[name]);
-    for (const key of ['provided', 'replaced']) {
-      if (Array.isArray(actual[key])) actual[key].sort(compareNames);
-    }
-    if (!isDeepStrictEqual(actual, expected)) throw new Error(`published Composer virtual-package metadata differs for ${name}`);
-  }
+  assertVirtualPackages(metadata.packages, virtual);
   for (const item of lock.packages) {
     const installed = metadata.packages?.[item.name];
     const version = item.version.replace(/^v/, '');

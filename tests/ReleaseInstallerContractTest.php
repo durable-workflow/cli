@@ -175,6 +175,7 @@ SH;
     public function test_installers_are_versioned_release_assets(): void
     {
         $releaseWorkflow = self::readRepoFile('.github/workflows/release.yml');
+        $publicVerifier = self::readRepoFile('scripts/ci/verify-installed-release.js');
 
         self::assertStringContainsString('Resolve release tag', $releaseWorkflow);
         self::assertStringContainsString('DISPATCH_TAG: ${{ inputs.tag }}', $releaseWorkflow);
@@ -207,21 +208,23 @@ SH;
         self::assertStringContainsString('cp scripts/verify-release.sh dist/verify-release.sh', $releaseWorkflow);
         self::assertStringContainsString('RELEASE_TAG: ${{ needs.resolve-release.outputs.tag }}', $releaseWorkflow);
         self::assertStringContainsString('Verify public release downloads', $releaseWorkflow);
-        self::assertStringContainsString('public_asset_url()', $releaseWorkflow);
-        self::assertStringContainsString('wait_for_asset()', $releaseWorkflow);
-        self::assertStringContainsString('VERSION="$tag" DURABLE_WORKFLOW_INSTALL_DIR="$install_dir"', $releaseWorkflow);
+        self::assertStringContainsString('node scripts/ci/run-public-release-verifier.mjs verify', $releaseWorkflow);
+        self::assertStringContainsString('node scripts/ci/run-public-release-verifier.mjs exercise', $releaseWorkflow);
+        self::assertStringContainsString('downloadAssets(ASSETS, tag, directory, state', $publicVerifier);
+        self::assertStringContainsString('child.VERSION = state.tag', $publicVerifier);
+        self::assertStringContainsString('child.DURABLE_WORKFLOW_INSTALL_DIR = destination', $publicVerifier);
         self::assertStringNotContainsString('scripts/verify-public-release-assets.sh "${{ needs.resolve-release.outputs.tag }}"', $releaseWorkflow);
         self::assertStringNotContainsString('continue-on-error: true', $releaseWorkflow);
         self::assertStringContainsString('gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" "${flags[@]}" dist/*', $releaseWorkflow);
         self::assertStringNotContainsString('softprops/action-gh-release', $releaseWorkflow);
         self::assertStringContainsString('Missing required release artifact: $artifact', $releaseWorkflow);
-        self::assertStringContainsString('Public release asset is not downloadable: $url', $releaseWorkflow);
+        self::assertStringContainsString('public download failed for ${name}', $publicVerifier);
         self::assertStringContainsString("needs.build-binary-windows.result == 'success'", $releaseWorkflow);
         self::assertStringContainsString('dw-windows-x86_64.exe', $releaseWorkflow);
         self::assertStringContainsString('.\\build\\dw-windows-x86_64.exe runtime:check', $releaseWorkflow);
-        self::assertStringContainsString('release-public-download-evidence.json', $releaseWorkflow);
-        self::assertStringContainsString('"artifact_versions": {"cli": "%s"}', $releaseWorkflow);
-        self::assertStringContainsString('"installable_artifacts": {"verified_public_downloads": true, "version": "%s"}', $releaseWorkflow);
+        self::assertStringContainsString('release-public-download-evidence-${{ matrix.name }}.json', $releaseWorkflow);
+        self::assertStringContainsString('artifact_versions: {cli: state.tag}', $publicVerifier);
+        self::assertStringContainsString('installable_artifacts: {verified_public_downloads: true, version: state.tag}', $publicVerifier);
         self::assertStringContainsString('name: release-evidence', $releaseWorkflow);
         self::assertStringNotContainsString('"docs_release_audit": {"artifact": "cli", "version": "%s", "checked_before_public_upload": true', $releaseWorkflow);
         self::assertStringContainsString('install.sh', $releaseWorkflow);
@@ -513,6 +516,7 @@ SH;
     public function test_release_binds_the_exact_source_at_publication(): void
     {
         $releaseWorkflow = self::readRepoFile('.github/workflows/release.yml');
+        $publicVerifier = self::readRepoFile('scripts/ci/verify-installed-release.js');
 
         self::assertStringContainsString('release_commit:', $releaseWorkflow);
         self::assertStringContainsString('commit: ${{ steps.resolve.outputs.commit }}', $releaseWorkflow);
@@ -526,7 +530,10 @@ SH;
         self::assertSame(2, substr_count($releaseWorkflow, 'release-control/scripts/ci/verify-release-tag-source.sh'));
         self::assertStringContainsString('release-control/scripts/verify-public-release-assets.sh', $releaseWorkflow);
         self::assertStringContainsString('durable-workflow.cli.release-control-authority/v1', $releaseWorkflow);
-        self::assertStringContainsString('"control": {"ref": "%s", "commit": "%s"}', $releaseWorkflow);
+        self::assertStringContainsString('RELEASE_CONTROL_REF: ${{ needs.resolve-release.outputs.control_ref }}', $releaseWorkflow);
+        self::assertStringContainsString('RELEASE_CONTROL_COMMIT: ${{ needs.resolve-release.outputs.control_commit }}', $releaseWorkflow);
+        self::assertStringContainsString('RELEASE_INITIATOR: ${{ needs.resolve-release.outputs.initiator }}', $releaseWorkflow);
+        self::assertStringContainsString('tag: state.tag, initiator: state.initiator, control: state.control', $publicVerifier);
         self::assertSame(3, substr_count($releaseWorkflow, 'ref: ${{ needs.resolve-release.outputs.commit }}'));
         self::assertStringNotContainsString('|| github.ref }}', $releaseWorkflow);
         self::assertStringContainsString('EXPECTED_COMMIT: ${{ needs.resolve-release.outputs.commit }}', $releaseWorkflow);
@@ -642,10 +649,15 @@ SH);
         self::assertStringContainsString('mv "$tmp" "$INSTALL_DIR/$BIN_NAME"', $shellInstaller);
 
         $releaseWorkflow = self::readRepoFile('.github/workflows/release.yml');
-        self::assertStringContainsString('export PATH="$install_dir:$default_install_dir:$PATH"', $releaseWorkflow);
-        self::assertStringContainsString('DURABLE_WORKFLOW_INSTALL_OUTPUT=json', $releaseWorkflow);
-        self::assertStringContainsString('command -v dw-release-check', $releaseWorkflow);
-        self::assertStringContainsString('dw-release-check --version', $releaseWorkflow);
+        $publicVerifier = self::readRepoFile('scripts/ci/verify-installed-release.js');
+        self::assertStringContainsString('node scripts/ci/run-public-release-verifier.mjs exercise', $releaseWorkflow);
+        self::assertStringContainsString('child.PATH = [...binDirectories, child.PATH', $publicVerifier);
+        self::assertStringContainsString("child.DURABLE_WORKFLOW_INSTALL_OUTPUT = 'json'", $publicVerifier);
+        self::assertStringContainsString('command -v dw', $publicVerifier);
+        self::assertStringContainsString('Get-Command dw -CommandType Application', $publicVerifier);
+        self::assertStringContainsString('fs.realpathSync(active) !== fs.realpathSync(binary)', $publicVerifier);
+        self::assertStringContainsString("['--version']", $publicVerifier);
+        self::assertStringContainsString('installed executable differs from its preverified public artifact', $publicVerifier);
 
         self::assertStringContainsString('SHA256SUMS', $powershellInstaller);
         self::assertStringContainsString('Checksum verification failed', $powershellInstaller);

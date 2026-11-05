@@ -12,6 +12,8 @@
 #   DURABLE_WORKFLOW_INSTALL_VERIFY_ATTESTATIONS
 #                                        Set to 1 to verify GitHub artifact attestations with gh.
 #   DURABLE_WORKFLOW_INSTALL_OUTPUT      Result format: human (default) or json.
+#   DURABLE_WORKFLOW_INSTALL_EXPECTED_SHA256
+#                                        Optional lowercase SHA-256 pin checked before binary execution.
 
 set -eu
 
@@ -23,6 +25,7 @@ RELEASE_BASE_URL="${DURABLE_WORKFLOW_RELEASE_BASE_URL:-https://github.com/${REPO
 RELEASE_BASE_URL="${RELEASE_BASE_URL%/}"
 VERIFY_ATTESTATIONS="${DURABLE_WORKFLOW_INSTALL_VERIFY_ATTESTATIONS:-0}"
 OUTPUT_MODE="${DURABLE_WORKFLOW_INSTALL_OUTPUT:-human}"
+EXPECTED_SHA256="${DURABLE_WORKFLOW_INSTALL_EXPECTED_SHA256:-}"
 
 err() { printf '\033[31merror:\033[0m %s\n' "$*" >&2; exit 1; }
 info() {
@@ -38,6 +41,11 @@ case "$OUTPUT_MODE" in
     human|json) ;;
     *) err "DURABLE_WORKFLOW_INSTALL_OUTPUT must be human or json" ;;
 esac
+if [ -n "$EXPECTED_SHA256" ] &&
+    { [ "${#EXPECTED_SHA256}" -ne 64 ] ||
+      ! printf '%s\n' "$EXPECTED_SHA256" | LC_ALL=C grep -Eq '^[a-f0-9]{64}$'; }; then
+    err "DURABLE_WORKFLOW_INSTALL_EXPECTED_SHA256 must be a lowercase SHA-256 digest"
+fi
 
 uname_s=$(uname -s)
 uname_m=$(uname -m)
@@ -64,6 +72,7 @@ command -v curl >/dev/null 2>&1 || err "curl is required"
 case "$VERSION" in
     supported) VERSION=stable ;;
     prerelease) err "pass an explicit prerelease tag with VERSION=..." ;;
+    *) : ;;
 esac
 
 if [ "$VERSION" = "latest" ] || [ "$VERSION" = "stable" ]; then
@@ -122,6 +131,9 @@ expected_sha=$(printf '%s' "$expected_sha" | tr '[:upper:]' '[:lower:]')
 if [ "$actual_sha" != "$expected_sha" ]; then
     err "checksum verification failed for $asset"
 fi
+if [ -n "$EXPECTED_SHA256" ] && [ "$actual_sha" != "$EXPECTED_SHA256" ]; then
+    err "download does not match the pinned artifact digest"
+fi
 
 if [ "$VERIFY_ATTESTATIONS" = "1" ]; then
     command -v gh >/dev/null 2>&1 || err "gh is required when DURABLE_WORKFLOW_INSTALL_VERIFY_ATTESTATIONS=1"
@@ -157,6 +169,7 @@ if resolved_path=$(command -v "$BIN_NAME" 2>/dev/null); then
                 pre_install_path="$canonical_pre_install_dir/$pre_install_name"
             fi
             ;;
+        *) : ;;
     esac
 fi
 
@@ -218,6 +231,7 @@ if resolved_path=$(command -v "$BIN_NAME" 2>/dev/null); then
                 active_path="$canonical_active_dir/$active_name"
             fi
             ;;
+        *) : ;;
     esac
 fi
 
@@ -265,6 +279,7 @@ if [ -n "${PPID:-}" ] && parent_command=$(ps -p "$PPID" -o comm= 2>/dev/null); t
         bash|dash|sh|ash|ksh|ksh93|mksh|pdksh|zsh|fish)
             parent_shell_name="$parent_command"
             ;;
+        *) : ;;
     esac
 fi
 

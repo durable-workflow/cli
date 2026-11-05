@@ -260,43 +260,21 @@ test('metadata reconciliation can only write from the main branch', () => {
   assert.match(reconciliationJob, /permissions:\n\s+contents: write/);
 });
 
-test('upgrade channel verification uses the executable installed from the public release', () => {
+test('installed code executes only after the credentialed verification step exits', () => {
   const workflow = fs.readFileSync(workflowPath, 'utf8');
-  const verificationStart = workflow.indexOf('- name: Verify public release downloads');
-  const verificationEnd = workflow.indexOf(
-    '- name: Upload release evidence',
-    verificationStart,
-  );
-
-  assert.notEqual(verificationStart, -1);
-  assert.notEqual(verificationEnd, -1);
-
-  const verification = workflow.slice(verificationStart, verificationEnd);
-  assert.match(
-    verification,
-    /export PATH="\$install_dir:\$default_install_dir:\$PATH"/,
-  );
-  assert.match(
-    verification,
-    /DURABLE_WORKFLOW_INSTALL_DIR="\$default_install_dir" \\\n+\s+DURABLE_WORKFLOW_RELEASE_BASE_URL=.* \\\n+\s+DURABLE_WORKFLOW_BIN_NAME=dw-channel-check sh scripts\/install\.sh/,
-  );
-  assert.match(
-    verification,
-    /upgrade_dry_run_evidence="\$\("\$install_dir\/dw-release-check" upgrade --dry-run --output=json\)"/,
-  );
-  assert.match(
-    verification,
-    /upgrade_apply_evidence="\$\("\$install_dir\/dw-release-check" upgrade --output=json\)"/,
-  );
-  assert.match(
-    verification,
-    /verify-cli-upgrade-result\.js \\\n+\s+--mode dry-run --release-version "\$tag" --channel-version "\$channel_version"/,
-  );
-  assert.match(
-    verification,
-    /verify-cli-upgrade-result\.js \\\n+\s+--mode apply --release-version "\$tag" --channel-version "\$channel_version"/,
-  );
-  assert.doesNotMatch(verification, /dist\/dw-linux-x86_64 upgrade/);
+  const verify = workflowJob(workflow, 'verify-release');
+  const verificationStart = verify.indexOf('- name: Verify public release downloads');
+  const executionStart = verify.indexOf('- name: Exercise verified temporary installations');
+  const cleanupStart = verify.indexOf('- name: Remove temporary verification state');
+  assert.ok(verificationStart >= 0 && executionStart > verificationStart && cleanupStart > executionStart);
+  const inputs = verify.slice(verificationStart, executionStart);
+  const execution = verify.slice(executionStart, cleanupStart);
+  assert.match(inputs, /GH_TOKEN: \$\{\{ github\.token \}\}/);
+  assert.match(inputs, /run: node scripts\/ci\/run-public-release-verifier\.mjs verify/);
+  assert.match(execution, /run: node scripts\/ci\/run-public-release-verifier\.mjs exercise/);
+  assert.match(execution, /VERIFIER_DIRECTORY: \$\{\{ steps\.public-inputs\.outputs\.directory \}\}/);
+  assert.doesNotMatch(execution, /GH_TOKEN|GITHUB_TOKEN|github\.token|secrets\./);
+  assert.match(verify.slice(cleanupStart), /if: always\(\)/);
 });
 
 function workflowJob(workflow, name) {
@@ -328,14 +306,34 @@ test('public release verification runs read-only after publication', () => {
   assert.match(verify, /needs: \[resolve-release, release\]/);
   assert.match(verify, /needs\.release\.result == 'success'/);
   assert.match(verify, /permissions:\n\s+contents: read\n/);
-  assert.doesNotMatch(verify, /contents: write|id-token|attestations|environment:|secrets\./);
+  assert.match(verify, /attestations: read/);
+  assert.doesNotMatch(verify, /contents: write|id-token|attestations: write|environment:|secrets\./);
   // Verification code comes from the workflow's own commit, not a job output.
   assert.match(verify, /ref: \$\{\{ github\.sha \}\}/);
   assert.doesNotMatch(verify, /ref: \$\{\{ needs\./);
   assert.match(verify, /VERIFIED_SOURCE_SHA: \$\{\{ needs\.resolve-release\.outputs\.commit \}\}/);
-  assert.match(verify, /release_commit="\$VERIFIED_SOURCE_SHA"/);
+  assert.match(verify, /RELEASE_CONTROL_REF: \$\{\{ needs\.resolve-release\.outputs\.control_ref \}\}/);
+  assert.match(verify, /RELEASE_CONTROL_COMMIT: \$\{\{ needs\.resolve-release\.outputs\.control_commit \}\}/);
+  assert.match(verify, /RELEASE_INITIATOR: \$\{\{ needs\.resolve-release\.outputs\.initiator \}\}/);
+
   assert.match(verify, /persist-credentials: false/);
   assert.match(verify, /- name: Verify public release downloads/);
-  assert.match(verify, /dw-release-check" upgrade --output=json/);
+  assert.match(verify, /run: node scripts\/ci\/run-public-release-verifier\.mjs exercise/);
+  assert.match(verify, /timeout-minutes: 15/);
   assert.match(verify, /name: release-evidence/);
+});
+
+test('public installation cells retain exactly the four existing native producer platforms', () => {
+  const workflow = fs.readFileSync(workflowPath, 'utf8');
+  const verify = workflowJob(workflow, 'verify-release');
+  const cells = [...verify.matchAll(/- name: ([a-z0-9_-]+)\n\s+runner: ([a-z0-9.-]+)/g)]
+    .map(match => [match[1], match[2]]);
+  assert.deepEqual(cells, [
+    ['linux-x86_64', 'ubuntu-24.04'], ['linux-aarch64', 'ubuntu-24.04-arm'],
+    ['macos-aarch64', 'macos-15'], ['windows-x86_64', 'windows-2022'],
+  ]);
+  assert.match(verify, /fail-fast: false/);
+  const jobEnvironment = verify.split('\n    env:\n')[1].split('\n    steps:\n')[0];
+  assert.doesNotMatch(jobEnvironment, /TOKEN|secrets\./);
+  assert.match(verify, /run: node scripts\/ci\/run-public-release-verifier\.mjs cleanup/);
 });

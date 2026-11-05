@@ -9,6 +9,10 @@
 #   $env:DURABLE_WORKFLOW_RELEASE_BASE_URL  Release base URL override for tests.
 #   $env:DURABLE_WORKFLOW_INSTALL_VERIFY_ATTESTATIONS
 #                                        Set to 1 to verify GitHub artifact attestations with gh.
+#   $env:DURABLE_WORKFLOW_INSTALL_NO_PATH_UPDATE
+#                                        Set to 1 for temporary installs without changing user PATH.
+#   $env:DURABLE_WORKFLOW_INSTALL_EXPECTED_SHA256
+#                                        Optional lowercase SHA-256 pin checked before binary execution.
 
 $ErrorActionPreference = 'Stop'
 
@@ -33,6 +37,10 @@ $releaseVersion = if ($version.StartsWith('v')) {
     $version
 }
 $verifyAttestations = $env:DURABLE_WORKFLOW_INSTALL_VERIFY_ATTESTATIONS -eq '1'
+$expectedSha256 = $env:DURABLE_WORKFLOW_INSTALL_EXPECTED_SHA256
+if ($expectedSha256 -and ($expectedSha256.Length -ne 64 -or $expectedSha256 -cnotmatch '^[a-f0-9]{64}$')) {
+    throw 'DURABLE_WORKFLOW_INSTALL_EXPECTED_SHA256 must be a lowercase SHA-256 digest'
+}
 
 if (-not [System.Environment]::Is64BitOperatingSystem) {
     throw 'Durable Workflow CLI requires a 64-bit operating system.'
@@ -90,6 +98,9 @@ try {
     if ($actualHash -ne $expectedHash) {
         throw "Checksum verification failed for $asset."
     }
+    if ($expectedSha256 -and $actualHash -cne $expectedSha256) {
+        throw 'Download does not match the pinned artifact digest.'
+    }
 
     if ($verifyAttestations) {
         if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
@@ -110,11 +121,13 @@ try {
 
 Write-Host "==> Installed $binName to $installDir" -ForegroundColor Green
 
-$userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
-$paths = @($userPath -split ';' | Where-Object { $_ })
-if ($paths -notcontains $installDir) {
-    [Environment]::SetEnvironmentVariable('Path', (($paths + $installDir) -join ';'), 'User')
-    Write-Host "==> Added $installDir to your user PATH. Restart your shell for the change to take effect." -ForegroundColor Green
+if ($env:DURABLE_WORKFLOW_INSTALL_NO_PATH_UPDATE -ne '1') {
+    $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+    $paths = @($userPath -split ';' | Where-Object { $_ })
+    if ($paths -notcontains $installDir) {
+        [Environment]::SetEnvironmentVariable('Path', (($paths + $installDir) -join ';'), 'User')
+        Write-Host "==> Added $installDir to your user PATH. Restart your shell for the change to take effect." -ForegroundColor Green
+    }
 }
 
 & $dest --version

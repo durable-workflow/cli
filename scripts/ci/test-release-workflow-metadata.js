@@ -323,6 +323,20 @@ test('public release verification runs read-only after publication', () => {
   assert.match(verify, /name: release-evidence/);
 });
 
+test('verifier PHP is established and bound before the public-input read token is available', () => {
+  const verify = workflowJob(fs.readFileSync(workflowPath, 'utf8'), 'verify-release');
+  const bootstrap = verify.indexOf('- name: Establish trusted verifier PHP');
+  const capture = verify.indexOf('- name: Capture exact verifier PHP authority');
+  const inputs = verify.indexOf('- name: Verify public release downloads');
+  assert.ok(bootstrap >= 0 && capture > bootstrap && inputs > capture);
+  const trustedTools = verify.slice(bootstrap, inputs);
+  assert.match(trustedTools, /shivammathur\/setup-php@f3e473d116dcccaddc5834248c87452386958240/);
+  assert.match(trustedTools, /BOOTSTRAPPED_PHP_VERSION: \$\{\{ steps\.verifier-php\.outputs\.php-version \}\}/);
+  assert.match(trustedTools, /run: node scripts\/ci\/run-public-release-verifier\.mjs authority/);
+  assert.doesNotMatch(trustedTools, /github\.token|secrets\./);
+  assert.match(verify.slice(inputs), /VERIFIER_PHP_AUTHORITY: \$\{\{ steps\.verifier-php-authority\.outputs\.authority \}\}/);
+});
+
 test('public installation cells retain exactly the four existing native producer platforms', () => {
   const workflow = fs.readFileSync(workflowPath, 'utf8');
   const verify = workflowJob(workflow, 'verify-release');

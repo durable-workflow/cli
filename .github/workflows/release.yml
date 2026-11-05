@@ -2006,6 +2006,7 @@ jobs:
       RELEASE_CONTROL_COMMIT: ${{ needs.resolve-release.outputs.control_commit }}
       RELEASE_INITIATOR: ${{ needs.resolve-release.outputs.initiator }}
       VERIFIER_PLATFORM: ${{ matrix.name }}
+      VERIFIER_PHP_SERIES: '8.4'
     steps:
       - name: Check out the release control source
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -2013,12 +2014,30 @@ jobs:
           persist-credentials: false
           ref: ${{ github.sha }}
 
+      - name: Establish trusted verifier PHP
+        id: verifier-php
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: ${{ env.VERIFIER_PHP_SERIES }}
+          extensions: phar
+          tools: none
+          coverage: none
+        env:
+          fail-fast: 'true'
+
+      - name: Capture exact verifier PHP authority
+        id: verifier-php-authority
+        env:
+          BOOTSTRAPPED_PHP_VERSION: ${{ steps.verifier-php.outputs.php-version }}
+        run: node scripts/ci/run-public-release-verifier.mjs authority
+
       # Only this trusted verification step receives the read token. It
       # verifies inputs without executing the downloaded distribution.
       - name: Verify public release downloads
         id: public-inputs
         env:
           GH_TOKEN: ${{ github.token }}
+          VERIFIER_PHP_AUTHORITY: ${{ steps.verifier-php-authority.outputs.authority }}
         run: node scripts/ci/run-public-release-verifier.mjs verify
 
       - name: Exercise verified temporary installations

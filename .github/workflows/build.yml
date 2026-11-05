@@ -113,6 +113,55 @@ jobs:
         uses: durable-workflow/.github/.github/actions/verify-composer-trust@75587fc33ff40c34f32ef777293dad56bb6f48c7  # clean-trust
       - run: composer test
 
+  verifier-inputs:
+    name: Verifier source inputs (${{ matrix.name }})
+    if: ${{ github.server_url == 'https://github.com' }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        include:
+          - name: linux-x86_64
+            runner: ubuntu-24.04
+          - name: linux-aarch64
+            runner: ubuntu-24.04-arm
+          - name: macos-aarch64
+            runner: macos-15
+          - name: windows-x86_64
+            runner: windows-2022
+    env:
+      VERIFIER_PHP_SERIES: '8.4'
+      GH_TOKEN: ''
+      GITHUB_TOKEN: ''
+      GH_ENTERPRISE_TOKEN: ''
+      GITHUB_ENTERPRISE_TOKEN: ''
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Establish trusted verifier PHP
+        id: verifier-php
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: ${{ env.VERIFIER_PHP_SERIES }}
+          extensions: phar
+          tools: none
+          coverage: none
+        env:
+          fail-fast: 'true'
+      - name: Capture exact verifier PHP authority
+        id: verifier-php-authority
+        env:
+          BOOTSTRAPPED_PHP_VERSION: ${{ steps.verifier-php.outputs.php-version }}
+        run: node scripts/ci/run-public-release-verifier.mjs authority
+      - name: Check native tools, immutable Git bytes and synthetic failure evidence
+        env:
+          VERIFIER_PHP_AUTHORITY: ${{ steps.verifier-php-authority.outputs.authority }}
+          DW_REQUIRE_NATIVE_VERIFIER_AUTHORITY: '1'
+        run: node --test --test-concurrency=2 scripts/ci/test-verifier-inputs.js
+
   build-phar:
     name: Build PHAR (smoke test)
     if: ${{ github.server_url == 'https://github.com' }}
@@ -176,7 +225,7 @@ jobs:
   target-branch-qualification:
     name: Target branch qualification
     if: ${{ always() && github.server_url == 'https://github.com' }}
-    needs: [action-policy, test, build-phar, reproducible-build]
+    needs: [action-policy, test, verifier-inputs, build-phar, reproducible-build]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
@@ -191,7 +240,9 @@ jobs:
           TEST_RESULT: ${{ needs.test.result }}
           PHAR_RESULT: ${{ needs.build-phar.result }}
           REPRODUCIBLE_RESULT: ${{ needs.reproducible-build.result }}
+          VERIFIER_INPUTS_RESULT: ${{ needs.verifier-inputs.result }}
         run: |
           test "$TEST_RESULT" = success
           test "$PHAR_RESULT" = success
           test "$REPRODUCIBLE_RESULT" = success
+          test "$VERIFIER_INPUTS_RESULT" = success

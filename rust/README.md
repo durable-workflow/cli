@@ -26,6 +26,7 @@ every command group reaches parity.
 | `doctor`: redacted connection sources, server metadata, warnings and next steps | Ported |
 | `workflow:list`: one namespace/page, filters, Server envelopes, JSON and JSONL | Ported |
 | `workflow:list-runs`: one workflow response page, envelope/cursor, JSON and JSONL | Ported |
+| `namespace:list`, `namespace:describe`: visible namespaces/configuration, JSON and JSONL | Ported |
 | Workflow, namespace and schedule commands | Next slices |
 | `--tls-verify=false` against HTTPS | CLI support pending |
 
@@ -44,6 +45,9 @@ returned records. Successful responses must identify the requested workflow
 and `list_runs` operation. Explicit row workflow IDs must match; omitted IDs
 in the published PHP Server shape inherit the verified envelope without
 adding fields. Contradictory identities or operations are refused.
+
+Namespace visibility requests make one target attempt and refuse redirects. Use
+the actual Server URL; a 3xx response is reported as a refusal.
 
 ## Build and test
 

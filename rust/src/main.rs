@@ -33,7 +33,7 @@ enum Handler {
 /// reported as not yet available.
 fn handler(name: &str) -> Option<Handler> {
     use commands::{
-        completion, doctor, env, runtime, schema, server, start_dev, upgrade, workflow,
+        completion, doctor, env, namespace, runtime, schema, server, start_dev, upgrade, workflow,
     };
     Some(match name {
         "completion" => Handler::Local(completion::completion),
@@ -48,6 +48,8 @@ fn handler(name: &str) -> Option<Handler> {
         "server:health" => Handler::Server(server::health),
         "server:info" => Handler::Server(server::info),
         "workflow:list" => Handler::Server(workflow::list),
+        "namespace:list" => Handler::Server(namespace::list),
+        "namespace:describe" => Handler::Server(namespace::describe),
         "workflow:list-runs" => Handler::Server(workflow::list_runs),
         "env:list" => Handler::Local(env::list),
         "env:set" => Handler::Local(env::set),
@@ -553,7 +555,8 @@ fn run(raw: Vec<String>) -> i32 {
             if !matches!(command.as_str(), "doctor" | "server:start-dev") {
                 context.warn_if_incompatible(
                     client::uses_worker_protocol(&command),
-                    NAMESPACE_SCOPED.contains(&command.as_str()),
+                    NAMESPACE_SCOPED.contains(&command.as_str())
+                        || matches!(command.as_str(), "namespace:list" | "namespace:describe"),
                 );
             }
             run(&context, &input)

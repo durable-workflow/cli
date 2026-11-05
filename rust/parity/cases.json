@@ -5979,6 +5979,1409 @@
      "reason": "Bind successful list_runs data to the requested workflow and operation; the legacy PHP CLI admits contradictory success metadata (cli#113)."
     }
    }
+  },
+  {
+   "name": "namespace list JSON envelope",
+   "argv": [
+    "namespace:list",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "status": 200,
+     "body": {
+      "namespaces": [
+       {
+        "name": "default",
+        "description": "Default namespace",
+        "retention_days": 30,
+        "status": "active",
+        "created_at": "2026-04-01T00:00:00Z",
+        "updated_at": "2026-04-15T12:00:00Z"
+       },
+       {
+        "name": "billing",
+        "description": "Billing workflows",
+        "retention_days": 90,
+        "status": "active",
+        "created_at": "2026-04-02T00:00:00Z",
+        "updated_at": "2026-04-16T12:00:00Z"
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace list JSONL records",
+   "argv": [
+    "namespace:list",
+    "--server={mock}",
+    "--output=jsonl"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "status": 200,
+     "body": {
+      "namespaces": [
+       {
+        "name": "default",
+        "description": "Default namespace",
+        "retention_days": 30,
+        "status": "active",
+        "created_at": "2026-04-01T00:00:00Z",
+        "updated_at": "2026-04-15T12:00:00Z"
+       },
+       {
+        "name": "billing",
+        "description": "Billing workflows",
+        "retention_days": 90,
+        "status": "active",
+        "created_at": "2026-04-02T00:00:00Z",
+        "updated_at": "2026-04-16T12:00:00Z"
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace list human table",
+   "argv": [
+    "namespace:list",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "status": 200,
+     "body": {
+      "namespaces": [
+       {
+        "name": "default",
+        "description": "Default namespace",
+        "retention_days": 30,
+        "status": "active",
+        "created_at": "2026-04-01T00:00:00Z",
+        "updated_at": "2026-04-15T12:00:00Z"
+       },
+       {
+        "name": "billing",
+        "description": "Billing workflows",
+        "retention_days": 90,
+        "status": "active",
+        "created_at": "2026-04-02T00:00:00Z",
+        "updated_at": "2026-04-16T12:00:00Z"
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace list empty human",
+   "argv": [
+    "namespace:list",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "status": 200,
+     "body": {
+      "namespaces": []
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace list empty JSONL",
+   "argv": [
+    "namespace:list",
+    "--server={mock}",
+    "--output=jsonl"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "status": 200,
+     "body": {
+      "namespaces": []
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace list server contexts",
+   "argv": [
+    "namespace:list",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "status": 200,
+     "body": {
+      "namespaces": [
+       {
+        "name": "default",
+        "description": "Default namespace",
+        "retention_days": 30,
+        "status": "active",
+        "created_at": "2026-04-01T00:00:00Z",
+        "updated_at": "2026-04-15T12:00:00Z"
+       },
+       {
+        "name": "billing",
+        "description": "Billing workflows",
+        "retention_days": 90,
+        "status": "active",
+        "created_at": "2026-04-02T00:00:00Z",
+        "updated_at": "2026-04-16T12:00:00Z",
+        "namespace": "item-from-server"
+       }
+      ],
+      "next_page_token": "not-followed",
+      "namespace": "root-from-server"
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace list server contexts JSONL",
+   "argv": [
+    "namespace:list",
+    "--server={mock}",
+    "--output=jsonl"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "status": 200,
+     "body": {
+      "namespaces": [
+       {
+        "name": "default",
+        "description": "Default namespace",
+        "retention_days": 30,
+        "status": "active",
+        "created_at": "2026-04-01T00:00:00Z",
+        "updated_at": "2026-04-15T12:00:00Z"
+       },
+       {
+        "name": "billing",
+        "description": "Billing workflows",
+        "retention_days": 90,
+        "status": "active",
+        "created_at": "2026-04-02T00:00:00Z",
+        "updated_at": "2026-04-16T12:00:00Z",
+        "namespace": "item-from-server"
+       }
+      ],
+      "next_page_token": "not-followed",
+      "namespace": "root-from-server"
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace list optional table fields",
+   "argv": [
+    "namespace:list",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "status": 200,
+     "body": {
+      "namespaces": [
+       {
+        "name": "lean"
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace list empty payload",
+   "argv": [
+    "namespace:list",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "status": 200,
+     "body": {}
+    }
+   }
+  },
+  {
+   "name": "namespace list invalid JSON human",
+   "argv": [
+    "namespace:list",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "status": 200,
+     "body": "not JSON"
+    }
+   }
+  },
+  {
+   "name": "namespace list nonarray root None",
+   "argv": [
+    "namespace:list",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "status": 200,
+     "body": "null"
+    }
+   }
+  },
+  {
+   "name": "namespace list nonarray root True",
+   "argv": [
+    "namespace:list",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "status": 200,
+     "body": true
+    }
+   }
+  },
+  {
+   "name": "namespace list nonarray root 42",
+   "argv": [
+    "namespace:list",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "status": 200,
+     "body": 42
+    }
+   }
+  },
+  {
+   "name": "namespace list nonarray root \"scalar\"",
+   "argv": [
+    "namespace:list",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "status": 200,
+     "body": "\"scalar\""
+    }
+   }
+  },
+  {
+   "name": "namespace list scalar and empty records",
+   "argv": [
+    "namespace:list",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "status": 200,
+     "body": {
+      "namespaces": [
+       {},
+       [],
+       null,
+       true,
+       1,
+       "name",
+       {
+        "name": 0
+       },
+       {
+        "name": false
+       },
+       {
+        "name": "  "
+       },
+       {
+        "name": "valid",
+        "namespace": false
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace list nonarray list human True",
+   "argv": [
+    "namespace:list",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "status": 200,
+     "body": {
+      "namespaces": true
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace list nonarray list human 7",
+   "argv": [
+    "namespace:list",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "status": 200,
+     "body": {
+      "namespaces": 7
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace list nonarray list human text",
+   "argv": [
+    "namespace:list",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "status": 200,
+     "body": {
+      "namespaces": "text"
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace list nonarray list human ",
+   "argv": [
+    "namespace:list",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "status": 200,
+     "body": {
+      "namespaces": ""
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace list nonarray list human False",
+   "argv": [
+    "namespace:list",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "status": 200,
+     "body": {
+      "namespaces": false
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace list nonarray list human 0",
+   "argv": [
+    "namespace:list",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "status": 200,
+     "body": {
+      "namespaces": 0
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace list HTTP 401",
+   "argv": [
+    "namespace:list",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "status": 401,
+     "body": {
+      "message": "Namespace request refused.",
+      "reason": "fixture"
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace list HTTP 403",
+   "argv": [
+    "namespace:list",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "status": 403,
+     "body": {
+      "message": "Namespace request refused.",
+      "reason": "fixture"
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace list HTTP 404",
+   "argv": [
+    "namespace:list",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "status": 404,
+     "body": {
+      "message": "Namespace request refused.",
+      "reason": "fixture"
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace list HTTP 422",
+   "argv": [
+    "namespace:list",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "status": 422,
+     "body": {
+      "message": "Namespace request refused.",
+      "reason": "fixture"
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace list HTTP 503",
+   "argv": [
+    "namespace:list",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "status": 503,
+     "body": {
+      "message": "Namespace request refused.",
+      "reason": "fixture"
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace list incompatible preflight",
+   "argv": [
+    "namespace:list",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [
+    [
+     [
+      "control_plane",
+      "version"
+     ],
+     "99"
+    ]
+   ],
+   "mock_routes": {
+    "/api/namespaces": {
+     "status": 200,
+     "body": {
+      "namespaces": [
+       {
+        "name": "default",
+        "description": "Default namespace",
+        "retention_days": 30,
+        "status": "active",
+        "created_at": "2026-04-01T00:00:00Z",
+        "updated_at": "2026-04-15T12:00:00Z"
+       },
+       {
+        "name": "billing",
+        "description": "Billing workflows",
+        "retention_days": 90,
+        "status": "active",
+        "created_at": "2026-04-02T00:00:00Z",
+        "updated_at": "2026-04-16T12:00:00Z"
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace list status coercion 0",
+   "argv": [
+    "namespace:list",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "status": 200,
+     "body": {
+      "namespaces": [
+       {
+        "name": "coercion",
+        "status": false
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace list status coercion 1",
+   "argv": [
+    "namespace:list",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "status": 200,
+     "body": {
+      "namespaces": [
+       {
+        "name": "coercion",
+        "status": true
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace list status coercion 2",
+   "argv": [
+    "namespace:list",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "status": 200,
+     "body": {
+      "namespaces": [
+       {
+        "name": "coercion",
+        "status": null
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace list status coercion 3",
+   "argv": [
+    "namespace:list",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "status": 200,
+     "body": {
+      "namespaces": [
+       {
+        "name": "coercion",
+        "status": []
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace list status coercion 4",
+   "argv": [
+    "namespace:list",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "status": 200,
+     "body": {
+      "namespaces": [
+       {
+        "name": "coercion",
+        "status": {}
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace list status coercion 5",
+   "argv": [
+    "namespace:list",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "status": 200,
+     "body": {
+      "namespaces": [
+       {
+        "name": "coercion",
+        "status": 1.25
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace list status coercion 6",
+   "argv": [
+    "namespace:list",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "status": 200,
+     "body": {
+      "namespaces": [
+       {
+        "name": "coercion",
+        "status": "completed"
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace describe JSON",
+   "argv": [
+    "namespace:describe",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "status": 200,
+     "body": {
+      "name": "billing",
+      "description": "Billing workflows",
+      "retention_days": 90,
+      "status": "active",
+      "created_at": "2026-04-02T00:00:00Z",
+      "updated_at": "2026-04-16T12:00:00Z",
+      "extra": {
+       "preserved": true
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace describe JSONL",
+   "argv": [
+    "namespace:describe",
+    "billing",
+    "--server={mock}",
+    "--output=jsonl"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "status": 200,
+     "body": {
+      "name": "billing",
+      "description": "Billing workflows",
+      "retention_days": 90,
+      "status": "active",
+      "created_at": "2026-04-02T00:00:00Z",
+      "updated_at": "2026-04-16T12:00:00Z",
+      "extra": {
+       "preserved": true
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace describe human",
+   "argv": [
+    "namespace:describe",
+    "billing",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "status": 200,
+     "body": {
+      "name": "billing",
+      "description": "Billing workflows",
+      "retention_days": 90,
+      "status": "active",
+      "created_at": "2026-04-02T00:00:00Z",
+      "updated_at": "2026-04-16T12:00:00Z",
+      "extra": {
+       "preserved": true
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace describe empty JSON",
+   "argv": [
+    "namespace:describe",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "status": 200,
+     "body": {}
+    }
+   }
+  },
+  {
+   "name": "namespace describe null names JSON",
+   "argv": [
+    "namespace:describe",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "status": 200,
+     "body": {
+      "name": null,
+      "namespace": null
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace describe server namespace JSON",
+   "argv": [
+    "namespace:describe",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "status": 200,
+     "body": {
+      "name": "billing",
+      "namespace": "explicit-server-context"
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace describe blank names JSON",
+   "argv": [
+    "namespace:describe",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "status": 200,
+     "body": {
+      "name": " \t",
+      "namespace": ""
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace describe scalar names JSON",
+   "argv": [
+    "namespace:describe",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "status": 200,
+     "body": {
+      "name": 7,
+      "namespace": false
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace describe array names JSON",
+   "argv": [
+    "namespace:describe",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "status": 200,
+     "body": {
+      "name": [],
+      "namespace": {}
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace describe decoded shape 0",
+   "argv": [
+    "namespace:describe",
+    "billing",
+    "--server={mock}",
+    "--output=jsonl"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "status": 200,
+     "body": null
+    }
+   }
+  },
+  {
+   "name": "namespace describe decoded shape 1",
+   "argv": [
+    "namespace:describe",
+    "billing",
+    "--server={mock}",
+    "--output=jsonl"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "status": 200,
+     "body": true
+    }
+   }
+  },
+  {
+   "name": "namespace describe decoded shape 2",
+   "argv": [
+    "namespace:describe",
+    "billing",
+    "--server={mock}",
+    "--output=jsonl"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "status": 200,
+     "body": 7
+    }
+   }
+  },
+  {
+   "name": "namespace describe decoded shape 3",
+   "argv": [
+    "namespace:describe",
+    "billing",
+    "--server={mock}",
+    "--output=jsonl"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "status": 200,
+     "body": "scalar"
+    }
+   }
+  },
+  {
+   "name": "namespace describe decoded shape 4",
+   "argv": [
+    "namespace:describe",
+    "billing",
+    "--server={mock}",
+    "--output=jsonl"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "status": 200,
+     "body": []
+    }
+   }
+  },
+  {
+   "name": "namespace describe HTTP 401",
+   "argv": [
+    "namespace:describe",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "status": 401,
+     "body": {
+      "message": "Namespace request refused.",
+      "reason": "fixture"
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace describe HTTP 403",
+   "argv": [
+    "namespace:describe",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "status": 403,
+     "body": {
+      "message": "Namespace request refused.",
+      "reason": "fixture"
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace describe HTTP 404",
+   "argv": [
+    "namespace:describe",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "status": 404,
+     "body": {
+      "message": "Namespace request refused.",
+      "reason": "fixture"
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace describe HTTP 422",
+   "argv": [
+    "namespace:describe",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "status": 422,
+     "body": {
+      "message": "Namespace request refused.",
+      "reason": "fixture"
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace describe HTTP 503",
+   "argv": [
+    "namespace:describe",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "status": 503,
+     "body": {
+      "message": "Namespace request refused.",
+      "reason": "fixture"
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace describe status coercion 0",
+   "argv": [
+    "namespace:describe",
+    "billing",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "status": 200,
+     "body": {
+      "name": "billing",
+      "description": "Billing workflows",
+      "retention_days": 90,
+      "status": null,
+      "created_at": "2026-04-02T00:00:00Z",
+      "updated_at": "2026-04-16T12:00:00Z",
+      "extra": {
+       "preserved": true
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace describe status coercion 1",
+   "argv": [
+    "namespace:describe",
+    "billing",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "status": 200,
+     "body": {
+      "name": "billing",
+      "description": "Billing workflows",
+      "retention_days": 90,
+      "status": false,
+      "created_at": "2026-04-02T00:00:00Z",
+      "updated_at": "2026-04-16T12:00:00Z",
+      "extra": {
+       "preserved": true
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace describe status coercion 2",
+   "argv": [
+    "namespace:describe",
+    "billing",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "status": 200,
+     "body": {
+      "name": "billing",
+      "description": "Billing workflows",
+      "retention_days": 90,
+      "status": 0,
+      "created_at": "2026-04-02T00:00:00Z",
+      "updated_at": "2026-04-16T12:00:00Z",
+      "extra": {
+       "preserved": true
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace describe status coercion 3",
+   "argv": [
+    "namespace:describe",
+    "billing",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "status": 200,
+     "body": {
+      "name": "billing",
+      "description": "Billing workflows",
+      "retention_days": 90,
+      "status": "0",
+      "created_at": "2026-04-02T00:00:00Z",
+      "updated_at": "2026-04-16T12:00:00Z",
+      "extra": {
+       "preserved": true
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace describe status coercion 4",
+   "argv": [
+    "namespace:describe",
+    "billing",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "status": 200,
+     "body": {
+      "name": "billing",
+      "description": "Billing workflows",
+      "retention_days": 90,
+      "status": true,
+      "created_at": "2026-04-02T00:00:00Z",
+      "updated_at": "2026-04-16T12:00:00Z",
+      "extra": {
+       "preserved": true
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace describe status coercion 5",
+   "argv": [
+    "namespace:describe",
+    "billing",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "status": 200,
+     "body": {
+      "name": "billing",
+      "description": "Billing workflows",
+      "retention_days": 90,
+      "status": 7,
+      "created_at": "2026-04-02T00:00:00Z",
+      "updated_at": "2026-04-16T12:00:00Z",
+      "extra": {
+       "preserved": true
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace describe status coercion 6",
+   "argv": [
+    "namespace:describe",
+    "billing",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "status": 200,
+     "body": {
+      "name": "billing",
+      "description": "Billing workflows",
+      "retention_days": 90,
+      "status": [],
+      "created_at": "2026-04-02T00:00:00Z",
+      "updated_at": "2026-04-16T12:00:00Z",
+      "extra": {
+       "preserved": true
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace describe status coercion 7",
+   "argv": [
+    "namespace:describe",
+    "billing",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "status": 200,
+     "body": {
+      "name": "billing",
+      "description": "Billing workflows",
+      "retention_days": 90,
+      "status": [
+       "completed"
+      ],
+      "created_at": "2026-04-02T00:00:00Z",
+      "updated_at": "2026-04-16T12:00:00Z",
+      "extra": {
+       "preserved": true
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace list unnamed list items JSON",
+   "argv": [
+    "namespace:list",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "status": 200,
+     "body": {
+      "namespaces": [
+       [],
+       [
+        "unnamed"
+       ],
+       {
+        "name": " "
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace list unnamed list items JSONL",
+   "argv": [
+    "namespace:list",
+    "--server={mock}",
+    "--output=jsonl"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "status": 200,
+     "body": {
+      "namespaces": [
+       [],
+       [
+        "unnamed"
+       ],
+       {
+        "name": " "
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace list redirect is refused without following",
+   "argv": [
+    "namespace:list",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "status": 302,
+     "body": {
+      "message": "redirected"
+     },
+     "headers": {
+      "Location": "/no-replay"
+     }
+    }
+   },
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "exit_code",
+      "stdout_json"
+     ],
+     "reason": "The SDK makes one target attempt without following redirects. Rust refuses the initial 3xx; the PHP reference follows the redirect and receives a different refusal. Use the actual Server URL (cli#72)."
+    }
+   }
+  },
+  {
+   "name": "namespace describe redirect is refused without following",
+   "argv": [
+    "namespace:describe",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "status": 302,
+     "body": {
+      "message": "redirected"
+     },
+     "headers": {
+      "Location": "/no-replay"
+     }
+    }
+   },
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "exit_code",
+      "stdout_json"
+     ],
+     "reason": "The SDK makes one target attempt without following redirects. Rust refuses the initial 3xx; the PHP reference follows the redirect and receives a different refusal. Use the actual Server URL (cli#72)."
+    }
+   }
   }
  ]
 }

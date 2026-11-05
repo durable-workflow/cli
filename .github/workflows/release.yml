@@ -68,6 +68,8 @@ jobs:
       recheck_latest: ${{ steps.resolve.outputs.recheck_latest }}
       implementation: ${{ steps.resolve.outputs.implementation }}
       observed_latest: ${{ steps.resolve.outputs.observed_latest }}
+      smoke_metadata_id: ${{ steps.smoke_metadata.outputs.artifact-id }}
+      smoke_metadata_digest: ${{ steps.smoke_metadata.outputs.artifact-digest }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
         with:
@@ -177,6 +179,30 @@ jobs:
           else
             echo "Resolved release tag $tag at immutable commit $commit"
           fi
+
+      # Only this controller step receives the read token. Build smoke uses
+      # the exact captured public bytes; installed qualification stays live.
+      - name: Capture public metadata for deterministic build smoke
+        if: steps.resolve.outputs.cache_warm != 'true' && steps.resolve.outputs.implementation == 'php'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.resolve.outputs.tag }}
+          VERIFIED_SOURCE_SHA: ${{ steps.resolve.outputs.commit }}
+          RELEASE_CONTROL_REF: ${{ steps.resolve.outputs.control_ref }}
+          RELEASE_CONTROL_COMMIT: ${{ steps.resolve.outputs.control_commit }}
+          RELEASE_INITIATOR: ${{ steps.resolve.outputs.initiator }}
+          OBSERVED_LATEST: ${{ steps.resolve.outputs.observed_latest }}
+        run: node scripts/ci/run-upgrade-smoke.js capture
+
+      - name: Bind exact build-smoke metadata artifact
+        id: smoke_metadata
+        if: steps.resolve.outputs.cache_warm != 'true' && steps.resolve.outputs.implementation == 'php'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          archive: false
+          name: upgrade-smoke-metadata
+          path: upgrade-smoke-metadata.json
+          if-no-files-found: error
 
       - name: Record release control and package authorities
         if: steps.resolve.outputs.cache_warm != 'true' && steps.resolve.outputs.implementation == 'php'
@@ -1057,14 +1083,38 @@ jobs:
             }
           '
 
+      - name: Restore exact metadata for deterministic build smoke
+        if: needs.resolve-release.outputs.cache_warm != 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          artifact-ids: ${{ needs.resolve-release.outputs.smoke_metadata_id }}
+          digest-mismatch: error
+          path: upgrade-smoke-input
+
       - name: Smoke test binary
         if: needs.resolve-release.outputs.cache_warm != 'true'
+        env:
+          RELEASE_TAG: ${{ needs.resolve-release.outputs.tag }}
+          VERIFIED_SOURCE_SHA: ${{ needs.resolve-release.outputs.commit }}
+          RELEASE_CONTROL_REF: ${{ needs.resolve-release.outputs.control_ref }}
+          RELEASE_CONTROL_COMMIT: ${{ needs.resolve-release.outputs.control_commit }}
+          RELEASE_INITIATOR: ${{ needs.resolve-release.outputs.initiator }}
+          OBSERVED_LATEST: ${{ needs.resolve-release.outputs.observed_latest }}
+          EXPECTED_METADATA_SHA256: ${{ needs.resolve-release.outputs.smoke_metadata_digest }}
         run: |
           chmod +x build/dw-${{ matrix.name }}
           ./build/dw-${{ matrix.name }} --version
           ./build/dw-${{ matrix.name }} runtime:check
           ./build/dw-${{ matrix.name }} list
-          ./build/dw-${{ matrix.name }} upgrade --dry-run --output=json
+          node release-toolchain-control/scripts/ci/run-upgrade-smoke.js exercise upgrade-smoke-input/upgrade-smoke-metadata.json build/dw-${{ matrix.name }} upgrade-smoke-evidence.json
+
+      - name: Retain deterministic upgrade build-smoke evidence
+        if: always() && needs.resolve-release.outputs.cache_warm != 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: upgrade-smoke-evidence-${{ matrix.name }}
+          path: upgrade-smoke-evidence.json
+          if-no-files-found: warn
 
       - name: Restore locked launcher qualification dependencies
         if: needs.resolve-release.outputs.cache_warm != 'true'
@@ -1589,14 +1639,38 @@ jobs:
           .\spc.exe micro:combine ..\..\build\dw.phar `
             --output=..\..\build\dw-windows-x86_64.exe
 
+      - name: Restore exact metadata for deterministic build smoke
+        if: needs.resolve-release.outputs.cache_warm != 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          artifact-ids: ${{ needs.resolve-release.outputs.smoke_metadata_id }}
+          digest-mismatch: error
+          path: upgrade-smoke-input
+
       - name: Smoke test binary
         if: needs.resolve-release.outputs.cache_warm != 'true'
         shell: pwsh
+        env:
+          RELEASE_TAG: ${{ needs.resolve-release.outputs.tag }}
+          VERIFIED_SOURCE_SHA: ${{ needs.resolve-release.outputs.commit }}
+          RELEASE_CONTROL_REF: ${{ needs.resolve-release.outputs.control_ref }}
+          RELEASE_CONTROL_COMMIT: ${{ needs.resolve-release.outputs.control_commit }}
+          RELEASE_INITIATOR: ${{ needs.resolve-release.outputs.initiator }}
+          OBSERVED_LATEST: ${{ needs.resolve-release.outputs.observed_latest }}
+          EXPECTED_METADATA_SHA256: ${{ needs.resolve-release.outputs.smoke_metadata_digest }}
         run: |
           .\build\dw-windows-x86_64.exe --version
           .\build\dw-windows-x86_64.exe runtime:check
           .\build\dw-windows-x86_64.exe list
-          .\build\dw-windows-x86_64.exe upgrade --dry-run --output=json
+          node release-toolchain-control/scripts/ci/run-upgrade-smoke.js exercise upgrade-smoke-input/upgrade-smoke-metadata.json build/dw-windows-x86_64.exe upgrade-smoke-evidence.json
+
+      - name: Retain deterministic upgrade build-smoke evidence
+        if: always() && needs.resolve-release.outputs.cache_warm != 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: upgrade-smoke-evidence-windows-x86_64
+          path: upgrade-smoke-evidence.json
+          if-no-files-found: warn
 
       - name: Retain the verified standalone dependency inventory
         if: needs.resolve-release.outputs.cache_warm != 'true'

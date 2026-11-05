@@ -148,20 +148,29 @@ impl Context {
 
     /// The 2.x session warning: the first compatibility warning, on stderr,
     /// before the command runs. Any failure to fetch cluster info is ignored.
-    pub fn warn_if_incompatible(&self, include_worker_protocol: bool) {
+    pub fn warn_if_incompatible(&self, include_worker_protocol: bool, literal: bool) {
         if let Ok(info) = self.cluster_info(Some(PREFLIGHT_TIMEOUT)) {
-            warn_first(&info, include_worker_protocol);
+            write_warning(&info, include_worker_protocol, literal);
         }
     }
 }
 
 pub fn warn_first(info: &Value, include_worker_protocol: bool) {
+    write_warning(info, include_worker_protocol, false);
+}
+
+fn write_warning(info: &Value, include_worker_protocol: bool, literal: bool) {
     if let Some(warning) =
         compat::warnings(info, build_info::version(), include_worker_protocol).first()
     {
+        let warning = if literal {
+            crate::formatter::display_text(warning)
+        } else {
+            warning.clone()
+        };
         crate::formatter::writeln_err(&format!(
             "<comment>{}{}</comment>",
-            crate::formatter::display_text(warning),
+            warning,
             compat::WARNING_SUFFIX
         ));
     }

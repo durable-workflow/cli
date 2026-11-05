@@ -4294,6 +4294,17 @@
   },
   {
    "name": "workflow list invalid status filter",
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "stderr_category",
+      "stderr",
+      "stdout_json",
+      "stdout_text"
+     ],
+     "reason": "Published PHP 2.3.5 writes canonical-filter validation failures to stderr even with --json. This port follows accepted PHP main's structured JSON error, exit 2 and namespace context (cli#61/#72); focused tests assert the exact envelope and zero list requests."
+    }
+   },
    "argv": [
     "workflow:list",
     "--server={mock}",

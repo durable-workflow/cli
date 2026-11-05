@@ -290,6 +290,14 @@ fn usage_profile_and_contract_refusals_send_no_list_request() {
     assert_eq!(output.status.code(), Some(2));
     let error: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(error["namespace"], "orders");
+    assert_eq!(error["exit_code"], 2);
+    assert_eq!(error["command"], "workflow:list");
+    assert_eq!(
+        error["error"],
+        "Server contract expects --status to be one of [running, completed, failed]; got [bogus]."
+    );
+    assert_eq!(error["recommendations"][0]["id"], "input.invalid");
+    assert!(output.stderr.is_empty());
     assert!(server.list_requests().is_empty());
 
     let server = Server::new(info(), 200, Some("2"), body());

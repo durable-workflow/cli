@@ -545,7 +545,10 @@ fn run(raw: Vec<String>) -> i32 {
         Handler::Server(run) => client::Context::new(&input).and_then(|context| {
             // doctor and server:start-dev opt out of the session warning in 2.x.
             if !matches!(command.as_str(), "doctor" | "server:start-dev") {
-                context.warn_if_incompatible(client::uses_worker_protocol(&command));
+                context.warn_if_incompatible(
+                    client::uses_worker_protocol(&command),
+                    command == "workflow:list",
+                );
             }
             run(&context, &input)
         }),

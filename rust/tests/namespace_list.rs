@@ -125,7 +125,12 @@ impl Server {
                             body.clone()
                         };
                         let status = if cluster { 200 } else { status };
-                        let headers = format!("HTTP/1.1 {status} Test\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", payload.len());
+                        let location = if (300..400).contains(&status) {
+                            "Location: /unexpected-redirect\r\n"
+                        } else {
+                            ""
+                        };
+                        let headers = format!("HTTP/1.1 {status} Test\r\n{location}Content-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", payload.len());
                         let _ = stream.write_all(headers.as_bytes());
                         let _ = stream.write_all(payload.as_bytes());
                     }
@@ -492,4 +497,33 @@ fn namespace_describe_refuses_invalid_path_segments_before_the_target_request() 
         .output()
         .unwrap();
     assert_eq!(output.status.code(), Some(1));
+}
+
+#[test]
+fn namespace_reads_refuse_redirects_without_following_or_reporting_success() {
+    let scratch = Scratch::new();
+    for describe in [false, true] {
+        for status in [301, 302, 303, 307, 308] {
+            let server = Server::new(
+                info(),
+                status,
+                r#"{"message":"redirected","name":"billing"}"#,
+            );
+            let output = if describe {
+                scratch.describe(&server.url, "billing", &["--json"])
+            } else {
+                scratch.run(&server.url, &["--json"])
+            };
+            assert_eq!(output.status.code(), Some(1));
+            let result: Value = serde_json::from_slice(&output.stdout).unwrap();
+            assert_eq!(result["error"], "Server error: redirected");
+            let requests = server.requests.lock().unwrap();
+            let target = requests
+                .iter()
+                .filter(|request| !request.contains("/api/cluster/info "))
+                .collect::<Vec<_>>();
+            assert_eq!(target.len(), 1);
+            assert!(!target[0].contains("unexpected-redirect"));
+        }
+    }
 }

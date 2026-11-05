@@ -46,6 +46,9 @@ and `list_runs` operation. Explicit row workflow IDs must match; omitted IDs
 in the published PHP Server shape inherit the verified envelope without
 adding fields. Contradictory identities or operations are refused.
 
+Namespace visibility requests make one target attempt and refuse redirects. Use
+the actual Server URL; a 3xx response is reported as a refusal.
+
 ## Build and test
 
 Requires Rust 1.86 or newer.

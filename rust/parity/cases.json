@@ -7323,6 +7323,65 @@
      }
     }
    }
+  },
+  {
+   "name": "namespace list redirect is refused without following",
+   "argv": [
+    "namespace:list",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces": {
+     "status": 302,
+     "body": {
+      "message": "redirected"
+     },
+     "headers": {
+      "Location": "/no-replay"
+     }
+    }
+   },
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "exit_code",
+      "stdout_json"
+     ],
+     "reason": "The SDK makes one target attempt without following redirects. Rust refuses the initial 3xx; the PHP reference follows the redirect and receives a different refusal. Use the actual Server URL (cli#72)."
+    }
+   }
+  },
+  {
+   "name": "namespace describe redirect is refused without following",
+   "argv": [
+    "namespace:describe",
+    "billing",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing": {
+     "status": 302,
+     "body": {
+      "message": "redirected"
+     },
+     "headers": {
+      "Location": "/no-replay"
+     }
+    }
+   },
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "exit_code",
+      "stdout_json"
+     ],
+     "reason": "The SDK makes one target attempt without following redirects. Rust refuses the initial 3xx; the PHP reference follows the redirect and receives a different refusal. Use the actual Server URL (cli#72)."
+    }
+   }
   }
  ]
 }

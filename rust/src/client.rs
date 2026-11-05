@@ -114,7 +114,7 @@ impl Context {
         let body = Value::Object(crate::php::array_map(
             response.json().unwrap_or(Value::Null),
         ));
-        if response.status() >= 400 {
+        if !response.is_success() {
             return Err(self.http_error(response.status(), &body));
         }
         Ok(body)

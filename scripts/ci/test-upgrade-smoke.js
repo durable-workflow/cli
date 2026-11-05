@@ -10,7 +10,8 @@ const test = require('node:test');
 const {execFile} = require('node:child_process');
 const {promisify} = require('node:util');
 const {ASSETS} = require('./verify-installed-release');
-const {AUTHORITY, UPGRADE_ARGS, capture, readSnapshot, exercise} = require('./run-upgrade-smoke');
+const {RUST_REQUIRED_ASSETS} = require('./verify-cli-release-channel');
+const {AUTHORITY, UPGRADE_ARGS, baseline, capture, readSnapshot, exercise} = require('./run-upgrade-smoke');
 
 const COMMIT = 'a'.repeat(40);
 const hash = value => crypto.createHash('sha256').update(value).digest('hex');
@@ -24,6 +25,15 @@ function release() {
     assets: ASSETS.map((name, index) => ({id: index + 1, name, size: 100,
       state: 'uploaded', digest: `sha256:${'b'.repeat(64)}`}))};
 }
+
+test('captured baseline binds the complete published implementation asset set', () => {
+  const value = release();
+  assert.equal(baseline(value).assets.length, 14);
+  value.tag_name = '2.5.0';
+  value.assets = RUST_REQUIRED_ASSETS.map((name, index) => ({id: index + 1, name,
+    size: 100, state: 'uploaded', digest: `sha256:${'b'.repeat(64)}`}));
+  assert.equal(baseline(value).assets.length, 15);
+});
 
 function fixture(t, value = release()) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cli-smoke-test-'));

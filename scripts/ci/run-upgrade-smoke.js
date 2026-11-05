@@ -167,7 +167,7 @@ async function exercise(filename, binary, evidencePath, environment = process.en
   server.requestTimeout = 5000;
   server.headersTimeout = 5000;
   server.setTimeout(5000, socket => socket.destroy());
-  let evidence = {schema: 'durable-workflow.cli.upgrade-build-smoke/v1', source: snapshot.source,
+  const evidence = {schema: 'durable-workflow.cli.upgrade-build-smoke/v1', source: snapshot.source,
     metadata_sha256: environment.EXPECTED_METADATA_SHA256, baseline: snapshot.baseline,
     authority_delivery: 'captured-public-metadata-loopback', live_https_qualified: false,
     outcome: 'fail'};

@@ -8,7 +8,7 @@ const path = require('node:path');
 const test = require('node:test');
 const {execFileSync} = require('node:child_process');
 const {ASSETS, PLATFORMS, CELL_MILLISECONDS, capturePhpAuthority, inspectPhpAuthority,
-  assertPhpAuthority, assertInstallerSource, verifyBundle, verify} = require('./verify-installed-release');
+  assertPhpAuthority, assertInstallerSource, nativePlatform, verifyBundle, verify} = require('./verify-installed-release');
 
 const hash = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 const COMMIT = 'a'.repeat(40);
@@ -59,8 +59,10 @@ test('real autocrlf checkout cannot change immutable installer authority or admi
   const checkout = path.join(directory, 'checkout');
   const downloaded = path.join(directory, 'downloaded');
   fs.mkdirSync(downloaded);
+  const gitConfig = path.join(directory, 'empty-git-config');
+  fs.writeFileSync(gitConfig, '');
   const options = {encoding: 'utf8', timeout: 15000,
-    env: {...process.env, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: os.devNull, GIT_ATTR_NOSYSTEM: '1'}};
+    env: {...process.env, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: gitConfig, GIT_ATTR_NOSYSTEM: '1'}};
   const execute = (_command, args) => execFileSync(git, args, options);
   execFileSync(git, ['clone', '--quiet', '--shared', '--no-checkout', root, checkout], options);
   execFileSync(git, ['-C', checkout, 'config', '--local', 'core.autocrlf', 'true'], options);
@@ -171,8 +173,10 @@ test('missing PHP authority retains failure before allocating private state', as
 });
 
 test('native CI records and rechecks the actual bootstrapped PHP authority',
-  {skip: !process.env.DW_REQUIRE_NATIVE_VERIFIER_AUTHORITY}, () => {
+  {skip: !process.env.DW_REQUIRE_NATIVE_VERIFIER_AUTHORITY}, t => {
     assert.equal(process.env.DW_REQUIRE_NATIVE_VERIFIER_AUTHORITY, '1');
+    const native = nativePlatform(process.env.VERIFIER_PLATFORM, {os: process.platform, arch: process.arch});
     const authority = assertPhpAuthority(JSON.parse(process.env.VERIFIER_PHP_AUTHORITY));
     assert.deepEqual(inspectPhpAuthority(authority.binary), authority);
+    t.diagnostic(JSON.stringify({native, php: authority}));
   });

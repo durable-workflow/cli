@@ -133,6 +133,7 @@ jobs:
             runner: windows-2022
     env:
       VERIFIER_PHP_SERIES: '8.4'
+      VERIFIER_PLATFORM: ${{ matrix.name }}
       GH_TOKEN: ''
       GITHUB_TOKEN: ''
       GH_ENTERPRISE_TOKEN: ''

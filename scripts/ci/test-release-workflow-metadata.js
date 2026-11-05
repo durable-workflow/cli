@@ -23,7 +23,7 @@ function workflowShell(marker) {
 }
 
 const latestCases = [
-  ['unchanged valid', [0, '2.3.6'], [0, '2.3.6'], true, true, 2],
+  ['unchanged valid', [0, '2.3.6'], [0, '2.3.6'], true, false, 2],
   ['newer initial', [0, '2.5.0'], [0, '2.5.0'], false, false, 1],
   ['changed final', [0, '2.3.6'], [0, '2.5.0'], true, false, 2],
   ['first failure', [1, ''], [0, '2.3.6'], false, false, 2],
@@ -128,7 +128,7 @@ test('maintenance metadata preserves a newer latest release and prerelease state
   assert.deepEqual(releaseMetadata('2.10.0', '2.9.0'), {prerelease: false, makeLatest: true});
 });
 
-test('the actual publication step drops latest when the observed channel changes', () => {
+test('maintenance publication remains nonlatest for unchanged, changed and unknown channels', () => {
   const os = require('node:os');
   const workflow = fs.readFileSync(workflowPath, 'utf8');
   const step = workflow.slice(workflow.indexOf('- name: Create GitHub Release'));
@@ -140,7 +140,7 @@ test('the actual publication step drops latest when the observed channel changes
   }
   assert.ok(shell.some(line => line.includes('gh release create')));
   for (const [latest, observed, status, expected] of [
-    ['2.3.6', '2.3.6', '0', 'true'], ['2.5.0', '2.3.6', '0', 'false'],
+    ['2.3.6', '2.3.6', '0', 'false'], ['2.5.0', '2.3.6', '0', 'false'],
     ['2.3.6', '2.3.6', '1', 'false'], ['', '', '1', 'false'],
     ['null', 'null', '0', 'false'], ['', '', '0', 'false'],
   ]) {

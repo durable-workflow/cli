@@ -415,3 +415,24 @@ fn server_error_text_is_not_console_markup() {
         "{stderr}"
     );
 }
+
+#[test]
+fn responses_nested_deeper_than_128_levels_decode_like_php() {
+    // 2.x's json_decode reads up to 512 levels; serde_json alone stops at 128.
+    let scratch = Scratch::new();
+    let mut memo = json!(1);
+    for _ in 0..300 {
+        memo = json!([memo]);
+    }
+    let mut body = run_body("running");
+    body["memo"] = memo;
+    let server = Server::new(info(), vec![ok(body)]);
+    let output = scratch.run(&server.url, &["workflow:describe", "chk-42", "--json"]);
+    let stdout = String::from_utf8(output.stdout.clone()).unwrap();
+    assert_eq!(output.status.code(), Some(0), "{output:?}");
+    assert!(
+        stdout.contains(&format!("\"memo\":{}1{}", "[".repeat(300), "]".repeat(300))),
+        "{}",
+        &stdout[..stdout.len().min(200)]
+    );
+}

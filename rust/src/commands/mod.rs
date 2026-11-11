@@ -14,4 +14,6 @@ pub mod task_queue;
 pub mod upgrade;
 pub mod worker;
 pub mod workflow;
+pub mod workflow_control;
+pub mod workflow_message;
 pub mod workflow_run;

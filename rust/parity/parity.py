@@ -279,6 +279,9 @@ def normalize_catalog_metadata(value, case, side, updates=None):
                 continue
             for field, update in fields.items():
                 text = update[side]
+                if not isinstance(text, str):
+                    # A reviewed option definition reconciles only in JSON.
+                    continue
                 plain = re.sub(r"</?(?:info|comment)>", "", text)
                 for rendered in dict.fromkeys([text, html.escape(text, quote=False), plain]):
                     if value.count(rendered) == 1:
@@ -416,6 +419,11 @@ def help_cases():
             case["expected_difference"] = {"*": {
                 "fields": ["stdout_text"],
                 "reason": "The help accurately describes one Server response page and an unconsumed cursor (cli#113).",
+            }}
+        if case["argv"][0] == "workflow:signal":
+            case["expected_difference"] = {"*": {
+                "fields": ["stdout_text"],
+                "reason": "Signals carry PHP main's caller command key: --request-id and its help (cli#61, cli#72).",
             }}
     return cases
 

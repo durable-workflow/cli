@@ -31,7 +31,8 @@ every command group reaches parity.
 | `workflow:history`: every page, `--follow` long-poll, JSON and streamed JSONL | Ported |
 | `workflow:history-export`: the Server bundle to stdout or `--output-file` | Ported |
 | `schedule:list`, `schedule:describe`, `schedule:history`, `schedule:create`, `schedule:update`, `schedule:delete`, `schedule:pause`, `schedule:resume`, `schedule:trigger`, `schedule:backfill`: JSON and JSONL, `--input`/`--input-file`/`--input-encoding` | Ported |
-| Remaining workflow commands (query, start, signal, update, cancel and run control) and the other command groups | Next slices ([gap list](https://github.com/durable-workflow/cli/issues/72#issuecomment-6801944950)) |
+| `workflow:cancel` (one run, or a bounded `--all-matching` batch pinned to each selected run), `workflow:terminate`, `workflow:archive`, `workflow:redrive`, `workflow:repair`, `workflow:migrate-v1` | Ported |
+| Remaining workflow commands (query, start, signal, update) and the other command groups | Next slices ([gap list](https://github.com/durable-workflow/cli/issues/72#issuecomment-6801944950)) |
 | `--tls-verify=false` against HTTPS: no certificate or hostname checks, as in 2.x, plus a stderr warning on every such command (also with `--json` and `-q`) | Ported, intentional addition |
 
 Server calls go through the published `durable-workflow` crate, pinned to
@@ -54,6 +55,17 @@ adding fields. Contradictory identities or operations are refused.
 `workflow:history-export` send workflow and run IDs the same way, each as one
 encoded path segment, and refuse empty, `.` and `..` IDs before any request.
 Human output prints Server values as text, never as console markup.
+
+`workflow:cancel`, `terminate`, `archive`, `redrive`, `repair` and
+`migrate-v1` make one request per target and refuse redirects. A lost
+response is reported as a transport failure and is never submitted again.
+`workflow:cancel --all-matching` selects at most `--limit` workflows from the
+visibility list, pins each to the run the list reported, and cancels that run
+only, never the workflow's current run, which may be a successor. A workflow
+listed without a run ID is reported, not cancelled. A repeated page token, or
+a page that adds nothing new, stops the selection before any cancellation.
+Without `--yes` the confirmation is asked on stderr and one answer line is
+read from stdin, as in 2.x; `-n` or end of input declines.
 
 Namespace visibility requests make one target attempt and refuse redirects. Use
 the actual Server URL; a 3xx response is reported as a refusal.

@@ -10919,6 +10919,2584 @@
      "reason": "The SDK makes one target attempt without following redirects. Rust refuses the initial 3xx; the PHP reference follows the redirect and receives a different refusal. Use the actual Server URL (cli#72)."
     }
    }
+  },
+  {
+   "name": "workflow cancel human",
+   "argv": [
+    "workflow:cancel",
+    "chk-42",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/cancel": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "outcome": "cancelled",
+      "command_status": "accepted",
+      "command_id": "cmd-1",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "cancel",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow cancel JSON",
+   "argv": [
+    "workflow:cancel",
+    "chk-42",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/cancel": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "outcome": "cancelled",
+      "command_status": "accepted",
+      "command_id": "cmd-1",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "cancel",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow cancel run-id reason JSON",
+   "argv": [
+    "workflow:cancel",
+    "chk-42",
+    "--run-id=run-7",
+    "--reason=runaway loop",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/runs/run-7/cancel": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "outcome": "cancelled",
+      "command_status": "accepted",
+      "command_id": "cmd-1",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "cancel",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow cancel minimal human",
+   "argv": [
+    "workflow:cancel",
+    "chk-42",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/cancel": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "outcome": "accepted",
+      "namespace": "orders-ns",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "cancel",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow cancel not found JSON",
+   "argv": [
+    "workflow:cancel",
+    "chk-42",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/cancel": {
+     "method": "POST",
+     "status": 404,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "message": "Workflow not found."
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow cancel conflict human",
+   "argv": [
+    "workflow:cancel",
+    "chk-42",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/cancel": {
+     "method": "POST",
+     "status": 409,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "message": "Workflow is already closed.",
+      "reason": "run_not_active"
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow terminate human",
+   "argv": [
+    "workflow:terminate",
+    "chk-42",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/terminate": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "outcome": "terminated",
+      "command_status": "accepted",
+      "command_id": "cmd-1",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "terminate",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow terminate JSON",
+   "argv": [
+    "workflow:terminate",
+    "chk-42",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/terminate": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "outcome": "terminated",
+      "command_status": "accepted",
+      "command_id": "cmd-1",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "terminate",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow terminate run-id reason JSON",
+   "argv": [
+    "workflow:terminate",
+    "chk-42",
+    "--run-id=run-7",
+    "--reason=runaway loop",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/runs/run-7/terminate": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "outcome": "terminated",
+      "command_status": "accepted",
+      "command_id": "cmd-1",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "terminate",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow terminate minimal human",
+   "argv": [
+    "workflow:terminate",
+    "chk-42",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/terminate": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "outcome": "accepted",
+      "namespace": "orders-ns",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "terminate",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow terminate not found JSON",
+   "argv": [
+    "workflow:terminate",
+    "chk-42",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/terminate": {
+     "method": "POST",
+     "status": 404,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "message": "Workflow not found."
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow terminate conflict human",
+   "argv": [
+    "workflow:terminate",
+    "chk-42",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/terminate": {
+     "method": "POST",
+     "status": 409,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "message": "Workflow is already closed.",
+      "reason": "run_not_active"
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow archive human",
+   "argv": [
+    "workflow:archive",
+    "chk-42",
+    "--reason=GDPR erasure",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/archive": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "outcome": "archived",
+      "command_status": "accepted",
+      "command_id": "cmd-1",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "archive",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow archive JSON",
+   "argv": [
+    "workflow:archive",
+    "chk-42",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/archive": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "outcome": "archived",
+      "command_status": "accepted",
+      "command_id": "cmd-1",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "archive",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow archive active refused JSON",
+   "argv": [
+    "workflow:archive",
+    "chk-42",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/archive": {
+     "method": "POST",
+     "status": 409,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "message": "Active runs cannot be archived.",
+      "reason": "run_active"
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow repair human",
+   "argv": [
+    "workflow:repair",
+    "chk-42",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/repair": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "outcome": "repair_dispatched",
+      "command_id": "cmd-1",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "repair",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow repair JSON",
+   "argv": [
+    "workflow:repair",
+    "chk-42",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/repair": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "outcome": "repair_not_needed",
+      "command_status": "accepted",
+      "command_id": "cmd-1",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "repair",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow redrive human",
+   "argv": [
+    "workflow:redrive",
+    "chk-42",
+    "run-7",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/runs/run-7/redrive": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-8",
+      "continued_from_run_id": "run-7",
+      "resume_step_sequence": 4,
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "redrive",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow redrive request-id JSON",
+   "argv": [
+    "workflow:redrive",
+    "chk-42",
+    "run-7",
+    "--request-id",
+    "incident-42",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/runs/run-7/redrive": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-8",
+      "continued_from_run_id": "run-7",
+      "resume_step_sequence": 4,
+      "request_id": "incident-42",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "redrive",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow redrive minimal human",
+   "argv": [
+    "workflow:redrive",
+    "chk-42",
+    "run-7",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/runs/run-7/redrive": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "redrive",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow redrive refused JSON",
+   "argv": [
+    "workflow:redrive",
+    "chk-42",
+    "run-7",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/runs/run-7/redrive": {
+     "method": "POST",
+     "status": 422,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "message": "Run has no verified failure boundary.",
+      "reason": "redrive_boundary_unavailable"
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow redrive missing run argument",
+   "argv": [
+    "workflow:redrive",
+    "chk-42",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {}
+  },
+  {
+   "name": "workflow migrate-v1 human",
+   "argv": [
+    "workflow:migrate-v1",
+    "parity/fixtures/migrate-v1/detail.json",
+    "--source-id= legacy-prod ",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/import/waterline-v1": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "status": "projected",
+      "identity": {
+       "waterline": {
+        "source_id": "legacy-prod",
+        "qualified_workflow_id": "v1:42"
+       },
+       "standalone": {
+        "workflow_id": "wl-legacy-prod-42",
+        "run_id": "wl-run-42",
+        "namespace": "default"
+       }
+      },
+      "unsupported_fields": [
+       {
+        "field": "chartData",
+        "reason": "not projected",
+        "remediation": "keep v1 Waterline"
+       },
+       "skipped",
+       {
+        "field": "exceptions"
+       }
+      ],
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "import",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow migrate-v1 dry run JSON",
+   "argv": [
+    "workflow:migrate-v1",
+    "parity/fixtures/migrate-v1/detail.json",
+    "--source-id=legacy-prod",
+    "--dry-run",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/import/waterline-v1": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "status": "dry_run",
+      "identity": {
+       "waterline": {
+        "source_id": "legacy-prod",
+        "qualified_workflow_id": "v1:42"
+       },
+       "standalone": {
+        "workflow_id": "wl-legacy-prod-42",
+        "run_id": "wl-run-42",
+        "namespace": "default"
+       }
+      },
+      "unsupported_fields": [
+       {
+        "field": "chartData",
+        "reason": "not projected",
+        "remediation": "keep v1 Waterline"
+       },
+       "skipped",
+       {
+        "field": "exceptions"
+       }
+      ],
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "import",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow migrate-v1 minimal human",
+   "argv": [
+    "workflow:migrate-v1",
+    "parity/fixtures/migrate-v1/detail.json",
+    "--source-id=legacy-prod",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/import/waterline-v1": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "namespace": "server-ns",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "import",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow migrate-v1 missing source",
+   "argv": [
+    "workflow:migrate-v1",
+    "parity/fixtures/migrate-v1/detail.json",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {}
+  },
+  {
+   "name": "workflow migrate-v1 blank source",
+   "argv": [
+    "workflow:migrate-v1",
+    "parity/fixtures/migrate-v1/detail.json",
+    "--source-id=  ",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {}
+  },
+  {
+   "name": "workflow migrate-v1 list projection",
+   "argv": [
+    "workflow:migrate-v1",
+    "parity/fixtures/migrate-v1/list.json",
+    "--source-id=legacy-prod",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {}
+  },
+  {
+   "name": "workflow migrate-v1 invalid projection",
+   "argv": [
+    "workflow:migrate-v1",
+    "parity/fixtures/migrate-v1/invalid.json",
+    "--source-id=legacy-prod",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {}
+  },
+  {
+   "name": "workflow migrate-v1 missing projection",
+   "argv": [
+    "workflow:migrate-v1",
+    "parity/fixtures/migrate-v1/absent.json",
+    "--source-id=legacy-prod",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {}
+  },
+  {
+   "name": "workflow migrate-v1 conflict JSON",
+   "argv": [
+    "workflow:migrate-v1",
+    "parity/fixtures/migrate-v1/detail.json",
+    "--source-id=legacy-prod",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/import/waterline-v1": {
+     "method": "POST",
+     "status": 409,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "message": "Projection identity conflicts.",
+      "reason": "identity_conflict"
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow cancel batch JSON",
+   "argv": [
+    "workflow:cancel",
+    "--all-matching=customer-42",
+    "--yes",
+    "--reason=customer request",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "method": "GET",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflows": [
+       {
+        "workflow_id": "order-7",
+        "run_id": "run-a"
+       },
+       {
+        "workflow_id": "order-8",
+        "run_id": "run-c"
+       }
+      ],
+      "next_page_token": null,
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "list",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    },
+    "/api/workflows/order-7/runs/run-a/cancel": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "order-7",
+      "run_id": "run-a",
+      "outcome": "cancelled",
+      "command_status": "accepted",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "cancel",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    },
+    "/api/workflows/order-8/runs/run-c/cancel": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "order-8",
+      "run_id": "run-c",
+      "outcome": "cancelled",
+      "command_status": "accepted",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "cancel",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow cancel batch human",
+   "argv": [
+    "workflow:cancel",
+    "--all-matching= customer-42 ",
+    "-y",
+    "--type=orders.process",
+    "--limit=5",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "method": "GET",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflows": [
+       {
+        "workflow_id": "order-7",
+        "run_id": "run-a"
+       },
+       {
+        "workflow_id": "order-8",
+        "run_id": "run-c"
+       }
+      ],
+      "next_page_token": null,
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "list",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    },
+    "/api/workflows/order-7/runs/run-a/cancel": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "order-7",
+      "run_id": "run-a",
+      "outcome": "cancelled",
+      "command_status": "accepted",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "cancel",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    },
+    "/api/workflows/order-8/runs/run-c/cancel": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "order-8",
+      "run_id": "run-c",
+      "outcome": "cancelled",
+      "command_status": "accepted",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "cancel",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow cancel batch prompt without terminal input",
+   "argv": [
+    "workflow:cancel",
+    "--all-matching=customer-42",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "method": "GET",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflows": [
+       {
+        "workflow_id": "order-7",
+        "run_id": "run-a"
+       },
+       {
+        "workflow_id": "order-8",
+        "run_id": "run-c"
+       }
+      ],
+      "next_page_token": null,
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "list",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    },
+    "/api/workflows/order-7/runs/run-a/cancel": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "order-7",
+      "run_id": "run-a",
+      "outcome": "cancelled",
+      "command_status": "accepted",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "cancel",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    },
+    "/api/workflows/order-8/runs/run-c/cancel": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "order-8",
+      "run_id": "run-c",
+      "outcome": "cancelled",
+      "command_status": "accepted",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "cancel",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow cancel batch no interaction",
+   "argv": [
+    "workflow:cancel",
+    "--all-matching=customer-42",
+    "-n",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "method": "GET",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflows": [
+       {
+        "workflow_id": "order-7",
+        "run_id": "run-a"
+       },
+       {
+        "workflow_id": "order-8",
+        "run_id": "run-c"
+       }
+      ],
+      "next_page_token": null,
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "list",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    },
+    "/api/workflows/order-7/runs/run-a/cancel": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "order-7",
+      "run_id": "run-a",
+      "outcome": "cancelled",
+      "command_status": "accepted",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "cancel",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    },
+    "/api/workflows/order-8/runs/run-c/cancel": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "order-8",
+      "run_id": "run-c",
+      "outcome": "cancelled",
+      "command_status": "accepted",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "cancel",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow cancel batch JSON requires yes",
+   "argv": [
+    "workflow:cancel",
+    "--all-matching=customer-42",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "method": "GET",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflows": [
+       {
+        "workflow_id": "order-7",
+        "run_id": "run-a"
+       },
+       {
+        "workflow_id": "order-8",
+        "run_id": "run-c"
+       }
+      ],
+      "next_page_token": null,
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "list",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    },
+    "/api/workflows/order-7/runs/run-a/cancel": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "order-7",
+      "run_id": "run-a",
+      "outcome": "cancelled",
+      "command_status": "accepted",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "cancel",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    },
+    "/api/workflows/order-8/runs/run-c/cancel": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "order-8",
+      "run_id": "run-c",
+      "outcome": "cancelled",
+      "command_status": "accepted",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "cancel",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow cancel batch with run-id",
+   "argv": [
+    "workflow:cancel",
+    "--all-matching=customer-42",
+    "--run-id=run-a",
+    "--yes",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "method": "GET",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflows": [
+       {
+        "workflow_id": "order-7",
+        "run_id": "run-a"
+       },
+       {
+        "workflow_id": "order-8",
+        "run_id": "run-c"
+       }
+      ],
+      "next_page_token": null,
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "list",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    },
+    "/api/workflows/order-7/runs/run-a/cancel": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "order-7",
+      "run_id": "run-a",
+      "outcome": "cancelled",
+      "command_status": "accepted",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "cancel",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    },
+    "/api/workflows/order-8/runs/run-c/cancel": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "order-8",
+      "run_id": "run-c",
+      "outcome": "cancelled",
+      "command_status": "accepted",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "cancel",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow cancel batch blank query",
+   "argv": [
+    "workflow:cancel",
+    "--all-matching=  ",
+    "--yes",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "method": "GET",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflows": [
+       {
+        "workflow_id": "order-7",
+        "run_id": "run-a"
+       },
+       {
+        "workflow_id": "order-8",
+        "run_id": "run-c"
+       }
+      ],
+      "next_page_token": null,
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "list",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    },
+    "/api/workflows/order-7/runs/run-a/cancel": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "order-7",
+      "run_id": "run-a",
+      "outcome": "cancelled",
+      "command_status": "accepted",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "cancel",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    },
+    "/api/workflows/order-8/runs/run-c/cancel": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "order-8",
+      "run_id": "run-c",
+      "outcome": "cancelled",
+      "command_status": "accepted",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "cancel",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow cancel batch and workflow id",
+   "argv": [
+    "workflow:cancel",
+    "order-7",
+    "--all-matching=customer-42",
+    "--yes",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "method": "GET",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflows": [
+       {
+        "workflow_id": "order-7",
+        "run_id": "run-a"
+       },
+       {
+        "workflow_id": "order-8",
+        "run_id": "run-c"
+       }
+      ],
+      "next_page_token": null,
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "list",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    },
+    "/api/workflows/order-7/runs/run-a/cancel": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "order-7",
+      "run_id": "run-a",
+      "outcome": "cancelled",
+      "command_status": "accepted",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "cancel",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    },
+    "/api/workflows/order-8/runs/run-c/cancel": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "order-8",
+      "run_id": "run-c",
+      "outcome": "cancelled",
+      "command_status": "accepted",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "cancel",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow cancel without target",
+   "argv": [
+    "workflow:cancel",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "method": "GET",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflows": [
+       {
+        "workflow_id": "order-7",
+        "run_id": "run-a"
+       },
+       {
+        "workflow_id": "order-8",
+        "run_id": "run-c"
+       }
+      ],
+      "next_page_token": null,
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "list",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    },
+    "/api/workflows/order-7/runs/run-a/cancel": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "order-7",
+      "run_id": "run-a",
+      "outcome": "cancelled",
+      "command_status": "accepted",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "cancel",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    },
+    "/api/workflows/order-8/runs/run-c/cancel": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "order-8",
+      "run_id": "run-c",
+      "outcome": "cancelled",
+      "command_status": "accepted",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "cancel",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow cancel batch invalid limit",
+   "argv": [
+    "workflow:cancel",
+    "--all-matching=customer-42",
+    "--yes",
+    "--limit=0",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "method": "GET",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflows": [
+       {
+        "workflow_id": "order-7",
+        "run_id": "run-a"
+       },
+       {
+        "workflow_id": "order-8",
+        "run_id": "run-c"
+       }
+      ],
+      "next_page_token": null,
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "list",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    },
+    "/api/workflows/order-7/runs/run-a/cancel": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "order-7",
+      "run_id": "run-a",
+      "outcome": "cancelled",
+      "command_status": "accepted",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "cancel",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    },
+    "/api/workflows/order-8/runs/run-c/cancel": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "order-8",
+      "run_id": "run-c",
+      "outcome": "cancelled",
+      "command_status": "accepted",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "cancel",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow cancel batch invalid status",
+   "argv": [
+    "workflow:cancel",
+    "--all-matching=customer-42",
+    "--yes",
+    "--status=bogus",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "method": "GET",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflows": [
+       {
+        "workflow_id": "order-7",
+        "run_id": "run-a"
+       },
+       {
+        "workflow_id": "order-8",
+        "run_id": "run-c"
+       }
+      ],
+      "next_page_token": null,
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "list",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    },
+    "/api/workflows/order-7/runs/run-a/cancel": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "order-7",
+      "run_id": "run-a",
+      "outcome": "cancelled",
+      "command_status": "accepted",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "cancel",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    },
+    "/api/workflows/order-8/runs/run-c/cancel": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "order-8",
+      "run_id": "run-c",
+      "outcome": "cancelled",
+      "command_status": "accepted",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "cancel",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   },
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "stderr_category",
+      "stderr",
+      "stdout_json",
+      "stdout_text"
+     ],
+     "reason": "Published PHP 2.3.5 writes canonical-filter validation failures to stderr even with --json. Like workflow:list, this port returns the structured JSON error and exit 2 (cli#61/#72)."
+    }
+   }
+  },
+  {
+   "name": "workflow cancel batch any status",
+   "argv": [
+    "workflow:cancel",
+    "--all-matching=customer-42",
+    "--yes",
+    "--status=",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "method": "GET",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflows": [
+       {
+        "workflow_id": "order-7",
+        "run_id": "run-a"
+       },
+       {
+        "workflow_id": "order-8",
+        "run_id": "run-c"
+       }
+      ],
+      "next_page_token": null,
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "list",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    },
+    "/api/workflows/order-7/runs/run-a/cancel": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "order-7",
+      "run_id": "run-a",
+      "outcome": "cancelled",
+      "command_status": "accepted",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "cancel",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    },
+    "/api/workflows/order-8/runs/run-c/cancel": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "order-8",
+      "run_id": "run-c",
+      "outcome": "cancelled",
+      "command_status": "accepted",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "cancel",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow cancel batch no matches JSON",
+   "argv": [
+    "workflow:cancel",
+    "--all-matching=customer-42",
+    "--yes",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "method": "GET",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflows": [],
+      "next_page_token": null,
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "list",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow cancel batch no matches human",
+   "argv": [
+    "workflow:cancel",
+    "--all-matching=customer-42",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "method": "GET",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflows": [],
+      "next_page_token": null,
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "list",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow cancel batch missing run ids JSON",
+   "argv": [
+    "workflow:cancel",
+    "--all-matching=customer-42",
+    "--yes",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "method": "GET",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflows": [
+       {
+        "workflow_id": "order-7"
+       },
+       {
+        "workflow_id": "order-8",
+        "run_id": ""
+       },
+       {
+        "run_id": "run-x"
+       },
+       "junk"
+      ],
+      "next_page_token": null,
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "list",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow cancel batch replaced run JSON",
+   "argv": [
+    "workflow:cancel",
+    "--all-matching=customer-42",
+    "--yes",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "method": "GET",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflows": [
+       {
+        "workflow_id": "order-7",
+        "run_id": "run-a"
+       },
+       {
+        "workflow_id": "order-8",
+        "run_id": "run-c"
+       }
+      ],
+      "next_page_token": null,
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "list",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    },
+    "/api/workflows/order-7/runs/run-a/cancel": {
+     "method": "POST",
+     "status": 409,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "message": "Commands cannot target historical runs.",
+      "workflow_id": "order-7",
+      "run_id": "run-a",
+      "reason": "historical_run_command_rejected",
+      "target_scope": "run"
+     }
+    },
+    "/api/workflows/order-8/runs/run-c/cancel": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "order-8",
+      "run_id": "run-c",
+      "outcome": "cancelled",
+      "command_status": "accepted",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "cancel",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow cancel batch replaced run human",
+   "argv": [
+    "workflow:cancel",
+    "--all-matching=customer-42",
+    "--yes",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "method": "GET",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflows": [
+       {
+        "workflow_id": "order-7",
+        "run_id": "run-a"
+       },
+       {
+        "workflow_id": "order-8",
+        "run_id": "run-c"
+       }
+      ],
+      "next_page_token": null,
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "list",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    },
+    "/api/workflows/order-7/runs/run-a/cancel": {
+     "method": "POST",
+     "status": 409,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "message": "Commands cannot target historical runs.",
+      "workflow_id": "order-7",
+      "run_id": "run-a",
+      "reason": "historical_run_command_rejected",
+      "target_scope": "run"
+     }
+    },
+    "/api/workflows/order-8/runs/run-c/cancel": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "order-8",
+      "run_id": "run-c",
+      "outcome": "cancelled",
+      "command_status": "accepted",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "cancel",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow cancel batch repeated token",
+   "argv": [
+    "workflow:cancel",
+    "--all-matching=customer-42",
+    "--yes",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "method": "GET",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflows": [
+       {
+        "workflow_id": "order-7",
+        "run_id": "run-a"
+       },
+       {
+        "workflow_id": "order-8",
+        "run_id": "run-c"
+       }
+      ],
+      "next_page_token": "stuck",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "list",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow cancel batch limit within page JSON",
+   "argv": [
+    "workflow:cancel",
+    "--all-matching=customer-42",
+    "--yes",
+    "--limit=1",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "method": "GET",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflows": [
+       {
+        "workflow_id": "order-7",
+        "run_id": "run-a"
+       },
+       {
+        "workflow_id": "order-8",
+        "run_id": "run-c"
+       }
+      ],
+      "next_page_token": "more",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "list",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    },
+    "/api/workflows/order-7/runs/run-a/cancel": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "order-7",
+      "run_id": "run-a",
+      "outcome": "cancelled",
+      "command_status": "accepted",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "cancel",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    },
+    "/api/workflows/order-8/runs/run-c/cancel": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "order-8",
+      "run_id": "run-c",
+      "outcome": "cancelled",
+      "command_status": "accepted",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "cancel",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
   }
  ]
 }

@@ -153,6 +153,61 @@ fn flag_false_skips_certificate_and_hostname_checks() {
     let body: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(body["status"], "ok");
     assert!(server.served() >= 1);
+    assert_warned_once(&output, &server);
+}
+
+/// The warning leads stderr exactly once; the fixture's minimal cluster info
+/// may add the usual compatibility warning after it.
+fn assert_warned_once(output: &Output, server: &SelfSignedServer) {
+    let stderr = String::from_utf8(output.stderr.clone()).unwrap();
+    assert!(stderr.starts_with(&warning(server)), "{stderr}");
+    assert_eq!(
+        stderr
+            .matches("TLS certificate verification is disabled")
+            .count(),
+        1
+    );
+}
+
+fn warning(server: &SelfSignedServer) -> String {
+    format!(
+        "Warning: TLS certificate verification is disabled for {}. Anyone on the network path can read or change this traffic, including the auth token. Use --tls-verify=true with a trusted certificate.\n",
+        server.url
+    )
+}
+
+#[test]
+fn verified_requests_print_no_tls_warning() {
+    let scratch = Scratch::new();
+    let server = SelfSignedServer::start();
+    let output = health(&scratch, &server, &[]);
+    assert!(!String::from_utf8_lossy(&output.stderr)
+        .contains("TLS certificate verification is disabled"));
+}
+
+#[test]
+fn plain_http_with_verification_off_prints_no_tls_warning() {
+    let scratch = Scratch::new();
+    let output = scratch.run(
+        &[
+            "server:health",
+            "--server",
+            "http://127.0.0.1:9",
+            "--tls-verify=false",
+            "--output=json",
+        ],
+        &[],
+    );
+    assert!(!String::from_utf8_lossy(&output.stderr).contains("TLS certificate verification"));
+}
+
+#[test]
+fn quiet_still_warns_when_verification_is_off() {
+    let scratch = Scratch::new();
+    let server = SelfSignedServer::start();
+    let output = health(&scratch, &server, &["--tls-verify=false", "-q"]);
+    assert_eq!(output.status.code(), Some(0), "{output:?}");
+    assert_eq!(String::from_utf8(output.stderr).unwrap(), warning(&server));
 }
 
 #[test]
@@ -164,6 +219,7 @@ fn environment_false_skips_verification() {
         &[("DURABLE_WORKFLOW_TLS_VERIFY", "false")],
     );
     assert_eq!(output.status.code(), Some(0), "{output:?}");
+    assert_warned_once(&output, &server);
 }
 
 #[test]
@@ -187,6 +243,7 @@ fn profile_false_skips_verification_and_flag_true_overrides_it() {
         &[],
     );
     assert_eq!(output.status.code(), Some(0), "{output:?}");
+    assert_warned_once(&output, &server);
 
     let served = server.served();
     let output = scratch.run(

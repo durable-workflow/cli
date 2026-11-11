@@ -67,7 +67,11 @@ impl Context {
     fn sdk_with_timeout(&self, timeout: Option<Duration>) -> Result<Client, CliError> {
         let connection = &self.connection;
         // --tls-verify=false skips certificate and hostname checks, like 2.x's
-        // verify_peer/verify_host. `doctor` reports it as a warning.
+        // verify_peer/verify_host. Unlike 2.x, every command says so on stderr,
+        // since the environment and profile forms are otherwise silent.
+        if !connection.tls_verify {
+            warn_tls_verification_disabled(&connection.server);
+        }
         let mut builder = Client::builder(connection.server.trim_end_matches('/'))
             .token(connection.token.clone())
             .namespace(connection.namespace.clone())
@@ -210,6 +214,25 @@ impl Context {
             write_warning(&info, include_worker_protocol, literal);
         }
     }
+}
+
+/// Once per process, before the first request to an https Server with
+/// verification off. Only the origin is named: base paths can carry
+/// namespace identities or credentials. Shown with --json and -q too.
+fn warn_tls_verification_disabled(server: &str) {
+    static WARNED: std::sync::Once = std::sync::Once::new();
+    let Ok(url) = reqwest::Url::parse(server) else {
+        return;
+    };
+    if url.scheme() != "https" {
+        return;
+    }
+    WARNED.call_once(|| {
+        crate::formatter::writeln_err_quiet(&format!(
+            "<comment>Warning: TLS certificate verification is disabled for {}. Anyone on the network path can read or change this traffic, including the auth token. Use --tls-verify=true with a trusted certificate.</comment>",
+            crate::formatter::display_text(&url.origin().ascii_serialization())
+        ));
+    });
 }
 
 pub fn warn_first(info: &Value, include_worker_protocol: bool) {

@@ -11,6 +11,13 @@ Usage, from the crate directory:
   cargo build
   python3 parity/parity.py [--build debug|release] [--report] [--verbose]
 
+A case with "reference": "php-main" compares against the PHP CLI built from
+this repository's source instead: DW_PARITY_PHP_MAIN names a checkout with
+`composer install --no-dev` done, and DW_PARITY_PHP the PHP to run it with
+(default `php`; parity/php-docker.sh on hosts without PHP). It reports the
+candidate's version, commit and build date, so identity lines agree. Such a
+case fails when DW_PARITY_PHP_MAIN is not set.
+
 Server cases run when DW_PARITY_SERVERS names running Servers, for example
   DW_PARITY_SERVERS=php=http://127.0.0.1:18080,native=http://127.0.0.1:18081
 with DW_PARITY_TOKEN as the auth token. The report, when asked for, is
@@ -44,6 +51,10 @@ REPORT = os.path.join(CRATE, "target", "parity-report.json")
 # Real cluster info from published PHP Server 2.11.8, served by the mock
 # Server with a case's patch applied.
 MOCK_CLUSTER_INFO = os.path.join(CRATE, "src", "compat", "fixtures", "cluster-info-php-2.11.8.json")
+
+# Directories whose `dw` the harness runs, shown as <bin>/ in output. The PHP
+# main reference adds its checkout's bin/ when configured.
+BIN_DIRECTORIES = [re.escape(os.path.join(CRATE, "target", "parity-bin")) + r"/(?:reference|candidate)/"]
 
 TIME = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d[0-9.:+Z-]*")
 ULID = re.compile(r"\b[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}\b")
@@ -87,9 +98,45 @@ def substitute(text, case):
     return text
 
 
+class Runner:
+    """How to invoke one CLI: a command prefix plus environment it needs."""
+
+    def __init__(self, command, env=None):
+        self.command = list(command)
+        self.env = dict(env or {})
+
+
+def runner(binary):
+    return binary if isinstance(binary, Runner) else Runner([binary])
+
+
+def php_main_runner(identity):
+    """PHP main from source, when DW_PARITY_PHP_MAIN is configured."""
+    root = os.environ.get("DW_PARITY_PHP_MAIN")
+    if not root:
+        return None
+    root = os.path.abspath(root)
+    script = os.path.join(root, "bin", "dw")
+    if not os.path.isfile(os.path.join(root, "vendor", "autoload.php")):
+        raise SystemExit(f"DW_PARITY_PHP_MAIN has no vendor/autoload.php: run composer install --no-dev in {root}.")
+    php = os.environ.get("DW_PARITY_PHP", "php")
+    if os.sep in php:
+        php = os.path.abspath(php)
+    pattern = re.escape(os.path.join(root, "bin")) + "/"
+    if pattern not in BIN_DIRECTORIES:
+        BIN_DIRECTORIES.append(pattern)
+    env = {"DW_PARITY_PHP_MAIN": root}
+    for key, name in (("version", "DW_CLI_VERSION"), ("commit", "DW_CLI_COMMIT"), ("build_date", "DW_CLI_BUILD_DATE")):
+        if key in identity:
+            env[name] = identity[key]
+    return Runner([php, script], env)
+
+
 def own_identity(binary):
     """Build metadata from this binary, rather than a different release."""
-    output = subprocess.run([binary, "--version"], capture_output=True, text=True, timeout=60, check=False).stdout
+    binary = runner(binary)
+    output = subprocess.run(binary.command + ["--version"], capture_output=True, text=True, timeout=60,
+                            check=False, env={**os.environ, **binary.env}).stdout
     match = re.match(r"dw (\S+) \(commit ([^,]+), built ([^)]+)\)", output)
     return dict(zip(("version", "commit", "build_date"), match.groups())) if match else {}
 
@@ -113,7 +160,8 @@ def normalize_doctor_identity(stdout_json, stdout_text, identity):
 
 def normalize_text(text, config_dir, version=None):
     text = text.replace(config_dir, "<config>")
-    text = re.sub(re.escape(os.path.join(CRATE, "target", "parity-bin")) + r"/(reference|candidate)/", "<bin>/", text)
+    for directory in BIN_DIRECTORIES:
+        text = re.sub(directory, "<bin>/", text)
     if version:
         text = VERSION_LINE.sub("dw <version>", text)
         text = re.sub(r"(?<![\w.])" + re.escape(version) + r"(?![\w.-])", "<cli-version>", text)
@@ -180,12 +228,13 @@ def read_config(config_dir):
 
 
 def run_case(binary, case, env_base, identity=None):
+    binary = runner(binary)
     identity = identity or {}
     version = identity.get("version")
     case = dict(case, vars={**case.get("vars", {}), "unique": unique_id()})
     config_dir = tempfile.mkdtemp(prefix="dw-parity-")
     try:
-        env = dict(env_base)
+        env = {**env_base, **binary.env}
         env["DW_CONFIG_HOME"] = config_dir
         for key, value in case.get("env", {}).items():
             env[key] = substitute(value, case)
@@ -193,11 +242,11 @@ def run_case(binary, case, env_base, identity=None):
         if "project" in case:
             project = prepare_project(config_dir, case["project"], env)
         for step in case.get("setup", []):
-            subprocess.run([binary] + [substitute(arg, case) for arg in step], env=env,
+            subprocess.run(binary.command + [substitute(arg, case) for arg in step], env=env,
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60, check=False)
         argv = [substitute(arg, case) for arg in case["argv"]]
         # No terminal on stdin, so neither CLI may prompt.
-        completed = subprocess.run([binary] + argv, env=env, stdin=subprocess.DEVNULL, capture_output=True,
+        completed = subprocess.run(binary.command + argv, env=env, stdin=subprocess.DEVNULL, capture_output=True,
                                    text=True, timeout=60, check=False, cwd=project)
         stdout_json = parse_json_lines(completed.stdout)
         stdout_text = completed.stdout
@@ -445,10 +494,8 @@ def help_cases():
                 "reason": "The help accurately describes one Server response page and an unconsumed cursor (cli#113).",
             }}
         if case["argv"][0] == "workflow:signal":
-            case["expected_difference"] = {"*": {
-                "fields": ["stdout_text"],
-                "reason": "Signals carry PHP main's caller command key: --request-id and its help (cli#61, cli#72).",
-            }}
+            # --request-id is PHP main's (cli#61); published 2.3.5 lacks it.
+            case["reference"] = "php-main"
     return cases
 
 
@@ -465,11 +512,16 @@ def invocation_path(binary, role):
     return copy_path
 
 
-def run_all(candidate_binary, servers, verbose, server_only=False):
+def run_all(candidate_binary, servers, verbose, server_only=False, skip_references=()):
     with open(CASES, encoding="utf-8") as handle:
         cases = json.load(handle)["cases"] + help_cases()
     if server_only:
         cases = [case for case in cases if case.get("server")]
+    skipped = [case for case in cases if case.get("reference") in skip_references]
+    if skipped:
+        # Said out loud so a skip never reads as a pass.
+        print(f"Skipping {len(skipped)} case(s) whose reference is {', '.join(sorted(skip_references))}.")
+        cases = [case for case in cases if case.get("reference") not in skip_references]
     env_base = {key: value for key, value in os.environ.items() if not key.startswith(("DURABLE_WORKFLOW_", "DW_"))}
     token = os.environ.get("DW_PARITY_TOKEN")
     if token:
@@ -477,15 +529,26 @@ def run_all(candidate_binary, servers, verbose, server_only=False):
 
     reference_binary = invocation_path(REFERENCE, "reference")
     candidate_binary = invocation_path(candidate_binary, "candidate")
-    identities = {reference_binary: own_identity(reference_binary), candidate_binary: own_identity(candidate_binary)}
+    candidate_identity = own_identity(candidate_binary)
+    identities = {reference_binary: own_identity(reference_binary), candidate_binary: candidate_identity}
+    php_main = php_main_runner(candidate_identity)
     results = []
     for case in expand_cases(cases, servers):
+        if case.get("reference") == "php-main" and php_main is None:
+            message = "needs the PHP main reference: set DW_PARITY_PHP_MAIN"
+            print(f"{'DIFFERENT':9}  {case['name']}  ({message})")
+            results.append({"case": case["name"], "argv": case["argv"], "differences": [message],
+                            "intentional": None, "reference": None, "candidate": None})
+            continue
+        reference_runner, reference_identity = reference_binary, identities[reference_binary]
+        if case.get("reference") == "php-main":
+            reference_runner, reference_identity = php_main, candidate_identity
         uses_mock = "mock" in case or "mock_routes" in case
         mock = MockServer(patched_cluster_info(case.get("mock", [])), case.get("mock_routes")) if uses_mock else None
         if mock:
             case = dict(case, vars={**case.get("vars", {}), "mock": mock.url})
         try:
-            reference = run_case(reference_binary, case, env_base, identities[reference_binary])
+            reference = run_case(reference_runner, case, env_base, reference_identity)
             candidate = run_case(candidate_binary, case, env_base, identities[candidate_binary])
         finally:
             if mock:
@@ -506,6 +569,8 @@ def main():
     parser.add_argument("--verbose", action="store_true")
     parser.add_argument("--server-cases-only", action="store_true",
                         help="run only the cases that need DW_PARITY_SERVERS")
+    parser.add_argument("--skip-reference", action="append", default=[], choices=["php-main"],
+                        help="skip the cases compared against this reference, and say how many")
     options = parser.parse_args()
 
     candidate = os.path.abspath(options.candidate) if options.candidate else CANDIDATES[options.build]
@@ -516,7 +581,8 @@ def main():
     servers = configured_servers()
     if options.server_cases_only and not servers:
         raise SystemExit("--server-cases-only needs DW_PARITY_SERVERS.")
-    results = run_all(candidate, servers, options.verbose, options.server_cases_only)
+    results = run_all(candidate, servers, options.verbose, options.server_cases_only,
+                      tuple(options.skip_reference))
     unexpected = sum(1 for result in results if result["differences"] and not result["intentional"])
     intentional = sum(1 for result in results if result["intentional"])
     print(f"\n{len(results) - unexpected - intentional}/{len(results)} cases match, "

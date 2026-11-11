@@ -25,6 +25,7 @@ import http.server
 import json
 import os
 import re
+import secrets
 import shutil
 import subprocess
 import sys
@@ -46,6 +47,15 @@ MOCK_CLUSTER_INFO = os.path.join(CRATE, "src", "compat", "fixtures", "cluster-in
 
 TIME = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d[0-9.:+Z-]*")
 ULID = re.compile(r"\b[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}\b")
+UUID = re.compile(r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b")
+CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+
+
+def unique_id():
+    """A fresh ULID-shaped value. Server cases that create state use
+    {unique} so the reference and candidate runs touch different
+    resources; the value normalizes to <id> like any ULID."""
+    return "".join(secrets.choice(CROCKFORD) for _ in range(26))
 VERSION_LINE = re.compile(r"dw \S+ \(commit [^,]+, built [^)]+\)")
 BUILD_IDENTITY = re.compile(r"\(commit [^,]+, built [^)]+\)")
 MARKDOWN_TITLE = re.compile(r"^(dw <version>)\n=+$", re.M)
@@ -114,7 +124,18 @@ def normalize_text(text, config_dir, version=None):
     text = TRANSPORT_LINE.sub("<transport error>", text)
     text = DOCTOR_TRANSPORT_LINE.sub(r"\1<transport error>", text)
     text = LOOPBACK_PORT.sub("127.0.0.1:<port>", text)
-    return ULID.sub("<id>", text)
+    return UUID.sub("<id>", ULID.sub("<id>", text))
+
+
+def mask_fields(value, fields):
+    """Replace the values of the named keys, at any depth. A case lists only
+    fields derived from its own {unique} input, such as a Server-computed
+    request fingerprint, so they cannot match across the two runs."""
+    if isinstance(value, dict):
+        return {key: "<masked>" if key in fields else mask_fields(item, fields) for key, item in value.items()}
+    if isinstance(value, list):
+        return [mask_fields(item, fields) for item in value]
+    return value
 
 
 def normalize_value(value, config_dir, version=None):
@@ -161,6 +182,7 @@ def read_config(config_dir):
 def run_case(binary, case, env_base, identity=None):
     identity = identity or {}
     version = identity.get("version")
+    case = dict(case, vars={**case.get("vars", {}), "unique": unique_id()})
     config_dir = tempfile.mkdtemp(prefix="dw-parity-")
     try:
         env = dict(env_base)
@@ -181,6 +203,8 @@ def run_case(binary, case, env_base, identity=None):
         stdout_text = completed.stdout
         if argv and argv[0] == "doctor":
             stdout_json, stdout_text = normalize_doctor_identity(stdout_json, stdout_text, identity)
+        if stdout_json is not None and case.get("normalize_fields"):
+            stdout_json = mask_fields(stdout_json, set(case["normalize_fields"]))
         return {
             "exit_code": completed.returncode,
             "stdout_json": normalize_value(stdout_json, config_dir, version) if stdout_json is not None else None,
@@ -441,9 +465,11 @@ def invocation_path(binary, role):
     return copy_path
 
 
-def run_all(candidate_binary, servers, verbose):
+def run_all(candidate_binary, servers, verbose, server_only=False):
     with open(CASES, encoding="utf-8") as handle:
         cases = json.load(handle)["cases"] + help_cases()
+    if server_only:
+        cases = [case for case in cases if case.get("server")]
     env_base = {key: value for key, value in os.environ.items() if not key.startswith(("DURABLE_WORKFLOW_", "DW_"))}
     token = os.environ.get("DW_PARITY_TOKEN")
     if token:
@@ -478,6 +504,8 @@ def main():
     parser.add_argument("--candidate", help="compare this executable instead of a cargo build (a release asset)")
     parser.add_argument("--report", action="store_true", help="write target/parity-report.json")
     parser.add_argument("--verbose", action="store_true")
+    parser.add_argument("--server-cases-only", action="store_true",
+                        help="run only the cases that need DW_PARITY_SERVERS")
     options = parser.parse_args()
 
     candidate = os.path.abspath(options.candidate) if options.candidate else CANDIDATES[options.build]
@@ -485,7 +513,10 @@ def main():
         if not os.access(binary, os.X_OK):
             raise SystemExit(f"Missing executable {binary}. Run parity/fetch-reference.sh and cargo build first.")
 
-    results = run_all(candidate, configured_servers(), options.verbose)
+    servers = configured_servers()
+    if options.server_cases_only and not servers:
+        raise SystemExit("--server-cases-only needs DW_PARITY_SERVERS.")
+    results = run_all(candidate, servers, options.verbose, options.server_cases_only)
     unexpected = sum(1 for result in results if result["differences"] and not result["intentional"])
     intentional = sum(1 for result in results if result["intentional"])
     print(f"\n{len(results) - unexpected - intentional}/{len(results)} cases match, "

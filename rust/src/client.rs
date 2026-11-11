@@ -66,18 +66,16 @@ impl Context {
 
     fn sdk_with_timeout(&self, timeout: Option<Duration>) -> Result<Client, CliError> {
         let connection = &self.connection;
-        // The SDK cannot disable certificate verification yet
-        // (durable-workflow/sdk-rust#180). Refuse instead of verifying
-        // against the caller's explicit choice.
-        if !connection.tls_verify && connection.server.to_lowercase().starts_with("https://") {
-            return Err(CliError::Invalid(
-                "This dw build cannot disable TLS certificate verification yet. Use a trusted certificate or the 2.x CLI for this Server."
-                    .into(),
-            ));
+        // --tls-verify=false skips certificate and hostname checks, like 2.x's
+        // verify_peer/verify_host. Unlike 2.x, every command says so on stderr,
+        // since the environment and profile forms are otherwise silent.
+        if !connection.tls_verify {
+            warn_tls_verification_disabled(&connection.server);
         }
         let mut builder = Client::builder(connection.server.trim_end_matches('/'))
             .token(connection.token.clone())
-            .namespace(connection.namespace.clone());
+            .namespace(connection.namespace.clone())
+            .danger_accept_invalid_certs(!connection.tls_verify);
         if let Some(timeout) = timeout {
             builder = builder.timeout(timeout);
         }
@@ -216,6 +214,25 @@ impl Context {
             write_warning(&info, include_worker_protocol, literal);
         }
     }
+}
+
+/// Once per process, before the first request to an https Server with
+/// verification off. Only the origin is named: base paths can carry
+/// namespace identities or credentials. Shown with --json and -q too.
+fn warn_tls_verification_disabled(server: &str) {
+    static WARNED: std::sync::Once = std::sync::Once::new();
+    let Ok(url) = reqwest::Url::parse(server) else {
+        return;
+    };
+    if url.scheme() != "https" {
+        return;
+    }
+    WARNED.call_once(|| {
+        crate::formatter::writeln_err_quiet(&format!(
+            "<comment>Warning: TLS certificate verification is disabled for {}. Anyone on the network path can read or change this traffic, including the auth token. Use --tls-verify=true with a trusted certificate.</comment>",
+            crate::formatter::display_text(&url.origin().ascii_serialization())
+        ));
+    });
 }
 
 pub fn warn_first(info: &Value, include_worker_protocol: bool) {

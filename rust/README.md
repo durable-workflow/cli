@@ -28,7 +28,7 @@ every command group reaches parity.
 | `workflow:list-runs`: one workflow response page, envelope/cursor, JSON and JSONL | Ported |
 | `namespace:list`, `namespace:describe`, `namespace:create`, `namespace:update`, `namespace:delete`: namespace configuration and lifecycle, JSON and JSONL | Ported |
 | Workflow, namespace and schedule commands | Next slices |
-| `--tls-verify=false` against HTTPS | CLI support pending |
+| `--tls-verify=false` against HTTPS: no certificate or hostname checks, as in 2.x, plus a stderr warning on every such command (also with `--json` and `-q`) | Ported, intentional addition |
 
 Server calls go through the published `durable-workflow` crate, pinned to
 the latest qualified release.

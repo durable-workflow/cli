@@ -133,7 +133,8 @@ impl Context {
     }
 
     /// One workflow command with a JSON body and the workflow response
-    /// contract. `timeout` replaces the SDK default for this request only.
+    /// contract: one attempt, no redirect followed. `timeout` replaces the
+    /// SDK default for this request only.
     pub fn workflow_post(
         &self,
         segments: &[&str],

@@ -32,7 +32,8 @@ every command group reaches parity.
 | `workflow:history-export`: the Server bundle to stdout or `--output-file` | Ported |
 | `schedule:list`, `schedule:describe`, `schedule:history`, `schedule:create`, `schedule:update`, `schedule:delete`, `schedule:pause`, `schedule:resume`, `schedule:trigger`, `schedule:backfill`: JSON and JSONL, `--input`/`--input-file`/`--input-encoding` | Ported |
 | `workflow:cancel` (one run, or a bounded `--all-matching` batch pinned to each selected run), `workflow:terminate`, `workflow:archive`, `workflow:redrive`, `workflow:repair`, `workflow:migrate-v1` | Ported |
-| Remaining workflow commands (query, start, signal, update) and the other command groups | Next slices ([gap list](https://github.com/durable-workflow/cli/issues/72#issuecomment-6801944950)) |
+| `workflow:query`, `workflow:start` (`--wait` with JSON wait diagnostics), `workflow:signal`, `workflow:update`: one request each, command keys, update diagnostics | Ported |
+| Remaining command groups (task queues, workers, activities, search attributes, storage, worker-plane tasks, system, `debug`, `watch`) | Next slices ([gap list](https://github.com/durable-workflow/cli/issues/72#issuecomment-6801944950)) |
 | `--tls-verify=false` against HTTPS: no certificate or hostname checks, as in 2.x, plus a stderr warning on every such command (also with `--json` and `-q`) | Ported, intentional addition |
 
 Server calls go through the published `durable-workflow` crate, pinned to
@@ -66,6 +67,16 @@ listed without a run ID is reported, not cancelled. A repeated page token, or
 a page that adds nothing new, stops the selection before any cancellation.
 Without `--yes` the confirmation is asked on stderr and one answer line is
 read from stdin, as in 2.x; `-n` or end of input declines.
+
+`workflow:query`, `workflow:start`, `workflow:signal` and `workflow:update`
+send exactly one request and never resend it. Signals and updates carry a
+caller command key (`request_id`): `--request-id`, or one generated per
+invocation as `cli-signal-<32 hex>` or `cli-update-<32 hex>`. When the response
+is lost or the Server fails (exit 3, 7 or 6), the outcome is unknown: the error
+names the key, and the next steps say to inspect workflow history and command
+receipts before retrying with the same key. These commands follow PHP main's
+command-key contract (#61); published 2.3.5 had no `--request-id` on
+`workflow:signal`, so the catalog adds it as a reviewed update.
 
 Namespace visibility requests make one target attempt and refuse redirects. Use
 the actual Server URL; a 3xx response is reported as a refusal.

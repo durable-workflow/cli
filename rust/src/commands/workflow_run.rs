@@ -86,7 +86,7 @@ fn show(
 
 /// 2.x `isTerminal()`: the Server's `is_terminal` when set, otherwise the
 /// terminal status buckets and statuses.
-fn is_terminal(result: &Value) -> bool {
+pub(crate) fn is_terminal(result: &Value) -> bool {
     match result.get("is_terminal") {
         Some(value) if !value.is_null() => truthy(value),
         _ => {
@@ -113,7 +113,7 @@ fn truthy(value: &Value) -> bool {
 }
 
 /// `formatStatus($value ?? $default)`, escaping the remote text first.
-fn status(value: Option<&Value>, default: &str) -> String {
+pub(crate) fn status(value: Option<&Value>, default: &str) -> String {
     let text = match value {
         Some(value) if !value.is_null() => {
             if !php::is_scalar(Some(value)) {

@@ -150,7 +150,19 @@ fn first_validation_message(body: &Map<String, Value>) -> Option<String> {
 pub struct ErrorContext<'a> {
     pub command: &'a str,
     pub namespace: Option<String>,
-    pub workflow_id: Option<String>,
+    /// 2.x `errorArgumentContext()`: trimmed, non-empty identifiers from
+    /// the command line, such as `workflow_id`, in that order.
+    pub arguments: Vec<(&'static str, String)>,
+    /// 2.x `errorRequestIdContext()`: the command key this invocation sent,
+    /// or the caller's `--request-id` when the command failed before
+    /// choosing one.
+    pub request_id: Option<String>,
+    /// True once the command chose its key (2.x `$commandRequestId`), so an
+    /// unknown outcome is reported as keyed.
+    pub keyed: bool,
+    /// The request a failed `workflow:update` was sending, for its error
+    /// diagnostics.
+    pub update: Option<crate::commands::workflow_message::UpdateErrorRequest>,
     pub server_flag: Option<String>,
     pub env_flag: Option<String>,
 }
@@ -167,9 +179,95 @@ impl ErrorContext<'_> {
     }
 }
 
+/// The Server's refusal reason for a request ID it already holds for a
+/// different command.
+const REQUEST_ID_CONFLICT_REASON: &str = "request_id_conflict";
+
+/// 2.x `errorRecommendations()`: the error's next step, then, for a keyed
+/// command whose outcome is unknown, the inspect-before-retry warning.
 pub fn recommendations(error: &CliError, context: &ErrorContext) -> Vec<Value> {
+    let mut next = base_recommendations(error, context);
+    let uncertain = match error {
+        CliError::Network(_) | CliError::Timeout(_) => true,
+        CliError::Http { status, .. } => (500..=599).contains(status),
+        _ => false,
+    };
+    if context.keyed && uncertain {
+        next.push(json!({
+            "id": "request_id.retry",
+            "severity": "error",
+            "message": "The outcome of this command is unknown. Inspect workflow history and command receipts before retrying. Keep the exact request ID; use --json for an exact copy. Retry with the same key only if the Server advertises retained command admission; a request ID alone does not prevent duplicates.",
+        }));
+    }
+    next
+}
+
+/// Non-empty trimmed text of a scalar, as 2.x `nonEmptyScalarString()`.
+fn scalar_text(value: Option<&Value>) -> Option<String> {
+    let value = value.filter(|value| crate::php::is_scalar(Some(value)))?;
+    let text = crate::php::trim(&crate::php::to_string(Some(value))).to_string();
+    (!text.is_empty()).then_some(text)
+}
+
+/// 2.x `requestIdConflictParts()`.
+fn conflict_parts(body: &Map<String, Value>) -> Vec<String> {
+    body.get("conflict")
+        .filter(|value| crate::php::is_array(value))
+        .map(|conflict| {
+            crate::php::values(conflict)
+                .into_iter()
+                .filter_map(|part| scalar_text(Some(part)))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// 2.x `requestIdConflictLines()`.
+fn conflict_lines(body: &Map<String, Value>) -> Vec<String> {
+    let mut lines = Vec::new();
+    let retained: Vec<String> = [
+        ("id", "retained_command_id"),
+        ("type", "retained_command_type"),
+        ("outcome", "retained_outcome"),
+    ]
+    .into_iter()
+    .filter_map(|(label, key)| scalar_text(body.get(key)).map(|value| format!("{label} {value}")))
+    .collect();
+    if !retained.is_empty() {
+        lines.push(format!("Retained command: {}", retained.join(", ")));
+    }
+    let parts = conflict_parts(body);
+    if !parts.is_empty() {
+        lines.push(format!("Conflicting parts: {}", parts.join(", ")));
+    }
+    lines
+}
+
+fn base_recommendations(error: &CliError, context: &ErrorContext) -> Vec<Value> {
     let item = |id: &str, message: &str, command: String| json!({"id": id, "severity": "error", "message": message, "command": command});
     let help = format!("dw {} --help", context.command);
+    if let CliError::Http {
+        status: 409, body, ..
+    } = error
+    {
+        if error.reason() == Some(REQUEST_ID_CONFLICT_REASON) {
+            let empty = Map::new();
+            let body = body.as_ref().unwrap_or(&empty);
+            let request_id = scalar_text(body.get("request_id"))
+                .or_else(|| context.request_id.clone())
+                .unwrap_or_else(|| "given".into());
+            let parts = conflict_parts(body);
+            return vec![json!({
+                "id": "request_id.conflict",
+                "severity": "error",
+                "message": format!(
+                    "Request id [{request_id}] already identifies a {} command with a different {}. Repeat that original command unchanged to read its receipt, or pass a new --request-id to record a new command.",
+                    scalar_text(body.get("retained_command_type")).unwrap_or_else(|| "retained".into()),
+                    if parts.is_empty() { "intent".to_string() } else { parts.join("/") },
+                ),
+            })];
+        }
+    }
     match error {
         CliError::Network(_) => vec![item(
             "server.unreachable",
@@ -337,13 +435,18 @@ pub fn envelope(error: &CliError, context: &ErrorContext) -> Value {
     if let Some(namespace) = &context.namespace {
         envelope.insert("namespace".into(), json!(namespace));
     }
+    if let Some(request_id) = &context.request_id {
+        envelope.insert("request_id".into(), json!(request_id));
+    }
     if let CliError::Http { status, body, .. } = error {
         add_http_details(&mut envelope, error, *status, body.as_ref());
     }
-    if let Some(workflow_id) = &context.workflow_id {
-        envelope
-            .entry("workflow_id")
-            .or_insert_with(|| json!(workflow_id));
+    for (field, value) in &context.arguments {
+        envelope.entry(*field).or_insert_with(|| json!(value));
+    }
+    if let Some(update) = &context.update {
+        envelope =
+            crate::commands::workflow_message::update_error_diagnostics(envelope, error, update);
     }
     if let CliError::Compatibility(failure) = error {
         envelope.insert(
@@ -407,6 +510,22 @@ fn next_step_lines(next: &[Value]) -> Vec<String> {
     lines
 }
 
+/// 2.x `humanOutputText()`: control characters become spaces and console
+/// markup is escaped.
+pub fn human_output_text(text: &str) -> String {
+    let plain: String = text
+        .chars()
+        .map(|character| {
+            if character.is_control() {
+                ' '
+            } else {
+                character
+            }
+        })
+        .collect();
+    crate::formatter::escape(&plain)
+}
+
 /// Human error text for stderr.
 pub fn human(error: &CliError, context: &ErrorContext) -> String {
     let display = |text: &str| {
@@ -418,6 +537,10 @@ pub fn human(error: &CliError, context: &ErrorContext) -> String {
                 | "workflow:show-run"
                 | "workflow:history"
                 | "workflow:history-export"
+                | "workflow:query"
+                | "workflow:start"
+                | "workflow:signal"
+                | "workflow:update"
                 | "workflow:cancel"
                 | "workflow:terminate"
                 | "workflow:archive"
@@ -440,11 +563,21 @@ pub fn human(error: &CliError, context: &ErrorContext) -> String {
     if let Some(namespace) = &context.namespace {
         lines.push(format!("Namespace: {}", display(namespace)));
     }
+    if let Some(request_id) = &context.request_id {
+        lines.push(format!("Request ID: {}", human_output_text(request_id)));
+    }
     if let Some(reason) = error.reason() {
         lines.push(format!("Reason: {}", display(reason)));
     }
     if let Some(body) = error.body() {
         lines.extend(body_code_lines(body).into_iter().map(|line| display(&line)));
+        if error.reason() == Some(REQUEST_ID_CONFLICT_REASON) {
+            lines.extend(
+                conflict_lines(body)
+                    .iter()
+                    .map(|line| human_output_text(line)),
+            );
+        }
     }
     if let Some(errors) = error.validation_errors() {
         lines.extend(
@@ -469,7 +602,10 @@ mod tests {
         ErrorContext {
             command: "workflow:cancel",
             namespace: Some("default".into()),
-            workflow_id: None,
+            arguments: Vec::new(),
+            request_id: None,
+            keyed: false,
+            update: None,
             server_flag: None,
             env_flag: None,
         }
@@ -539,7 +675,10 @@ mod tests {
         let context = ErrorContext {
             command: "server:health",
             namespace: None,
-            workflow_id: None,
+            arguments: Vec::new(),
+            request_id: None,
+            keyed: false,
+            update: None,
             server_flag: Some("http://127.0.0.1:1".into()),
             env_flag: None,
         };

@@ -502,12 +502,25 @@ jobs:
       LEGACY_PHAR_SHA256: 67538671d44709312dd0ce77ec890094daf5c70d1e15eaa777c22231627d05a5
     steps:
       - name: Set up PHP for the PHAR install
-        if: matrix.install == 'phar'
+        if: matrix.install == 'phar' && runner.os == 'Linux'
         uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240  # v2
         with:
           php-version: '8.4'
           tools: none
           coverage: none
+
+      # setup-php could not install PHP on macos-15 for 2.5.0-rc.3 (twice,
+      # ~29 minutes each), so macOS takes PHP 8.4 from Homebrew core, as
+      # release.yml's macOS qualification does.
+      - name: Install PHP from Homebrew for the macOS PHAR install
+        if: matrix.install == 'phar' && runner.os == 'macOS'
+        timeout-minutes: 15
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+          HOMEBREW_NO_INSTALL_CLEANUP: '1'
+        run: |
+          brew install php@8.4
+          printf '%s/bin\n' "$(brew --prefix php@8.4)" >> "$GITHUB_PATH"
 
       - name: Install the published 2.x CLI and upgrade it
         env:

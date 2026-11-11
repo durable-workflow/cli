@@ -6,8 +6,8 @@ file, JSON envelopes and exit codes, so existing scripts and profiles keep
 working. A 2.x version also stays inside the CLI range that PHP Server 2.x
 advertises.
 
-It is not released yet. The 2.x PHP CLI remains the supported `dw` until
-every command group reaches parity.
+It ships as `dw` from 2.5.0, replacing the PHP implementation; every 2.x
+command is ported.
 
 ## Status
 
@@ -163,7 +163,7 @@ published PHP 2.11.8 cluster info with the case's patch applied, so
 compatibility warnings and refusals are compared without a broken Server.
 
 Server cases run both CLIs against the published Servers pinned in
-`parity/servers.json` (PHP 2.11.8 and native 3.0.5). `parity/start-servers.sh`
+`parity/servers.json` (PHP 2.11.8, native 3.5.0 and native 3.0.5). `parity/start-servers.sh`
 checks each Compose file's SHA-256, starts it with the image pinned by digest,
 waits until it is healthy and prints the `DW_PARITY_SERVERS` value;
 `parity/start-servers.sh down` removes them. CI runs these cases in the

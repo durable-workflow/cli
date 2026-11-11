@@ -5,6 +5,7 @@ pub mod env;
 pub mod info;
 pub mod namespace;
 pub mod runtime;
+pub mod schedule;
 pub mod schema;
 pub mod server;
 pub mod start_dev;

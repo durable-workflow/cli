@@ -8519,6 +8519,1306 @@
      "echo_request": true
     }
    }
+  },
+  {
+   "name": "schedule:list --json",
+   "argv": [
+    "schedule:list",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules": {
+     "body": {
+      "schedules": [
+       {
+        "schedule_id": "daily",
+        "workflow_type": "reports.Daily",
+        "status": "active",
+        "next_fire": "2026-04-22T06:00:00Z",
+        "last_fire": null
+       }
+      ],
+      "next_page_token": "tok-2"
+     }
+    }
+   }
+  },
+  {
+   "name": "schedule:list --output=jsonl",
+   "argv": [
+    "schedule:list",
+    "--server={mock}",
+    "--output=jsonl"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules": {
+     "body": {
+      "schedules": [
+       {
+        "schedule_id": "daily",
+        "workflow_type": "reports.Daily",
+        "status": "active",
+        "next_fire": "2026-04-22T06:00:00Z",
+        "last_fire": null
+       },
+       "junk"
+      ],
+      "namespace": "ns-from-server"
+     }
+    }
+   }
+  },
+  {
+   "name": "schedule:list",
+   "argv": [
+    "schedule:list",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules": {
+     "body": {
+      "schedules": []
+     }
+    }
+   }
+  },
+  {
+   "name": "schedule:list #2",
+   "argv": [
+    "schedule:list",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules": {
+     "body": {
+      "schedules": "abc"
+     }
+    }
+   }
+  },
+  {
+   "name": "schedule:list #3",
+   "argv": [
+    "schedule:list",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules": {
+     "body": {
+      "schedules": 5
+     }
+    }
+   }
+  },
+  {
+   "name": "schedule:list --json #2",
+   "argv": [
+    "schedule:list",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules": {
+     "body": [
+      1,
+      2
+     ]
+    }
+   }
+  },
+  {
+   "name": "schedule:list --json #3",
+   "argv": [
+    "schedule:list",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules": {
+     "body": "not json"
+    }
+   }
+  },
+  {
+   "name": "schedule:list HTTP 500",
+   "argv": [
+    "schedule:list",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules": {
+     "status": 500,
+     "body": {
+      "message": "boom",
+      "reason": "x"
+     }
+    }
+   }
+  },
+  {
+   "name": "schedule:list --json HTTP 422",
+   "argv": [
+    "schedule:list",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules": {
+     "status": 422,
+     "body": {
+      "errors": {
+       "status": [
+        "bad"
+       ]
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "schedule:list HTTP 401",
+   "argv": [
+    "schedule:list",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules": {
+     "status": 401,
+     "body": {
+      "message": "no"
+     }
+    }
+   }
+  },
+  {
+   "name": "schedule:list --limit=201",
+   "argv": [
+    "schedule:list",
+    "--server={mock}",
+    "--limit=201"
+   ],
+   "mock": []
+  },
+  {
+   "name": "schedule:list --limit=abc",
+   "argv": [
+    "schedule:list",
+    "--server={mock}",
+    "--limit=abc"
+   ],
+   "mock": []
+  },
+  {
+   "name": "schedule:list --limit=5",
+   "argv": [
+    "schedule:list",
+    "--server={mock}",
+    "--limit=5\n"
+   ],
+   "mock": []
+  },
+  {
+   "name": "schedule:list --type= --status=x",
+   "argv": [
+    "schedule:list",
+    "--server={mock}",
+    "--type=",
+    "--status=x"
+   ],
+   "mock": []
+  },
+  {
+   "name": "schedule:list --next-page-token=",
+   "argv": [
+    "schedule:list",
+    "--server={mock}",
+    "--next-page-token= "
+   ],
+   "mock": []
+  },
+  {
+   "name": "schedule:list --status=paused --type=t --query=q --limit=5 --next-page-token=n",
+   "argv": [
+    "schedule:list",
+    "--server={mock}",
+    "--status=paused",
+    "--type=t",
+    "--query=q",
+    "--limit=5",
+    "--next-page-token=n"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules": {
+     "body": {
+      "schedules": []
+     }
+    }
+   }
+  },
+  {
+   "name": "schedule:list incompatible server",
+   "argv": [
+    "schedule:list",
+    "--server={mock}"
+   ],
+   "mock": [
+    [
+     [
+      "control_plane",
+      "version"
+     ],
+     "99"
+    ]
+   ]
+  },
+  {
+   "name": "schedule:create --cron=x --json incompatible server",
+   "argv": [
+    "schedule:create",
+    "--cron=x",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [
+    [
+     [
+      "control_plane",
+      "version"
+     ],
+     "99"
+    ]
+   ]
+  },
+  {
+   "name": "schedule:list #4",
+   "argv": [
+    "schedules",
+    "list",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules": {
+     "body": {
+      "schedules": []
+     }
+    }
+   }
+  },
+  {
+   "name": "schedule:describe daily",
+   "argv": [
+    "schedule:describe",
+    "daily",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily": {
+     "body": {
+      "schedule_id": "daily",
+      "spec": {
+       "cron_expressions": [
+        "0 6 * * *"
+       ],
+       "timezone": "UTC"
+      },
+      "action": {
+       "workflow_type": "w",
+       "input": [
+        1,
+        2.5,
+        "a/b"
+       ]
+      },
+      "state": {
+       "paused": false
+      },
+      "overlap_policy": "buffer_one",
+      "jitter_seconds": 30,
+      "max_runs": 10,
+      "remaining_actions": 7,
+      "info": {
+       "buffered_actions": [
+        1,
+        2
+       ],
+       "skipped_trigger_count": 3,
+       "last_skip_reason": "overlap"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "schedule:describe daily #2",
+   "argv": [
+    "schedule:describe",
+    "daily",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily": {
+     "body": {
+      "schedule_id": "daily"
+     }
+    }
+   }
+  },
+  {
+   "name": "schedule:describe daily --json",
+   "argv": [
+    "schedule:describe",
+    "daily",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily": {
+     "body": {
+      "schedule_id": "daily",
+      "namespace": "ns2",
+      "jitter_seconds": "0",
+      "max_runs": 3,
+      "info": "x"
+     }
+    }
+   }
+  },
+  {
+   "name": "schedule:describe daily #3",
+   "argv": [
+    "schedule:describe",
+    "daily",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily": {
+     "body": {
+      "jitter_seconds": 1.5,
+      "max_runs": 2.9,
+      "info": {
+       "buffered_actions": {
+        "a": 1
+       },
+       "skipped_trigger_count": "2",
+       "last_skip_reason": null
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "schedule:describe daily HTTP 404",
+   "argv": [
+    "schedule:describe",
+    "daily",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily": {
+     "status": 404,
+     "body": {
+      "message": "Schedule not found."
+     }
+    }
+   }
+  },
+  {
+   "name": "schedule:describe daily --json HTTP 404",
+   "argv": [
+    "schedule:describe",
+    "daily",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily": {
+     "status": 404,
+     "body": {
+      "message": "Schedule not found."
+     }
+    }
+   }
+  },
+  {
+   "name": "schedule:history daily",
+   "argv": [
+    "schedule:history",
+    "daily",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily/history": {
+     "body": {
+      "events": [
+       {
+        "sequence": 1,
+        "event_type": "ScheduleCreated",
+        "recorded_at": "2026-01-01T00:00:00Z"
+       },
+       {
+        "sequence": 2,
+        "event_type": "ScheduleTriggered",
+        "recorded_at": "2026-01-01T06:00:00Z",
+        "workflow_instance_id": "wf-1",
+        "workflow_run_id": "run-1"
+       }
+      ],
+      "has_more": true,
+      "next_cursor": 2
+     }
+    }
+   }
+  },
+  {
+   "name": "schedule:history daily --json --limit=1 --after-sequence=0",
+   "argv": [
+    "schedule:history",
+    "daily",
+    "--server={mock}",
+    "--json",
+    "--limit=1",
+    "--after-sequence=0"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily/history": {
+     "body": {
+      "events": [
+       {
+        "sequence": 1
+       }
+      ],
+      "has_more": true,
+      "next_cursor": 1
+     }
+    }
+   }
+  },
+  {
+   "name": "schedule:history daily --all --output=jsonl",
+   "argv": [
+    "schedule:history",
+    "daily",
+    "--server={mock}",
+    "--all",
+    "--output=jsonl"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily/history": {
+     "body": {
+      "events": [
+       {
+        "sequence": 1
+       },
+       {
+        "sequence": 2
+       }
+      ],
+      "has_more": false,
+      "next_cursor": null,
+      "namespace": "n3"
+     }
+    }
+   }
+  },
+  {
+   "name": "schedule:history daily --all --json",
+   "argv": [
+    "schedule:history",
+    "daily",
+    "--server={mock}",
+    "--all",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily/history": {
+     "body": {
+      "events": [
+       {
+        "sequence": 1
+       }
+      ],
+      "has_more": true
+     }
+    }
+   }
+  },
+  {
+   "name": "schedule:history daily #2",
+   "argv": [
+    "schedule:history",
+    "daily",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily/history": {
+     "body": {
+      "events": []
+     }
+    }
+   }
+  },
+  {
+   "name": "schedule:history daily #3",
+   "argv": [
+    "schedule:history",
+    "daily",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily/history": {
+     "body": {
+      "events": "x",
+      "has_more": "yes"
+     }
+    }
+   }
+  },
+  {
+   "name": "schedule:history daily #4",
+   "argv": [
+    "schedule:history",
+    "daily",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily/history": {
+     "body": {
+      "events": [
+       5
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "schedule:history daily --limit=501",
+   "argv": [
+    "schedule:history",
+    "daily",
+    "--server={mock}",
+    "--limit=501"
+   ],
+   "mock": []
+  },
+  {
+   "name": "schedule:history daily --after-sequence=-1",
+   "argv": [
+    "schedule:history",
+    "daily",
+    "--server={mock}",
+    "--after-sequence=-1"
+   ],
+   "mock": []
+  },
+  {
+   "name": "schedule:history daily --after-sequence=x --json",
+   "argv": [
+    "schedule:history",
+    "daily",
+    "--server={mock}",
+    "--after-sequence=x",
+    "--json"
+   ],
+   "mock": []
+  },
+  {
+   "name": "schedule:create --schedule-id=daily --workflow-type=reports.Daily --cron=0 6 * * * --task-queue=q --timezone=Europe/Paris --execution-timeout=60 --run-timeout=30 --overlap-policy=buffer_one --jitter=5 --max-runs=3 --paused --note=hello --input={\"a\":[1,{}]} --json",
+   "argv": [
+    "schedule:create",
+    "--schedule-id=daily",
+    "--workflow-type=reports.Daily",
+    "--cron=0 6 * * *",
+    "--task-queue=q",
+    "--timezone=Europe/Paris",
+    "--execution-timeout=60",
+    "--run-timeout=30",
+    "--overlap-policy=buffer_one",
+    "--jitter=5",
+    "--max-runs=3",
+    "--paused",
+    "--note=hello",
+    "--input={\"a\":[1,{}]}",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules": {
+     "method": "POST",
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "schedule:create --interval=PT1H",
+   "argv": [
+    "schedule:create",
+    "--interval=PT1H",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules": {
+     "method": "POST",
+     "body": {
+      "schedule_id": "daily"
+     }
+    }
+   }
+  },
+  {
+   "name": "schedule:create",
+   "argv": [
+    "schedule:create",
+    "--server={mock}"
+   ],
+   "mock": []
+  },
+  {
+   "name": "schedule:create --json",
+   "argv": [
+    "schedule:create",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": []
+  },
+  {
+   "name": "schedule:create --cron=x --schedule-id=d HTTP 409",
+   "argv": [
+    "schedule:create",
+    "--cron=x",
+    "--schedule-id=d",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules": {
+     "method": "POST",
+     "status": 409,
+     "body": {
+      "message": "Schedule already exists.",
+      "reason": "duplicate"
+     }
+    }
+   }
+  },
+  {
+   "name": "schedule:update daily --cron=0 5 * * * --interval=PT2H --workflow-type=w2 --overlap-policy=skip --jitter=60 --max-runs=100 --note=n --input=[1] --json",
+   "argv": [
+    "schedule:update",
+    "daily",
+    "--cron=0 5 * * *",
+    "--interval=PT2H",
+    "--workflow-type=w2",
+    "--overlap-policy=skip",
+    "--jitter=60",
+    "--max-runs=100",
+    "--note=n",
+    "--input=[1]",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily": {
+     "method": "PUT",
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "schedule:update daily --input=7 --json",
+   "argv": [
+    "schedule:update",
+    "daily",
+    "--input=7",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily": {
+     "method": "PUT",
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "schedule:update daily --run-timeout=9",
+   "argv": [
+    "schedule:update",
+    "daily",
+    "--run-timeout=9",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily": {
+     "method": "PUT",
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "schedule:update daily",
+   "argv": [
+    "schedule:update",
+    "daily",
+    "--server={mock}"
+   ],
+   "mock": []
+  },
+  {
+   "name": "schedule:update daily --cron --note --json",
+   "argv": [
+    "schedule:update",
+    "daily",
+    "--cron",
+    "--note",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": []
+  },
+  {
+   "name": "schedule:delete daily",
+   "argv": [
+    "schedule:delete",
+    "daily",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily": {
+     "method": "DELETE",
+     "body": {
+      "deleted": true
+     }
+    }
+   }
+  },
+  {
+   "name": "schedule:delete daily --json",
+   "argv": [
+    "schedule:delete",
+    "daily",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily": {
+     "method": "DELETE",
+     "body": {
+      "deleted": true
+     }
+    }
+   }
+  },
+  {
+   "name": "schedule:pause daily --note=maint --json",
+   "argv": [
+    "schedule:pause",
+    "daily",
+    "--note=maint",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily/pause": {
+     "method": "POST",
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "schedule:pause daily",
+   "argv": [
+    "schedule:pause",
+    "daily",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily/pause": {
+     "method": "POST",
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "schedule:resume daily --json",
+   "argv": [
+    "schedule:resume",
+    "daily",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily/resume": {
+     "method": "POST",
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "schedule:resume daily --note=done",
+   "argv": [
+    "schedule:resume",
+    "daily",
+    "--note=done",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily/resume": {
+     "method": "POST",
+     "body": {}
+    }
+   }
+  },
+  {
+   "name": "schedule:backfill daily --start-time=2026-04-01T00:00:00Z --end-time=2026-04-02T00:00:00Z --overlap-policy=allow_all --json",
+   "argv": [
+    "schedule:backfill",
+    "daily",
+    "--start-time=2026-04-01T00:00:00Z",
+    "--end-time=2026-04-02T00:00:00Z",
+    "--overlap-policy=allow_all",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily/backfill": {
+     "method": "POST",
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "schedule:backfill daily",
+   "argv": [
+    "schedule:backfill",
+    "daily",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily/backfill": {
+     "method": "POST",
+     "body": {
+      "fired": 3
+     }
+    }
+   }
+  },
+  {
+   "name": "schedule:trigger daily outcome triggered",
+   "argv": [
+    "schedule:trigger",
+    "daily",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily/trigger": {
+     "method": "POST",
+     "body": {
+      "workflow_id": "wf-9",
+      "outcome": "triggered"
+     }
+    }
+   }
+  },
+  {
+   "name": "schedule:trigger daily --json outcome triggered",
+   "argv": [
+    "schedule:trigger",
+    "daily",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily/trigger": {
+     "method": "POST",
+     "body": {
+      "workflow_id": "wf-9",
+      "outcome": "triggered"
+     }
+    }
+   }
+  },
+  {
+   "name": "schedule:trigger daily outcome triggered #2",
+   "argv": [
+    "schedule:trigger",
+    "daily",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily/trigger": {
+     "method": "POST",
+     "body": {
+      "outcome": "triggered"
+     }
+    }
+   }
+  },
+  {
+   "name": "schedule:trigger daily --json outcome triggered #2",
+   "argv": [
+    "schedule:trigger",
+    "daily",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily/trigger": {
+     "method": "POST",
+     "body": {
+      "outcome": "triggered"
+     }
+    }
+   }
+  },
+  {
+   "name": "schedule:trigger daily outcome buffered",
+   "argv": [
+    "schedule:trigger",
+    "daily",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily/trigger": {
+     "method": "POST",
+     "body": {
+      "buffer_depth": 2,
+      "outcome": "buffered"
+     }
+    }
+   }
+  },
+  {
+   "name": "schedule:trigger daily --json outcome buffered",
+   "argv": [
+    "schedule:trigger",
+    "daily",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily/trigger": {
+     "method": "POST",
+     "body": {
+      "buffer_depth": 2,
+      "outcome": "buffered"
+     }
+    }
+   }
+  },
+  {
+   "name": "schedule:trigger daily outcome buffer_full",
+   "argv": [
+    "schedule:trigger",
+    "daily",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily/trigger": {
+     "method": "POST",
+     "body": {
+      "outcome": "buffer_full"
+     }
+    }
+   }
+  },
+  {
+   "name": "schedule:trigger daily --json outcome buffer_full",
+   "argv": [
+    "schedule:trigger",
+    "daily",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily/trigger": {
+     "method": "POST",
+     "body": {
+      "outcome": "buffer_full"
+     }
+    }
+   }
+  },
+  {
+   "name": "schedule:trigger daily outcome skipped",
+   "argv": [
+    "schedule:trigger",
+    "daily",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily/trigger": {
+     "method": "POST",
+     "body": {
+      "reason": "exhausted now",
+      "outcome": "skipped"
+     }
+    }
+   }
+  },
+  {
+   "name": "schedule:trigger daily --json outcome skipped",
+   "argv": [
+    "schedule:trigger",
+    "daily",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily/trigger": {
+     "method": "POST",
+     "body": {
+      "reason": "exhausted now",
+      "outcome": "skipped"
+     }
+    }
+   }
+  },
+  {
+   "name": "schedule:trigger daily outcome trigger_failed",
+   "argv": [
+    "schedule:trigger",
+    "daily",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily/trigger": {
+     "method": "POST",
+     "body": {
+      "outcome": "trigger_failed"
+     }
+    }
+   }
+  },
+  {
+   "name": "schedule:trigger daily --json outcome trigger_failed",
+   "argv": [
+    "schedule:trigger",
+    "daily",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily/trigger": {
+     "method": "POST",
+     "body": {
+      "outcome": "trigger_failed"
+     }
+    }
+   }
+  },
+  {
+   "name": "schedule:trigger daily outcome weird",
+   "argv": [
+    "schedule:trigger",
+    "daily",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily/trigger": {
+     "method": "POST",
+     "body": {
+      "outcome": "weird"
+     }
+    }
+   }
+  },
+  {
+   "name": "schedule:trigger daily --json outcome weird",
+   "argv": [
+    "schedule:trigger",
+    "daily",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily/trigger": {
+     "method": "POST",
+     "body": {
+      "outcome": "weird"
+     }
+    }
+   }
+  },
+  {
+   "name": "schedule:trigger daily",
+   "argv": [
+    "schedule:trigger",
+    "daily",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily/trigger": {
+     "method": "POST",
+     "body": {}
+    }
+   }
+  },
+  {
+   "name": "schedule:trigger daily --json",
+   "argv": [
+    "schedule:trigger",
+    "daily",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily/trigger": {
+     "method": "POST",
+     "body": {}
+    }
+   }
+  },
+  {
+   "name": "schedule:trigger daily --overlap-policy=allow_all --json",
+   "argv": [
+    "schedule:trigger",
+    "daily",
+    "--overlap-policy=allow_all",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily/trigger": {
+     "method": "POST",
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "schedule:trigger daily --overlap-policy --json",
+   "argv": [
+    "schedule:trigger",
+    "daily",
+    "--overlap-policy",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily/trigger": {
+     "method": "POST",
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "schedule describe redirect is refused without following",
+   "argv": [
+    "schedule:describe",
+    "daily",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily": {
+     "method": "GET",
+     "status": 302,
+     "body": {
+      "message": "redirected"
+     },
+     "headers": {
+      "Location": "/no-replay"
+     }
+    }
+   },
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "exit_code",
+      "stdout_json"
+     ],
+     "reason": "The SDK makes one target attempt without following redirects. Rust refuses the initial 3xx; the PHP reference follows the redirect and receives a different refusal. Use the actual Server URL (cli#72)."
+    }
+   }
+  },
+  {
+   "name": "schedule pause redirect is refused without following",
+   "argv": [
+    "schedule:pause",
+    "daily",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/schedules/daily/pause": {
+     "method": "POST",
+     "status": 302,
+     "body": {
+      "message": "redirected"
+     },
+     "headers": {
+      "Location": "/no-replay"
+     }
+    }
+   },
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "exit_code",
+      "stdout_json"
+     ],
+     "reason": "The SDK makes one target attempt without following redirects. Rust refuses the initial 3xx; the PHP reference follows the redirect and receives a different refusal. Use the actual Server URL (cli#72)."
+    }
+   }
   }
  ]
 }

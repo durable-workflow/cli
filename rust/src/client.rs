@@ -112,6 +112,13 @@ impl Context {
         self.namespace_request(RawRequest::delete(["namespaces", name]))
     }
 
+    /// One request for a resource outside the workflow response contract,
+    /// such as a schedule: one attempt, no redirect followed, the body
+    /// decoded as the 2.x client decodes it.
+    pub fn resource_request(&self, request: RawRequest) -> Result<Value, CliError> {
+        self.namespace_request(request)
+    }
+
     fn namespace_request(&self, request: RawRequest) -> Result<Value, CliError> {
         let request = request
             .protocol_version(compat::worker_protocol_version())

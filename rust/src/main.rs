@@ -12,7 +12,9 @@ mod error;
 mod formatter;
 mod lookup;
 mod output;
+mod payload;
 mod php;
+mod php_json;
 
 use cli::{Input, UsageError};
 use descriptor::Format;
@@ -33,7 +35,8 @@ enum Handler {
 /// reported as not yet available.
 fn handler(name: &str) -> Option<Handler> {
     use commands::{
-        completion, doctor, env, namespace, runtime, schema, server, start_dev, upgrade, workflow,
+        completion, doctor, env, namespace, runtime, schedule, schema, server, start_dev, upgrade,
+        workflow,
     };
     Some(match name {
         "completion" => Handler::Local(completion::completion),
@@ -54,6 +57,16 @@ fn handler(name: &str) -> Option<Handler> {
         "namespace:update" => Handler::Server(namespace::update),
         "namespace:delete" => Handler::Server(namespace::delete),
         "workflow:list-runs" => Handler::Server(workflow::list_runs),
+        "schedule:list" => Handler::Server(schedule::list),
+        "schedule:describe" => Handler::Server(schedule::describe),
+        "schedule:history" => Handler::Server(schedule::history),
+        "schedule:create" => Handler::Server(schedule::create),
+        "schedule:update" => Handler::Server(schedule::update),
+        "schedule:delete" => Handler::Server(schedule::delete),
+        "schedule:pause" => Handler::Server(schedule::pause),
+        "schedule:resume" => Handler::Server(schedule::resume),
+        "schedule:trigger" => Handler::Server(schedule::trigger),
+        "schedule:backfill" => Handler::Server(schedule::backfill),
         "env:list" => Handler::Local(env::list),
         "env:set" => Handler::Local(env::set),
         "env:use" => Handler::Local(env::use_env),
@@ -64,7 +77,20 @@ fn handler(name: &str) -> Option<Handler> {
 }
 
 /// Commands whose errors carry the resolved namespace.
-const NAMESPACE_SCOPED: &[&str] = &["workflow:list", "workflow:list-runs"];
+const NAMESPACE_SCOPED: &[&str] = &[
+    "workflow:list",
+    "workflow:list-runs",
+    "schedule:backfill",
+    "schedule:create",
+    "schedule:delete",
+    "schedule:describe",
+    "schedule:history",
+    "schedule:list",
+    "schedule:pause",
+    "schedule:resume",
+    "schedule:trigger",
+    "schedule:update",
+];
 
 /// Verbs of a group and the command each one names.
 type GroupVerbs = &'static [(&'static str, &'static str)];

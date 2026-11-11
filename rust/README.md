@@ -27,7 +27,8 @@ every command group reaches parity.
 | `workflow:list`: one namespace/page, filters, Server envelopes, JSON and JSONL | Ported |
 | `workflow:list-runs`: one workflow response page, envelope/cursor, JSON and JSONL | Ported |
 | `namespace:list`, `namespace:describe`, `namespace:create`, `namespace:update`, `namespace:delete`: namespace configuration and lifecycle, JSON and JSONL | Ported |
-| Workflow, namespace and schedule commands | Next slices |
+| `schedule:list`, `schedule:describe`, `schedule:history`, `schedule:create`, `schedule:update`, `schedule:delete`, `schedule:pause`, `schedule:resume`, `schedule:trigger`, `schedule:backfill`: JSON and JSONL, `--input`/`--input-file`/`--input-encoding` | Ported |
+| Remaining workflow and namespace commands | Next slices |
 | `--tls-verify=false` against HTTPS | CLI support pending |
 
 Server calls go through the published `durable-workflow` crate, pinned to
@@ -53,6 +54,18 @@ Namespace lifecycle requests make one target attempt and refuse HTTP redirects.
 Use the actual Server URL; a redirect is not reported as a completed creation,
 update or deletion. A lost response remains uncertain and is not automatically
 submitted again.
+
+Schedule commands follow the same rules: one request per history page or
+mutation, no redirect followed, and no automatic resubmission after a lost
+response. The schedule ID is sent as one percent-encoded path segment, so IDs
+containing `/`, `?` or `#` cannot select another route. Empty IDs and `.` or
+`..` are refused with exit 2 before the request.
+
+`--input` values are decoded with PHP's JSON rules and error messages, including
+the 511-level nesting limit, integers past 64 bits becoming floats, and `null`
+meaning no input. Input PHP decodes but cannot send, such as `1e400` or invalid
+UTF-8 from `--input-encoding=raw|base64`, is refused with exit 3 after the
+compatibility check, without a request, as 2.x reports it.
 
 ## Build and test
 

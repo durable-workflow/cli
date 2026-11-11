@@ -132,6 +132,23 @@ impl Context {
         self.workflow_read(request, path)
     }
 
+    /// One workflow command with a JSON body and the workflow response
+    /// contract: one attempt, no redirect followed. `timeout` replaces the
+    /// SDK default for this request only.
+    pub fn workflow_post(
+        &self,
+        segments: &[&str],
+        body: Value,
+        path: &str,
+        timeout: Option<Duration>,
+    ) -> Result<Value, CliError> {
+        let mut request = RawRequest::post(segments.iter().copied()).json(body);
+        if let Some(timeout) = timeout {
+            request = request.timeout(timeout);
+        }
+        self.workflow_read(request, path)
+    }
+
     /// A history export: 2.x passes the Server's bundle through without the
     /// workflow response contract.
     pub fn workflow_history_export(

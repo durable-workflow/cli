@@ -1129,7 +1129,15 @@
    "argv": [
     "list",
     "--format=md"
-   ]
+   ],
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "stdout_text"
+     ],
+     "reason": "The workflow:signal entry lists PHP main's --request-id option (cli#61, cli#72)."
+    }
+   }
   },
   {
    "name": "list raw",
@@ -10917,6 +10925,3123 @@
       "stdout_json"
      ],
      "reason": "The SDK makes one target attempt without following redirects. Rust refuses the initial 3xx; the PHP reference follows the redirect and receives a different refusal. Use the actual Server URL (cli#72)."
+    }
+   }
+  },
+  {
+   "name": "workflow query human",
+   "argv": [
+    "workflow:query",
+    "chk-42",
+    "status",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/query/status": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "query_name": "status",
+      "result": {
+       "stage": "<b>shipping</b>",
+       "items": [
+        1,
+        2
+       ],
+       "path": "a/b"
+      },
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "query",
+       "operation_name": "status",
+       "operation_name_field": "query_name",
+       "workflow_id": "chk-42",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow query JSON",
+   "argv": [
+    "workflow:query",
+    "chk-42",
+    "status",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/query/status": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "query_name": "status",
+      "result": {
+       "stage": "<b>shipping</b>",
+       "items": [
+        1,
+        2
+       ],
+       "path": "a/b"
+      },
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "query",
+       "operation_name": "status",
+       "operation_name_field": "query_name",
+       "workflow_id": "chk-42",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow query input JSON",
+   "argv": [
+    "workflow:query",
+    "chk-42",
+    "status",
+    "--server={mock}",
+    "--input={\"currency\":\"USD\"}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/query/status": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "query_name": "status",
+      "result": {
+       "stage": "<b>shipping</b>",
+       "items": [
+        1,
+        2
+       ],
+       "path": "a/b"
+      },
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "query",
+       "operation_name": "status",
+       "operation_name_field": "query_name",
+       "workflow_id": "chk-42",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow query scalar input",
+   "argv": [
+    "workflow:query",
+    "chk-42",
+    "status",
+    "--server={mock}",
+    "-i",
+    "42",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/query/status": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "query_name": "status",
+      "result": {
+       "stage": "<b>shipping</b>",
+       "items": [
+        1,
+        2
+       ],
+       "path": "a/b"
+      },
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "query",
+       "operation_name": "status",
+       "operation_name_field": "query_name",
+       "workflow_id": "chk-42",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow query raw input",
+   "argv": [
+    "workflow:query",
+    "chk-42",
+    "status",
+    "--server={mock}",
+    "--input=plain text",
+    "--input-encoding=raw",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/query/status": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "query_name": "status",
+      "result": {
+       "stage": "<b>shipping</b>",
+       "items": [
+        1,
+        2
+       ],
+       "path": "a/b"
+      },
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "query",
+       "operation_name": "status",
+       "operation_name_field": "query_name",
+       "workflow_id": "chk-42",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow query base64 input",
+   "argv": [
+    "workflow:query",
+    "chk-42",
+    "status",
+    "--server={mock}",
+    "--input=eyJhIjoxfQ==",
+    "--input-encoding=base64",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/query/status": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "query_name": "status",
+      "result": {
+       "stage": "<b>shipping</b>",
+       "items": [
+        1,
+        2
+       ],
+       "path": "a/b"
+      },
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "query",
+       "operation_name": "status",
+       "operation_name_field": "query_name",
+       "workflow_id": "chk-42",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow query run-id",
+   "argv": [
+    "workflow:query",
+    "chk-42",
+    "status",
+    "--server={mock}",
+    "--run-id=run-7",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/runs/run-7/query/status": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "query_name": "status",
+      "result": {
+       "stage": "<b>shipping</b>",
+       "items": [
+        1,
+        2
+       ],
+       "path": "a/b"
+      },
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "query",
+       "operation_name": "status",
+       "operation_name_field": "query_name",
+       "workflow_id": "chk-42",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow query invalid JSON input",
+   "argv": [
+    "workflow:query",
+    "chk-42",
+    "status",
+    "--server={mock}",
+    "--input={\"a\":",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/query/status": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "query_name": "status",
+      "result": {
+       "stage": "<b>shipping</b>",
+       "items": [
+        1,
+        2
+       ],
+       "path": "a/b"
+      },
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "query",
+       "operation_name": "status",
+       "operation_name_field": "query_name",
+       "workflow_id": "chk-42",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow query invalid JSON input human",
+   "argv": [
+    "workflow:query",
+    "chk-42",
+    "status",
+    "--server={mock}",
+    "--input=[1,]"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/query/status": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "query_name": "status",
+      "result": {
+       "stage": "<b>shipping</b>",
+       "items": [
+        1,
+        2
+       ],
+       "path": "a/b"
+      },
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "query",
+       "operation_name": "status",
+       "operation_name_field": "query_name",
+       "workflow_id": "chk-42",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow query control character input",
+   "argv": [
+    "workflow:query",
+    "chk-42",
+    "status",
+    "--server={mock}",
+    "--input=\"a\u0001\"",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/query/status": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "query_name": "status",
+      "result": {
+       "stage": "<b>shipping</b>",
+       "items": [
+        1,
+        2
+       ],
+       "path": "a/b"
+      },
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "query",
+       "operation_name": "status",
+       "operation_name_field": "query_name",
+       "workflow_id": "chk-42",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow query invalid base64",
+   "argv": [
+    "workflow:query",
+    "chk-42",
+    "status",
+    "--server={mock}",
+    "--input=Y",
+    "--input-encoding=base64",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/query/status": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "query_name": "status",
+      "result": {
+       "stage": "<b>shipping</b>",
+       "items": [
+        1,
+        2
+       ],
+       "path": "a/b"
+      },
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "query",
+       "operation_name": "status",
+       "operation_name_field": "query_name",
+       "workflow_id": "chk-42",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow query unknown encoding",
+   "argv": [
+    "workflow:query",
+    "chk-42",
+    "status",
+    "--server={mock}",
+    "--input=1",
+    "--input-encoding=yaml",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/query/status": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "query_name": "status",
+      "result": {
+       "stage": "<b>shipping</b>",
+       "items": [
+        1,
+        2
+       ],
+       "path": "a/b"
+      },
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "query",
+       "operation_name": "status",
+       "operation_name_field": "query_name",
+       "workflow_id": "chk-42",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow query unknown encoding without input",
+   "argv": [
+    "workflow:query",
+    "chk-42",
+    "status",
+    "--server={mock}",
+    "--input-encoding=yaml",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/query/status": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "query_name": "status",
+      "result": {
+       "stage": "<b>shipping</b>",
+       "items": [
+        1,
+        2
+       ],
+       "path": "a/b"
+      },
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "query",
+       "operation_name": "status",
+       "operation_name_field": "query_name",
+       "workflow_id": "chk-42",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow query input and file",
+   "argv": [
+    "workflow:query",
+    "chk-42",
+    "status",
+    "--server={mock}",
+    "--input=1",
+    "--input-file=x.json",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/query/status": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "query_name": "status",
+      "result": {
+       "stage": "<b>shipping</b>",
+       "items": [
+        1,
+        2
+       ],
+       "path": "a/b"
+      },
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "query",
+       "operation_name": "status",
+       "operation_name_field": "query_name",
+       "workflow_id": "chk-42",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow query missing input file",
+   "argv": [
+    "workflow:query",
+    "chk-42",
+    "status",
+    "--server={mock}",
+    "--input-file=/nonexistent/dw-parity.json",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/query/status": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "query_name": "status",
+      "result": {
+       "stage": "<b>shipping</b>",
+       "items": [
+        1,
+        2
+       ],
+       "path": "a/b"
+      },
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "query",
+       "operation_name": "status",
+       "operation_name_field": "query_name",
+       "workflow_id": "chk-42",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow query not found",
+   "argv": [
+    "workflow:query",
+    "chk-42",
+    "status",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/query/status": {
+     "method": "POST",
+     "status": 404,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "message": "Workflow not found."
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow query rejected human",
+   "argv": [
+    "workflow:query",
+    "chk-42",
+    "status",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/query/status": {
+     "method": "POST",
+     "status": 409,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "message": "Query rejected.",
+      "reason": "query_rejected"
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow describe run-id not found JSON",
+   "argv": [
+    "workflow:describe",
+    "chk-42",
+    "--run-id=run-7",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/runs/run-7": {
+     "status": 404,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "message": "Run not found."
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow signal human",
+   "argv": [
+    "workflow:signal",
+    "chk-42",
+    "approve",
+    "--server={mock}",
+    "--request-id=approve-1"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/signal/approve": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "signal_name": "approve",
+      "outcome": "signal_received",
+      "command_status": "accepted",
+      "command_id": "cmd-1",
+      "request_id": "approve-1",
+      "retained": true,
+      "intent_verified": false,
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "signal",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "operation_name": "approve",
+       "operation_name_field": "signal_name",
+       "workflow_id": "chk-42"
+      }
+     }
+    }
+   },
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "exit_code",
+      "stderr",
+      "stderr_category",
+      "stdout_text"
+     ],
+     "reason": "Published 2.3.5 sends signals without a command key and has no --request-id. This port follows PHP main's signal command key (cli#61): a generated or caller key, its receipt lines and its error context (cli#72)."
+    }
+   }
+  },
+  {
+   "name": "workflow signal JSON",
+   "argv": [
+    "workflow:signal",
+    "chk-42",
+    "approve",
+    "--server={mock}",
+    "--request-id=approve-1",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/signal/approve": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "signal_name": "approve",
+      "outcome": "signal_received",
+      "command_status": "accepted",
+      "command_id": "cmd-1",
+      "request_id": "approve-1",
+      "retained": true,
+      "intent_verified": false,
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "signal",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "operation_name": "approve",
+       "operation_name_field": "signal_name",
+       "workflow_id": "chk-42"
+      }
+     }
+    }
+   },
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "exit_code",
+      "stderr",
+      "stderr_category",
+      "stdout_json",
+      "stdout_text"
+     ],
+     "reason": "Published 2.3.5 sends signals without a command key and has no --request-id. This port follows PHP main's signal command key (cli#61): a generated or caller key, its receipt lines and its error context (cli#72)."
+    }
+   }
+  },
+  {
+   "name": "workflow signal legacy server keeps the key",
+   "argv": [
+    "workflow:signal",
+    "chk-42",
+    "approve",
+    "--server={mock}",
+    "--request-id=approve-1",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/signal/approve": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "signal_name": "approve",
+      "outcome": "signal_received",
+      "command_status": "accepted",
+      "command_id": "cmd-1",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "signal",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "operation_name": "approve",
+       "operation_name_field": "signal_name",
+       "workflow_id": "chk-42"
+      }
+     }
+    }
+   },
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "exit_code",
+      "stderr",
+      "stderr_category",
+      "stdout_json",
+      "stdout_text"
+     ],
+     "reason": "Published 2.3.5 sends signals without a command key and has no --request-id. This port follows PHP main's signal command key (cli#61): a generated or caller key, its receipt lines and its error context (cli#72)."
+    }
+   }
+  },
+  {
+   "name": "workflow signal legacy server human",
+   "argv": [
+    "workflow:signal",
+    "chk-42",
+    "approve",
+    "--server={mock}",
+    "--request-id=approve-1"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/signal/approve": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "signal_name": "approve",
+      "outcome": "signal_received",
+      "command_status": "accepted",
+      "command_id": "cmd-1",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "signal",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "operation_name": "approve",
+       "operation_name_field": "signal_name",
+       "workflow_id": "chk-42"
+      }
+     }
+    }
+   },
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "exit_code",
+      "stderr",
+      "stderr_category",
+      "stdout_text"
+     ],
+     "reason": "Published 2.3.5 sends signals without a command key and has no --request-id. This port follows PHP main's signal command key (cli#61): a generated or caller key, its receipt lines and its error context (cli#72)."
+    }
+   }
+  },
+  {
+   "name": "workflow signal input JSON",
+   "argv": [
+    "workflow:signal",
+    "chk-42",
+    "approve",
+    "--server={mock}",
+    "--request-id=approve-1",
+    "-i",
+    "{\"amount\":99.95}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/signal/approve": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "signal_name": "approve",
+      "outcome": "signal_received",
+      "command_status": "accepted",
+      "command_id": "cmd-1",
+      "request_id": "approve-1",
+      "retained": true,
+      "intent_verified": false,
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "signal",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "operation_name": "approve",
+       "operation_name_field": "signal_name",
+       "workflow_id": "chk-42"
+      }
+     }
+    }
+   },
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "exit_code",
+      "stderr",
+      "stderr_category",
+      "stdout_json",
+      "stdout_text"
+     ],
+     "reason": "Published 2.3.5 sends signals without a command key and has no --request-id. This port follows PHP main's signal command key (cli#61): a generated or caller key, its receipt lines and its error context (cli#72)."
+    }
+   }
+  },
+  {
+   "name": "workflow signal run-id",
+   "argv": [
+    "workflow:signal",
+    "chk-42",
+    "approve",
+    "--server={mock}",
+    "--run-id=run-7",
+    "--request-id=approve-1",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/runs/run-7/signal/approve": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "signal_name": "approve",
+      "outcome": "signal_received",
+      "command_status": "accepted",
+      "command_id": "cmd-1",
+      "request_id": "approve-1",
+      "retained": true,
+      "intent_verified": false,
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "signal",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "operation_name": "approve",
+       "operation_name_field": "signal_name",
+       "workflow_id": "chk-42"
+      }
+     }
+    }
+   },
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "exit_code",
+      "stderr",
+      "stderr_category",
+      "stdout_json",
+      "stdout_text"
+     ],
+     "reason": "Published 2.3.5 sends signals without a command key and has no --request-id. This port follows PHP main's signal command key (cli#61): a generated or caller key, its receipt lines and its error context (cli#72)."
+    }
+   }
+  },
+  {
+   "name": "workflow signal blank request id",
+   "argv": [
+    "workflow:signal",
+    "chk-42",
+    "approve",
+    "--server={mock}",
+    "--request-id=   ",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/signal/approve": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "signal_name": "approve",
+      "outcome": "signal_received",
+      "command_status": "accepted",
+      "command_id": "cmd-1",
+      "request_id": "approve-1",
+      "retained": true,
+      "intent_verified": false,
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "signal",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "operation_name": "approve",
+       "operation_name_field": "signal_name",
+       "workflow_id": "chk-42"
+      }
+     }
+    }
+   },
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "exit_code",
+      "stderr",
+      "stderr_category",
+      "stdout_json",
+      "stdout_text"
+     ],
+     "reason": "Published 2.3.5 sends signals without a command key and has no --request-id. This port follows PHP main's signal command key (cli#61): a generated or caller key, its receipt lines and its error context (cli#72)."
+    }
+   }
+  },
+  {
+   "name": "workflow signal blank request id human",
+   "argv": [
+    "workflow:signal",
+    "chk-42",
+    "approve",
+    "--server={mock}",
+    "--request-id= "
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/signal/approve": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "signal_name": "approve",
+      "outcome": "signal_received",
+      "command_status": "accepted",
+      "command_id": "cmd-1",
+      "request_id": "approve-1",
+      "retained": true,
+      "intent_verified": false,
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "signal",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "operation_name": "approve",
+       "operation_name_field": "signal_name",
+       "workflow_id": "chk-42"
+      }
+     }
+    }
+   },
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "exit_code",
+      "stderr",
+      "stderr_category"
+     ],
+     "reason": "Published 2.3.5 sends signals without a command key and has no --request-id. This port follows PHP main's signal command key (cli#61): a generated or caller key, its receipt lines and its error context (cli#72)."
+    }
+   }
+  },
+  {
+   "name": "workflow signal request id without value",
+   "argv": [
+    "workflow:signal",
+    "chk-42",
+    "approve",
+    "--server={mock}",
+    "--json",
+    "--request-id"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/signal/approve": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "signal_name": "approve",
+      "outcome": "signal_received",
+      "command_status": "accepted",
+      "command_id": "cmd-1",
+      "request_id": "approve-1",
+      "retained": true,
+      "intent_verified": false,
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "signal",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "operation_name": "approve",
+       "operation_name_field": "signal_name",
+       "workflow_id": "chk-42"
+      }
+     }
+    }
+   },
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "exit_code",
+      "stderr",
+      "stderr_category",
+      "stdout_json",
+      "stdout_text"
+     ],
+     "reason": "Published 2.3.5 sends signals without a command key and has no --request-id. This port follows PHP main's signal command key (cli#61): a generated or caller key, its receipt lines and its error context (cli#72)."
+    }
+   }
+  },
+  {
+   "name": "workflow signal request id too long",
+   "argv": [
+    "workflow:signal",
+    "chk-42",
+    "approve",
+    "--server={mock}",
+    "--request-id=éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/signal/approve": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "signal_name": "approve",
+      "outcome": "signal_received",
+      "command_status": "accepted",
+      "command_id": "cmd-1",
+      "request_id": "approve-1",
+      "retained": true,
+      "intent_verified": false,
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "signal",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "operation_name": "approve",
+       "operation_name_field": "signal_name",
+       "workflow_id": "chk-42"
+      }
+     }
+    }
+   },
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "exit_code",
+      "stderr",
+      "stderr_category",
+      "stdout_json",
+      "stdout_text"
+     ],
+     "reason": "Published 2.3.5 sends signals without a command key and has no --request-id. This port follows PHP main's signal command key (cli#61): a generated or caller key, its receipt lines and its error context (cli#72)."
+    }
+   }
+  },
+  {
+   "name": "workflow signal request id conflict JSON",
+   "argv": [
+    "workflow:signal",
+    "chk-42",
+    "approve",
+    "--server={mock}",
+    "--request-id=approve-1",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/signal/approve": {
+     "method": "POST",
+     "status": 409,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "message": "Request id already used.",
+      "reason": "request_id_conflict",
+      "request_id": "approve-1",
+      "retained_command_id": "cmd-0",
+      "retained_command_type": "update",
+      "retained_outcome": "update_accepted",
+      "conflict": [
+       "command_type",
+       "name"
+      ]
+     }
+    }
+   },
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "exit_code",
+      "stderr",
+      "stderr_category",
+      "stdout_json",
+      "stdout_text"
+     ],
+     "reason": "Published 2.3.5 sends signals without a command key and has no --request-id. This port follows PHP main's signal command key (cli#61): a generated or caller key, its receipt lines and its error context (cli#72)."
+    }
+   }
+  },
+  {
+   "name": "workflow signal request id conflict human",
+   "argv": [
+    "workflow:signal",
+    "chk-42",
+    "approve",
+    "--server={mock}",
+    "--request-id=approve-1"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/signal/approve": {
+     "method": "POST",
+     "status": 409,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "message": "Request id already used.",
+      "reason": "request_id_conflict",
+      "request_id": "approve-1",
+      "retained_command_id": "cmd-0",
+      "retained_command_type": "update",
+      "retained_outcome": "update_accepted",
+      "conflict": [
+       "command_type",
+       "name"
+      ]
+     }
+    }
+   },
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "exit_code",
+      "stderr",
+      "stderr_category"
+     ],
+     "reason": "Published 2.3.5 sends signals without a command key and has no --request-id. This port follows PHP main's signal command key (cli#61): a generated or caller key, its receipt lines and its error context (cli#72)."
+    }
+   }
+  },
+  {
+   "name": "workflow signal server error is unknown outcome JSON",
+   "argv": [
+    "workflow:signal",
+    "chk-42",
+    "approve",
+    "--server={mock}",
+    "--request-id=approve-1",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/signal/approve": {
+     "method": "POST",
+     "status": 503,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "message": "Database unavailable."
+     }
+    }
+   },
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "exit_code",
+      "stderr",
+      "stderr_category",
+      "stdout_json",
+      "stdout_text"
+     ],
+     "reason": "Published 2.3.5 sends signals without a command key and has no --request-id. This port follows PHP main's signal command key (cli#61): a generated or caller key, its receipt lines and its error context (cli#72)."
+    }
+   }
+  },
+  {
+   "name": "workflow signal server error is unknown outcome human",
+   "argv": [
+    "workflow:signal",
+    "chk-42",
+    "approve",
+    "--server={mock}",
+    "--request-id=approve-1"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/signal/approve": {
+     "method": "POST",
+     "status": 500,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "message": "Database unavailable."
+     }
+    }
+   },
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "exit_code",
+      "stderr",
+      "stderr_category"
+     ],
+     "reason": "Published 2.3.5 sends signals without a command key and has no --request-id. This port follows PHP main's signal command key (cli#61): a generated or caller key, its receipt lines and its error context (cli#72)."
+    }
+   }
+  },
+  {
+   "name": "workflow signal not found",
+   "argv": [
+    "workflow:signal",
+    "chk-42",
+    "approve",
+    "--server={mock}",
+    "--request-id=approve-1",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/signal/approve": {
+     "method": "POST",
+     "status": 404,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "message": "Workflow not found."
+     }
+    }
+   },
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "exit_code",
+      "stderr",
+      "stderr_category",
+      "stdout_json",
+      "stdout_text"
+     ],
+     "reason": "Published 2.3.5 sends signals without a command key and has no --request-id. This port follows PHP main's signal command key (cli#61): a generated or caller key, its receipt lines and its error context (cli#72)."
+    }
+   }
+  },
+  {
+   "name": "workflow signal invalid input keeps the key",
+   "argv": [
+    "workflow:signal",
+    "chk-42",
+    "approve",
+    "--server={mock}",
+    "--request-id=approve-1",
+    "--input={",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/signal/approve": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "signal_name": "approve",
+      "outcome": "signal_received",
+      "command_status": "accepted",
+      "command_id": "cmd-1",
+      "request_id": "approve-1",
+      "retained": true,
+      "intent_verified": false,
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "signal",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "operation_name": "approve",
+       "operation_name_field": "signal_name",
+       "workflow_id": "chk-42"
+      }
+     }
+    }
+   },
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "exit_code",
+      "stderr",
+      "stderr_category",
+      "stdout_json",
+      "stdout_text"
+     ],
+     "reason": "Published 2.3.5 sends signals without a command key and has no --request-id. This port follows PHP main's signal command key (cli#61): a generated or caller key, its receipt lines and its error context (cli#72)."
+    }
+   }
+  },
+  {
+   "name": "workflow update human",
+   "argv": [
+    "workflow:update",
+    "chk-42",
+    "quota.adjust",
+    "--server={mock}",
+    "--wait=completed",
+    "--request-id=quota-1",
+    "-i",
+    "[{\"quota\":50}]"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/update/quota.adjust": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "update_name": "quota.adjust",
+      "update_id": "upd-1",
+      "outcome": "update_completed",
+      "command_status": "accepted",
+      "command_id": "cmd-9",
+      "update_status": "completed",
+      "wait_for": "completed",
+      "workflow_sequence": 12,
+      "result": {
+       "quota": 50
+      },
+      "request_id": "quota-1",
+      "retained": false,
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "update",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "operation_name": "quota.adjust",
+       "operation_name_field": "update_name",
+       "workflow_id": "chk-42",
+       "update_id": "upd-1"
+      }
+     }
+    }
+   },
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "stdout_text"
+     ],
+     "reason": "Published 2.3.5 predates the command-key contract merged on PHP main in cli#61: update receipts with retained/intent fields, request-ID error context, conflict and unknown-outcome guidance, and refusal of blank keys. This port follows PHP main (cli#72)."
+    }
+   }
+  },
+  {
+   "name": "workflow update JSON",
+   "argv": [
+    "workflow:update",
+    "chk-42",
+    "quota.adjust",
+    "--server={mock}",
+    "--wait=completed",
+    "--request-id=quota-1",
+    "-i",
+    "[{\"quota\":50}]",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/update/quota.adjust": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "update_name": "quota.adjust",
+      "update_id": "upd-1",
+      "outcome": "update_completed",
+      "command_status": "accepted",
+      "command_id": "cmd-9",
+      "update_status": "completed",
+      "wait_for": "completed",
+      "workflow_sequence": 12,
+      "result": {
+       "quota": 50
+      },
+      "request_id": "quota-1",
+      "retained": false,
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "update",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "operation_name": "quota.adjust",
+       "operation_name_field": "update_name",
+       "workflow_id": "chk-42",
+       "update_id": "upd-1"
+      }
+     }
+    }
+   },
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "stdout_json"
+     ],
+     "reason": "Published 2.3.5 predates the command-key contract merged on PHP main in cli#61: update receipts with retained/intent fields, request-ID error context, conflict and unknown-outcome guidance, and refusal of blank keys. This port follows PHP main (cli#72)."
+    }
+   }
+  },
+  {
+   "name": "workflow update minimal response JSON",
+   "argv": [
+    "workflow:update",
+    "chk-42",
+    "quota.adjust",
+    "--server={mock}",
+    "--request-id=quota-1",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/update/quota.adjust": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "update_id": "upd-1",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "update",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "operation_name": "quota.adjust",
+       "operation_name_field": "update_name",
+       "workflow_id": "chk-42",
+       "update_id": "upd-1"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow update minimal response human",
+   "argv": [
+    "workflow:update",
+    "chk-42",
+    "quota.adjust",
+    "--server={mock}",
+    "--request-id=quota-1"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/update/quota.adjust": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "update_id": "upd-1",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "update",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "operation_name": "quota.adjust",
+       "operation_name_field": "update_name",
+       "workflow_id": "chk-42",
+       "update_id": "upd-1"
+      }
+     }
+    }
+   },
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "stdout_text"
+     ],
+     "reason": "Published 2.3.5 predates the command-key contract merged on PHP main in cli#61: update receipts with retained/intent fields, request-ID error context, conflict and unknown-outcome guidance, and refusal of blank keys. This port follows PHP main (cli#72). 2.3.5 also prints a PHP 'Undefined array key' warning for a response without outcome."
+    }
+   }
+  },
+  {
+   "name": "workflow update object input JSON",
+   "argv": [
+    "workflow:update",
+    "chk-42",
+    "quota.adjust",
+    "--server={mock}",
+    "--request-id=quota-1",
+    "-i",
+    "{\"by\":10,\"meta\":{}}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/update/quota.adjust": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "update_id": "upd-1",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "update",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "operation_name": "quota.adjust",
+       "operation_name_field": "update_name",
+       "workflow_id": "chk-42",
+       "update_id": "upd-1"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow update run-id JSON",
+   "argv": [
+    "workflow:update",
+    "chk-42",
+    "quota.adjust",
+    "--server={mock}",
+    "--run-id=run-7",
+    "--request-id=quota-1",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/runs/run-7/update/quota.adjust": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "update_id": "upd-1",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "update",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "operation_name": "quota.adjust",
+       "operation_name_field": "update_name",
+       "workflow_id": "chk-42",
+       "update_id": "upd-1"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow update empty wait means accepted",
+   "argv": [
+    "workflow:update",
+    "chk-42",
+    "quota.adjust",
+    "--server={mock}",
+    "--wait=",
+    "--request-id=quota-1",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/update/quota.adjust": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "update_id": "upd-1",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "update",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "operation_name": "quota.adjust",
+       "operation_name_field": "update_name",
+       "workflow_id": "chk-42",
+       "update_id": "upd-1"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow update unknown wait policy",
+   "argv": [
+    "workflow:update",
+    "chk-42",
+    "quota.adjust",
+    "--server={mock}",
+    "--wait=done",
+    "--request-id=quota-1",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/update/quota.adjust": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "update_id": "upd-1",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "update",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "operation_name": "quota.adjust",
+       "operation_name_field": "update_name",
+       "workflow_id": "chk-42",
+       "update_id": "upd-1"
+      }
+     }
+    }
+   },
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "stderr_category",
+      "stderr",
+      "stdout_json",
+      "stdout_text"
+     ],
+     "reason": "Published PHP 2.3.5 writes canonical-option validation failures to stderr even with --json. This port follows accepted PHP main's structured error, exit 2 and namespace context (cli#61/#72)."
+    }
+   }
+  },
+  {
+   "name": "workflow update unknown wait policy human",
+   "argv": [
+    "workflow:update",
+    "chk-42",
+    "quota.adjust",
+    "--server={mock}",
+    "--wait=done"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/update/quota.adjust": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "update_id": "upd-1",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "update",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "operation_name": "quota.adjust",
+       "operation_name_field": "update_name",
+       "workflow_id": "chk-42",
+       "update_id": "upd-1"
+      }
+     }
+    }
+   },
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "stderr"
+     ],
+     "reason": "Published PHP 2.3.5 writes canonical-option validation failures to stderr even with --json. This port follows accepted PHP main's structured error, exit 2 and namespace context (cli#61/#72)."
+    }
+   }
+  },
+  {
+   "name": "workflow update rejected JSON",
+   "argv": [
+    "workflow:update",
+    "chk-42",
+    "quota.adjust",
+    "--server={mock}",
+    "--request-id=quota-1",
+    "-i",
+    "[1]",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/update/quota.adjust": {
+     "method": "POST",
+     "status": 422,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "message": "Update rejected by validator.",
+      "reason": "update_rejected",
+      "outcome": "rejected_by_validator",
+      "rejection_reason": "quota too high",
+      "workflow_id": "chk-42",
+      "update_name": "quota.adjust",
+      "command_status": "rejected",
+      "workflow_sequence": 13
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow update rejected human",
+   "argv": [
+    "workflow:update",
+    "chk-42",
+    "quota.adjust",
+    "--server={mock}",
+    "--request-id=quota-1"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/update/quota.adjust": {
+     "method": "POST",
+     "status": 422,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "message": "Update rejected by validator.",
+      "reason": "update_rejected",
+      "outcome": "rejected_by_validator",
+      "rejection_reason": "quota too high",
+      "workflow_id": "chk-42",
+      "update_name": "quota.adjust",
+      "command_status": "rejected",
+      "workflow_sequence": 13
+     }
+    }
+   },
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "stderr"
+     ],
+     "reason": "Published 2.3.5 predates the command-key contract merged on PHP main in cli#61: update receipts with retained/intent fields, request-ID error context, conflict and unknown-outcome guidance, and refusal of blank keys. This port follows PHP main (cli#72)."
+    }
+   }
+  },
+  {
+   "name": "workflow update conflict JSON",
+   "argv": [
+    "workflow:update",
+    "chk-42",
+    "quota.adjust",
+    "--server={mock}",
+    "--request-id=approve-1",
+    "--wait=completed",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/update/quota.adjust": {
+     "method": "POST",
+     "status": 409,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "message": "Request id already used.",
+      "reason": "request_id_conflict",
+      "request_id": "approve-1",
+      "retained_command_id": "cmd-0",
+      "retained_command_type": "update",
+      "retained_outcome": "update_accepted",
+      "conflict": [
+       "command_type",
+       "name"
+      ]
+     }
+    }
+   },
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "stdout_json"
+     ],
+     "reason": "Published 2.3.5 predates the command-key contract merged on PHP main in cli#61: update receipts with retained/intent fields, request-ID error context, conflict and unknown-outcome guidance, and refusal of blank keys. This port follows PHP main (cli#72)."
+    }
+   }
+  },
+  {
+   "name": "workflow update server error JSON",
+   "argv": [
+    "workflow:update",
+    "chk-42",
+    "quota.adjust",
+    "--server={mock}",
+    "--request-id=quota-1",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/update/quota.adjust": {
+     "method": "POST",
+     "status": 504,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "message": "Timed out waiting."
+     }
+    }
+   },
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "stdout_json"
+     ],
+     "reason": "Published 2.3.5 predates the command-key contract merged on PHP main in cli#61: update receipts with retained/intent fields, request-ID error context, conflict and unknown-outcome guidance, and refusal of blank keys. This port follows PHP main (cli#72)."
+    }
+   }
+  },
+  {
+   "name": "workflow update not found JSON",
+   "argv": [
+    "workflow:update",
+    "chk-42",
+    "quota.adjust",
+    "--server={mock}",
+    "--request-id=quota-1",
+    "--run-id=run-9",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/runs/run-9/update/quota.adjust": {
+     "method": "POST",
+     "status": 404,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "message": "Run not found."
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow update invalid input JSON",
+   "argv": [
+    "workflow:update",
+    "chk-42",
+    "quota.adjust",
+    "--server={mock}",
+    "--request-id=quota-1",
+    "-i",
+    "[1,",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/update/quota.adjust": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "update_id": "upd-1",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "update",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "operation_name": "quota.adjust",
+       "operation_name_field": "update_name",
+       "workflow_id": "chk-42",
+       "update_id": "upd-1"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow update blank request id JSON",
+   "argv": [
+    "workflow:update",
+    "chk-42",
+    "quota.adjust",
+    "--server={mock}",
+    "--request-id=　",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/update/quota.adjust": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "update_id": "upd-1",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "update",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "operation_name": "quota.adjust",
+       "operation_name_field": "update_name",
+       "workflow_id": "chk-42",
+       "update_id": "upd-1"
+      }
+     }
+    }
+   },
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "exit_code",
+      "stdout_json"
+     ],
+     "reason": "Published 2.3.5 predates the command-key contract merged on PHP main in cli#61: update receipts with retained/intent fields, request-ID error context, conflict and unknown-outcome guidance, and refusal of blank keys. This port follows PHP main (cli#72)."
+    }
+   }
+  },
+  {
+   "name": "workflow start human",
+   "argv": [
+    "workflow:start",
+    "--type=orders.Checkout",
+    "-w",
+    "chk-42",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-1",
+      "workflow_type": "orders.Checkout",
+      "business_key": "order-42",
+      "payload_codec": "avro",
+      "outcome": "started_new",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "start",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42",
+       "run_id": "run-1"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow start JSON",
+   "argv": [
+    "workflow:start",
+    "--type=orders.Checkout",
+    "-w",
+    "chk-42",
+    "--business-key=order-42",
+    "--json",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-1",
+      "workflow_type": "orders.Checkout",
+      "business_key": "order-42",
+      "payload_codec": "avro",
+      "outcome": "started_new",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "start",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42",
+       "run_id": "run-1"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow start minimal human",
+   "argv": [
+    "workflow:start",
+    "-t",
+    "orders.Checkout",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-1",
+      "outcome": "started_new",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "start",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow start with options JSON",
+   "argv": [
+    "workflow:start",
+    "-t",
+    "orders.Checkout",
+    "-w",
+    "chk-42",
+    "-i",
+    "{\"order_id\":42}",
+    "--memo={\"source\":\"cli\"}",
+    "--search-attr",
+    "env=prod",
+    "--search-attr",
+    "tier=gold",
+    "--execution-timeout=3600",
+    "--run-timeout=600",
+    "--priority=3",
+    "--fairness-key= tenant-a ",
+    "--fairness-weight=5",
+    "--duplicate-policy=fail",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-1",
+      "workflow_type": "orders.Checkout",
+      "business_key": "order-42",
+      "payload_codec": "avro",
+      "outcome": "started_new",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "start",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42",
+       "run_id": "run-1"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow start unknown duplicate policy",
+   "argv": [
+    "workflow:start",
+    "-t",
+    "orders.Checkout",
+    "--duplicate-policy=reject_duplicate",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-1",
+      "workflow_type": "orders.Checkout",
+      "business_key": "order-42",
+      "payload_codec": "avro",
+      "outcome": "started_new",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "start",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42",
+       "run_id": "run-1"
+      }
+     }
+    }
+   },
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "stderr_category",
+      "stderr",
+      "stdout_json",
+      "stdout_text"
+     ],
+     "reason": "Published PHP 2.3.5 writes canonical-option validation failures to stderr even with --json. This port follows accepted PHP main's structured error, exit 2 and namespace context (cli#61/#72)."
+    }
+   }
+  },
+  {
+   "name": "workflow start duplicate policy alias",
+   "argv": [
+    "workflow:start",
+    "-t",
+    "orders.Checkout",
+    "--duplicate-policy=use_existing",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-1",
+      "workflow_type": "orders.Checkout",
+      "business_key": "order-42",
+      "payload_codec": "avro",
+      "outcome": "started_new",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "start",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42",
+       "run_id": "run-1"
+      }
+     }
+    }
+   },
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "stderr"
+     ],
+     "reason": "Published PHP 2.3.5 writes canonical-option validation failures to stderr even with --json. This port follows accepted PHP main's structured error, exit 2 and namespace context (cli#61/#72)."
+    }
+   }
+  },
+  {
+   "name": "workflow start invalid memo",
+   "argv": [
+    "workflow:start",
+    "-t",
+    "orders.Checkout",
+    "--memo={bad",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-1",
+      "workflow_type": "orders.Checkout",
+      "business_key": "order-42",
+      "payload_codec": "avro",
+      "outcome": "started_new",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "start",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42",
+       "run_id": "run-1"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow start invalid input",
+   "argv": [
+    "workflow:start",
+    "-t",
+    "orders.Checkout",
+    "--input=[",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-1",
+      "workflow_type": "orders.Checkout",
+      "business_key": "order-42",
+      "payload_codec": "avro",
+      "outcome": "started_new",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "start",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42",
+       "run_id": "run-1"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow start duplicate",
+   "argv": [
+    "workflow:start",
+    "-t",
+    "orders.Checkout",
+    "-w",
+    "chk-42",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "method": "POST",
+     "status": 409,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "message": "Workflow instance already exists.",
+      "reason": "duplicate_start",
+      "outcome": "returned_existing_active",
+      "workflow_id": "chk-42"
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow start wait completed human",
+   "argv": [
+    "workflow:start",
+    "-t",
+    "orders.Checkout",
+    "-w",
+    "chk-42",
+    "--wait",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-1",
+      "workflow_type": "orders.Checkout",
+      "business_key": "order-42",
+      "payload_codec": "avro",
+      "outcome": "started_new",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "start",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42",
+       "run_id": "run-1"
+      }
+     }
+    },
+    "/api/workflows/chk-42": {
+     "method": "GET",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-1",
+      "status": "completed",
+      "status_bucket": "completed",
+      "is_terminal": true,
+      "closed_reason": "completed",
+      "closed_at": "2026-04-22T05:01:00Z",
+      "output": {
+       "ok": true,
+       "path": "a/b"
+      },
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "describe",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow start wait completed JSON",
+   "argv": [
+    "workflow:start",
+    "-t",
+    "orders.Checkout",
+    "-w",
+    "chk-42",
+    "--wait",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-1",
+      "workflow_type": "orders.Checkout",
+      "business_key": "order-42",
+      "payload_codec": "avro",
+      "outcome": "started_new",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "start",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42",
+       "run_id": "run-1"
+      }
+     }
+    },
+    "/api/workflows/chk-42": {
+     "method": "GET",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-1",
+      "status": "completed",
+      "status_bucket": "completed",
+      "is_terminal": true,
+      "closed_reason": "completed",
+      "closed_at": "2026-04-22T05:01:00Z",
+      "output": {
+       "ok": true,
+       "path": "a/b"
+      },
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "describe",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow start wait failed human",
+   "argv": [
+    "workflow:start",
+    "-t",
+    "orders.Checkout",
+    "-w",
+    "chk-42",
+    "--wait",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-1",
+      "workflow_type": "orders.Checkout",
+      "business_key": "order-42",
+      "payload_codec": "avro",
+      "outcome": "started_new",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "start",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42",
+       "run_id": "run-1"
+      }
+     }
+    },
+    "/api/workflows/chk-42": {
+     "method": "GET",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-1",
+      "status": "failed",
+      "status_bucket": "failed",
+      "is_terminal": true,
+      "closed_reason": "failed",
+      "closed_at": "2026-04-22T05:01:00Z",
+      "output": null,
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "describe",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow start wait failed JSON",
+   "argv": [
+    "workflow:start",
+    "-t",
+    "orders.Checkout",
+    "-w",
+    "chk-42",
+    "--wait",
+    "--server={mock}",
+    "--output=json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-1",
+      "workflow_type": "orders.Checkout",
+      "business_key": "order-42",
+      "payload_codec": "avro",
+      "outcome": "started_new",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "start",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42",
+       "run_id": "run-1"
+      }
+     }
+    },
+    "/api/workflows/chk-42": {
+     "method": "GET",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-1",
+      "status": "failed",
+      "status_bucket": "failed",
+      "is_terminal": true,
+      "closed_reason": "failed",
+      "closed_at": "2026-04-22T05:01:00Z",
+      "output": null,
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "describe",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42"
+      }
+     }
     }
    }
   }

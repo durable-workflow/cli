@@ -36,7 +36,7 @@ enum Handler {
 fn handler(name: &str) -> Option<Handler> {
     use commands::{
         completion, doctor, env, namespace, runtime, schedule, schema, server, start_dev, upgrade,
-        workflow, workflow_run,
+        workflow, workflow_message, workflow_run,
     };
     Some(match name {
         "completion" => Handler::Local(completion::completion),
@@ -61,6 +61,10 @@ fn handler(name: &str) -> Option<Handler> {
         "workflow:show-run" => Handler::Server(workflow_run::show_run),
         "workflow:history" => Handler::Server(workflow_run::history),
         "workflow:history-export" => Handler::Server(workflow_run::history_export),
+        "workflow:query" => Handler::Server(workflow_message::query),
+        "workflow:start" => Handler::Server(workflow_message::start),
+        "workflow:signal" => Handler::Server(workflow_message::signal),
+        "workflow:update" => Handler::Server(workflow_message::update),
         "schedule:list" => Handler::Server(schedule::list),
         "schedule:describe" => Handler::Server(schedule::describe),
         "schedule:history" => Handler::Server(schedule::history),
@@ -88,6 +92,10 @@ const NAMESPACE_SCOPED: &[&str] = &[
     "workflow:show-run",
     "workflow:history",
     "workflow:history-export",
+    "workflow:query",
+    "workflow:start",
+    "workflow:signal",
+    "workflow:update",
     "schedule:backfill",
     "schedule:create",
     "schedule:delete",
@@ -339,6 +347,22 @@ fn error_mode(input: &Input, server_command: bool) -> Mode {
     .unwrap_or(Mode::Table)
 }
 
+/// 2.x `errorArgumentContext()`: these arguments, then the `--run-id` option.
+fn argument_context(input: &Input) -> Vec<(&'static str, String)> {
+    [
+        ("workflow-id", "workflow_id"),
+        ("signal-name", "signal_name"),
+        ("query-name", "query_name"),
+        ("update-name", "update_name"),
+    ]
+    .into_iter()
+    .filter_map(|(argument, field)| input.arg(argument).map(|value| (field, value)))
+    .chain(input.opt("run-id").flatten().map(|value| ("run_id", value)))
+    .map(|(field, value)| (field, php::trim(value).to_owned()))
+    .filter(|(_, value)| !value.is_empty())
+    .collect()
+}
+
 fn report(error: &CliError, input: &Input, server_command: bool) -> i32 {
     let namespace = if NAMESPACE_SCOPED.contains(&input.command.as_str()) {
         client::Context::new(input)
@@ -350,11 +374,11 @@ fn report(error: &CliError, input: &Input, server_command: bool) -> i32 {
     let context = ErrorContext {
         command: &input.command,
         namespace,
-        workflow_id: input
-            .arg("workflow-id")
-            .map(php::trim)
-            .filter(|value| !value.is_empty())
-            .map(str::to_owned),
+        arguments: argument_context(input),
+        request_id: commands::workflow_message::error_request_id(input),
+        keyed: commands::workflow_message::command_request_id().is_some(),
+        update: (input.command == "workflow:update")
+            .then(|| commands::workflow_message::UpdateErrorRequest::from_input(input)),
         server_flag: input.opt_str("server").map(str::to_string),
         env_flag: input.opt_str("env").map(str::to_string),
     };

@@ -12711,10 +12711,10 @@
   {
    "name": "workflow:signal",
    "description": "Send a signal to a running workflow",
-   "synopsis": "workflow:signal [-s|--server [SERVER]] [--namespace [NAMESPACE]] [--token [TOKEN]] [--tls-verify TLS-VERIFY] [--env ENV] [--output OUTPUT] [--run-id [RUN-ID]] [--json] [-i|--input [INPUT]] [--input-file [INPUT-FILE]] [--input-encoding [INPUT-ENCODING]] [--] <workflow-id> <signal-name>",
+   "synopsis": "workflow:signal [-s|--server [SERVER]] [--namespace [NAMESPACE]] [--token [TOKEN]] [--tls-verify TLS-VERIFY] [--env ENV] [--output OUTPUT] [--run-id [RUN-ID]] [--request-id [REQUEST-ID]] [--json] [-i|--input [INPUT]] [--input-file [INPUT-FILE]] [--input-encoding [INPUT-ENCODING]] [--] <workflow-id> <signal-name>",
    "aliases": [],
    "hidden": false,
-   "help": "Deliver an asynchronous signal to a running workflow. The signal is\ndurably recorded in history even if the workflow is currently idle or\nwaiting.\n\n<comment>Examples:</comment>\n\n  <info>dw workflow:signal chk-42 approve</info>\n  <info>dw workflow:signal chk-42 payment_received -i '{\"amount\":99.95}'</info>",
+   "help": "Deliver an asynchronous signal to a running workflow. The signal is\ndurably recorded in history even if the workflow is currently idle or\nwaiting.\n\nEvery signal carries a caller command key (<comment>request_id</comment>).\nThe CLI generates one per invocation unless <comment>--request-id</comment>\nis given, and prints the key it used. An explicit empty or whitespace-only\nkey is refused. After a lost response the outcome is unknown: inspect\nworkflow history and command receipts before retrying. A request ID alone\ndoes not prove that a repeated signal is safe. Rely on retained admission\nand intent-conflict guarantees only when the Server advertises that\ncapability; legacy servers may store a key without deduplicating signals.\n\n<comment>Examples:</comment>\n\n  <info>dw workflow:signal chk-42 approve</info>\n  <info>dw workflow:signal chk-42 payment_received -i '{\"amount\":99.95}'</info>\n  <info>dw workflow:signal chk-42 approve --request-id=approve-chk-42-2026-10-20 --json</info>",
    "definition": {
     "arguments": {
      "workflow-id": {
@@ -12794,6 +12794,15 @@
       "is_value_required": false,
       "is_multiple": false,
       "description": "Target a specific run ID",
+      "default": null
+     },
+     "request-id": {
+      "name": "--request-id",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Caller command key (1-255 Unicode code points); generated only when omitted",
       "default": null
      },
      "json": {

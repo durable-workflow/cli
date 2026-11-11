@@ -72,6 +72,27 @@ pub fn parse(input: &Input) -> Result<Option<Payload>, CliError> {
     }
 }
 
+/// The 2.x `parseJsonOption()`: an option whose value is a JSON document,
+/// such as `--memo`. Absent or empty means no value; so does JSON `null`.
+pub fn parse_json_option(value: Option<&str>, option: &str) -> Result<Option<Payload>, CliError> {
+    let Some(value) = value.filter(|value| !value.is_empty()) else {
+        return Ok(None);
+    };
+    let decoded = php_json::decode(value.as_bytes()).map_err(|error| {
+        CliError::Invalid(format!(
+            "--{option} must be valid JSON: {}",
+            error.message()
+        ))
+    })?;
+    if decoded.value.is_null() && !decoded.non_finite {
+        return Ok(None);
+    }
+    Ok(Some(Payload {
+        value: decoded.value,
+        unencodable: decoded.non_finite.then_some(NON_FINITE),
+    }))
+}
+
 /// The 2.x `parseInputArgumentsOption()`: a workflow argument list. A value
 /// that is not an array becomes the only argument.
 pub fn parse_arguments(input: &Input) -> Result<Option<Payload>, CliError> {

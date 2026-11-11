@@ -35,9 +35,9 @@ enum Handler {
 /// reported as not yet available.
 fn handler(name: &str) -> Option<Handler> {
     use commands::{
-        completion, doctor, env, namespace, runtime, schedule, schema, search_attribute, server,
-        start_dev, task_queue, upgrade, worker, workflow, workflow_control, workflow_message,
-        workflow_run,
+        activity_task, completion, doctor, env, namespace, runtime, schedule, schema,
+        search_attribute, server, start_dev, task_queue, upgrade, worker, workflow,
+        workflow_control, workflow_message, workflow_run,
     };
     Some(match name {
         "completion" => Handler::Local(completion::completion),
@@ -97,6 +97,17 @@ fn handler(name: &str) -> Option<Handler> {
         "worker:describe" => Handler::Server(worker::describe),
         "worker:register" => Handler::Server(worker::register),
         "worker:deregister" => Handler::Server(worker::deregister),
+        "activity:list" => Handler::Server(activity_task::activity_list),
+        "activity:describe" => Handler::Server(activity_task::activity_describe),
+        "activity:complete" => Handler::Server(activity_task::activity_complete),
+        "activity:fail" => Handler::Server(activity_task::activity_fail),
+        "workflow-task:poll" => Handler::Server(activity_task::workflow_task_poll),
+        "workflow-task:complete" => Handler::Server(activity_task::workflow_task_complete),
+        "workflow-task:fail" => Handler::Server(activity_task::workflow_task_fail),
+        "workflow-task:history" => Handler::Server(activity_task::workflow_task_history),
+        "query-task:poll" => Handler::Server(activity_task::query_task_poll),
+        "query-task:complete" => Handler::Server(activity_task::query_task_complete),
+        "query-task:fail" => Handler::Server(activity_task::query_task_fail),
         "env:list" => Handler::Local(env::list),
         "env:set" => Handler::Local(env::set),
         "env:use" => Handler::Local(env::use_env),
@@ -148,6 +159,17 @@ const NAMESPACE_SCOPED: &[&str] = &[
     "worker:describe",
     "worker:list",
     "worker:register",
+    "activity:complete",
+    "activity:describe",
+    "activity:fail",
+    "activity:list",
+    "query-task:complete",
+    "query-task:fail",
+    "query-task:poll",
+    "workflow-task:complete",
+    "workflow-task:fail",
+    "workflow-task:history",
+    "workflow-task:poll",
 ];
 
 /// Verbs of a group and the command each one names.

@@ -22,6 +22,14 @@ pub struct Payload {
 }
 
 impl Payload {
+    /// JSON `null`, for options 2.x sends as given even when null.
+    pub fn null() -> Self {
+        Payload {
+            value: Value::Null,
+            unencodable: None,
+        }
+    }
+
     fn text(bytes: Vec<u8>) -> Self {
         match String::from_utf8(bytes) {
             Ok(text) => Payload {

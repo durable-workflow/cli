@@ -611,6 +611,8 @@ jobs:
 
           case "${{ runner.os }}" in
             Linux)
+              # No APT retries: CVE-2026-109518 (durable-workflow/.github#295).
+              echo 'Acquire::Retries "0";' | sudo tee /etc/apt/apt.conf.d/99-no-retries >/dev/null
               sudo apt-get update
               sudo apt-get install --no-install-recommends -y build-essential pkg-config
               compiler=cc

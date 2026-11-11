@@ -195,7 +195,11 @@ jobs:
       - run: cargo fmt --check
       - run: cargo clippy --locked --all-targets -- -D warnings
       - name: Install completion test shells
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends bash zsh fish
+        # CVE-2026-109518 needs APT to retry a redirected download; hosted
+        # runner images still ship affected apt (durable-workflow/.github#295).
+        run: |
+          echo 'Acquire::Retries "0";' | sudo tee /etc/apt/apt.conf.d/99-no-retries >/dev/null
+          sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends bash zsh fish
       - run: cargo test --locked
         env:
           DW_REQUIRE_COMPLETION_SHELLS: '1'

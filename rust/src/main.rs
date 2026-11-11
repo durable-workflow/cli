@@ -36,7 +36,7 @@ enum Handler {
 fn handler(name: &str) -> Option<Handler> {
     use commands::{
         completion, doctor, env, namespace, runtime, schedule, schema, server, start_dev, upgrade,
-        workflow, workflow_message, workflow_run,
+        workflow, workflow_control, workflow_message, workflow_run,
     };
     Some(match name {
         "completion" => Handler::Local(completion::completion),
@@ -65,6 +65,12 @@ fn handler(name: &str) -> Option<Handler> {
         "workflow:start" => Handler::Server(workflow_message::start),
         "workflow:signal" => Handler::Server(workflow_message::signal),
         "workflow:update" => Handler::Server(workflow_message::update),
+        "workflow:cancel" => Handler::Server(workflow_control::cancel),
+        "workflow:terminate" => Handler::Server(workflow_control::terminate),
+        "workflow:archive" => Handler::Server(workflow_control::archive),
+        "workflow:redrive" => Handler::Server(workflow_control::redrive),
+        "workflow:repair" => Handler::Server(workflow_control::repair),
+        "workflow:migrate-v1" => Handler::Server(workflow_control::migrate_v1),
         "schedule:list" => Handler::Server(schedule::list),
         "schedule:describe" => Handler::Server(schedule::describe),
         "schedule:history" => Handler::Server(schedule::history),
@@ -96,6 +102,12 @@ const NAMESPACE_SCOPED: &[&str] = &[
     "workflow:start",
     "workflow:signal",
     "workflow:update",
+    "workflow:cancel",
+    "workflow:terminate",
+    "workflow:archive",
+    "workflow:redrive",
+    "workflow:repair",
+    "workflow:migrate-v1",
     "schedule:backfill",
     "schedule:create",
     "schedule:delete",

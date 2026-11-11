@@ -1,0 +1,13 @@
+{
+  "data": {
+    "id": 42,
+    "class": "App\\Workflows\\Checkout",
+    "status": "completed",
+    "arguments": "[]",
+    "output": "{}",
+    "logs": [],
+    "exceptions": [],
+    "chartData": [],
+    "empty": {}
+  }
+}

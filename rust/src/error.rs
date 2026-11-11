@@ -541,6 +541,12 @@ pub fn human(error: &CliError, context: &ErrorContext) -> String {
                 | "workflow:start"
                 | "workflow:signal"
                 | "workflow:update"
+                | "workflow:cancel"
+                | "workflow:terminate"
+                | "workflow:archive"
+                | "workflow:redrive"
+                | "workflow:repair"
+                | "workflow:migrate-v1"
                 | "namespace:list"
                 | "namespace:describe"
                 | "namespace:create"
@@ -655,7 +661,12 @@ mod tests {
     #[test]
     fn existing_commands_keep_their_ansi_placeholder_boundaries() {
         let error = CliError::Invalid("Use <name>.".into());
-        let rendered = crate::formatter::format(&human(&error, &context()), true);
+        // A command whose human errors are not escaped.
+        let context = ErrorContext {
+            command: "worker:list",
+            ..context()
+        };
+        let rendered = crate::formatter::format(&human(&error, &context), true);
         assert!(rendered.contains("\u{1b}[39;49m\u{1b}[37;41m<name>\u{1b}[39;49m\u{1b}[37;41m"));
     }
 

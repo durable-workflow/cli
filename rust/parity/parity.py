@@ -512,11 +512,16 @@ def invocation_path(binary, role):
     return copy_path
 
 
-def run_all(candidate_binary, servers, verbose, server_only=False):
+def run_all(candidate_binary, servers, verbose, server_only=False, skip_references=()):
     with open(CASES, encoding="utf-8") as handle:
         cases = json.load(handle)["cases"] + help_cases()
     if server_only:
         cases = [case for case in cases if case.get("server")]
+    skipped = [case for case in cases if case.get("reference") in skip_references]
+    if skipped:
+        # Said out loud so a skip never reads as a pass.
+        print(f"Skipping {len(skipped)} case(s) whose reference is {', '.join(sorted(skip_references))}.")
+        cases = [case for case in cases if case.get("reference") not in skip_references]
     env_base = {key: value for key, value in os.environ.items() if not key.startswith(("DURABLE_WORKFLOW_", "DW_"))}
     token = os.environ.get("DW_PARITY_TOKEN")
     if token:
@@ -564,6 +569,8 @@ def main():
     parser.add_argument("--verbose", action="store_true")
     parser.add_argument("--server-cases-only", action="store_true",
                         help="run only the cases that need DW_PARITY_SERVERS")
+    parser.add_argument("--skip-reference", action="append", default=[], choices=["php-main"],
+                        help="skip the cases compared against this reference, and say how many")
     options = parser.parse_args()
 
     candidate = os.path.abspath(options.candidate) if options.candidate else CANDIDATES[options.build]
@@ -574,7 +581,8 @@ def main():
     servers = configured_servers()
     if options.server_cases_only and not servers:
         raise SystemExit("--server-cases-only needs DW_PARITY_SERVERS.")
-    results = run_all(candidate, servers, options.verbose, options.server_cases_only)
+    results = run_all(candidate, servers, options.verbose, options.server_cases_only,
+                      tuple(options.skip_reference))
     unexpected = sum(1 for result in results if result["differences"] and not result["intentional"])
     intentional = sum(1 for result in results if result["intentional"])
     print(f"\n{len(results) - unexpected - intentional}/{len(results)} cases match, "

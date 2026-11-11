@@ -557,6 +557,9 @@ pub fn human(error: &CliError, context: &ErrorContext) -> String {
             "search-attribute:",
             "task-queue:",
             "worker:",
+            "activity:",
+            "workflow-task:",
+            "query-task:",
             "system:",
         ]
         .iter()
@@ -678,9 +681,9 @@ mod tests {
     #[test]
     fn existing_commands_keep_their_ansi_placeholder_boundaries() {
         let error = CliError::Invalid("Use <name>.".into());
-        // A command whose human errors are not escaped.
+        // A local command: its own messages keep 2.x's markup handling.
         let context = ErrorContext {
-            command: "activity:list",
+            command: "env:set",
             ..context()
         };
         let rendered = crate::formatter::format(&human(&error, &context), true);

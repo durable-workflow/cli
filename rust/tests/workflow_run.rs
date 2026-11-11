@@ -395,3 +395,23 @@ fn history_export_writes_the_bundle_to_a_file_and_confirms_on_stderr() {
         ["GET /prefix/api/workflows/chk-42/runs/run-7/history/export HTTP/1.1"]
     );
 }
+
+#[test]
+fn server_error_text_is_not_console_markup() {
+    let scratch = Scratch::new();
+    let server = Server::new(
+        info(),
+        vec![Reply {
+            status: 404,
+            control_plane: true,
+            body: json!({"message": "<error>FORGED</error>\u{1b}[2J"}),
+        }],
+    );
+    let output = scratch.run(&server.url, &["workflow:describe", "chk-42"]);
+    assert_eq!(output.status.code(), Some(5), "{output:?}");
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.contains("<error>FORGED</error>\\u{001b}[2J"),
+        "{stderr}"
+    );
+}

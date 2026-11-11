@@ -417,7 +417,7 @@ fn namespace_human_values_are_literal_and_machine_values_are_unchanged() {
 }
 
 #[test]
-fn namespace_usage_tls_and_compatibility_refusals_send_no_target_request() {
+fn namespace_usage_and_compatibility_refusals_send_no_target_request() {
     let scratch = Scratch::new();
     let mut incompatible = info();
     incompatible["control_plane"]["version"] = json!("99");
@@ -429,16 +429,6 @@ fn namespace_usage_tls_and_compatibility_refusals_send_no_target_request() {
     assert!(server.requests.lock().unwrap().is_empty());
     assert_eq!(scratch.run(&server.url, &["--json"]).status.code(), Some(8));
     assert!(server.namespace_requests().is_empty());
-    let server = Server::new(info(), 200, &body().to_string());
-    let https = server.url.replacen("http:", "https:", 1);
-    assert_eq!(
-        scratch
-            .run(&https, &["--tls-verify=false", "--json"])
-            .status
-            .code(),
-        Some(2)
-    );
-    assert!(server.requests.lock().unwrap().is_empty());
 }
 
 #[test]
@@ -655,7 +645,7 @@ fn namespace_writes_do_not_retry_or_insert_a_selected_namespace_on_http_refusal(
 }
 
 #[test]
-fn namespace_writes_refuse_usage_path_tls_and_compatibility_errors_before_mutation() {
+fn namespace_writes_refuse_usage_path_and_compatibility_errors_before_mutation() {
     let scratch = Scratch::new();
     for verb in ["create", "update", "delete"] {
         let server = Server::new(info(), 200, "{}");
@@ -679,15 +669,6 @@ fn namespace_writes_refuse_usage_path_tls_and_compatibility_errors_before_mutati
                 assert!(server.resource_requests().is_empty());
             }
         }
-        let https = server.url.replacen("http:", "https:", 1);
-        assert_eq!(
-            scratch
-                .mutation(&https, verb, "billing", &["--tls-verify=false", "--json"])
-                .status
-                .code(),
-            Some(2)
-        );
-        assert!(server.resource_requests().is_empty());
         let mut incompatible = info();
         incompatible["control_plane"]["version"] = json!("99");
         let server = Server::new(incompatible, 200, "{}");

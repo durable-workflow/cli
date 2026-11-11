@@ -328,17 +328,6 @@ fn usage_profile_and_contract_refusals_send_no_list_request() {
     assert_eq!(error["recommendations"][0]["id"], "input.invalid");
     assert!(output.stderr.is_empty());
     assert!(server.list_requests().is_empty());
-
-    let server = Server::new(info(), 200, Some("2"), body());
-    let https = server.url.replacen("http:", "https:", 1);
-    assert_eq!(
-        scratch
-            .run(&https, &["--tls-verify=false", "--json"])
-            .status
-            .code(),
-        Some(2)
-    );
-    assert!(server.requests.lock().unwrap().is_empty());
 }
 
 #[test]

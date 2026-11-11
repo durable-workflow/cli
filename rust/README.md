@@ -36,7 +36,9 @@ every command group reaches parity.
 | `search-attribute:list`, `search-attribute:create`, `search-attribute:delete`, `storage:test`, `namespace:set-storage-driver` | Ported |
 | `task-queue:list`, `task-queue:describe`, `task-queue:build-ids`, `task-queue:drain`, `task-queue:promote`, `task-queue:resume`: admission, leases, pollers, build-id rollout | Ported |
 | `worker:list`, `worker:describe`, `worker:register`, `worker:deregister`: `worker:register` checks the worker-protocol response version as 2.x does | Ported |
-| Remaining command groups (activities, worker-plane tasks, system, `service-call`, `bridge`, `debug`, `watch`) | Next slices ([gap list](https://github.com/durable-workflow/cli/issues/72#issuecomment-6801944950)) |
+| `activity:list`, `activity:describe`, `activity:complete`, `activity:fail`: standalone activities; complete and fail speak the worker protocol | Ported |
+| `workflow-task:poll`, `workflow-task:complete`, `workflow-task:fail`, `workflow-task:history`, `query-task:poll`, `query-task:complete`, `query-task:fail`: worker-protocol diagnostics, one request each | Ported |
+| Remaining command groups (system, `service-call`, `bridge`, `debug`, `watch`) | Next slices ([gap list](https://github.com/durable-workflow/cli/issues/72#issuecomment-6801944950)) |
 | `--tls-verify=false` against HTTPS: no certificate or hostname checks, as in 2.x, plus a stderr warning on every such command (also with `--json` and `-q`) | Ported, intentional addition |
 
 Server calls go through the published `durable-workflow` crate, pinned to

@@ -1,3 +1,4 @@
+pub mod activity_task;
 pub mod completion;
 mod completion_log;
 pub mod doctor;

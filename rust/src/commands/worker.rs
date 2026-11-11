@@ -398,7 +398,7 @@ pub fn register(context: &Context, input: &Input) -> Result<i32, CliError> {
 }
 
 /// 2.x `positiveIntOption()`.
-fn positive_int_option(input: &Input, option: &str) -> Result<Option<i64>, CliError> {
+pub(crate) fn positive_int_option(input: &Input, option: &str) -> Result<Option<i64>, CliError> {
     let Some(value) = input
         .opt(option)
         .flatten()

@@ -18244,6 +18244,1624 @@
    ],
    "mock": [],
    "mock_routes": {}
+  },
+  {
+   "name": "activity list human",
+   "argv": [
+    "activity:list",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/activities": {
+     "status": 200,
+     "body": {
+      "activities": [
+       {
+        "activity_id": "act-1",
+        "activity_type": "email.send",
+        "activity_status": "running",
+        "current_attempt_status": "running",
+        "current_attempt_id": "att-2",
+        "task_queue": "mail",
+        "started_at": "2026-04-22T05:00:00Z",
+        "closed_at": null
+       },
+       {
+        "activity_id": "act-2",
+        "activity_type": "email.send",
+        "status": "completed",
+        "task_queue": "mail",
+        "started_at": "2026-04-22T05:00:00Z",
+        "closed_at": "2026-04-22T05:01:00Z",
+        "namespace": "other"
+       },
+       "not an activity"
+      ],
+      "next_page_token": "p2"
+     }
+    }
+   }
+  },
+  {
+   "name": "activity list alias human",
+   "argv": [
+    "activities:list",
+    "--server={mock}",
+    "--status=running",
+    "--limit=10"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/activities": {
+     "status": 200,
+     "body": {
+      "activities": [
+       {
+        "activity_id": "act-1",
+        "activity_type": "email.send",
+        "activity_status": "running",
+        "current_attempt_status": "running",
+        "current_attempt_id": "att-2",
+        "task_queue": "mail",
+        "started_at": "2026-04-22T05:00:00Z",
+        "closed_at": null
+       },
+       {
+        "activity_id": "act-2",
+        "activity_type": "email.send",
+        "status": "completed",
+        "task_queue": "mail",
+        "started_at": "2026-04-22T05:00:00Z",
+        "closed_at": "2026-04-22T05:01:00Z",
+        "namespace": "other"
+       },
+       "not an activity"
+      ],
+      "next_page_token": "p2"
+     }
+    }
+   }
+  },
+  {
+   "name": "activity list JSON",
+   "argv": [
+    "activity:list",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/activities": {
+     "status": 200,
+     "body": {
+      "activities": [
+       {
+        "activity_id": "act-1",
+        "activity_type": "email.send",
+        "activity_status": "running",
+        "current_attempt_status": "running",
+        "current_attempt_id": "att-2",
+        "task_queue": "mail",
+        "started_at": "2026-04-22T05:00:00Z",
+        "closed_at": null
+       },
+       {
+        "activity_id": "act-2",
+        "activity_type": "email.send",
+        "status": "completed",
+        "task_queue": "mail",
+        "started_at": "2026-04-22T05:00:00Z",
+        "closed_at": "2026-04-22T05:01:00Z",
+        "namespace": "other"
+       },
+       "not an activity"
+      ],
+      "next_page_token": "p2"
+     }
+    }
+   }
+  },
+  {
+   "name": "activity list JSONL",
+   "argv": [
+    "activity:list",
+    "--server={mock}",
+    "--output=jsonl"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/activities": {
+     "status": 200,
+     "body": {
+      "activities": [
+       {
+        "activity_id": "act-1",
+        "activity_type": "email.send",
+        "activity_status": "running",
+        "current_attempt_status": "running",
+        "current_attempt_id": "att-2",
+        "task_queue": "mail",
+        "started_at": "2026-04-22T05:00:00Z",
+        "closed_at": null
+       },
+       {
+        "activity_id": "act-2",
+        "activity_type": "email.send",
+        "status": "completed",
+        "task_queue": "mail",
+        "started_at": "2026-04-22T05:00:00Z",
+        "closed_at": "2026-04-22T05:01:00Z",
+        "namespace": "other"
+       },
+       "not an activity"
+      ],
+      "next_page_token": "p2"
+     }
+    }
+   }
+  },
+  {
+   "name": "activity list empty",
+   "argv": [
+    "activity:list",
+    "--server={mock}",
+    "--namespace=orders"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/activities": {
+     "status": 200,
+     "body": {
+      "activities": []
+     }
+    }
+   }
+  },
+  {
+   "name": "activity list not an array",
+   "argv": [
+    "activity:list",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/activities": {
+     "status": 200,
+     "body": {
+      "activities": "nope"
+     }
+    }
+   }
+  },
+  {
+   "name": "activity list server error",
+   "argv": [
+    "activity:list",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/activities": {
+     "status": 500,
+     "body": {
+      "message": "Boom."
+     }
+    }
+   }
+  },
+  {
+   "name": "activity describe human",
+   "argv": [
+    "activity:describe",
+    "act-1",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/activities/act-1": {
+     "status": 200,
+     "body": {
+      "activity_id": "act-1",
+      "activity_execution_id": "exec-1",
+      "activity_type": "email.send",
+      "activity_class": "App\\Email",
+      "activity_status": "failed",
+      "attempt_count": 2,
+      "current_attempt_id": "att-2",
+      "current_attempt_status": "failed",
+      "workflow_run_id": null,
+      "task_queue": "mail",
+      "started_at": "2026-04-22T05:00:00Z",
+      "closed_at": "2026-04-22T05:02:00Z",
+      "closed_reason": "failed",
+      "attempts": [
+       {
+        "activity_attempt_id": "att-1",
+        "attempt_number": 1,
+        "status": "failed",
+        "lease_owner": "w-1",
+        "started_at": "2026-04-22T05:00:00Z",
+        "closed_at": "2026-04-22T05:01:00Z"
+       },
+       {
+        "id": "att-2",
+        "attempt_number": 2,
+        "status": "failed"
+       },
+       7
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "activity describe JSON",
+   "argv": [
+    "activity:describe",
+    "act-1",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/activities/act-1": {
+     "status": 200,
+     "body": {
+      "activity_id": "act-1",
+      "activity_execution_id": "exec-1",
+      "activity_type": "email.send",
+      "activity_class": "App\\Email",
+      "activity_status": "failed",
+      "attempt_count": 2,
+      "current_attempt_id": "att-2",
+      "current_attempt_status": "failed",
+      "workflow_run_id": null,
+      "task_queue": "mail",
+      "started_at": "2026-04-22T05:00:00Z",
+      "closed_at": "2026-04-22T05:02:00Z",
+      "closed_reason": "failed",
+      "attempts": [
+       {
+        "activity_attempt_id": "att-1",
+        "attempt_number": 1,
+        "status": "failed",
+        "lease_owner": "w-1",
+        "started_at": "2026-04-22T05:00:00Z",
+        "closed_at": "2026-04-22T05:01:00Z"
+       },
+       {
+        "id": "att-2",
+        "attempt_number": 2,
+        "status": "failed"
+       },
+       7
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "activity describe minimal",
+   "argv": [
+    "activities:describe",
+    "act-1",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/activities/act-1": {
+     "status": 200,
+     "body": {
+      "status": "running"
+     }
+    }
+   }
+  },
+  {
+   "name": "activity describe not found",
+   "argv": [
+    "activity:describe",
+    "act-1",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/activities/act-1": {
+     "status": 404,
+     "body": {
+      "message": "Activity not found."
+     }
+    }
+   }
+  },
+  {
+   "name": "activity complete human",
+   "argv": [
+    "activity:complete",
+    "act-1",
+    "att-1",
+    "--server={mock}",
+    "--input={\"ok\":true}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/activity-tasks/act-1/complete": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "task_id": "act-1",
+      "activity_attempt_id": "att-1",
+      "recorded": true,
+      "outcome": "completed",
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "activity complete JSON",
+   "argv": [
+    "activity:complete",
+    "act-1",
+    "att-1",
+    "--server={mock}",
+    "--lease-owner=w-9",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/activity-tasks/act-1/complete": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "task_id": "act-1",
+      "activity_attempt_id": "att-1",
+      "recorded": true,
+      "outcome": "completed",
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "activity complete invalid input",
+   "argv": [
+    "activity:complete",
+    "act-1",
+    "att-1",
+    "--server={mock}",
+    "--input={",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/activity-tasks/act-1/complete": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "task_id": "act-1",
+      "activity_attempt_id": "att-1",
+      "recorded": true,
+      "outcome": "completed",
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "activity complete missing protocol header",
+   "argv": [
+    "activity:complete",
+    "act-1",
+    "att-1",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/activity-tasks/act-1/complete": {
+     "method": "POST",
+     "status": 200,
+     "headers": {},
+     "body": {
+      "task_id": "act-1",
+      "activity_attempt_id": "att-1",
+      "recorded": true,
+      "outcome": "completed",
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "activity complete wrong body protocol",
+   "argv": [
+    "activity:complete",
+    "act-1",
+    "att-1",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/activity-tasks/act-1/complete": {
+     "method": "POST",
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "task_id": "act-1",
+      "activity_attempt_id": "att-1",
+      "recorded": true,
+      "outcome": "completed",
+      "protocol_version": "1.19"
+     }
+    }
+   }
+  },
+  {
+   "name": "activity complete conflict",
+   "argv": [
+    "activity:complete",
+    "act-1",
+    "att-1",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/activity-tasks/act-1/complete": {
+     "method": "POST",
+     "status": 409,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "message": "Attempt already settled.",
+      "reason": "attempt_settled",
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "activity complete worker protocol refusal",
+   "argv": [
+    "activity:complete",
+    "act-1",
+    "att-1",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [
+    [
+     [
+      "worker_protocol",
+      "version"
+     ],
+     "2.0"
+    ]
+   ],
+   "mock_routes": {
+    "/api/worker/activity-tasks/act-1/complete": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "task_id": "act-1",
+      "activity_attempt_id": "att-1",
+      "recorded": true,
+      "outcome": "completed",
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "activity fail human",
+   "argv": [
+    "activity:fail",
+    "act-1",
+    "att-1",
+    "--server={mock}",
+    "-m",
+    "boom",
+    "-t",
+    "Upstream",
+    "--non-retryable",
+    "--failure-kind=application",
+    "--timeout-type=heartbeat",
+    "--cancelled",
+    "--malformed-output"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/activity-tasks/act-1/fail": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "task_id": "act-1",
+      "activity_attempt_id": "att-1",
+      "recorded": false,
+      "reason": "attempt_settled",
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "activity fail JSON",
+   "argv": [
+    "activity:fail",
+    "act-1",
+    "att-1",
+    "--server={mock}",
+    "--message=boom",
+    "--retryable",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/activity-tasks/act-1/fail": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "task_id": "act-1",
+      "activity_attempt_id": "att-1",
+      "recorded": false,
+      "reason": "attempt_settled",
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "activity fail both retry flags",
+   "argv": [
+    "activity:fail",
+    "act-1",
+    "att-1",
+    "--server={mock}",
+    "--retryable",
+    "--non-retryable",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/activity-tasks/act-1/fail": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "task_id": "act-1",
+      "activity_attempt_id": "att-1",
+      "recorded": false,
+      "reason": "attempt_settled",
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow-task poll human",
+   "argv": [
+    "workflow-task:poll",
+    "cli-worker",
+    "--server={mock}",
+    "--task-queue=orders",
+    "--history-page-size=50"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/workflow-tasks/poll": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "task": {
+       "task_id": "wt-1",
+       "workflow_id": "chk-42",
+       "run_id": "run-7",
+       "workflow_task_attempt": 1,
+       "lease_owner": "cli-worker",
+       "history_events": [
+        {
+         "sequence": 1
+        },
+        {
+         "sequence": 2
+        }
+       ],
+       "next_history_page_token": "page-2"
+      },
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow-task poll JSON",
+   "argv": [
+    "workflow-task:poll",
+    "cli-worker",
+    "--server={mock}",
+    "--build-id=b-1",
+    "--poll-request-id=p-1",
+    "--accept-history-encoding=gzip",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/workflow-tasks/poll": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "task": {
+       "task_id": "wt-1",
+       "workflow_id": "chk-42",
+       "run_id": "run-7",
+       "workflow_task_attempt": 1,
+       "lease_owner": "cli-worker",
+       "history_events": [
+        {
+         "sequence": 1
+        },
+        {
+         "sequence": 2
+        }
+       ],
+       "next_history_page_token": "page-2"
+      },
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow-task poll empty",
+   "argv": [
+    "workflow-task:poll",
+    "cli-worker",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/workflow-tasks/poll": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "task": null,
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow-task poll no token",
+   "argv": [
+    "workflow-task:poll",
+    "cli-worker",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/workflow-tasks/poll": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "task": {
+       "task_id": "wt-1"
+      },
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow-task poll invalid page size",
+   "argv": [
+    "workflow-task:poll",
+    "cli-worker",
+    "--server={mock}",
+    "--history-page-size=0",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/workflow-tasks/poll": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "task": {
+       "task_id": "wt-1",
+       "workflow_id": "chk-42",
+       "run_id": "run-7",
+       "workflow_task_attempt": 1,
+       "lease_owner": "cli-worker",
+       "history_events": [
+        {
+         "sequence": 1
+        },
+        {
+         "sequence": 2
+        }
+       ],
+       "next_history_page_token": "page-2"
+      },
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow-task poll invalid page size human",
+   "argv": [
+    "workflow-task:poll",
+    "cli-worker",
+    "--server={mock}",
+    "--history-page-size=abc"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/workflow-tasks/poll": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "task": {
+       "task_id": "wt-1",
+       "workflow_id": "chk-42",
+       "run_id": "run-7",
+       "workflow_task_attempt": 1,
+       "lease_owner": "cli-worker",
+       "history_events": [
+        {
+         "sequence": 1
+        },
+        {
+         "sequence": 2
+        }
+       ],
+       "next_history_page_token": "page-2"
+      },
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow-task complete human",
+   "argv": [
+    "workflow-task:complete",
+    "wt-1",
+    "1",
+    "--server={mock}",
+    "--lease-owner=cli-worker"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/workflow-tasks/wt-1/complete": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "task_id": "wt-1",
+      "workflow_task_attempt": 1,
+      "outcome": "completed",
+      "run_status": "completed",
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow-task complete minimal human",
+   "argv": [
+    "workflow-task:complete",
+    "wt-1",
+    "2",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/workflow-tasks/wt-1/complete": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow-task complete result JSON",
+   "argv": [
+    "workflow-task:complete",
+    "wt-1",
+    "1",
+    "--server={mock}",
+    "--complete-result={\"codec\":\"avro\",\"blob\":\"AA==\"}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/workflow-tasks/wt-1/complete": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "task_id": "wt-1",
+      "workflow_task_attempt": 1,
+      "outcome": "completed",
+      "run_status": "completed",
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow-task complete commands JSON",
+   "argv": [
+    "workflow-task:complete",
+    "wt-1",
+    "1",
+    "--server={mock}",
+    "--command={\"type\":\"fail_workflow\",\"message\":\"boom\"}",
+    "--command={\"type\":\"complete_workflow\"}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/workflow-tasks/wt-1/complete": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "task_id": "wt-1",
+      "workflow_task_attempt": 1,
+      "outcome": "completed",
+      "run_status": "completed",
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow-task complete both",
+   "argv": [
+    "workflow-task:complete",
+    "wt-1",
+    "1",
+    "--server={mock}",
+    "--command={}",
+    "--complete-result=1",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/workflow-tasks/wt-1/complete": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "task_id": "wt-1",
+      "workflow_task_attempt": 1,
+      "outcome": "completed",
+      "run_status": "completed",
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow-task complete scalar command",
+   "argv": [
+    "workflow-task:complete",
+    "wt-1",
+    "1",
+    "--server={mock}",
+    "--command=42",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/workflow-tasks/wt-1/complete": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "task_id": "wt-1",
+      "workflow_task_attempt": 1,
+      "outcome": "completed",
+      "run_status": "completed",
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow-task complete invalid command JSON",
+   "argv": [
+    "workflow-task:complete",
+    "wt-1",
+    "1",
+    "--server={mock}",
+    "--command={",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/workflow-tasks/wt-1/complete": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "task_id": "wt-1",
+      "workflow_task_attempt": 1,
+      "outcome": "completed",
+      "run_status": "completed",
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow-task complete invalid attempt",
+   "argv": [
+    "workflow-task:complete",
+    "wt-1",
+    "0",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/workflow-tasks/wt-1/complete": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "task_id": "wt-1",
+      "workflow_task_attempt": 1,
+      "outcome": "completed",
+      "run_status": "completed",
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow-task complete invalid attempt human",
+   "argv": [
+    "workflow-task:complete",
+    "wt-1",
+    "x1",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/workflow-tasks/wt-1/complete": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "task_id": "wt-1",
+      "workflow_task_attempt": 1,
+      "outcome": "completed",
+      "run_status": "completed",
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow-task fail human",
+   "argv": [
+    "workflow-task:fail",
+    "wt-1",
+    "1",
+    "--server={mock}",
+    "--message=replay mismatch",
+    "--type=NonDeterminism",
+    "--stack-trace=at line 1"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/workflow-tasks/wt-1/fail": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "task_id": "wt-1",
+      "workflow_task_attempt": 1,
+      "outcome": "failed",
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow-task fail JSON",
+   "argv": [
+    "workflow-task:fail",
+    "wt-1",
+    "1",
+    "--server={mock}",
+    "-m",
+    "boom",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/workflow-tasks/wt-1/fail": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "outcome": "failed",
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow-task fail missing message",
+   "argv": [
+    "workflow-task:fail",
+    "wt-1",
+    "1",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/workflow-tasks/wt-1/fail": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow-task fail blank message",
+   "argv": [
+    "workflow-task:fail",
+    "wt-1",
+    "1",
+    "--server={mock}",
+    "--message=  "
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/workflow-tasks/wt-1/fail": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow-task fail lease conflict",
+   "argv": [
+    "workflow-task:fail",
+    "wt-1",
+    "1",
+    "--server={mock}",
+    "-m",
+    "boom",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/workflow-tasks/wt-1/fail": {
+     "method": "POST",
+     "status": 409,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "message": "Lease expired.",
+      "reason": "lease_expired",
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow-task history human",
+   "argv": [
+    "workflow-task:history",
+    "wt-1",
+    "page-2",
+    "--server={mock}",
+    "--attempt=1"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/workflow-tasks/wt-1/history": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "history_events": [
+       {
+        "sequence": 3
+       }
+      ],
+      "next_history_page_token": null,
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow-task history more pages",
+   "argv": [
+    "workflow-task:history",
+    "wt-1",
+    "page-2",
+    "--server={mock}",
+    "--attempt=2",
+    "--lease-owner=w-1"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/workflow-tasks/wt-1/history": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "history_events": [],
+      "next_history_page_token": "page-3",
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow-task history JSON",
+   "argv": [
+    "workflow-task:history",
+    "wt-1",
+    "page-2",
+    "--server={mock}",
+    "--attempt=1",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/workflow-tasks/wt-1/history": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "history_events": [
+       {
+        "sequence": 3
+       }
+      ],
+      "next_history_page_token": null,
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow-task history missing attempt",
+   "argv": [
+    "workflow-task:history",
+    "wt-1",
+    "page-2",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/workflow-tasks/wt-1/history": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "history_events": [
+       {
+        "sequence": 3
+       }
+      ],
+      "next_history_page_token": null,
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "query-task poll human",
+   "argv": [
+    "query-task:poll",
+    "cli-worker",
+    "--server={mock}",
+    "--task-queue=orders"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/query-tasks/poll": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "task": {
+       "query_task_id": "qt-1",
+       "workflow_id": "chk-42",
+       "run_id": "run-7",
+       "query_name": "status",
+       "query_task_attempt": 1
+      },
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "query-task poll JSON",
+   "argv": [
+    "query-task:poll",
+    "cli-worker",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/query-tasks/poll": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "task": {
+       "query_task_id": "qt-1",
+       "workflow_id": "chk-42",
+       "run_id": "run-7",
+       "query_name": "status",
+       "query_task_attempt": 1
+      },
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "query-task poll empty",
+   "argv": [
+    "query-task:poll",
+    "cli-worker",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/query-tasks/poll": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "task": [],
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "query-task complete human",
+   "argv": [
+    "query-task:complete",
+    "qt-1",
+    "1",
+    "--server={mock}",
+    "--result={\"ready\":true}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/query-tasks/qt-1/complete": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "query_task_id": "qt-1",
+      "query_task_attempt": 1,
+      "outcome": "completed",
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "query-task complete null result JSON",
+   "argv": [
+    "query-task:complete",
+    "qt-1",
+    "1",
+    "--server={mock}",
+    "--result=null",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/query-tasks/qt-1/complete": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "query_task_id": "qt-1",
+      "query_task_attempt": 1,
+      "outcome": "completed",
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "query-task complete minimal human",
+   "argv": [
+    "query-task:complete",
+    "qt-1",
+    "3",
+    "--server={mock}",
+    "--result=42"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/query-tasks/qt-1/complete": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "query-task complete missing result",
+   "argv": [
+    "query-task:complete",
+    "qt-1",
+    "1",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/query-tasks/qt-1/complete": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "query_task_id": "qt-1",
+      "query_task_attempt": 1,
+      "outcome": "completed",
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "query-task complete invalid result",
+   "argv": [
+    "query-task:complete",
+    "qt-1",
+    "1",
+    "--server={mock}",
+    "--result=[1,]",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/query-tasks/qt-1/complete": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "query_task_id": "qt-1",
+      "query_task_attempt": 1,
+      "outcome": "completed",
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "query-task fail human",
+   "argv": [
+    "query-task:fail",
+    "qt-1",
+    "1",
+    "--server={mock}",
+    "--message=unknown query",
+    "--reason=unknown_query",
+    "--type=QueryError"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/query-tasks/qt-1/fail": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "outcome": "failed",
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "query-task fail JSON",
+   "argv": [
+    "query-task:fail",
+    "qt-1",
+    "1",
+    "--server={mock}",
+    "-m",
+    "decode failed",
+    "--stack-trace=trace",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/query-tasks/qt-1/fail": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "query_task_id": "qt-1",
+      "query_task_attempt": 1,
+      "outcome": "failed",
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "query-task fail missing message",
+   "argv": [
+    "query-task:fail",
+    "qt-1",
+    "1",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/query-tasks/qt-1/fail": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "query-task fail unauthorized",
+   "argv": [
+    "query-task:fail",
+    "qt-1",
+    "1",
+    "--server={mock}",
+    "-m",
+    "x",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/query-tasks/qt-1/fail": {
+     "method": "POST",
+     "status": 401,
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "message": "Unauthenticated.",
+      "protocol_version": "1.20"
+     }
+    }
+   }
   }
  ]
 }

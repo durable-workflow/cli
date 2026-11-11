@@ -552,9 +552,17 @@ pub fn human(error: &CliError, context: &ErrorContext) -> String {
                 | "namespace:create"
                 | "namespace:update"
                 | "namespace:delete"
-        ) || ["schedule:", "search-attribute:", "task-queue:", "worker:"]
-            .iter()
-            .any(|group| context.command.starts_with(group))
+        ) || [
+            "schedule:",
+            "search-attribute:",
+            "task-queue:",
+            "worker:",
+            "activity:",
+            "workflow-task:",
+            "query-task:",
+        ]
+        .iter()
+        .any(|group| context.command.starts_with(group))
             || matches!(
                 context.command,
                 "storage:test" | "namespace:set-storage-driver"
@@ -669,7 +677,7 @@ mod tests {
         let error = CliError::Invalid("Use <name>.".into());
         // A command whose human errors are not escaped.
         let context = ErrorContext {
-            command: "activity:list",
+            command: "watch",
             ..context()
         };
         let rendered = crate::formatter::format(&human(&error, &context), true);

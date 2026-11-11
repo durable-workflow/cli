@@ -110,6 +110,13 @@ impl Context {
         self.namespace_request(RawRequest::delete(["namespaces", name]))
     }
 
+    /// One request for a resource outside the workflow response contract,
+    /// such as a schedule: one attempt, no redirect followed, the body
+    /// decoded as the 2.x client decodes it.
+    pub fn resource_request(&self, request: RawRequest) -> Result<Value, CliError> {
+        self.namespace_request(request)
+    }
+
     /// One workflow read with the PHP CLI's workflow response contract. Each
     /// segment is encoded by the SDK; `path` names the request in errors.
     pub fn workflow_get(

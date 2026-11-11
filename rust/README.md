@@ -30,7 +30,8 @@ every command group reaches parity.
 | `workflow:describe`, `workflow:show-run`: one execution or run, `--follow`, JSON | Ported |
 | `workflow:history`: every page, `--follow` long-poll, JSON and streamed JSONL | Ported |
 | `workflow:history-export`: the Server bundle to stdout or `--output-file` | Ported |
-| Remaining workflow, schedule and other command groups | Next slices ([gap list](https://github.com/durable-workflow/cli/issues/72#issuecomment-6801944950)) |
+| `schedule:list`, `schedule:describe`, `schedule:history`, `schedule:create`, `schedule:update`, `schedule:delete`, `schedule:pause`, `schedule:resume`, `schedule:trigger`, `schedule:backfill`: JSON and JSONL, `--input`/`--input-file`/`--input-encoding` | Ported |
+| Remaining workflow commands (query, start, signal, update, cancel and run control) and the other command groups | Next slices ([gap list](https://github.com/durable-workflow/cli/issues/72#issuecomment-6801944950)) |
 | `--tls-verify=false` against HTTPS: no certificate or hostname checks, as in 2.x, plus a stderr warning on every such command (also with `--json` and `-q`) | Ported, intentional addition |
 
 Server calls go through the published `durable-workflow` crate, pinned to
@@ -61,6 +62,18 @@ Namespace lifecycle requests make one target attempt and refuse HTTP redirects.
 Use the actual Server URL; a redirect is not reported as a completed creation,
 update or deletion. A lost response remains uncertain and is not automatically
 submitted again.
+
+Schedule commands follow the same rules: one request per history page or
+mutation, no redirect followed, and no automatic resubmission after a lost
+response. The schedule ID is sent as one percent-encoded path segment, so IDs
+containing `/`, `?` or `#` cannot select another route. Empty IDs and `.` or
+`..` are refused with exit 2 before the request.
+
+`--input` values are decoded with PHP's JSON rules and error messages, including
+the 511-level nesting limit, integers past 64 bits becoming floats, and `null`
+meaning no input. Input PHP decodes but cannot send, such as `1e400` or invalid
+UTF-8 from `--input-encoding=raw|base64`, is refused with exit 3 after the
+compatibility check, without a request, as 2.x reports it.
 
 ## Build and test
 

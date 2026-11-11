@@ -423,7 +423,8 @@ pub fn human(error: &CliError, context: &ErrorContext) -> String {
                 | "namespace:create"
                 | "namespace:update"
                 | "namespace:delete"
-        ) {
+        ) || context.command.starts_with("schedule:")
+        {
             crate::formatter::display_text(text)
         } else {
             text.to_owned()

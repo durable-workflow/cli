@@ -28,6 +28,12 @@ tokio = { version = "1", features = ["rt", "macros"] }
 # Release downloads for `dw upgrade`; the same version and TLS stack the SDK uses.
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 
+[dev-dependencies]
+# A self-signed HTTPS Server for the --tls-verify tests, on the ring provider
+# reqwest already uses.
+rcgen = { version = "0.13", default-features = false, features = ["ring", "pem"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+
 [target.'cfg(unix)'.dependencies]
 # access(2), for PHP's is_writable/is_executable checks in `dw upgrade`.
 libc = "0.2"

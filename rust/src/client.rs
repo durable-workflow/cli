@@ -66,18 +66,12 @@ impl Context {
 
     fn sdk_with_timeout(&self, timeout: Option<Duration>) -> Result<Client, CliError> {
         let connection = &self.connection;
-        // The SDK cannot disable certificate verification yet
-        // (durable-workflow/sdk-rust#180). Refuse instead of verifying
-        // against the caller's explicit choice.
-        if !connection.tls_verify && connection.server.to_lowercase().starts_with("https://") {
-            return Err(CliError::Invalid(
-                "This dw build cannot disable TLS certificate verification yet. Use a trusted certificate or the 2.x CLI for this Server."
-                    .into(),
-            ));
-        }
+        // --tls-verify=false skips certificate and hostname checks, like 2.x's
+        // verify_peer/verify_host. `doctor` reports it as a warning.
         let mut builder = Client::builder(connection.server.trim_end_matches('/'))
             .token(connection.token.clone())
-            .namespace(connection.namespace.clone());
+            .namespace(connection.namespace.clone())
+            .danger_accept_invalid_certs(!connection.tls_verify);
         if let Some(timeout) = timeout {
             builder = builder.timeout(timeout);
         }

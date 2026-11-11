@@ -273,8 +273,10 @@ fn set_option(
 
     let mut value = inline;
     if value.is_none() {
+        // Symfony takes the next token as the value unless it starts with
+        // `-`; an empty token is a value too.
         if let Some(next) = tokens.get(*index) {
-            if !next.is_empty() && !next.starts_with('-') {
+            if next.is_empty() || !next.starts_with('-') {
                 value = Some(next.clone());
                 *index += 1;
             }
@@ -361,6 +363,15 @@ mod tests {
         assert!(input.provided("server"));
         assert_eq!(input.opt("server"), Some(None));
         assert_eq!(input.opt_str("env"), Some("prod"));
+    }
+
+    #[test]
+    fn an_empty_token_is_an_option_value_as_in_symfony() {
+        let input = parse(&health(), &tokens(&["-s", "", "--env", "prod"])).unwrap();
+        assert_eq!(input.opt("server"), Some(Some("")));
+        assert_eq!(input.opt_str("env"), Some("prod"));
+        let input = parse(&spec(), &tokens(&["dev", "--output", ""])).unwrap();
+        assert_eq!(input.opt("output"), Some(Some("")));
     }
 
     #[test]

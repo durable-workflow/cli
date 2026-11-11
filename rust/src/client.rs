@@ -181,9 +181,7 @@ impl Context {
                 .map_err(map_error)
         })?;
         let status = response.status();
-        let body = Value::Object(crate::php::array_map(
-            response.json().unwrap_or(Value::Null),
-        ));
+        let body = Value::Object(crate::php::array_map(decode_body(&response)));
         if status >= 400 {
             let mut error = CliError::from_http(status, &crate::php::json_encode(&body));
             if status == 403 && self.managed_namespace() {
@@ -232,9 +230,7 @@ impl Context {
                 .map_err(map_error)
         })?;
         // The PHP Server client decodes non-array or invalid JSON as an empty array.
-        let body = Value::Object(crate::php::array_map(
-            response.json().unwrap_or(Value::Null),
-        ));
+        let body = Value::Object(crate::php::array_map(decode_body(&response)));
         if !response.is_success() {
             return Err(self.http_error(response.status(), &body));
         }
@@ -270,7 +266,7 @@ impl Context {
                 .map_err(map_error)
         })?;
         let status = response.status();
-        let body = response.json().unwrap_or(Value::Null);
+        let body = decode_body(&response);
         let normalized = workflow_response::normalize(
             body.clone(),
             response.control_plane_version(),
@@ -373,6 +369,14 @@ pub fn uses_worker_protocol(command: &str) -> bool {
         || command.starts_with("workflow-task:")
         || command.starts_with("query-task:")
         || matches!(command, "activity:complete" | "activity:fail")
+}
+
+/// The response body as 2.x's `json_decode($content, true)` reads it: up to
+/// 512 levels deep, PHP's number rules, and `null` for anything invalid.
+fn decode_body(response: &durable_workflow::RawResponse) -> Value {
+    crate::php_json::decode(response.body_bytes())
+        .map(|decoded| decoded.value)
+        .unwrap_or(Value::Null)
 }
 
 /// Maps SDK failures onto the CLI's exit categories.

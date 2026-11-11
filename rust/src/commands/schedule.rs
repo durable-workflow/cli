@@ -683,7 +683,7 @@ pub(crate) fn truthy(value: Option<&Value>) -> bool {
 }
 
 /// PHP 8 `$value > 0`, where a missing value is `0`.
-fn greater_than_zero(value: Option<&Value>) -> bool {
+pub(crate) fn greater_than_zero(value: Option<&Value>) -> bool {
     match value {
         None | Some(Value::Null) => false,
         Some(Value::Bool(flag)) => *flag,

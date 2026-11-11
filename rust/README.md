@@ -38,7 +38,9 @@ every command group reaches parity.
 | `worker:list`, `worker:describe`, `worker:register`, `worker:deregister`: `worker:register` checks the worker-protocol response version as 2.x does | Ported |
 | `activity:list`, `activity:describe`, `activity:complete`, `activity:fail`: standalone activities; complete and fail speak the worker protocol | Ported |
 | `workflow-task:poll`, `workflow-task:complete`, `workflow-task:fail`, `workflow-task:history`, `query-task:poll`, `query-task:complete`, `query-task:fail`: worker-protocol diagnostics, one request each | Ported |
-| Remaining command groups (system, `service-call`, `bridge`, `debug`, `watch`) | Next slices ([gap list](https://github.com/durable-workflow/cli/issues/72#issuecomment-6801944950)) |
+| `system:repair-status`, `system:repair-pass`, `system:retention-status`, `system:retention-pass`, `system:activity-timeout-status`, `system:activity-timeout-pass`, `system:operator-metrics`: each `*-pass` is one request; failed entries exit 1 | Ported |
+| `service-call:describe`, `bridge:webhook`: one GET; one POST with the 2.x target/correlation/input checks before any request | Ported |
+| `debug workflow` (with the cancellation cascade view) and `watch workflow`: every poll is one read; `watch` exits 0 on completed, 1 on another terminal state and 7 at `--max-polls` | Ported |
 | `--tls-verify=false` against HTTPS: no certificate or hostname checks, as in 2.x, plus a stderr warning on every such command (also with `--json` and `-q`) | Ported, intentional addition |
 
 Server calls go through the published `durable-workflow` crate, pinned to

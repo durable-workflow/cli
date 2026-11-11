@@ -35,8 +35,8 @@ enum Handler {
 /// reported as not yet available.
 fn handler(name: &str) -> Option<Handler> {
     use commands::{
-        activity_task, completion, doctor, env, namespace, runtime, schedule, schema,
-        search_attribute, server, start_dev, task_queue, upgrade, worker, workflow,
+        activity_task, completion, debug, doctor, env, namespace, runtime, schedule, schema,
+        search_attribute, server, start_dev, system, task_queue, upgrade, worker, workflow,
         workflow_control, workflow_message, workflow_run,
     };
     Some(match name {
@@ -108,6 +108,17 @@ fn handler(name: &str) -> Option<Handler> {
         "query-task:poll" => Handler::Server(activity_task::query_task_poll),
         "query-task:complete" => Handler::Server(activity_task::query_task_complete),
         "query-task:fail" => Handler::Server(activity_task::query_task_fail),
+        "system:repair-status" => Handler::Server(system::repair_status),
+        "system:repair-pass" => Handler::Server(system::repair_pass),
+        "system:retention-status" => Handler::Server(system::retention_status),
+        "system:retention-pass" => Handler::Server(system::retention_pass),
+        "system:activity-timeout-status" => Handler::Server(system::activity_timeout_status),
+        "system:activity-timeout-pass" => Handler::Server(system::activity_timeout_pass),
+        "system:operator-metrics" => Handler::Server(system::operator_metrics),
+        "service-call:describe" => Handler::Server(system::service_call_describe),
+        "bridge:webhook" => Handler::Server(system::bridge_webhook),
+        "debug" => Handler::Server(debug::debug),
+        "watch" => Handler::Server(debug::watch),
         "env:list" => Handler::Local(env::list),
         "env:set" => Handler::Local(env::set),
         "env:use" => Handler::Local(env::use_env),
@@ -170,6 +181,17 @@ const NAMESPACE_SCOPED: &[&str] = &[
     "workflow-task:fail",
     "workflow-task:history",
     "workflow-task:poll",
+    "bridge:webhook",
+    "debug",
+    "service-call:describe",
+    "system:activity-timeout-pass",
+    "system:activity-timeout-status",
+    "system:operator-metrics",
+    "system:repair-pass",
+    "system:repair-status",
+    "system:retention-pass",
+    "system:retention-status",
+    "watch",
 ];
 
 /// Verbs of a group and the command each one names.

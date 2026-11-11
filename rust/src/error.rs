@@ -560,12 +560,18 @@ pub fn human(error: &CliError, context: &ErrorContext) -> String {
             "activity:",
             "workflow-task:",
             "query-task:",
+            "system:",
         ]
         .iter()
         .any(|group| context.command.starts_with(group))
             || matches!(
                 context.command,
-                "storage:test" | "namespace:set-storage-driver"
+                "storage:test"
+                    | "namespace:set-storage-driver"
+                    | "service-call:describe"
+                    | "bridge:webhook"
+                    | "debug"
+                    | "watch"
             )
         {
             crate::formatter::display_text(text)
@@ -675,9 +681,9 @@ mod tests {
     #[test]
     fn existing_commands_keep_their_ansi_placeholder_boundaries() {
         let error = CliError::Invalid("Use <name>.".into());
-        // A command whose human errors are not escaped.
+        // A local command: its own messages keep 2.x's markup handling.
         let context = ErrorContext {
-            command: "watch",
+            command: "env:set",
             ..context()
         };
         let rendered = crate::formatter::format(&human(&error, &context), true);

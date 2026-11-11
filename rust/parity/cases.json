@@ -10919,6 +10919,1628 @@
      "reason": "The SDK makes one target attempt without following redirects. Rust refuses the initial 3xx; the PHP reference follows the redirect and receives a different refusal. Use the actual Server URL (cli#72)."
     }
    }
+  },
+  {
+   "name": "search-attribute list human",
+   "argv": [
+    "search-attribute:list",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/search-attributes": {
+     "body": {
+      "system_attributes": {
+       "WorkflowType": "keyword",
+       "StartTime": "datetime"
+      },
+      "custom_attributes": {
+       "OrderStatus": "keyword",
+       "Amount": "double"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "search-attribute list JSON",
+   "argv": [
+    "search-attribute:list",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/search-attributes": {
+     "body": {
+      "system_attributes": {
+       "WorkflowType": "keyword",
+       "StartTime": "datetime"
+      },
+      "custom_attributes": {
+       "OrderStatus": "keyword",
+       "Amount": "double"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "search-attribute list grouped alias",
+   "argv": [
+    "search-attributes",
+    "list",
+    "--server={mock}",
+    "--output=jsonl"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/search-attributes": {
+     "body": {
+      "system_attributes": {
+       "WorkflowType": "keyword",
+       "StartTime": "datetime"
+      },
+      "custom_attributes": {
+       "OrderStatus": "keyword",
+       "Amount": "double"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "search-attribute list empty",
+   "argv": [
+    "search-attribute:list",
+    "--server={mock}",
+    "--namespace=orders"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/search-attributes": {
+     "body": {
+      "system_attributes": {},
+      "custom_attributes": []
+     }
+    }
+   }
+  },
+  {
+   "name": "search-attribute list server namespace",
+   "argv": [
+    "search-attribute:list",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/search-attributes": {
+     "body": {
+      "system_attributes": {
+       "WorkflowType": "keyword",
+       "StartTime": "datetime"
+      },
+      "custom_attributes": {
+       "OrderStatus": "keyword",
+       "Amount": "double"
+      },
+      "namespace": "billing"
+     }
+    }
+   }
+  },
+  {
+   "name": "search-attribute create human",
+   "argv": [
+    "search-attribute:create",
+    "OrderStatus",
+    "keyword",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/search-attributes": {
+     "method": "POST",
+     "status": 201,
+     "body": {
+      "name": "OrderStatus",
+      "type": "keyword"
+     }
+    }
+   }
+  },
+  {
+   "name": "search-attribute create JSON",
+   "argv": [
+    "search-attribute:create",
+    "OrderStatus",
+    "keyword",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/search-attributes": {
+     "method": "POST",
+     "status": 201,
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "search-attribute create conflict",
+   "argv": [
+    "search-attribute:create",
+    "OrderStatus",
+    "keyword",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/search-attributes": {
+     "method": "POST",
+     "status": 409,
+     "body": {
+      "message": "Search attribute already exists.",
+      "reason": "duplicate"
+     }
+    }
+   }
+  },
+  {
+   "name": "search-attribute delete human",
+   "argv": [
+    "search-attribute:delete",
+    "OrderStatus",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/search-attributes/OrderStatus": {
+     "method": "DELETE",
+     "body": {
+      "deleted": true
+     }
+    }
+   }
+  },
+  {
+   "name": "search-attribute delete JSON",
+   "argv": [
+    "search-attributes:delete",
+    "OrderStatus",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/search-attributes/OrderStatus": {
+     "method": "DELETE",
+     "body": {
+      "deleted": true,
+      "namespace": "orders"
+     }
+    }
+   }
+  },
+  {
+   "name": "search-attribute delete not found",
+   "argv": [
+    "search-attribute:delete",
+    "Missing",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/search-attributes/Missing": {
+     "method": "DELETE",
+     "status": 404,
+     "body": {
+      "message": "Search attribute not found."
+     }
+    }
+   }
+  },
+  {
+   "name": "storage test human",
+   "argv": [
+    "storage:test",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/storage/test": {
+     "method": "POST",
+     "body": {
+      "status": "passed",
+      "driver": "s3",
+      "small_payload": {
+       "status": "inline",
+       "bytes": 128,
+       "sha256": "abc"
+      },
+      "large_payload": {
+       "status": "offloaded",
+       "bytes": 2097152,
+       "sha256": "def",
+       "reference_uri": "s3://dw/payloads/1"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "storage test JSON echo",
+   "argv": [
+    "storage:test",
+    "--server={mock}",
+    "--driver= s3 ",
+    "--small-bytes=64",
+    "--large-bytes=4096",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/storage/test": {
+     "method": "POST",
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "storage test minimal human",
+   "argv": [
+    "storage:test",
+    "--server={mock}",
+    "--driver=gcs"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/storage/test": {
+     "method": "POST",
+     "body": {
+      "small_payload": "x"
+     }
+    }
+   }
+  },
+  {
+   "name": "storage test invalid size",
+   "argv": [
+    "storage:test",
+    "--server={mock}",
+    "--small-bytes=0",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {}
+  },
+  {
+   "name": "storage test bare size",
+   "argv": [
+    "storage:test",
+    "--server={mock}",
+    "--large-bytes"
+   ],
+   "mock": [],
+   "mock_routes": {}
+  },
+  {
+   "name": "storage test invalid driver",
+   "argv": [
+    "storage:test",
+    "--server={mock}",
+    "--driver=ftp"
+   ],
+   "mock": [],
+   "mock_routes": {}
+  },
+  {
+   "name": "storage test invalid driver JSON",
+   "argv": [
+    "storage:test",
+    "--server={mock}",
+    "--driver=ftp",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {}
+  },
+  {
+   "name": "namespace set-storage-driver human",
+   "argv": [
+    "namespace:set-storage-driver",
+    "billing",
+    "s3",
+    "--server={mock}",
+    "--disk=x",
+    "--bucket=y",
+    "--threshold-bytes=2097152"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing/external-storage": {
+     "method": "PUT",
+     "body": {
+      "name": "billing",
+      "external_payload_storage": {
+       "driver": "s3",
+       "enabled": true,
+       "threshold_bytes": 2097152,
+       "config": {
+        "disk": "x",
+        "bucket": "y"
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace set-storage-driver JSON echo",
+   "argv": [
+    "namespace:set-storage-driver",
+    "billing",
+    " local ",
+    "--server={mock}",
+    "--uri= file:///tmp/p ",
+    "--prefix=",
+    "--disable",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing/external-storage": {
+     "method": "PUT",
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "namespace set-storage-driver flat response",
+   "argv": [
+    "namespace:set-storage-driver",
+    "billing",
+    "azure",
+    "--server={mock}",
+    "--disable",
+    "--threshold-bytes"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/namespaces/billing/external-storage": {
+     "method": "PUT",
+     "body": {
+      "driver": "azure",
+      "enabled": "off"
+     }
+    }
+   }
+  },
+  {
+   "name": "namespace set-storage-driver invalid driver",
+   "argv": [
+    "namespace:set-storage-driver",
+    "billing",
+    "ftp",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {}
+  },
+  {
+   "name": "namespace set-storage-driver invalid threshold",
+   "argv": [
+    "namespace:set-storage-driver",
+    "billing",
+    "s3",
+    "--server={mock}",
+    "--threshold-bytes=-5"
+   ],
+   "mock": [],
+   "mock_routes": {}
+  },
+  {
+   "name": "task-queue list human",
+   "argv": [
+    "task-queue:list",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/task-queues": {
+     "body": {
+      "task_queues": [
+       {
+        "name": "orders",
+        "admission": {
+         "workflow_tasks": {
+          "status": "accepting",
+          "server_remaining_active_lease_capacity": 8,
+          "server_remaining_namespace_active_lease_capacity": 20,
+          "server_remaining_dispatch_capacity": 50,
+          "server_dispatch_budget_group": "tenant-a",
+          "server_remaining_budget_group_dispatch_capacity": 30
+         },
+         "activity_tasks": {
+          "status": "throttled",
+          "available_slot_count": 0,
+          "server_remaining_budget_group_dispatch_capacity": 3
+         },
+         "query_tasks": {
+          "status": "accepting",
+          "remaining_pending_capacity": 5
+         }
+        }
+       },
+       {
+        "name": "emails"
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "task-queue list JSON",
+   "argv": [
+    "task-queue:list",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/task-queues": {
+     "body": {
+      "task_queues": [
+       {
+        "name": "orders",
+        "admission": {
+         "workflow_tasks": {
+          "status": "accepting",
+          "server_remaining_active_lease_capacity": 8,
+          "server_remaining_namespace_active_lease_capacity": 20,
+          "server_remaining_dispatch_capacity": 50,
+          "server_dispatch_budget_group": "tenant-a",
+          "server_remaining_budget_group_dispatch_capacity": 30
+         },
+         "activity_tasks": {
+          "status": "throttled",
+          "available_slot_count": 0,
+          "server_remaining_budget_group_dispatch_capacity": 3
+         },
+         "query_tasks": {
+          "status": "accepting",
+          "remaining_pending_capacity": 5
+         }
+        }
+       },
+       {
+        "name": "emails"
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "task-queue list JSONL",
+   "argv": [
+    "task-queue:list",
+    "--server={mock}",
+    "--output=jsonl"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/task-queues": {
+     "body": {
+      "task_queues": [
+       {
+        "name": "orders",
+        "admission": {
+         "workflow_tasks": {
+          "status": "accepting",
+          "server_remaining_active_lease_capacity": 8,
+          "server_remaining_namespace_active_lease_capacity": 20,
+          "server_remaining_dispatch_capacity": 50,
+          "server_dispatch_budget_group": "tenant-a",
+          "server_remaining_budget_group_dispatch_capacity": 30
+         },
+         "activity_tasks": {
+          "status": "throttled",
+          "available_slot_count": 0,
+          "server_remaining_budget_group_dispatch_capacity": 3
+         },
+         "query_tasks": {
+          "status": "accepting",
+          "remaining_pending_capacity": 5
+         }
+        }
+       },
+       {
+        "name": "emails"
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "task-queue list empty",
+   "argv": [
+    "task-queue:list",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/task-queues": {
+     "body": {
+      "task_queues": []
+     }
+    }
+   }
+  },
+  {
+   "name": "task-queue describe human",
+   "argv": [
+    "task-queue:describe",
+    "orders",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/task-queues/orders": {
+     "body": {
+      "name": "orders",
+      "stats": {
+       "approximate_backlog_count": 12,
+       "approximate_backlog_age": "PT5S",
+       "workflow_tasks": {
+        "ready_count": 3,
+        "leased_count": 1,
+        "expired_lease_count": 0
+       },
+       "activity_tasks": {
+        "ready_count": 9
+       },
+       "pollers": {
+        "active_count": "2",
+        "stale_count": 1
+       }
+      },
+      "admission": {
+       "workflow_tasks": {
+        "status": "accepting",
+        "server_active_lease_count": 2,
+        "server_max_active_leases_per_queue": 10,
+        "server_remaining_active_lease_capacity": 8,
+        "server_namespace_active_lease_count": 4,
+        "server_max_active_leases_per_namespace": 40,
+        "server_remaining_namespace_active_lease_capacity": 36,
+        "server_dispatch_count_this_minute": 5,
+        "server_max_dispatches_per_minute": 60,
+        "server_remaining_dispatch_capacity": 55,
+        "server_namespace_dispatch_count_this_minute": 7,
+        "server_max_dispatches_per_minute_per_namespace": 100,
+        "server_remaining_namespace_dispatch_capacity": 93,
+        "server_dispatch_budget_group": "tenant-a",
+        "server_budget_group_dispatch_count_this_minute": 1,
+        "server_max_dispatches_per_minute_per_budget_group": 10,
+        "server_remaining_budget_group_dispatch_capacity": 9,
+        "budget_source": "queue",
+        "server_budget_source": "server"
+       },
+       "activity_tasks": {
+        "status": "full",
+        "leased_count": 4,
+        "configured_slot_count": 4,
+        "available_slot_count": 0,
+        "server_dispatch_budget_group": "tenant-b"
+       },
+       "query_tasks": {
+        "status": "accepting",
+        "approximate_pending_count": 1,
+        "max_pending_per_queue": 10,
+        "remaining_pending_capacity": 9,
+        "lock_supported": false,
+        "budget_source": "default"
+       }
+      },
+      "current_leases": [
+       {
+        "task_id": "t-1",
+        "task_type": "workflow",
+        "workflow_id": "wf-1",
+        "lease_owner": "w-1",
+        "lease_expires_at": "2026-04-22T05:00:00Z",
+        "is_expired": true
+       },
+       {
+        "task_id": "t-2",
+        "task_type": "activity"
+       }
+      ],
+      "pollers": [
+       {
+        "worker_id": "w-1",
+        "runtime": "php",
+        "build_id": "b-1",
+        "last_heartbeat_at": "2026-04-22T05:00:00Z",
+        "status": "active"
+       },
+       {
+        "worker_id": "w-2",
+        "status": "stale"
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "task-queue describe JSON",
+   "argv": [
+    "task-queue:describe",
+    "orders",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/task-queues/orders": {
+     "body": {
+      "name": "orders",
+      "stats": {
+       "approximate_backlog_count": 12,
+       "approximate_backlog_age": "PT5S",
+       "workflow_tasks": {
+        "ready_count": 3,
+        "leased_count": 1,
+        "expired_lease_count": 0
+       },
+       "activity_tasks": {
+        "ready_count": 9
+       },
+       "pollers": {
+        "active_count": "2",
+        "stale_count": 1
+       }
+      },
+      "admission": {
+       "workflow_tasks": {
+        "status": "accepting",
+        "server_active_lease_count": 2,
+        "server_max_active_leases_per_queue": 10,
+        "server_remaining_active_lease_capacity": 8,
+        "server_namespace_active_lease_count": 4,
+        "server_max_active_leases_per_namespace": 40,
+        "server_remaining_namespace_active_lease_capacity": 36,
+        "server_dispatch_count_this_minute": 5,
+        "server_max_dispatches_per_minute": 60,
+        "server_remaining_dispatch_capacity": 55,
+        "server_namespace_dispatch_count_this_minute": 7,
+        "server_max_dispatches_per_minute_per_namespace": 100,
+        "server_remaining_namespace_dispatch_capacity": 93,
+        "server_dispatch_budget_group": "tenant-a",
+        "server_budget_group_dispatch_count_this_minute": 1,
+        "server_max_dispatches_per_minute_per_budget_group": 10,
+        "server_remaining_budget_group_dispatch_capacity": 9,
+        "budget_source": "queue",
+        "server_budget_source": "server"
+       },
+       "activity_tasks": {
+        "status": "full",
+        "leased_count": 4,
+        "configured_slot_count": 4,
+        "available_slot_count": 0,
+        "server_dispatch_budget_group": "tenant-b"
+       },
+       "query_tasks": {
+        "status": "accepting",
+        "approximate_pending_count": 1,
+        "max_pending_per_queue": 10,
+        "remaining_pending_capacity": 9,
+        "lock_supported": false,
+        "budget_source": "default"
+       }
+      },
+      "current_leases": [
+       {
+        "task_id": "t-1",
+        "task_type": "workflow",
+        "workflow_id": "wf-1",
+        "lease_owner": "w-1",
+        "lease_expires_at": "2026-04-22T05:00:00Z",
+        "is_expired": true
+       },
+       {
+        "task_id": "t-2",
+        "task_type": "activity"
+       }
+      ],
+      "pollers": [
+       {
+        "worker_id": "w-1",
+        "runtime": "php",
+        "build_id": "b-1",
+        "last_heartbeat_at": "2026-04-22T05:00:00Z",
+        "status": "active"
+       },
+       {
+        "worker_id": "w-2",
+        "status": "stale"
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "task-queue describe minimal",
+   "argv": [
+    "task-queue:describe",
+    "orders",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/task-queues/orders": {
+     "body": {
+      "name": "orders"
+     }
+    }
+   }
+  },
+  {
+   "name": "task-queue describe not found",
+   "argv": [
+    "task-queue:describe",
+    "nope",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/task-queues/nope": {
+     "status": 404,
+     "body": {
+      "message": "Task queue not found."
+     }
+    }
+   }
+  },
+  {
+   "name": "task-queue build-ids human",
+   "argv": [
+    "task-queue:build-ids",
+    "orders",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/task-queues/orders/build-ids": {
+     "body": {
+      "task_queue": "orders",
+      "stale_after_seconds": 60,
+      "build_ids": [
+       {
+        "build_id": "b-2",
+        "rollout_status": "active",
+        "active_worker_count": 2,
+        "draining_worker_count": 0,
+        "stale_worker_count": 1,
+        "total_worker_count": 3,
+        "new_start_selected": true,
+        "promoted_at": "2026-04-22T05:00:00Z",
+        "workflow_definition_fingerprint_conflicts": [
+         {
+          "workflow_type": "orders.Checkout",
+          "fingerprint_count": "2"
+         },
+         {
+          "workflow_type": "x",
+          "fingerprint_count": "n"
+         },
+         "bad"
+        ],
+        "runtimes": [
+         "php",
+         "python",
+         3
+        ],
+        "sdk_versions": [],
+        "last_heartbeat_at": "2026-04-22T05:01:00Z",
+        "first_seen_at": "2026-04-20T00:00:00Z"
+       },
+       {
+        "build_id": null,
+        "rollout_status": "draining"
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "task-queue build-ids JSON",
+   "argv": [
+    "task-queue:build-ids",
+    "orders",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/task-queues/orders/build-ids": {
+     "body": {
+      "task_queue": "orders",
+      "stale_after_seconds": 60,
+      "build_ids": [
+       {
+        "build_id": "b-2",
+        "rollout_status": "active",
+        "active_worker_count": 2,
+        "draining_worker_count": 0,
+        "stale_worker_count": 1,
+        "total_worker_count": 3,
+        "new_start_selected": true,
+        "promoted_at": "2026-04-22T05:00:00Z",
+        "workflow_definition_fingerprint_conflicts": [
+         {
+          "workflow_type": "orders.Checkout",
+          "fingerprint_count": "2"
+         },
+         {
+          "workflow_type": "x",
+          "fingerprint_count": "n"
+         },
+         "bad"
+        ],
+        "runtimes": [
+         "php",
+         "python",
+         3
+        ],
+        "sdk_versions": [],
+        "last_heartbeat_at": "2026-04-22T05:01:00Z",
+        "first_seen_at": "2026-04-20T00:00:00Z"
+       },
+       {
+        "build_id": null,
+        "rollout_status": "draining"
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "task-queue build-ids empty",
+   "argv": [
+    "task-queue:build-ids",
+    "orders",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/task-queues/orders/build-ids": {
+     "body": {
+      "build_ids": []
+     }
+    }
+   }
+  },
+  {
+   "name": "task-queue drain human",
+   "argv": [
+    "task-queue:drain",
+    "orders",
+    "--build-id=b-1",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/task-queues/orders/build-ids/drain": {
+     "method": "POST",
+     "body": {
+      "task_queue": "orders",
+      "build_id": "b-1",
+      "drained_at": "2026-04-22T05:00:00Z"
+     }
+    }
+   }
+  },
+  {
+   "name": "task-queue drain unversioned JSON echo",
+   "argv": [
+    "task-queue:drain",
+    "orders",
+    "--unversioned",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/task-queues/orders/build-ids/drain": {
+     "method": "POST",
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "task-queue drain unversioned human",
+   "argv": [
+    "task-queue:drain",
+    "orders",
+    "--unversioned",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/task-queues/orders/build-ids/drain": {
+     "method": "POST",
+     "body": {
+      "build_id": null
+     }
+    }
+   }
+  },
+  {
+   "name": "task-queue drain conflicting target",
+   "argv": [
+    "task-queue:drain",
+    "orders",
+    "--unversioned",
+    "--build-id=b-1",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {}
+  },
+  {
+   "name": "task-queue drain missing target",
+   "argv": [
+    "task-queue:drain",
+    "orders",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {}
+  },
+  {
+   "name": "task-queue promote human",
+   "argv": [
+    "task-queue:promote",
+    "orders",
+    "--build-id=b-1",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/task-queues/orders/build-ids/promote": {
+     "method": "POST",
+     "body": {
+      "task_queue": "orders",
+      "build_id": "b-1",
+      "promoted_at": "2026-04-22T05:00:00Z"
+     }
+    }
+   }
+  },
+  {
+   "name": "task-queue promote unversioned JSON echo",
+   "argv": [
+    "task-queue:promote",
+    "orders",
+    "--unversioned",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/task-queues/orders/build-ids/promote": {
+     "method": "POST",
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "task-queue promote unversioned human",
+   "argv": [
+    "task-queue:promote",
+    "orders",
+    "--unversioned",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/task-queues/orders/build-ids/promote": {
+     "method": "POST",
+     "body": {
+      "build_id": null
+     }
+    }
+   }
+  },
+  {
+   "name": "task-queue promote conflicting target",
+   "argv": [
+    "task-queue:promote",
+    "orders",
+    "--unversioned",
+    "--build-id=b-1",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {}
+  },
+  {
+   "name": "task-queue promote missing target",
+   "argv": [
+    "task-queue:promote",
+    "orders",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {}
+  },
+  {
+   "name": "task-queue resume human",
+   "argv": [
+    "task-queue:resume",
+    "orders",
+    "--build-id=b-1",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/task-queues/orders/build-ids/resume": {
+     "method": "POST",
+     "body": {
+      "task_queue": "orders",
+      "build_id": "b-1"
+     }
+    }
+   }
+  },
+  {
+   "name": "task-queue resume unversioned JSON echo",
+   "argv": [
+    "task-queue:resume",
+    "orders",
+    "--unversioned",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/task-queues/orders/build-ids/resume": {
+     "method": "POST",
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "task-queue resume unversioned human",
+   "argv": [
+    "task-queue:resume",
+    "orders",
+    "--unversioned",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/task-queues/orders/build-ids/resume": {
+     "method": "POST",
+     "body": {
+      "build_id": null
+     }
+    }
+   }
+  },
+  {
+   "name": "task-queue resume conflicting target",
+   "argv": [
+    "task-queue:resume",
+    "orders",
+    "--unversioned",
+    "--build-id=b-1",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {}
+  },
+  {
+   "name": "task-queue resume missing target",
+   "argv": [
+    "task-queue:resume",
+    "orders",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {}
+  },
+  {
+   "name": "worker list human",
+   "argv": [
+    "worker:list",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workers": {
+     "body": {
+      "workers": [
+       {
+        "worker_id": "w-1",
+        "task_queue": "orders",
+        "runtime": "php",
+        "build_id": "b-1",
+        "status": "active",
+        "task_slots": {
+         "workflow_available": 3,
+         "workflow_capacity": 5,
+         "activity_available": 1
+        },
+        "max_concurrent_activity_tasks": 4,
+        "last_heartbeat_at": "2026-04-22T05:00:00Z"
+       },
+       {
+        "worker_id": "w-2",
+        "status": "stale",
+        "max_concurrent_workflow_tasks": 0
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "worker list filters JSON",
+   "argv": [
+    "worker:list",
+    "--server={mock}",
+    "--task-queue=orders",
+    "--status=stale",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workers": {
+     "body": {
+      "workers": [
+       {
+        "worker_id": "w-1",
+        "task_queue": "orders",
+        "runtime": "php",
+        "build_id": "b-1",
+        "status": "active",
+        "task_slots": {
+         "workflow_available": 3,
+         "workflow_capacity": 5,
+         "activity_available": 1
+        },
+        "max_concurrent_activity_tasks": 4,
+        "last_heartbeat_at": "2026-04-22T05:00:00Z"
+       },
+       {
+        "worker_id": "w-2",
+        "status": "stale",
+        "max_concurrent_workflow_tasks": 0
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "worker list JSONL",
+   "argv": [
+    "worker:list",
+    "--server={mock}",
+    "--output=jsonl"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workers": {
+     "body": {
+      "workers": [
+       {
+        "worker_id": "w-1",
+        "task_queue": "orders",
+        "runtime": "php",
+        "build_id": "b-1",
+        "status": "active",
+        "task_slots": {
+         "workflow_available": 3,
+         "workflow_capacity": 5,
+         "activity_available": 1
+        },
+        "max_concurrent_activity_tasks": 4,
+        "last_heartbeat_at": "2026-04-22T05:00:00Z"
+       },
+       {
+        "worker_id": "w-2",
+        "status": "stale",
+        "max_concurrent_workflow_tasks": 0
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "worker list empty",
+   "argv": [
+    "worker:list",
+    "--server={mock}",
+    "--namespace=orders"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workers": {
+     "body": {
+      "workers": []
+     }
+    }
+   }
+  },
+  {
+   "name": "worker describe human",
+   "argv": [
+    "worker:describe",
+    "w-1",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workers/w-1": {
+     "body": {
+      "worker_id": "w-1",
+      "task_queue": "orders",
+      "runtime": "python",
+      "sdk_version": "1.2.3",
+      "build_id": "b-1",
+      "status": "active",
+      "max_concurrent_workflow_tasks": 5,
+      "max_concurrent_activity_tasks": 4,
+      "task_slots": {
+       "workflow_available": 3,
+       "activity_available": "2",
+       "session_capacity": 0
+      },
+      "process_metrics": {
+       "cpu_percent": 12.5,
+       "memory_bytes": 157286400,
+       "process_uptime_seconds": 3725,
+       "process_id": 4242,
+       "host": "node-1"
+      },
+      "heartbeat_interval_seconds": 30,
+      "last_heartbeat_at": "2026-04-22T05:00:00Z",
+      "registered_at": "2026-04-22T04:00:00Z",
+      "updated_at": "2026-04-22T05:00:00Z",
+      "supported_workflow_types": [
+       "orders.Checkout"
+      ],
+      "supported_activity_types": [
+       "email.send",
+       "sms.send"
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "worker describe JSON",
+   "argv": [
+    "worker:describe",
+    "w-1",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workers/w-1": {
+     "body": {
+      "worker_id": "w-1",
+      "task_queue": "orders",
+      "runtime": "python",
+      "sdk_version": "1.2.3",
+      "build_id": "b-1",
+      "status": "active",
+      "max_concurrent_workflow_tasks": 5,
+      "max_concurrent_activity_tasks": 4,
+      "task_slots": {
+       "workflow_available": 3,
+       "activity_available": "2",
+       "session_capacity": 0
+      },
+      "process_metrics": {
+       "cpu_percent": 12.5,
+       "memory_bytes": 157286400,
+       "process_uptime_seconds": 3725,
+       "process_id": 4242,
+       "host": "node-1"
+      },
+      "heartbeat_interval_seconds": 30,
+      "last_heartbeat_at": "2026-04-22T05:00:00Z",
+      "registered_at": "2026-04-22T04:00:00Z",
+      "updated_at": "2026-04-22T05:00:00Z",
+      "supported_workflow_types": [
+       "orders.Checkout"
+      ],
+      "supported_activity_types": [
+       "email.send",
+       "sms.send"
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "worker describe minimal",
+   "argv": [
+    "worker:describe",
+    "w-9",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workers/w-9": {
+     "body": {
+      "worker_id": "w-9",
+      "process_metrics": {
+       "cpu_percent": 3,
+       "memory_bytes": 512
+      },
+      "heartbeat_interval_seconds": "30"
+     }
+    }
+   }
+  },
+  {
+   "name": "worker describe not found",
+   "argv": [
+    "worker:describe",
+    "w-0",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workers/w-0": {
+     "status": 404,
+     "body": {
+      "message": "Worker not found."
+     }
+    }
+   }
+  },
+  {
+   "name": "worker deregister human",
+   "argv": [
+    "worker:deregister",
+    "w-1",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workers/w-1": {
+     "method": "DELETE",
+     "body": {
+      "worker_id": "w-1",
+      "outcome": "deregistered"
+     }
+    }
+   }
+  },
+  {
+   "name": "worker deregister JSON",
+   "argv": [
+    "worker:deregister",
+    "w-1",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workers/w-1": {
+     "method": "DELETE",
+     "body": {
+      "outcome": "deregistered"
+     }
+    }
+   }
+  },
+  {
+   "name": "worker deregister minimal human",
+   "argv": [
+    "worker:deregister",
+    "w-1",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workers/w-1": {
+     "method": "DELETE",
+     "body": {}
+    }
+   }
+  },
+  {
+   "name": "worker register human",
+   "argv": [
+    "worker:register",
+    "cli-worker",
+    "--server={mock}",
+    "--task-queue=orders",
+    "--workflow-type=orders.Checkout",
+    "--build-id=b-1"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/register": {
+     "method": "POST",
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "registered": true,
+      "worker_id": "w-77",
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "worker register JSON",
+   "argv": [
+    "worker:register",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/register": {
+     "method": "POST",
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "registered": true,
+      "worker_id": "w-77",
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "worker register not confirmed",
+   "argv": [
+    "worker:register",
+    "w",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/register": {
+     "method": "POST",
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "registered": "yes",
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "worker register missing protocol header",
+   "argv": [
+    "worker:register",
+    "w",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/register": {
+     "method": "POST",
+     "body": {
+      "registered": true,
+      "worker_id": "w-77",
+      "protocol_version": "1.20"
+     }
+    }
+   }
+  },
+  {
+   "name": "worker register mismatched body version",
+   "argv": [
+    "worker:register",
+    "w",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/register": {
+     "method": "POST",
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "1.20"
+     },
+     "body": {
+      "registered": true,
+      "worker_id": "w-77",
+      "protocol_version": "1.19"
+     }
+    }
+   }
+  },
+  {
+   "name": "worker register incompatible version",
+   "argv": [
+    "worker:register",
+    "w",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/register": {
+     "method": "POST",
+     "headers": {
+      "X-Durable-Workflow-Protocol-Version": "2.0"
+     },
+     "body": {
+      "registered": true,
+      "worker_id": "w-77",
+      "protocol_version": "2.0"
+     }
+    }
+   }
+  },
+  {
+   "name": "worker register refused",
+   "argv": [
+    "worker:register",
+    "w",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/worker/register": {
+     "method": "POST",
+     "status": 422,
+     "body": {
+      "message": "Invalid task queue.",
+      "errors": {
+       "task_queue": [
+        "Required."
+       ]
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "worker register invalid max",
+   "argv": [
+    "worker:register",
+    "w",
+    "--server={mock}",
+    "--max-workflow-tasks=0",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {}
   }
  ]
 }

@@ -31,6 +31,9 @@ every command group reaches parity.
 | `workflow:history`: every page, `--follow` long-poll, JSON and streamed JSONL | Ported |
 | `workflow:history-export`: the Server bundle to stdout or `--output-file` | Ported |
 | `schedule:list`, `schedule:describe`, `schedule:history`, `schedule:create`, `schedule:update`, `schedule:delete`, `schedule:pause`, `schedule:resume`, `schedule:trigger`, `schedule:backfill`: JSON and JSONL, `--input`/`--input-file`/`--input-encoding` | Ported |
+| `search-attribute:list`, `search-attribute:create`, `search-attribute:delete`, `storage:test`, `namespace:set-storage-driver` | Ported |
+| `task-queue:list`, `task-queue:describe`, `task-queue:build-ids`, `task-queue:drain`, `task-queue:promote`, `task-queue:resume`: admission, leases, pollers, build-id rollout | Ported |
+| `worker:list`, `worker:describe`, `worker:register`, `worker:deregister`: `worker:register` checks the worker-protocol response version as 2.x does | Ported |
 | Remaining workflow commands (query, start, signal, update, cancel and run control) and the other command groups | Next slices ([gap list](https://github.com/durable-workflow/cli/issues/72#issuecomment-6801944950)) |
 | `--tls-verify=false` against HTTPS: no certificate or hostname checks, as in 2.x, plus a stderr warning on every such command (also with `--json` and `-q`) | Ported, intentional addition |
 

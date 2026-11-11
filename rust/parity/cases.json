@@ -18244,6 +18244,2881 @@
    ],
    "mock": [],
    "mock_routes": {}
+  },
+  {
+   "name": "system repair-status human",
+   "argv": [
+    "system:repair-status",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/system/repair": {
+     "status": 200,
+     "body": {
+      "policy": {
+       "redispatch_after_seconds": 30,
+       "loop_throttle_seconds": 5,
+       "scan_limit": 100,
+       "scan_strategy": "scope_round_robin",
+       "failure_backoff_max_seconds": 300
+      },
+      "candidates": {
+       "existing_task_candidates": 2,
+       "missing_task_candidates": 1,
+       "total_candidates": 3,
+       "scan_pressure": true,
+       "oldest_task_candidate_created_at": "2026-04-22T05:00:00Z",
+       "oldest_missing_run_started_at": null,
+       "scopes": [
+        {
+         "scope_key": "orders:default",
+         "existing_task_candidates": 2,
+         "missing_task_candidates": 1,
+         "total_candidates": 3,
+         "selected_total_candidates": 3,
+         "scan_limited_by_global_policy": false
+        },
+        {
+         "scope_key": "billing:urgent",
+         "existing_task_candidates": "4",
+         "scan_limited_by_global_policy": 1
+        }
+       ]
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "system repair-status JSON",
+   "argv": [
+    "system:repair-status",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/system/repair": {
+     "status": 200,
+     "body": {
+      "policy": {
+       "redispatch_after_seconds": 30,
+       "loop_throttle_seconds": 5,
+       "scan_limit": 100,
+       "scan_strategy": "scope_round_robin",
+       "failure_backoff_max_seconds": 300
+      },
+      "candidates": {
+       "existing_task_candidates": 2,
+       "missing_task_candidates": 1,
+       "total_candidates": 3,
+       "scan_pressure": true,
+       "oldest_task_candidate_created_at": "2026-04-22T05:00:00Z",
+       "oldest_missing_run_started_at": null,
+       "scopes": [
+        {
+         "scope_key": "orders:default",
+         "existing_task_candidates": 2,
+         "missing_task_candidates": 1,
+         "total_candidates": 3,
+         "selected_total_candidates": 3,
+         "scan_limited_by_global_policy": false
+        },
+        {
+         "scope_key": "billing:urgent",
+         "existing_task_candidates": "4",
+         "scan_limited_by_global_policy": 1
+        }
+       ]
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "system repair-status empty",
+   "argv": [
+    "system:repair-status",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/system/repair": {
+     "status": 200,
+     "body": {}
+    }
+   }
+  },
+  {
+   "name": "system repair-status zero candidates",
+   "argv": [
+    "system:repair-status",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/system/repair": {
+     "status": 200,
+     "body": {
+      "policy": {
+       "scan_strategy": "global"
+      },
+      "candidates": {
+       "total_candidates": 0,
+       "scopes": []
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "system repair-status server error",
+   "argv": [
+    "system:repair-status",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/system/repair": {
+     "status": 403,
+     "body": {
+      "message": "Forbidden."
+     }
+    }
+   }
+  },
+  {
+   "name": "system repair-pass human",
+   "argv": [
+    "system:repair-pass",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/system/repair/pass": {
+     "status": 200,
+     "body": {
+      "selected_existing_task_candidates": 2,
+      "selected_missing_task_candidates": 1,
+      "repaired_existing_tasks": 2,
+      "repaired_missing_tasks": 1,
+      "dispatched_tasks": 3,
+      "selected_command_contract_candidates": 0,
+      "backfilled_command_contracts": 0,
+      "command_contract_backfill_unavailable": 0
+     },
+     "method": "POST"
+    }
+   }
+  },
+  {
+   "name": "system repair-pass throttled",
+   "argv": [
+    "system:repair-pass",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/system/repair/pass": {
+     "status": 200,
+     "body": {
+      "throttled": true
+     },
+     "method": "POST"
+    }
+   }
+  },
+  {
+   "name": "system repair-pass failures",
+   "argv": [
+    "system:repair-pass",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/system/repair/pass": {
+     "status": 200,
+     "body": {
+      "selected_existing_task_candidates": 2,
+      "selected_missing_task_candidates": 1,
+      "repaired_existing_tasks": 2,
+      "repaired_missing_tasks": 1,
+      "dispatched_tasks": 3,
+      "selected_command_contract_candidates": 0,
+      "backfilled_command_contracts": 0,
+      "command_contract_backfill_unavailable": 0,
+      "existing_task_failures": [
+       {
+        "candidate_id": "task-1",
+        "message": "lease held"
+       }
+      ],
+      "missing_run_failures": [
+       {
+        "run_id": "run-2"
+       }
+      ],
+      "command_contract_failures": [
+       {
+        "message": "no contract"
+       }
+      ]
+     },
+     "method": "POST"
+    }
+   }
+  },
+  {
+   "name": "system repair-pass request body",
+   "argv": [
+    "system:repair-pass",
+    "--server={mock}",
+    "--run-id=run-a",
+    "--run-id=run-b",
+    "--instance-id=chk-42",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/system/repair/pass": {
+     "status": 200,
+     "body": {},
+     "method": "POST",
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "system repair-pass empty request body",
+   "argv": [
+    "system:repair-pass",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/system/repair/pass": {
+     "status": 200,
+     "body": {},
+     "method": "POST",
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "system repair-pass conflict",
+   "argv": [
+    "system:repair-pass",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/system/repair/pass": {
+     "status": 409,
+     "body": {
+      "message": "Repair is disabled."
+     },
+     "method": "POST"
+    }
+   }
+  },
+  {
+   "name": "system retention-status human",
+   "argv": [
+    "system:retention-status",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/system/retention": {
+     "status": 200,
+     "body": {
+      "namespace": "billing",
+      "retention_days": 30,
+      "cutoff": "2026-03-23T00:00:00Z",
+      "expired_run_count": 2,
+      "scan_limit": 500,
+      "scan_pressure": false,
+      "expired_run_ids": [
+       "run-1",
+       "run-2"
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "system retention-status JSON",
+   "argv": [
+    "system:retention-status",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/system/retention": {
+     "status": 200,
+     "body": {
+      "namespace": "billing",
+      "retention_days": 30,
+      "cutoff": "2026-03-23T00:00:00Z",
+      "expired_run_count": 2,
+      "scan_limit": 500,
+      "scan_pressure": false,
+      "expired_run_ids": [
+       "run-1",
+       "run-2"
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "system retention-status empty",
+   "argv": [
+    "system:retention-status",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/system/retention": {
+     "status": 200,
+     "body": {}
+    }
+   }
+  },
+  {
+   "name": "system retention-pass human failures",
+   "argv": [
+    "system:retention-pass",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/system/retention/pass": {
+     "status": 200,
+     "body": {
+      "processed": 3,
+      "pruned": 2,
+      "skipped": 0,
+      "failed": 1,
+      "results": [
+       {
+        "run_id": "run-1",
+        "outcome": "pruned"
+       },
+       {
+        "run_id": "run-3",
+        "outcome": "error",
+        "reason": "locked"
+       },
+       {
+        "outcome": "error"
+       }
+      ]
+     },
+     "method": "POST"
+    }
+   }
+  },
+  {
+   "name": "system retention-pass clean",
+   "argv": [
+    "system:retention-pass",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/system/retention/pass": {
+     "status": 200,
+     "body": {
+      "processed": 1,
+      "pruned": 1,
+      "results": [
+       {
+        "run_id": "run-1",
+        "outcome": "pruned"
+       }
+      ]
+     },
+     "method": "POST"
+    }
+   }
+  },
+  {
+   "name": "system retention-pass request body",
+   "argv": [
+    "system:retention-pass",
+    "--server={mock}",
+    "--limit=25",
+    "--run-id=r1",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/system/retention/pass": {
+     "status": 200,
+     "body": {},
+     "method": "POST",
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "system retention-pass non-numeric limit",
+   "argv": [
+    "system:retention-pass",
+    "--server={mock}",
+    "--limit=abc",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/system/retention/pass": {
+     "status": 200,
+     "body": {},
+     "method": "POST",
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "system activity-timeout-status human",
+   "argv": [
+    "system:activity-timeout-status",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/system/activity-timeouts": {
+     "status": 200,
+     "body": {
+      "expired_count": 1,
+      "scan_limit": 100,
+      "scan_pressure": true,
+      "expired_execution_ids": [
+       "act-1"
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "system activity-timeout-status none",
+   "argv": [
+    "system:activity-timeout-status",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/system/activity-timeouts": {
+     "status": 200,
+     "body": {
+      "expired_count": 0,
+      "scan_limit": 100,
+      "expired_execution_ids": []
+     }
+    }
+   }
+  },
+  {
+   "name": "system activity-timeout-status JSON",
+   "argv": [
+    "system:activity-timeout-status",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/system/activity-timeouts": {
+     "status": 200,
+     "body": {
+      "expired_count": 0
+     }
+    }
+   }
+  },
+  {
+   "name": "system activity-timeout-pass human",
+   "argv": [
+    "system:activity-timeout-pass",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/system/activity-timeouts/pass": {
+     "status": 200,
+     "body": {
+      "processed": 2,
+      "enforced": 1,
+      "skipped": 0,
+      "failed": 1,
+      "results": [
+       {
+        "execution_id": "act-1",
+        "outcome": "error",
+        "reason": "stale lease"
+       }
+      ]
+     },
+     "method": "POST"
+    }
+   }
+  },
+  {
+   "name": "system activity-timeout-pass request body",
+   "argv": [
+    "system:activity-timeout-pass",
+    "--server={mock}",
+    "--execution-id=act-1",
+    "--execution-id=act-2",
+    "--limit=10",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/system/activity-timeouts/pass": {
+     "status": 200,
+     "body": {},
+     "method": "POST",
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "system operator-metrics human",
+   "argv": [
+    "system:operator-metrics",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/system/operator-metrics": {
+     "status": 200,
+     "body": {
+      "namespace": "orders",
+      "operator_metrics": {
+       "generated_at": "2026-04-22T05:00:00Z",
+       "runs": {
+        "repair_needed": 2,
+        "max_repair_needed_age_ms": 1500,
+        "oldest_repair_needed_at": "2026-04-22T04:59:00Z",
+        "claim_failed": 0,
+        "compatibility_blocked": 1,
+        "waiting": 4,
+        "max_wait_age_ms": 900,
+        "oldest_wait_started_at": "2026-04-22T04:58:00Z"
+       },
+       "tasks": {
+        "ready": 5,
+        "ready_due": 3,
+        "delayed": 2,
+        "leased": 1,
+        "unhealthy": 1,
+        "dispatch_failed": 1,
+        "claim_failed": 0,
+        "dispatch_overdue": 0,
+        "lease_expired": 0,
+        "max_unhealthy_age_ms": 100,
+        "oldest_unhealthy_at": "2026-04-22T04:57:00Z",
+        "max_ready_due_age_ms": 40,
+        "oldest_dispatch_overdue_since": "2026-04-22T04:56:00Z"
+       },
+       "backlog": {
+        "runnable_tasks": 5,
+        "delayed_tasks": 2,
+        "leased_tasks": 1,
+        "unhealthy_tasks": 1,
+        "repair_needed_runs": 2,
+        "claim_failed_runs": 0,
+        "compatibility_blocked_runs": 1,
+        "max_compatibility_blocked_age_ms": 77,
+        "oldest_compatibility_blocked_started_at": "2026-04-22T04:55:00Z"
+       },
+       "repair": {
+        "missing_task_candidates": 1,
+        "selected_missing_task_candidates": 1,
+        "max_missing_run_age_ms": 12
+       },
+       "projections": {
+        "run_summaries": {
+         "max_missing_run_age_ms": 33
+        }
+       },
+       "workers": {
+        "required_compatibility": "build-b",
+        "active_workers": 2,
+        "active_worker_scopes": 1,
+        "active_workers_supporting_required": 0,
+        "fleet": [
+         {
+          "worker_id": "w-1",
+          "connection": "redis",
+          "queue": "orders",
+          "supported": [
+           "build-a",
+           3,
+           "build-c"
+          ],
+          "supports_required": false,
+          "recorded_at": "2026-04-22T04:59:59Z"
+         },
+         {
+          "worker_id": "w-2",
+          "supported": [],
+          "supports_required": true
+         },
+         "junk"
+        ]
+       },
+       "backend": {
+        "supported": false,
+        "severity": "error",
+        "database": {
+         "connection": "mysql",
+         "driver": "mysql"
+        },
+        "queue": {
+         "connection": "redis"
+        },
+        "cache": {
+         "store": "file",
+         "driver": "file"
+        },
+        "issues": [
+         {
+          "summary": "Queue driver sync is not supported",
+          "severity": "error"
+         },
+         {
+          "code": "cache_driver"
+         },
+         {}
+        ]
+       },
+       "matching_role": {
+        "queue_wake_enabled": 1,
+        "shape": "embedded",
+        "task_dispatch_mode": "poll",
+        "partition_primitives": [
+         "queue",
+         "",
+         5,
+         "namespace"
+        ],
+        "backpressure_model": "lease",
+        "discovery_limits": {
+         "poll_batch_cap": 10,
+         "availability_ceiling_seconds": 30,
+         "activity_task_lease_seconds": 300
+        }
+       },
+       "schedules": {
+        "active": 3,
+        "paused": 1,
+        "missed": 0,
+        "max_overdue_ms": 0,
+        "oldest_overdue_at": "2026-04-22T04:00:00Z",
+        "fires_total": 99,
+        "failures_total": 2
+       },
+       "activities": {
+        "open": 4,
+        "pending": 1,
+        "running": 3,
+        "retrying": 1,
+        "max_retrying_age_ms": 500,
+        "timeout_overdue": 0,
+        "failed_attempts": 7,
+        "max_attempt_count": 3
+       },
+       "repair_policy": {
+        "redispatch_after_seconds": 30,
+        "loop_throttle_seconds": 5,
+        "scan_limit": 100,
+        "failure_backoff_max_seconds": 300
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "system operator-metrics JSON",
+   "argv": [
+    "system:operator-metrics",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/system/operator-metrics": {
+     "status": 200,
+     "body": {
+      "namespace": "orders",
+      "operator_metrics": {
+       "generated_at": "2026-04-22T05:00:00Z",
+       "runs": {
+        "repair_needed": 2,
+        "max_repair_needed_age_ms": 1500,
+        "oldest_repair_needed_at": "2026-04-22T04:59:00Z",
+        "claim_failed": 0,
+        "compatibility_blocked": 1,
+        "waiting": 4,
+        "max_wait_age_ms": 900,
+        "oldest_wait_started_at": "2026-04-22T04:58:00Z"
+       },
+       "tasks": {
+        "ready": 5,
+        "ready_due": 3,
+        "delayed": 2,
+        "leased": 1,
+        "unhealthy": 1,
+        "dispatch_failed": 1,
+        "claim_failed": 0,
+        "dispatch_overdue": 0,
+        "lease_expired": 0,
+        "max_unhealthy_age_ms": 100,
+        "oldest_unhealthy_at": "2026-04-22T04:57:00Z",
+        "max_ready_due_age_ms": 40,
+        "oldest_dispatch_overdue_since": "2026-04-22T04:56:00Z"
+       },
+       "backlog": {
+        "runnable_tasks": 5,
+        "delayed_tasks": 2,
+        "leased_tasks": 1,
+        "unhealthy_tasks": 1,
+        "repair_needed_runs": 2,
+        "claim_failed_runs": 0,
+        "compatibility_blocked_runs": 1,
+        "max_compatibility_blocked_age_ms": 77,
+        "oldest_compatibility_blocked_started_at": "2026-04-22T04:55:00Z"
+       },
+       "repair": {
+        "missing_task_candidates": 1,
+        "selected_missing_task_candidates": 1,
+        "max_missing_run_age_ms": 12
+       },
+       "projections": {
+        "run_summaries": {
+         "max_missing_run_age_ms": 33
+        }
+       },
+       "workers": {
+        "required_compatibility": "build-b",
+        "active_workers": 2,
+        "active_worker_scopes": 1,
+        "active_workers_supporting_required": 0,
+        "fleet": [
+         {
+          "worker_id": "w-1",
+          "connection": "redis",
+          "queue": "orders",
+          "supported": [
+           "build-a",
+           3,
+           "build-c"
+          ],
+          "supports_required": false,
+          "recorded_at": "2026-04-22T04:59:59Z"
+         },
+         {
+          "worker_id": "w-2",
+          "supported": [],
+          "supports_required": true
+         },
+         "junk"
+        ]
+       },
+       "backend": {
+        "supported": false,
+        "severity": "error",
+        "database": {
+         "connection": "mysql",
+         "driver": "mysql"
+        },
+        "queue": {
+         "connection": "redis"
+        },
+        "cache": {
+         "store": "file",
+         "driver": "file"
+        },
+        "issues": [
+         {
+          "summary": "Queue driver sync is not supported",
+          "severity": "error"
+         },
+         {
+          "code": "cache_driver"
+         },
+         {}
+        ]
+       },
+       "matching_role": {
+        "queue_wake_enabled": 1,
+        "shape": "embedded",
+        "task_dispatch_mode": "poll",
+        "partition_primitives": [
+         "queue",
+         "",
+         5,
+         "namespace"
+        ],
+        "backpressure_model": "lease",
+        "discovery_limits": {
+         "poll_batch_cap": 10,
+         "availability_ceiling_seconds": 30,
+         "activity_task_lease_seconds": 300
+        }
+       },
+       "schedules": {
+        "active": 3,
+        "paused": 1,
+        "missed": 0,
+        "max_overdue_ms": 0,
+        "oldest_overdue_at": "2026-04-22T04:00:00Z",
+        "fires_total": 99,
+        "failures_total": 2
+       },
+       "activities": {
+        "open": 4,
+        "pending": 1,
+        "running": 3,
+        "retrying": 1,
+        "max_retrying_age_ms": 500,
+        "timeout_overdue": 0,
+        "failed_attempts": 7,
+        "max_attempt_count": 3
+       },
+       "repair_policy": {
+        "redispatch_after_seconds": 30,
+        "loop_throttle_seconds": 5,
+        "scan_limit": 100,
+        "failure_backoff_max_seconds": 300
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "system operator-metrics empty",
+   "argv": [
+    "system:operator-metrics",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/system/operator-metrics": {
+     "status": 200,
+     "body": {}
+    }
+   }
+  },
+  {
+   "name": "system operator-metrics workers only",
+   "argv": [
+    "system:operator-metrics",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/system/operator-metrics": {
+     "status": 200,
+     "body": {
+      "operator_metrics": {
+       "workers": {
+        "required_compatibility": true,
+        "active_workers": "3",
+        "active_workers_supporting_required": 2
+       },
+       "matching_role": [],
+       "schedules": [],
+       "activities": {}
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "service-call describe human",
+   "argv": [
+    "service-call:describe",
+    "billing",
+    "invoices",
+    "create",
+    "call-42",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/service-endpoints/billing/services/invoices/operations/create/service-calls/call-42": {
+     "status": 200,
+     "body": {
+      "id": "call-42",
+      "status": "completed",
+      "outcome": "succeeded",
+      "call_deadline_at": null,
+      "caller_namespace": "orders",
+      "retry_attempt_count": 1,
+      "result_envelope": {
+       "codec": "avro",
+       "blob": "a/b"
+      },
+      "outcome_metadata": {
+       "note": "café"
+      },
+      "service_call_attempts": [
+       {
+        "attempt": 1
+       }
+      ],
+      "message": ""
+     }
+    }
+   }
+  },
+  {
+   "name": "service-call describe JSON",
+   "argv": [
+    "service-call:describe",
+    "billing",
+    "invoices",
+    "create",
+    "call-42",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/service-endpoints/billing/services/invoices/operations/create/service-calls/call-42": {
+     "status": 200,
+     "body": {
+      "id": "call-42",
+      "status": "completed",
+      "outcome": "succeeded",
+      "call_deadline_at": null,
+      "caller_namespace": "orders",
+      "retry_attempt_count": 1,
+      "result_envelope": {
+       "codec": "avro",
+       "blob": "a/b"
+      },
+      "outcome_metadata": {
+       "note": "café"
+      },
+      "service_call_attempts": [
+       {
+        "attempt": 1
+       }
+      ],
+      "message": ""
+     }
+    }
+   }
+  },
+  {
+   "name": "service-call describe namespace kept",
+   "argv": [
+    "service-call:describe",
+    "billing",
+    "invoices",
+    "create",
+    "call-42",
+    "--server={mock}",
+    "--namespace=shared"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/service-endpoints/billing/services/invoices/operations/create/service-calls/call-42": {
+     "status": 200,
+     "body": {
+      "id": "call-42",
+      "status": "completed",
+      "outcome": "succeeded",
+      "call_deadline_at": null,
+      "caller_namespace": "orders",
+      "retry_attempt_count": 1,
+      "result_envelope": {
+       "codec": "avro",
+       "blob": "a/b"
+      },
+      "outcome_metadata": {
+       "note": "café"
+      },
+      "service_call_attempts": [
+       {
+        "attempt": 1
+       }
+      ],
+      "message": "",
+      "namespace": "target-ns"
+     }
+    }
+   }
+  },
+  {
+   "name": "service-call describe encoded names",
+   "argv": [
+    "service-call:describe",
+    "bill ing",
+    "in/voices",
+    "create",
+    "call 42",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/service-endpoints/bill%20ing/services/in%2Fvoices/operations/create/service-calls/call%2042": {
+     "status": 200,
+     "body": {
+      "id": "call-42",
+      "status": "completed",
+      "outcome": "succeeded",
+      "call_deadline_at": null,
+      "caller_namespace": "orders",
+      "retry_attempt_count": 1,
+      "result_envelope": {
+       "codec": "avro",
+       "blob": "a/b"
+      },
+      "outcome_metadata": {
+       "note": "café"
+      },
+      "service_call_attempts": [
+       {
+        "attempt": 1
+       }
+      ],
+      "message": ""
+     }
+    }
+   }
+  },
+  {
+   "name": "service-call describe not found",
+   "argv": [
+    "service-call:describe",
+    "billing",
+    "invoices",
+    "create",
+    "call-42",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/service-endpoints/billing/services/invoices/operations/create/service-calls/call-42": {
+     "status": 404,
+     "body": {
+      "message": "Service call not found."
+     }
+    }
+   }
+  },
+  {
+   "name": "bridge webhook human",
+   "argv": [
+    "bridge:webhook",
+    "stripe",
+    "--action=start_workflow",
+    "--idempotency-key=evt-1",
+    "--target={\"workflow_type\":\"orders.fulfillment\",\"task_queue\":\"external-workflows\"}",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/bridge-adapters/webhook/stripe": {
+     "status": 200,
+     "body": {
+      "adapter": "stripe",
+      "action": "start_workflow",
+      "accepted": true,
+      "outcome": "started",
+      "idempotency_key": "evt-1",
+      "workflow_id": "wf-1",
+      "run_id": "run-1",
+      "command_id": "",
+      "reason": null,
+      "target": {
+       "workflow_type": "orders.fulfillment",
+       "task_queue": "a/b"
+      }
+     },
+     "method": "POST"
+    }
+   }
+  },
+  {
+   "name": "bridge webhook rejected outcome",
+   "argv": [
+    "bridge:webhook",
+    "stripe",
+    "--action=signal_workflow",
+    "--idempotency-key=evt-2",
+    "--target={\"workflow_type\":\"orders.fulfillment\",\"task_queue\":\"external-workflows\"}",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/bridge-adapters/webhook/stripe": {
+     "status": 200,
+     "body": {
+      "adapter": "stripe",
+      "accepted": false,
+      "outcome": "rejected",
+      "reason": "unknown_target",
+      "control_plane_outcome": 7
+     },
+     "method": "POST"
+    }
+   }
+  },
+  {
+   "name": "bridge webhook request body",
+   "argv": [
+    "bridge:webhook",
+    " stripe ",
+    "--action= start_workflow ",
+    "--idempotency-key=evt-1",
+    "--target={\"workflow_type\":\"orders.fulfillment\",\"task_queue\":\"external-workflows\"}",
+    "-i",
+    "{\"order_id\":\"o-1\"}",
+    "--correlation={\"trace\":\"t-1\"}",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/bridge-adapters/webhook/stripe": {
+     "status": 200,
+     "body": {},
+     "method": "POST",
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "bridge webhook raw input",
+   "argv": [
+    "bridge:webhook",
+    "stripe",
+    "--action=start_workflow",
+    "--idempotency-key=evt-1",
+    "--target={\"workflow_type\":\"orders.fulfillment\",\"task_queue\":\"external-workflows\"}",
+    "--input=hello",
+    "--input-encoding=raw",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/bridge-adapters/webhook/stripe": {
+     "status": 200,
+     "body": {},
+     "method": "POST",
+     "echo_request": true
+    }
+   }
+  },
+  {
+   "name": "bridge webhook missing action",
+   "argv": [
+    "bridge:webhook",
+    "stripe",
+    "--idempotency-key=evt-1",
+    "--target={\"workflow_type\":\"orders.fulfillment\",\"task_queue\":\"external-workflows\"}",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {}
+  },
+  {
+   "name": "bridge webhook blank idempotency key",
+   "argv": [
+    "bridge:webhook",
+    "stripe",
+    "--action=start_workflow",
+    "--idempotency-key=  ",
+    "--target={\"workflow_type\":\"orders.fulfillment\",\"task_queue\":\"external-workflows\"}",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {}
+  },
+  {
+   "name": "bridge webhook missing target",
+   "argv": [
+    "bridge:webhook",
+    "stripe",
+    "--action=start_workflow",
+    "--idempotency-key=evt-1",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {}
+  },
+  {
+   "name": "bridge webhook invalid target JSON",
+   "argv": [
+    "bridge:webhook",
+    "stripe",
+    "--action=start_workflow",
+    "--idempotency-key=evt-1",
+    "--target={",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {}
+  },
+  {
+   "name": "bridge webhook list target",
+   "argv": [
+    "bridge:webhook",
+    "stripe",
+    "--action=start_workflow",
+    "--idempotency-key=evt-1",
+    "--target=[1,2]",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {}
+  },
+  {
+   "name": "bridge webhook empty object target",
+   "argv": [
+    "bridge:webhook",
+    "stripe",
+    "--action=start_workflow",
+    "--idempotency-key=evt-1",
+    "--target={}",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {}
+  },
+  {
+   "name": "bridge webhook list correlation",
+   "argv": [
+    "bridge:webhook",
+    "stripe",
+    "--action=start_workflow",
+    "--idempotency-key=evt-1",
+    "--target={\"workflow_type\":\"orders.fulfillment\",\"task_queue\":\"external-workflows\"}",
+    "--correlation=[1]",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {}
+  },
+  {
+   "name": "bridge webhook blank adapter",
+   "argv": [
+    "bridge:webhook",
+    "  ",
+    "--action=start_workflow",
+    "--idempotency-key=evt-1",
+    "--target={\"workflow_type\":\"orders.fulfillment\",\"task_queue\":\"external-workflows\"}",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {}
+  },
+  {
+   "name": "bridge webhook invalid input",
+   "argv": [
+    "bridge:webhook",
+    "stripe",
+    "--action=start_workflow",
+    "--idempotency-key=evt-1",
+    "--target={\"workflow_type\":\"orders.fulfillment\",\"task_queue\":\"external-workflows\"}",
+    "--input={",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {}
+  },
+  {
+   "name": "bridge webhook server refusal",
+   "argv": [
+    "bridge:webhook",
+    "stripe",
+    "--action=start_workflow",
+    "--idempotency-key=evt-1",
+    "--target={\"workflow_type\":\"orders.fulfillment\",\"task_queue\":\"external-workflows\"}",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/bridge-adapters/webhook/stripe": {
+     "status": 422,
+     "body": {
+      "message": "Adapter disabled.",
+      "reason": "adapter_disabled"
+     },
+     "method": "POST"
+    }
+   }
+  },
+  {
+   "name": "debug workflow human",
+   "argv": [
+    "debug",
+    "workflow",
+    "chk-42",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/debug": {
+     "status": 200,
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "diagnostic_status": "attention",
+      "execution": {
+       "status": "running",
+       "workflow_type": "orders.checkout",
+       "task_queue": "orders",
+       "last_event": {
+        "sequence": 7,
+        "event_type": "ActivityScheduled",
+        "timestamp": "2026-04-22T05:00:00Z"
+       },
+       "next_scheduled_event": {
+        "task_type": "activity",
+        "task_status": "ready",
+        "lease_expires_at": "2026-04-22T05:01:00Z"
+       }
+      },
+      "findings": [
+       {
+        "severity": "warning",
+        "code": "stale_poller",
+        "message": "No poller in 60s."
+       },
+       "junk",
+       {}
+      ],
+      "task_queue": {
+       "stats": {
+        "approximate_backlog_count": 4,
+        "approximate_backlog_age": "12s",
+        "workflow_tasks": {
+         "ready_count": 1,
+         "leased_count": 0,
+         "expired_lease_count": "2"
+        },
+        "activity_tasks": {
+         "ready_count": 3
+        },
+        "pollers": {
+         "active_count": 0,
+         "stale_count": 1
+        }
+       }
+      },
+      "pending_workflow_tasks": [
+       {
+        "task_id": "wt-1",
+        "status": "ready",
+        "lease_expired": true
+       },
+       "junk"
+      ],
+      "pending_activities": [
+       {
+        "activity_execution_id": "act-1",
+        "activity_type": "charge",
+        "status": "running",
+        "current_attempt": {
+         "lease_owner": "w-1",
+         "lease_expires_at": "2026-04-22T05:02:00Z"
+        }
+       }
+      ],
+      "recent_failures": [
+       {
+        "exception_class": "RuntimeException",
+        "message": "boom",
+        "created_at": "2026-04-22T04:59:00Z"
+       }
+      ],
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "debug",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42"
+      }
+     },
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     }
+    }
+   }
+  },
+  {
+   "name": "debug workflow JSON",
+   "argv": [
+    "debug",
+    "workflow",
+    "chk-42",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/debug": {
+     "status": 200,
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "diagnostic_status": "attention",
+      "execution": {
+       "status": "running",
+       "workflow_type": "orders.checkout",
+       "task_queue": "orders",
+       "last_event": {
+        "sequence": 7,
+        "event_type": "ActivityScheduled",
+        "timestamp": "2026-04-22T05:00:00Z"
+       },
+       "next_scheduled_event": {
+        "task_type": "activity",
+        "task_status": "ready",
+        "lease_expires_at": "2026-04-22T05:01:00Z"
+       }
+      },
+      "findings": [
+       {
+        "severity": "warning",
+        "code": "stale_poller",
+        "message": "No poller in 60s."
+       },
+       "junk",
+       {}
+      ],
+      "task_queue": {
+       "stats": {
+        "approximate_backlog_count": 4,
+        "approximate_backlog_age": "12s",
+        "workflow_tasks": {
+         "ready_count": 1,
+         "leased_count": 0,
+         "expired_lease_count": "2"
+        },
+        "activity_tasks": {
+         "ready_count": 3
+        },
+        "pollers": {
+         "active_count": 0,
+         "stale_count": 1
+        }
+       }
+      },
+      "pending_workflow_tasks": [
+       {
+        "task_id": "wt-1",
+        "status": "ready",
+        "lease_expired": true
+       },
+       "junk"
+      ],
+      "pending_activities": [
+       {
+        "activity_execution_id": "act-1",
+        "activity_type": "charge",
+        "status": "running",
+        "current_attempt": {
+         "lease_owner": "w-1",
+         "lease_expires_at": "2026-04-22T05:02:00Z"
+        }
+       }
+      ],
+      "recent_failures": [
+       {
+        "exception_class": "RuntimeException",
+        "message": "boom",
+        "created_at": "2026-04-22T04:59:00Z"
+       }
+      ],
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "debug",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42"
+      }
+     },
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     }
+    }
+   }
+  },
+  {
+   "name": "debug workflow run-id",
+   "argv": [
+    "debug",
+    "workflow",
+    "chk-42",
+    "--run-id=run-7",
+    "--server={mock}",
+    "--output=json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/runs/run-7/debug": {
+     "status": 200,
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "diagnostic_status": "attention",
+      "execution": {
+       "status": "running",
+       "workflow_type": "orders.checkout",
+       "task_queue": "orders",
+       "last_event": {
+        "sequence": 7,
+        "event_type": "ActivityScheduled",
+        "timestamp": "2026-04-22T05:00:00Z"
+       },
+       "next_scheduled_event": {
+        "task_type": "activity",
+        "task_status": "ready",
+        "lease_expires_at": "2026-04-22T05:01:00Z"
+       }
+      },
+      "findings": [
+       {
+        "severity": "warning",
+        "code": "stale_poller",
+        "message": "No poller in 60s."
+       },
+       "junk",
+       {}
+      ],
+      "task_queue": {
+       "stats": {
+        "approximate_backlog_count": 4,
+        "approximate_backlog_age": "12s",
+        "workflow_tasks": {
+         "ready_count": 1,
+         "leased_count": 0,
+         "expired_lease_count": "2"
+        },
+        "activity_tasks": {
+         "ready_count": 3
+        },
+        "pollers": {
+         "active_count": 0,
+         "stale_count": 1
+        }
+       }
+      },
+      "pending_workflow_tasks": [
+       {
+        "task_id": "wt-1",
+        "status": "ready",
+        "lease_expired": true
+       },
+       "junk"
+      ],
+      "pending_activities": [
+       {
+        "activity_execution_id": "act-1",
+        "activity_type": "charge",
+        "status": "running",
+        "current_attempt": {
+         "lease_owner": "w-1",
+         "lease_expires_at": "2026-04-22T05:02:00Z"
+        }
+       }
+      ],
+      "recent_failures": [
+       {
+        "exception_class": "RuntimeException",
+        "message": "boom",
+        "created_at": "2026-04-22T04:59:00Z"
+       }
+      ],
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "debug",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42"
+      }
+     },
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     }
+    }
+   }
+  },
+  {
+   "name": "debug workflow empty run-id",
+   "argv": [
+    "debug",
+    "workflow",
+    "chk-42",
+    "-r",
+    "",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/debug": {
+     "status": 200,
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "diagnostic_status": "attention",
+      "execution": {
+       "status": "running",
+       "workflow_type": "orders.checkout",
+       "task_queue": "orders",
+       "last_event": {
+        "sequence": 7,
+        "event_type": "ActivityScheduled",
+        "timestamp": "2026-04-22T05:00:00Z"
+       },
+       "next_scheduled_event": {
+        "task_type": "activity",
+        "task_status": "ready",
+        "lease_expires_at": "2026-04-22T05:01:00Z"
+       }
+      },
+      "findings": [
+       {
+        "severity": "warning",
+        "code": "stale_poller",
+        "message": "No poller in 60s."
+       },
+       "junk",
+       {}
+      ],
+      "task_queue": {
+       "stats": {
+        "approximate_backlog_count": 4,
+        "approximate_backlog_age": "12s",
+        "workflow_tasks": {
+         "ready_count": 1,
+         "leased_count": 0,
+         "expired_lease_count": "2"
+        },
+        "activity_tasks": {
+         "ready_count": 3
+        },
+        "pollers": {
+         "active_count": 0,
+         "stale_count": 1
+        }
+       }
+      },
+      "pending_workflow_tasks": [
+       {
+        "task_id": "wt-1",
+        "status": "ready",
+        "lease_expired": true
+       },
+       "junk"
+      ],
+      "pending_activities": [
+       {
+        "activity_execution_id": "act-1",
+        "activity_type": "charge",
+        "status": "running",
+        "current_attempt": {
+         "lease_owner": "w-1",
+         "lease_expires_at": "2026-04-22T05:02:00Z"
+        }
+       }
+      ],
+      "recent_failures": [
+       {
+        "exception_class": "RuntimeException",
+        "message": "boom",
+        "created_at": "2026-04-22T04:59:00Z"
+       }
+      ],
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "debug",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42"
+      }
+     },
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     }
+    }
+   }
+  },
+  {
+   "name": "debug workflow minimal",
+   "argv": [
+    "debug",
+    "workflow",
+    "chk-42",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/debug": {
+     "status": 200,
+     "body": {
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "debug",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     },
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     }
+    }
+   }
+  },
+  {
+   "name": "debug workflow unsupported target",
+   "argv": [
+    "debug",
+    "schedule",
+    "chk-42",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {}
+  },
+  {
+   "name": "debug workflow not found",
+   "argv": [
+    "debug",
+    "workflow",
+    "chk-42",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/debug": {
+     "status": 404,
+     "body": {
+      "message": "Workflow not found."
+     },
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     }
+    }
+   }
+  },
+  {
+   "name": "debug workflow missing contract",
+   "argv": [
+    "debug",
+    "workflow",
+    "chk-42",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/debug": {
+     "status": 200,
+     "body": {
+      "workflow_id": "chk-42"
+     }
+    }
+   }
+  },
+  {
+   "name": "debug workflow cancellation cascade",
+   "argv": [
+    "debug",
+    "workflow",
+    "chk-42",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/debug": {
+     "status": 200,
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "diagnostic_status": "attention",
+      "execution": {
+       "status": "running",
+       "workflow_type": "orders.checkout",
+       "task_queue": "orders",
+       "last_event": {
+        "sequence": 7,
+        "event_type": "ActivityScheduled",
+        "timestamp": "2026-04-22T05:00:00Z"
+       },
+       "next_scheduled_event": {
+        "task_type": "activity",
+        "task_status": "ready",
+        "lease_expires_at": "2026-04-22T05:01:00Z"
+       }
+      },
+      "findings": [
+       {
+        "severity": "warning",
+        "code": "stale_poller",
+        "message": "No poller in 60s."
+       },
+       "junk",
+       {}
+      ],
+      "task_queue": {
+       "stats": {
+        "approximate_backlog_count": 4,
+        "approximate_backlog_age": "12s",
+        "workflow_tasks": {
+         "ready_count": 1,
+         "leased_count": 0,
+         "expired_lease_count": "2"
+        },
+        "activity_tasks": {
+         "ready_count": 3
+        },
+        "pollers": {
+         "active_count": 0,
+         "stale_count": 1
+        }
+       }
+      },
+      "pending_workflow_tasks": [
+       {
+        "task_id": "wt-1",
+        "status": "ready",
+        "lease_expired": true
+       },
+       "junk"
+      ],
+      "pending_activities": [
+       {
+        "activity_execution_id": "act-1",
+        "activity_type": "charge",
+        "status": "running",
+        "current_attempt": {
+         "lease_owner": "w-1",
+         "lease_expires_at": "2026-04-22T05:02:00Z"
+        }
+       }
+      ],
+      "recent_failures": [
+       {
+        "exception_class": "RuntimeException",
+        "message": "boom",
+        "created_at": "2026-04-22T04:59:00Z"
+       }
+      ],
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "debug",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42"
+      },
+      "cancellation_cascade_supported": true,
+      "cancellation_cascade": {
+       "schema": "durable-workflow.cancellation-cascade/v1",
+       "selected_run_id": "run-7",
+       "inspection_complete": true,
+       "truncated": false,
+       "root": {
+        "root_request_id": "req-1",
+        "root_workflow_instance_id": "chk-42",
+        "root_workflow_run_id": "run-7",
+        "requested_at": "2026-04-22T05:00:00Z",
+        "cleanup_deadline_at": "2026-04-22T05:05:00Z",
+        "reason": "operator\nrequest",
+        "source": "cli",
+        "requester": {
+         "id": "user-1"
+        }
+       },
+       "runs": [
+        {
+         "run_id": "run-7",
+         "workflow_type": "orders.checkout",
+         "workflow_id": "chk-42",
+         "lifecycle": "cleanup",
+         "projected_status": "running",
+         "same_root_budget": true,
+         "request": {
+          "request_id": "req-1",
+          "root_request_id": "req-1",
+          "cleanup_deadline_at": "2026-04-22T05:05:00Z"
+         },
+         "delivery": {
+          "history_event_id": 9,
+          "sequence": 9,
+          "call_kind": "activity"
+         },
+         "cleanup": {
+          "outcome": "pending"
+         },
+         "activity_stops": [
+          {
+           "activity_execution_id": "act-1",
+           "activity_type": "charge",
+           "execution_mode": "remote",
+           "callback_state": "requested",
+           "received_after_deadline": false
+          }
+         ],
+         "cleanup_recovery": [
+          {
+           "activity_execution_id": "act-1",
+           "attempt": {
+            "workflow_task_id": "wt-2"
+           }
+          }
+         ],
+         "child_propagation": [
+          {
+           "child_run_id": "run-9",
+           "policy": "request_cancel"
+          }
+         ]
+        },
+        {
+         "run_id": "run-9",
+         "request": {
+          "root_request_id": "req-2"
+         }
+        }
+       ],
+       "edges": [
+        {
+         "parent_run_id": "run-7",
+         "child_run_id": "run-9",
+         "kind": "child",
+         "reference_state": "<b>linked</b>"
+        }
+       ],
+       "findings": [
+        {
+         "code": "late_ack",
+         "message": "Ack after deadline."
+        }
+       ]
+      }
+     },
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     }
+    }
+   }
+  },
+  {
+   "name": "debug workflow cascade not requested",
+   "argv": [
+    "debug",
+    "workflow",
+    "chk-42",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/debug": {
+     "status": 200,
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "diagnostic_status": "attention",
+      "execution": {
+       "status": "running",
+       "workflow_type": "orders.checkout",
+       "task_queue": "orders",
+       "last_event": {
+        "sequence": 7,
+        "event_type": "ActivityScheduled",
+        "timestamp": "2026-04-22T05:00:00Z"
+       },
+       "next_scheduled_event": {
+        "task_type": "activity",
+        "task_status": "ready",
+        "lease_expires_at": "2026-04-22T05:01:00Z"
+       }
+      },
+      "findings": [
+       {
+        "severity": "warning",
+        "code": "stale_poller",
+        "message": "No poller in 60s."
+       },
+       "junk",
+       {}
+      ],
+      "task_queue": {
+       "stats": {
+        "approximate_backlog_count": 4,
+        "approximate_backlog_age": "12s",
+        "workflow_tasks": {
+         "ready_count": 1,
+         "leased_count": 0,
+         "expired_lease_count": "2"
+        },
+        "activity_tasks": {
+         "ready_count": 3
+        },
+        "pollers": {
+         "active_count": 0,
+         "stale_count": 1
+        }
+       }
+      },
+      "pending_workflow_tasks": [
+       {
+        "task_id": "wt-1",
+        "status": "ready",
+        "lease_expired": true
+       },
+       "junk"
+      ],
+      "pending_activities": [
+       {
+        "activity_execution_id": "act-1",
+        "activity_type": "charge",
+        "status": "running",
+        "current_attempt": {
+         "lease_owner": "w-1",
+         "lease_expires_at": "2026-04-22T05:02:00Z"
+        }
+       }
+      ],
+      "recent_failures": [
+       {
+        "exception_class": "RuntimeException",
+        "message": "boom",
+        "created_at": "2026-04-22T04:59:00Z"
+       }
+      ],
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "debug",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42"
+      },
+      "cancellation_cascade_supported": true
+     },
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     }
+    }
+   }
+  },
+  {
+   "name": "debug workflow cascade unavailable",
+   "argv": [
+    "debug",
+    "workflow",
+    "chk-42",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/debug": {
+     "status": 200,
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "diagnostic_status": "attention",
+      "execution": {
+       "status": "running",
+       "workflow_type": "orders.checkout",
+       "task_queue": "orders",
+       "last_event": {
+        "sequence": 7,
+        "event_type": "ActivityScheduled",
+        "timestamp": "2026-04-22T05:00:00Z"
+       },
+       "next_scheduled_event": {
+        "task_type": "activity",
+        "task_status": "ready",
+        "lease_expires_at": "2026-04-22T05:01:00Z"
+       }
+      },
+      "findings": [
+       {
+        "severity": "warning",
+        "code": "stale_poller",
+        "message": "No poller in 60s."
+       },
+       "junk",
+       {}
+      ],
+      "task_queue": {
+       "stats": {
+        "approximate_backlog_count": 4,
+        "approximate_backlog_age": "12s",
+        "workflow_tasks": {
+         "ready_count": 1,
+         "leased_count": 0,
+         "expired_lease_count": "2"
+        },
+        "activity_tasks": {
+         "ready_count": 3
+        },
+        "pollers": {
+         "active_count": 0,
+         "stale_count": 1
+        }
+       }
+      },
+      "pending_workflow_tasks": [
+       {
+        "task_id": "wt-1",
+        "status": "ready",
+        "lease_expired": true
+       },
+       "junk"
+      ],
+      "pending_activities": [
+       {
+        "activity_execution_id": "act-1",
+        "activity_type": "charge",
+        "status": "running",
+        "current_attempt": {
+         "lease_owner": "w-1",
+         "lease_expires_at": "2026-04-22T05:02:00Z"
+        }
+       }
+      ],
+      "recent_failures": [
+       {
+        "exception_class": "RuntimeException",
+        "message": "boom",
+        "created_at": "2026-04-22T04:59:00Z"
+       }
+      ],
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "debug",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42"
+      },
+      "cancellation_cascade": null
+     },
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     }
+    }
+   }
+  },
+  {
+   "name": "debug workflow cascade unknown schema",
+   "argv": [
+    "debug",
+    "workflow",
+    "chk-42",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/debug": {
+     "status": 200,
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "diagnostic_status": "attention",
+      "execution": {
+       "status": "running",
+       "workflow_type": "orders.checkout",
+       "task_queue": "orders",
+       "last_event": {
+        "sequence": 7,
+        "event_type": "ActivityScheduled",
+        "timestamp": "2026-04-22T05:00:00Z"
+       },
+       "next_scheduled_event": {
+        "task_type": "activity",
+        "task_status": "ready",
+        "lease_expires_at": "2026-04-22T05:01:00Z"
+       }
+      },
+      "findings": [
+       {
+        "severity": "warning",
+        "code": "stale_poller",
+        "message": "No poller in 60s."
+       },
+       "junk",
+       {}
+      ],
+      "task_queue": {
+       "stats": {
+        "approximate_backlog_count": 4,
+        "approximate_backlog_age": "12s",
+        "workflow_tasks": {
+         "ready_count": 1,
+         "leased_count": 0,
+         "expired_lease_count": "2"
+        },
+        "activity_tasks": {
+         "ready_count": 3
+        },
+        "pollers": {
+         "active_count": 0,
+         "stale_count": 1
+        }
+       }
+      },
+      "pending_workflow_tasks": [
+       {
+        "task_id": "wt-1",
+        "status": "ready",
+        "lease_expired": true
+       },
+       "junk"
+      ],
+      "pending_activities": [
+       {
+        "activity_execution_id": "act-1",
+        "activity_type": "charge",
+        "status": "running",
+        "current_attempt": {
+         "lease_owner": "w-1",
+         "lease_expires_at": "2026-04-22T05:02:00Z"
+        }
+       }
+      ],
+      "recent_failures": [
+       {
+        "exception_class": "RuntimeException",
+        "message": "boom",
+        "created_at": "2026-04-22T04:59:00Z"
+       }
+      ],
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "debug",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42"
+      },
+      "cancellation_cascade": {
+       "schema": "other"
+      }
+     },
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     }
+    }
+   }
+  },
+  {
+   "name": "watch workflow completed",
+   "argv": [
+    "watch",
+    "workflow",
+    "chk-42",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42": {
+     "status": 200,
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "status": "completed",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "describe",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42"
+      },
+      "status_bucket": "completed"
+     },
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     }
+    }
+   }
+  },
+  {
+   "name": "watch workflow failed",
+   "argv": [
+    "watch",
+    "workflow",
+    "chk-42",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42": {
+     "status": 200,
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "status": "failed",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "describe",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42"
+      }
+     },
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     }
+    }
+   }
+  },
+  {
+   "name": "watch workflow is_terminal",
+   "argv": [
+    "watch",
+    "workflow",
+    "chk-42",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42": {
+     "status": 200,
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "status": "weird",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "describe",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42"
+      },
+      "is_terminal": 1
+     },
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     }
+    }
+   }
+  },
+  {
+   "name": "watch workflow run-id",
+   "argv": [
+    "watch",
+    "workflow",
+    "chk-42",
+    "--run-id=run-7",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/runs/run-7": {
+     "status": 200,
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "status": "terminated",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "describe",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42"
+      }
+     },
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     }
+    }
+   }
+  },
+  {
+   "name": "watch workflow max polls one",
+   "argv": [
+    "watch",
+    "workflow",
+    "chk-42",
+    "--max-polls=1",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42": {
+     "status": 200,
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "status": "running",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "describe",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42"
+      }
+     },
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     }
+    }
+   }
+  },
+  {
+   "name": "watch workflow max polls two",
+   "argv": [
+    "watch",
+    "workflow",
+    "chk-42",
+    "--max-polls=2",
+    "--interval=0",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42": {
+     "status": 200,
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "status": "",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "describe",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42"
+      }
+     },
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     }
+    }
+   }
+  },
+  {
+   "name": "watch workflow JSON mode is human",
+   "argv": [
+    "watch",
+    "workflow",
+    "chk-42",
+    "--server={mock}",
+    "--output=json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42": {
+     "status": 200,
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "status": "completed",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "describe",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42"
+      }
+     },
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     }
+    }
+   }
+  },
+  {
+   "name": "watch workflow negative interval",
+   "argv": [
+    "watch",
+    "workflow",
+    "chk-42",
+    "--server={mock}",
+    "--interval=-1"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42": {
+     "status": 200,
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "status": "completed",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "describe",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42"
+      }
+     },
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     }
+    }
+   }
+  },
+  {
+   "name": "watch workflow text interval",
+   "argv": [
+    "watch",
+    "workflow",
+    "chk-42",
+    "--server={mock}",
+    "--interval=soon"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42": {
+     "status": 200,
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "status": "completed",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "describe",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42"
+      }
+     },
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     }
+    }
+   }
+  },
+  {
+   "name": "watch workflow valueless interval",
+   "argv": [
+    "watch",
+    "workflow",
+    "chk-42",
+    "--server={mock}",
+    "--interval"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42": {
+     "status": 200,
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "status": "completed",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "describe",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42"
+      }
+     },
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     }
+    }
+   }
+  },
+  {
+   "name": "watch workflow zero max polls",
+   "argv": [
+    "watch",
+    "workflow",
+    "chk-42",
+    "--server={mock}",
+    "--max-polls=0"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42": {
+     "status": 200,
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "status": "completed",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "describe",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42"
+      }
+     },
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     }
+    }
+   }
+  },
+  {
+   "name": "watch workflow text max polls",
+   "argv": [
+    "watch",
+    "workflow",
+    "chk-42",
+    "--server={mock}",
+    "--max-polls=x"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42": {
+     "status": 200,
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "status": "completed",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "describe",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42"
+      }
+     },
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     }
+    }
+   }
+  },
+  {
+   "name": "watch workflow empty max polls",
+   "argv": [
+    "watch",
+    "workflow",
+    "chk-42",
+    "--server={mock}",
+    "--max-polls=",
+    "--interval=0"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42": {
+     "status": 200,
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "status": "completed",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "describe",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42"
+      }
+     },
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     }
+    }
+   }
+  },
+  {
+   "name": "watch unsupported resource",
+   "argv": [
+    "watch",
+    "schedule",
+    "chk-42",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {}
+  },
+  {
+   "name": "watch workflow not found",
+   "argv": [
+    "watch",
+    "workflow",
+    "chk-42",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42": {
+     "status": 404,
+     "body": {
+      "message": "Workflow not found."
+     },
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     }
+    }
+   }
   }
  ]
 }

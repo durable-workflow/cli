@@ -552,12 +552,23 @@ pub fn human(error: &CliError, context: &ErrorContext) -> String {
                 | "namespace:create"
                 | "namespace:update"
                 | "namespace:delete"
-        ) || ["schedule:", "search-attribute:", "task-queue:", "worker:"]
-            .iter()
-            .any(|group| context.command.starts_with(group))
+        ) || [
+            "schedule:",
+            "search-attribute:",
+            "task-queue:",
+            "worker:",
+            "system:",
+        ]
+        .iter()
+        .any(|group| context.command.starts_with(group))
             || matches!(
                 context.command,
-                "storage:test" | "namespace:set-storage-driver"
+                "storage:test"
+                    | "namespace:set-storage-driver"
+                    | "service-call:describe"
+                    | "bridge:webhook"
+                    | "debug"
+                    | "watch"
             )
         {
             crate::formatter::display_text(text)

@@ -597,7 +597,7 @@ fn non_blank<'a>(input: &'a Input, name: &str) -> Result<Option<&'a str>, CliErr
 }
 
 /// `preg_match('/^\d+$/', $value)`, whose `$` also matches before a final newline.
-fn digits(value: &str) -> bool {
+pub(crate) fn digits(value: &str) -> bool {
     php::ctype_digit(value.strip_suffix('\n').unwrap_or(value))
 }
 
@@ -617,7 +617,7 @@ fn bounded_integer(input: &Input, name: &str, max: i64) -> Result<Option<i64>, C
 
 /// 2.x `addNamespaceContext()`: the resolved namespace where the Server
 /// left none, on the response and on each listed item.
-fn with_namespace(value: Value, fallback: &str, items_key: Option<&str>) -> Value {
+pub(crate) fn with_namespace(value: Value, fallback: &str, items_key: Option<&str>) -> Value {
     let mut body = php::array_map(value);
     if !nonempty_scalar(body.get("namespace")) {
         body.insert("namespace".into(), json!(fallback));
@@ -644,34 +644,34 @@ fn with_namespace(value: Value, fallback: &str, items_key: Option<&str>) -> Valu
 }
 
 /// 2.x `writeNamespaceLine()`.
-fn write_namespace_line(result: &Value) {
+pub(crate) fn write_namespace_line(result: &Value) {
     let namespace = php::get(result, "namespace").filter(|value| nonempty_scalar(Some(value)));
     formatter::writeln_out(&format!("  Namespace: {}", text_or(namespace, "-")));
 }
 
-fn nonempty_scalar(value: Option<&Value>) -> bool {
+pub(crate) fn nonempty_scalar(value: Option<&Value>) -> bool {
     php::is_scalar(value) && !php::trim(&php::to_string(value)).is_empty()
 }
 
 /// A remote value as display text.
-fn text(value: Option<&Value>) -> String {
+pub(crate) fn text(value: Option<&Value>) -> String {
     formatter::display_text(&php::to_string(value))
 }
 
 /// `$value ?? $default` as display text.
-fn text_or(value: Option<&Value>, default: &str) -> String {
+pub(crate) fn text_or(value: Option<&Value>, default: &str) -> String {
     formatter::display_text(&php::or(value, default))
 }
 
 /// `formatStatus()` of a remote value, escaped before the CLI adds its style.
-fn status_cell(status: &Value) -> String {
+pub(crate) fn status_cell(status: &Value) -> String {
     let escaped = php::is_scalar(Some(status))
         .then(|| json!(formatter::display_text(&php::to_string(Some(status)))));
     output::format_status(escaped.as_ref())
 }
 
 /// PHP `(bool) $value`; a missing value is false.
-fn truthy(value: Option<&Value>) -> bool {
+pub(crate) fn truthy(value: Option<&Value>) -> bool {
     match value {
         None | Some(Value::Null) => false,
         Some(Value::Bool(flag)) => *flag,
@@ -700,7 +700,7 @@ fn greater_than_zero(value: Option<&Value>) -> bool {
 
 /// PHP 8 `is_numeric()` for a string: optional surrounding whitespace and a
 /// decimal or exponent number, without hexadecimal.
-fn numeric(text: &str) -> Option<f64> {
+pub(crate) fn numeric(text: &str) -> Option<f64> {
     let blank = [' ', '\t', '\n', '\r', '\x0B', '\x0C'];
     let trimmed = text.trim_matches(blank);
     let unsigned = trimmed.strip_prefix(['+', '-']).unwrap_or(trimmed);
@@ -716,7 +716,7 @@ fn numeric(text: &str) -> Option<f64> {
 }
 
 /// The name PHP gives a value's type in a TypeError.
-fn value_name(value: &Value) -> &'static str {
+pub(crate) fn value_name(value: &Value) -> &'static str {
     match value {
         Value::Null => "null",
         Value::Bool(true) => "true",

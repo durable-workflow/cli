@@ -33,7 +33,10 @@ every command group reaches parity.
 | `schedule:list`, `schedule:describe`, `schedule:history`, `schedule:create`, `schedule:update`, `schedule:delete`, `schedule:pause`, `schedule:resume`, `schedule:trigger`, `schedule:backfill`: JSON and JSONL, `--input`/`--input-file`/`--input-encoding` | Ported |
 | `workflow:cancel` (one run, or a bounded `--all-matching` batch pinned to each selected run), `workflow:terminate`, `workflow:archive`, `workflow:redrive`, `workflow:repair`, `workflow:migrate-v1` | Ported |
 | `workflow:query`, `workflow:start` (`--wait` with JSON wait diagnostics), `workflow:signal`, `workflow:update`: one request each, command keys, update diagnostics | Ported |
-| Remaining command groups (task queues, workers, activities, search attributes, storage, worker-plane tasks, system, `debug`, `watch`) | Next slices ([gap list](https://github.com/durable-workflow/cli/issues/72#issuecomment-6801944950)) |
+| `search-attribute:list`, `search-attribute:create`, `search-attribute:delete`, `storage:test`, `namespace:set-storage-driver` | Ported |
+| `task-queue:list`, `task-queue:describe`, `task-queue:build-ids`, `task-queue:drain`, `task-queue:promote`, `task-queue:resume`: admission, leases, pollers, build-id rollout | Ported |
+| `worker:list`, `worker:describe`, `worker:register`, `worker:deregister`: `worker:register` checks the worker-protocol response version as 2.x does | Ported |
+| Remaining command groups (activities, worker-plane tasks, system, `service-call`, `bridge`, `debug`, `watch`) | Next slices ([gap list](https://github.com/durable-workflow/cli/issues/72#issuecomment-6801944950)) |
 | `--tls-verify=false` against HTTPS: no certificate or hostname checks, as in 2.x, plus a stderr warning on every such command (also with `--json` and `-q`) | Ported, intentional addition |
 
 Server calls go through the published `durable-workflow` crate, pinned to

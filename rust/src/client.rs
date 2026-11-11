@@ -166,6 +166,61 @@ impl Context {
         ]))
     }
 
+    /// One worker-protocol request (`/worker/...`), checked as 2.x checks
+    /// it: a successful response must echo a compatible
+    /// `X-Durable-Workflow-Protocol-Version` header and the same
+    /// `protocol_version` in its body. `path` names the request in errors.
+    pub fn worker_request(&self, request: RawRequest, path: &str) -> Result<Value, CliError> {
+        let request = request
+            .protocol_version(compat::worker_protocol_version())
+            .control_plane_version(compat::control_plane_version());
+        let response = self.runtime.block_on(async {
+            self.sdk()?
+                .control_plane_request(request)
+                .await
+                .map_err(map_error)
+        })?;
+        let status = response.status();
+        let body = Value::Object(crate::php::array_map(
+            response.json().unwrap_or(Value::Null),
+        ));
+        if status >= 400 {
+            let mut error = CliError::from_http(status, &crate::php::json_encode(&body));
+            if status == 403 && self.managed_namespace() {
+                if let CliError::Http { message, .. } = &mut error {
+                    message.push_str(" This worker-protocol operation requires a worker runtime credential; a client runtime credential cannot be used.");
+                }
+            }
+            return Err(error);
+        }
+        let client = compat::worker_protocol_version();
+        let version = response
+            .protocol_version()
+            .map(crate::php::trim)
+            .filter(|version| !version.is_empty());
+        let Some(version) = version
+            .filter(|version| compat::is_compatible_worker_protocol_version(&client, version))
+        else {
+            return Err(CliError::Failure(format!(
+                "Server error: invalid worker-protocol response version for [{path}]; expected same-major server minor compatible with [{client}], got [{}].",
+                version.unwrap_or("missing")
+            )));
+        };
+        let body_version = body.get("protocol_version");
+        let body_version = crate::php::is_scalar(body_version)
+            .then(|| crate::php::to_string(body_version))
+            .map(|text| crate::php::trim(&text).to_owned());
+        if !body_version.as_deref().is_some_and(|body_version| {
+            body_version == version
+                && compat::is_compatible_worker_protocol_version(&client, body_version)
+        }) {
+            return Err(CliError::Failure(format!(
+                "Server error: invalid worker-protocol response body for [{path}]; expected protocol_version same-major compatible with [{client}]."
+            )));
+        }
+        Ok(body)
+    }
+
     fn namespace_request(&self, request: RawRequest) -> Result<Value, CliError> {
         let request = request
             .protocol_version(compat::worker_protocol_version())

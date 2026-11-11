@@ -162,7 +162,7 @@ fn resource_result(
     Ok(0)
 }
 
-fn with_resource_context(value: Value, fallback: &str) -> Value {
+pub(crate) fn with_resource_context(value: Value, fallback: &str) -> Value {
     let name = if nonempty_scalar(php::get(&value, "name")) {
         php::to_string(php::get(&value, "name"))
     } else {

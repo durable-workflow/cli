@@ -35,8 +35,9 @@ enum Handler {
 /// reported as not yet available.
 fn handler(name: &str) -> Option<Handler> {
     use commands::{
-        completion, doctor, env, namespace, runtime, schedule, schema, server, start_dev, upgrade,
-        workflow, workflow_control, workflow_message, workflow_run,
+        completion, doctor, env, namespace, runtime, schedule, schema, search_attribute, server,
+        start_dev, task_queue, upgrade, worker, workflow, workflow_control, workflow_message,
+        workflow_run,
     };
     Some(match name {
         "completion" => Handler::Local(completion::completion),
@@ -81,6 +82,21 @@ fn handler(name: &str) -> Option<Handler> {
         "schedule:resume" => Handler::Server(schedule::resume),
         "schedule:trigger" => Handler::Server(schedule::trigger),
         "schedule:backfill" => Handler::Server(schedule::backfill),
+        "search-attribute:list" => Handler::Server(search_attribute::list),
+        "search-attribute:create" => Handler::Server(search_attribute::create),
+        "search-attribute:delete" => Handler::Server(search_attribute::delete),
+        "storage:test" => Handler::Server(search_attribute::storage_test),
+        "namespace:set-storage-driver" => Handler::Server(search_attribute::set_storage_driver),
+        "task-queue:list" => Handler::Server(task_queue::list),
+        "task-queue:describe" => Handler::Server(task_queue::describe),
+        "task-queue:build-ids" => Handler::Server(task_queue::build_ids),
+        "task-queue:drain" => Handler::Server(task_queue::drain),
+        "task-queue:promote" => Handler::Server(task_queue::promote),
+        "task-queue:resume" => Handler::Server(task_queue::resume),
+        "worker:list" => Handler::Server(worker::list),
+        "worker:describe" => Handler::Server(worker::describe),
+        "worker:register" => Handler::Server(worker::register),
+        "worker:deregister" => Handler::Server(worker::deregister),
         "env:list" => Handler::Local(env::list),
         "env:set" => Handler::Local(env::set),
         "env:use" => Handler::Local(env::use_env),
@@ -118,6 +134,20 @@ const NAMESPACE_SCOPED: &[&str] = &[
     "schedule:resume",
     "schedule:trigger",
     "schedule:update",
+    "search-attribute:create",
+    "search-attribute:delete",
+    "search-attribute:list",
+    "storage:test",
+    "task-queue:build-ids",
+    "task-queue:describe",
+    "task-queue:drain",
+    "task-queue:list",
+    "task-queue:promote",
+    "task-queue:resume",
+    "worker:deregister",
+    "worker:describe",
+    "worker:list",
+    "worker:register",
 ];
 
 /// Verbs of a group and the command each one names.
@@ -255,6 +285,17 @@ fn print_usage_error(error: &UsageError) {
         lines.push(String::new());
     }
     formatter::writeln_err_quiet(&lines.join("\n"));
+}
+
+/// A console usage error raised by a command, as when a 2.x command throws
+/// Symfony's own option exception: the error block and the command's
+/// synopsis on stderr in every output mode, exit 1.
+pub(crate) fn command_usage_error(command: &str, message: &str) -> i32 {
+    print_usage_error(&UsageError {
+        message: message.to_string(),
+        synopsis: catalog::spec(command).map(|spec| spec.synopsis),
+    });
+    exit::FAILURE
 }
 
 /// Writes a description in its format: txt is styled for the stream, md
@@ -636,6 +677,7 @@ fn run(raw: Vec<String>) -> i32 {
                                 | "namespace:create"
                                 | "namespace:update"
                                 | "namespace:delete"
+                                | "namespace:set-storage-driver"
                         ),
                 );
             }

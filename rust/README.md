@@ -27,7 +27,10 @@ every command group reaches parity.
 | `workflow:list`: one namespace/page, filters, Server envelopes, JSON and JSONL | Ported |
 | `workflow:list-runs`: one workflow response page, envelope/cursor, JSON and JSONL | Ported |
 | `namespace:list`, `namespace:describe`, `namespace:create`, `namespace:update`, `namespace:delete`: namespace configuration and lifecycle, JSON and JSONL | Ported |
-| Workflow, namespace and schedule commands | Next slices |
+| `workflow:describe`, `workflow:show-run`: one execution or run, `--follow`, JSON | Ported |
+| `workflow:history`: every page, `--follow` long-poll, JSON and streamed JSONL | Ported |
+| `workflow:history-export`: the Server bundle to stdout or `--output-file` | Ported |
+| Remaining workflow, schedule and other command groups | Next slices ([gap list](https://github.com/durable-workflow/cli/issues/72#issuecomment-6801944950)) |
 | `--tls-verify=false` against HTTPS: no certificate or hostname checks, as in 2.x, plus a stderr warning on every such command (also with `--json` and `-q`) | Ported, intentional addition |
 
 Server calls go through the published `durable-workflow` crate, pinned to
@@ -45,6 +48,11 @@ returned records. Successful responses must identify the requested workflow
 and `list_runs` operation. Explicit row workflow IDs must match; omitted IDs
 in the published PHP Server shape inherit the verified envelope without
 adding fields. Contradictory identities or operations are refused.
+
+`workflow:describe`, `workflow:show-run`, `workflow:history` and
+`workflow:history-export` send workflow and run IDs the same way, each as one
+encoded path segment, and refuse empty, `.` and `..` IDs before any request.
+Human output prints Server values as text, never as console markup.
 
 Namespace visibility requests make one target attempt and refuse redirects. Use
 the actual Server URL; a 3xx response is reported as a refusal.

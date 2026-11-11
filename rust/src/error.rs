@@ -414,6 +414,10 @@ pub fn human(error: &CliError, context: &ErrorContext) -> String {
             context.command,
             "workflow:list"
                 | "workflow:list-runs"
+                | "workflow:describe"
+                | "workflow:show-run"
+                | "workflow:history"
+                | "workflow:history-export"
                 | "namespace:list"
                 | "namespace:describe"
                 | "namespace:create"

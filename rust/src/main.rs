@@ -34,6 +34,7 @@ enum Handler {
 fn handler(name: &str) -> Option<Handler> {
     use commands::{
         completion, doctor, env, namespace, runtime, schema, server, start_dev, upgrade, workflow,
+        workflow_run,
     };
     Some(match name {
         "completion" => Handler::Local(completion::completion),
@@ -54,6 +55,10 @@ fn handler(name: &str) -> Option<Handler> {
         "namespace:update" => Handler::Server(namespace::update),
         "namespace:delete" => Handler::Server(namespace::delete),
         "workflow:list-runs" => Handler::Server(workflow::list_runs),
+        "workflow:describe" => Handler::Server(workflow_run::describe),
+        "workflow:show-run" => Handler::Server(workflow_run::show_run),
+        "workflow:history" => Handler::Server(workflow_run::history),
+        "workflow:history-export" => Handler::Server(workflow_run::history_export),
         "env:list" => Handler::Local(env::list),
         "env:set" => Handler::Local(env::set),
         "env:use" => Handler::Local(env::use_env),
@@ -64,7 +69,14 @@ fn handler(name: &str) -> Option<Handler> {
 }
 
 /// Commands whose errors carry the resolved namespace.
-const NAMESPACE_SCOPED: &[&str] = &["workflow:list", "workflow:list-runs"];
+const NAMESPACE_SCOPED: &[&str] = &[
+    "workflow:list",
+    "workflow:list-runs",
+    "workflow:describe",
+    "workflow:show-run",
+    "workflow:history",
+    "workflow:history-export",
+];
 
 /// Verbs of a group and the command each one names.
 type GroupVerbs = &'static [(&'static str, &'static str)];

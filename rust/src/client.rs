@@ -110,6 +110,38 @@ impl Context {
         self.namespace_request(RawRequest::delete(["namespaces", name]))
     }
 
+    /// One workflow read with the PHP CLI's workflow response contract. Each
+    /// segment is encoded by the SDK; `path` names the request in errors.
+    pub fn workflow_get(
+        &self,
+        segments: &[&str],
+        query: &[(String, String)],
+        path: &str,
+    ) -> Result<Value, CliError> {
+        let mut request = RawRequest::get(segments.iter().copied());
+        for (name, value) in query {
+            request = request.query(name, value);
+        }
+        self.workflow_read(request, path)
+    }
+
+    /// A history export: 2.x passes the Server's bundle through without the
+    /// workflow response contract.
+    pub fn workflow_history_export(
+        &self,
+        workflow_id: &str,
+        run_id: &str,
+    ) -> Result<Value, CliError> {
+        self.namespace_request(RawRequest::get([
+            "workflows",
+            workflow_id,
+            "runs",
+            run_id,
+            "history",
+            "export",
+        ]))
+    }
+
     fn namespace_request(&self, request: RawRequest) -> Result<Value, CliError> {
         let request = request
             .protocol_version(compat::worker_protocol_version())

@@ -15201,9 +15201,11 @@
    "expected_difference": {
     "*": {
      "fields": [
-      "stdout_text"
+      "stdout_text",
+      "stderr",
+      "stderr_category"
      ],
-     "reason": "PHP main prints a PHP 'Undefined array key \"outcome\"' warning (with its source path) to stdout when the Server omits outcome; this build prints the empty Outcome line without the warning."
+     "reason": "PHP main prints a PHP 'Undefined array key \"outcome\"' warning (with its source path) when the Server omits outcome: on stdout or stderr depending on the PHP build's display_errors. This build prints the empty Outcome line without the warning."
     }
    }
   },

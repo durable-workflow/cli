@@ -303,6 +303,69 @@ fn leased_task_line(label: &str, task: &Value, key: &str) {
     formatter::writeln_out(&format!("  {label}: {}", text_or(php::get(task, key), "-")));
 }
 
+/// A poll result: JSON as returned, or the leased task's fields. Returns the
+/// task when one was leased and printed, for any extra lines.
+fn render_leased<'a>(
+    context: &Context,
+    result: &'a Value,
+    kind: &str,
+    fields: &[(&str, &str)],
+) -> Option<&'a Value> {
+    if context.mode.machine_readable() {
+        output::print_json(result);
+        return None;
+    }
+    let Some(task) = result.get("task").filter(|task| php::is_array(task)) else {
+        formatter::writeln_out(&format!("<comment>No {kind} task available.</comment>"));
+        return None;
+    };
+    formatter::writeln_out(&format!("<info>{} task leased</info>", php::ucfirst(kind)));
+    for (label, key) in fields {
+        leased_task_line(label, task, key);
+    }
+    Some(task)
+}
+
+/// Completes or fails one workflow task with exactly one request, then prints
+/// JSON or the shared result lines. Returns the result for extra lines.
+#[allow(clippy::too_many_arguments)]
+fn workflow_task_outcome(
+    context: &Context,
+    input: &Input,
+    task_id: &str,
+    attempt: i64,
+    action: &str,
+    body: Map<String, Value>,
+    payloads: &[Option<&Payload>],
+    title: &str,
+) -> Result<Option<Value>, CliError> {
+    let result = worker_post(
+        context,
+        input,
+        &["worker", "workflow-tasks", task_id, action],
+        body,
+        payloads,
+    )?;
+    if context.mode.machine_readable() {
+        output::print_json(&result);
+        return Ok(None);
+    }
+    formatter::writeln_out(&format!("<info>{title}</info>"));
+    formatter::writeln_out(&format!(
+        "  Task ID: {}",
+        text_or_value(result.get("task_id"), task_id)
+    ));
+    formatter::writeln_out(&format!(
+        "  Attempt: {}",
+        text_or_value(result.get("workflow_task_attempt"), &attempt.to_string())
+    ));
+    formatter::writeln_out(&format!(
+        "  Outcome: {}",
+        text_or(result.get("outcome"), "-")
+    ));
+    Ok(Some(result))
+}
+
 fn history_count(value: Option<&Value>) -> usize {
     value
         .filter(|value| php::is_array(value))
@@ -341,20 +404,20 @@ pub fn workflow_task_poll(context: &Context, input: &Input) -> Result<i32, CliEr
         body,
         &[],
     )?;
-    if context.mode.machine_readable() {
-        output::print_json(&result);
-        return Ok(0);
-    }
-    let Some(task) = result.get("task").filter(|task| php::is_array(task)) else {
-        formatter::writeln_out("<comment>No workflow task available.</comment>");
+    let Some(task) = render_leased(
+        context,
+        &result,
+        "workflow",
+        &[
+            ("Task ID", "task_id"),
+            ("Workflow ID", "workflow_id"),
+            ("Run ID", "run_id"),
+            ("Attempt", "workflow_task_attempt"),
+            ("Lease Owner", "lease_owner"),
+        ],
+    ) else {
         return Ok(0);
     };
-    formatter::writeln_out("<info>Workflow task leased</info>");
-    leased_task_line("Task ID", task, "task_id");
-    leased_task_line("Workflow ID", task, "workflow_id");
-    leased_task_line("Run ID", task, "run_id");
-    leased_task_line("Attempt", task, "workflow_task_attempt");
-    leased_task_line("Lease Owner", task, "lease_owner");
     formatter::writeln_out(&format!(
         "  History Events: {}",
         history_count(php::get(task, "history_events"))
@@ -411,34 +474,21 @@ pub fn workflow_task_complete(context: &Context, input: &Input) -> Result<i32, C
     body.insert("lease_owner".into(), option_value(input, "lease-owner"));
     body.insert("workflow_task_attempt".into(), json!(attempt));
     body.insert("commands".into(), Value::Array(commands));
-    let result = worker_post(
+    if let Some(result) = workflow_task_outcome(
         context,
         input,
-        &["worker", "workflow-tasks", task_id, "complete"],
+        task_id,
+        attempt,
+        "complete",
         body,
         &payloads.iter().map(Some).collect::<Vec<_>>(),
-    )?;
-    if context.mode.machine_readable() {
-        output::print_json(&result);
-        return Ok(0);
+        "Workflow task completed",
+    )? {
+        formatter::writeln_out(&format!(
+            "  Run Status: {}",
+            status_cell(result.get("run_status").unwrap_or(&Value::Null))
+        ));
     }
-    formatter::writeln_out("<info>Workflow task completed</info>");
-    formatter::writeln_out(&format!(
-        "  Task ID: {}",
-        text_or_value(result.get("task_id"), task_id)
-    ));
-    formatter::writeln_out(&format!(
-        "  Attempt: {}",
-        text_or_value(result.get("workflow_task_attempt"), &attempt.to_string())
-    ));
-    formatter::writeln_out(&format!(
-        "  Outcome: {}",
-        text_or(result.get("outcome"), "-")
-    ));
-    formatter::writeln_out(&format!(
-        "  Run Status: {}",
-        status_cell(result.get("run_status").unwrap_or(&Value::Null))
-    ));
     Ok(0)
 }
 
@@ -475,30 +525,16 @@ pub fn workflow_task_fail(context: &Context, input: &Input) -> Result<i32, CliEr
     body.insert("lease_owner".into(), option_value(input, "lease-owner"));
     body.insert("workflow_task_attempt".into(), json!(attempt));
     body.insert("failure".into(), Value::Object(failure));
-    let result = worker_post(
+    workflow_task_outcome(
         context,
         input,
-        &["worker", "workflow-tasks", task_id, "fail"],
+        task_id,
+        attempt,
+        "fail",
         body,
         &[],
+        "Workflow task failed",
     )?;
-    if context.mode.machine_readable() {
-        output::print_json(&result);
-        return Ok(0);
-    }
-    formatter::writeln_out("<info>Workflow task failed</info>");
-    formatter::writeln_out(&format!(
-        "  Task ID: {}",
-        text_or_value(result.get("task_id"), task_id)
-    ));
-    formatter::writeln_out(&format!(
-        "  Attempt: {}",
-        text_or_value(result.get("workflow_task_attempt"), &attempt.to_string())
-    ));
-    formatter::writeln_out(&format!(
-        "  Outcome: {}",
-        text_or(result.get("outcome"), "-")
-    ));
     Ok(0)
 }
 
@@ -556,20 +592,18 @@ pub fn query_task_poll(context: &Context, input: &Input) -> Result<i32, CliError
         body,
         &[],
     )?;
-    if context.mode.machine_readable() {
-        output::print_json(&result);
-        return Ok(0);
-    }
-    let Some(task) = result.get("task").filter(|task| php::is_array(task)) else {
-        formatter::writeln_out("<comment>No query task available.</comment>");
-        return Ok(0);
-    };
-    formatter::writeln_out("<info>Query task leased</info>");
-    leased_task_line("Task ID", task, "query_task_id");
-    leased_task_line("Workflow ID", task, "workflow_id");
-    leased_task_line("Run ID", task, "run_id");
-    leased_task_line("Query", task, "query_name");
-    leased_task_line("Attempt", task, "query_task_attempt");
+    render_leased(
+        context,
+        &result,
+        "query",
+        &[
+            ("Task ID", "query_task_id"),
+            ("Workflow ID", "workflow_id"),
+            ("Run ID", "run_id"),
+            ("Query", "query_name"),
+            ("Attempt", "query_task_attempt"),
+        ],
+    );
     Ok(0)
 }
 

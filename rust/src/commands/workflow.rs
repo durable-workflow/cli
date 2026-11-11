@@ -33,7 +33,7 @@ pub fn list(context: &Context, input: &Input) -> Result<i32, CliError> {
     let result = with_namespace(
         context.workflow_list(&query)?,
         &context.connection.namespace,
-        "workflows",
+        Some("workflows"),
     );
     if context.mode.machine_readable() {
         output::print_json_list(context.mode, &result, "workflows");
@@ -88,7 +88,7 @@ pub fn list_runs(context: &Context, input: &Input) -> Result<i32, CliError> {
     let result = with_namespace(
         context.workflow_runs(workflow_id)?,
         &context.connection.namespace,
-        "runs",
+        Some("runs"),
     );
     if context.mode.machine_readable() {
         output::print_json_list(context.mode, &result, "runs");
@@ -145,13 +145,18 @@ pub fn list_runs(context: &Context, input: &Input) -> Result<i32, CliError> {
     Ok(0)
 }
 
-fn with_namespace(value: Value, fallback: &str, items_key: &str) -> Value {
+/// 2.x `withNamespaceContext()`: the envelope, and each item under
+/// `items_key`, gets the namespace when it has none.
+pub fn with_namespace(value: Value, fallback: &str, items_key: Option<&str>) -> Value {
     let mut body = php::array_map(value);
     if !nonempty_scalar(body.get("namespace")) {
         body.insert("namespace".into(), json!(fallback));
     }
     let namespace = php::to_string(body.get("namespace"));
-    if let Some(workflows) = body.get_mut(items_key).filter(|value| php::is_array(value)) {
+    if let Some(workflows) = items_key
+        .and_then(|key| body.get_mut(key))
+        .filter(|value| php::is_array(value))
+    {
         let enrich = |workflow: &mut Value| {
             if php::is_array(workflow) && !nonempty_scalar(php::get(workflow, "namespace")) {
                 let mut fields = php::array_map(workflow.take());

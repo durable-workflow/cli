@@ -8519,6 +8519,1106 @@
      "echo_request": true
     }
    }
+  },
+  {
+   "name": "workflow describe human",
+   "argv": [
+    "workflow:describe",
+    "chk-42",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42": {
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "workflow_type": "orders.checkout",
+      "business_key": "order-42",
+      "status": "completed",
+      "status_bucket": "completed",
+      "is_terminal": true,
+      "run_number": 2,
+      "run_count": 2,
+      "is_current_run": true,
+      "task_queue": "orders",
+      "compatibility": "build-a",
+      "payload_codec": "json",
+      "execution_timeout_seconds": 3600,
+      "run_timeout_seconds": null,
+      "execution_deadline_at": "2026-04-22T06:00:00Z",
+      "run_deadline_at": null,
+      "started_at": "2026-04-22T05:00:00Z",
+      "closed_at": "2026-04-22T05:01:00Z",
+      "last_progress_at": "2026-04-22T05:01:00Z",
+      "closed_reason": "completed",
+      "wait_kind": null,
+      "wait_reason": null,
+      "input": [
+       {
+        "order": "o-1",
+        "path": "a/b"
+       }
+      ],
+      "output": {
+       "ok": true
+      },
+      "memo": {},
+      "search_attributes": {
+       "Region": "eu"
+      },
+      "actions": {
+       "can_signal": false,
+       "can_cancel": true,
+       "can_terminate": true
+      },
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "describe",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow describe JSON",
+   "argv": [
+    "workflow:describe",
+    "chk-42",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42": {
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "workflow_type": "orders.checkout",
+      "business_key": "order-42",
+      "status": "completed",
+      "status_bucket": "completed",
+      "is_terminal": true,
+      "run_number": 2,
+      "run_count": 2,
+      "is_current_run": true,
+      "task_queue": "orders",
+      "compatibility": "build-a",
+      "payload_codec": "json",
+      "execution_timeout_seconds": 3600,
+      "run_timeout_seconds": null,
+      "execution_deadline_at": "2026-04-22T06:00:00Z",
+      "run_deadline_at": null,
+      "started_at": "2026-04-22T05:00:00Z",
+      "closed_at": "2026-04-22T05:01:00Z",
+      "last_progress_at": "2026-04-22T05:01:00Z",
+      "closed_reason": "completed",
+      "wait_kind": null,
+      "wait_reason": null,
+      "input": [
+       {
+        "order": "o-1",
+        "path": "a/b"
+       }
+      ],
+      "output": {
+       "ok": true
+      },
+      "memo": {},
+      "search_attributes": {
+       "Region": "eu"
+      },
+      "actions": {
+       "can_signal": false,
+       "can_cancel": true,
+       "can_terminate": true
+      },
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "describe",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow describe run-id JSON",
+   "argv": [
+    "workflow:describe",
+    "chk-42",
+    "--run-id=run-7",
+    "--server={mock}",
+    "--output=json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/runs/run-7": {
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "workflow_type": "orders.checkout",
+      "business_key": "order-42",
+      "status": "completed",
+      "status_bucket": "completed",
+      "is_terminal": true,
+      "run_number": 2,
+      "run_count": 2,
+      "is_current_run": true,
+      "task_queue": "orders",
+      "compatibility": "build-a",
+      "payload_codec": "json",
+      "execution_timeout_seconds": 3600,
+      "run_timeout_seconds": null,
+      "execution_deadline_at": "2026-04-22T06:00:00Z",
+      "run_deadline_at": null,
+      "started_at": "2026-04-22T05:00:00Z",
+      "closed_at": "2026-04-22T05:01:00Z",
+      "last_progress_at": "2026-04-22T05:01:00Z",
+      "closed_reason": "completed",
+      "wait_kind": null,
+      "wait_reason": null,
+      "input": [
+       {
+        "order": "o-1",
+        "path": "a/b"
+       }
+      ],
+      "output": {
+       "ok": true
+      },
+      "memo": {},
+      "search_attributes": {
+       "Region": "eu"
+      },
+      "actions": {
+       "can_signal": false,
+       "can_cancel": true,
+       "can_terminate": true
+      },
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "describe",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow describe follow terminal",
+   "argv": [
+    "workflow:describe",
+    "chk-42",
+    "--follow",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42": {
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "workflow_type": "orders.checkout",
+      "business_key": "order-42",
+      "status": "completed",
+      "status_bucket": "completed",
+      "is_terminal": true,
+      "run_number": 2,
+      "run_count": 2,
+      "is_current_run": true,
+      "task_queue": "orders",
+      "compatibility": "build-a",
+      "payload_codec": "json",
+      "execution_timeout_seconds": 3600,
+      "run_timeout_seconds": null,
+      "execution_deadline_at": "2026-04-22T06:00:00Z",
+      "run_deadline_at": null,
+      "started_at": "2026-04-22T05:00:00Z",
+      "closed_at": "2026-04-22T05:01:00Z",
+      "last_progress_at": "2026-04-22T05:01:00Z",
+      "closed_reason": "completed",
+      "wait_kind": null,
+      "wait_reason": null,
+      "input": [
+       {
+        "order": "o-1",
+        "path": "a/b"
+       }
+      ],
+      "output": {
+       "ok": true
+      },
+      "memo": {},
+      "search_attributes": {
+       "Region": "eu"
+      },
+      "actions": {
+       "can_signal": false,
+       "can_cancel": true,
+       "can_terminate": true
+      },
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "describe",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow describe minimal human",
+   "argv": [
+    "workflow:describe",
+    "chk-42",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42": {
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "status": "running",
+      "namespace": "orders-ns",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "describe",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow describe not found",
+   "argv": [
+    "workflow:describe",
+    "chk-42",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42": {
+     "status": 404,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "message": "Workflow not found."
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow describe not found JSON",
+   "argv": [
+    "workflow:describe",
+    "chk-42",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42": {
+     "status": 404,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "message": "Workflow not found."
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow describe missing control-plane version",
+   "argv": [
+    "workflow:describe",
+    "chk-42",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42": {
+     "status": 200,
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "workflow_type": "orders.checkout",
+      "business_key": "order-42",
+      "status": "completed",
+      "status_bucket": "completed",
+      "is_terminal": true,
+      "run_number": 2,
+      "run_count": 2,
+      "is_current_run": true,
+      "task_queue": "orders",
+      "compatibility": "build-a",
+      "payload_codec": "json",
+      "execution_timeout_seconds": 3600,
+      "run_timeout_seconds": null,
+      "execution_deadline_at": "2026-04-22T06:00:00Z",
+      "run_deadline_at": null,
+      "started_at": "2026-04-22T05:00:00Z",
+      "closed_at": "2026-04-22T05:01:00Z",
+      "last_progress_at": "2026-04-22T05:01:00Z",
+      "closed_reason": "completed",
+      "wait_kind": null,
+      "wait_reason": null,
+      "input": [
+       {
+        "order": "o-1",
+        "path": "a/b"
+       }
+      ],
+      "output": {
+       "ok": true
+      },
+      "memo": {},
+      "search_attributes": {
+       "Region": "eu"
+      },
+      "actions": {
+       "can_signal": false,
+       "can_cancel": true,
+       "can_terminate": true
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow show-run human",
+   "argv": [
+    "workflow:show-run",
+    "chk-42",
+    "run-7",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/runs/run-7": {
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "workflow_type": "orders.checkout",
+      "business_key": "order-42",
+      "status": "completed",
+      "status_bucket": "completed",
+      "is_terminal": true,
+      "run_number": 2,
+      "run_count": 2,
+      "is_current_run": true,
+      "task_queue": "orders",
+      "compatibility": "build-a",
+      "payload_codec": "json",
+      "execution_timeout_seconds": 3600,
+      "run_timeout_seconds": null,
+      "execution_deadline_at": "2026-04-22T06:00:00Z",
+      "run_deadline_at": null,
+      "started_at": "2026-04-22T05:00:00Z",
+      "closed_at": "2026-04-22T05:01:00Z",
+      "last_progress_at": "2026-04-22T05:01:00Z",
+      "closed_reason": "completed",
+      "wait_kind": null,
+      "wait_reason": null,
+      "input": [
+       {
+        "order": "o-1",
+        "path": "a/b"
+       }
+      ],
+      "output": {
+       "ok": true
+      },
+      "memo": {},
+      "search_attributes": {
+       "Region": "eu"
+      },
+      "actions": {
+       "can_signal": false,
+       "can_cancel": true,
+       "can_terminate": true
+      },
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "describe",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow show-run JSON",
+   "argv": [
+    "workflow:show-run",
+    "chk-42",
+    "run-7",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/runs/run-7": {
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "workflow_type": "orders.checkout",
+      "business_key": "order-42",
+      "status": "completed",
+      "status_bucket": "completed",
+      "is_terminal": true,
+      "run_number": 2,
+      "run_count": 2,
+      "is_current_run": true,
+      "task_queue": "orders",
+      "compatibility": "build-a",
+      "payload_codec": "json",
+      "execution_timeout_seconds": 3600,
+      "run_timeout_seconds": null,
+      "execution_deadline_at": "2026-04-22T06:00:00Z",
+      "run_deadline_at": null,
+      "started_at": "2026-04-22T05:00:00Z",
+      "closed_at": "2026-04-22T05:01:00Z",
+      "last_progress_at": "2026-04-22T05:01:00Z",
+      "closed_reason": "completed",
+      "wait_kind": null,
+      "wait_reason": null,
+      "input": [
+       {
+        "order": "o-1",
+        "path": "a/b"
+       }
+      ],
+      "output": {
+       "ok": true
+      },
+      "memo": {},
+      "search_attributes": {
+       "Region": "eu"
+      },
+      "actions": {
+       "can_signal": false,
+       "can_cancel": true,
+       "can_terminate": true
+      },
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "describe",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow show-run follow terminal JSON",
+   "argv": [
+    "workflow:show-run",
+    "chk-42",
+    "run-7",
+    "-f",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/runs/run-7": {
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "workflow_type": "orders.checkout",
+      "business_key": "order-42",
+      "status": "completed",
+      "status_bucket": "completed",
+      "is_terminal": true,
+      "run_number": 2,
+      "run_count": 2,
+      "is_current_run": true,
+      "task_queue": "orders",
+      "compatibility": "build-a",
+      "payload_codec": "json",
+      "execution_timeout_seconds": 3600,
+      "run_timeout_seconds": null,
+      "execution_deadline_at": "2026-04-22T06:00:00Z",
+      "run_deadline_at": null,
+      "started_at": "2026-04-22T05:00:00Z",
+      "closed_at": "2026-04-22T05:01:00Z",
+      "last_progress_at": "2026-04-22T05:01:00Z",
+      "closed_reason": "completed",
+      "wait_kind": null,
+      "wait_reason": null,
+      "input": [
+       {
+        "order": "o-1",
+        "path": "a/b"
+       }
+      ],
+      "output": {
+       "ok": true
+      },
+      "memo": {},
+      "search_attributes": {
+       "Region": "eu"
+      },
+      "actions": {
+       "can_signal": false,
+       "can_cancel": true,
+       "can_terminate": true
+      },
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "describe",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow show-run missing run argument",
+   "argv": [
+    "workflow:show-run",
+    "chk-42",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {}
+  },
+  {
+   "name": "workflow history human",
+   "argv": [
+    "workflow:history",
+    "chk-42",
+    "run-7",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/runs/run-7/history": {
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "events": [
+       {
+        "sequence": 1,
+        "event_type": "WorkflowStarted",
+        "timestamp": "2026-04-22T05:00:00Z",
+        "principal": {
+         "id": "user-1",
+         "type": "user",
+         "label": " Ada "
+        },
+        "payload": {
+         "input": [
+          "a/b"
+         ]
+        }
+       },
+       {
+        "sequence": 2,
+        "event_type": "WorkflowCompleted",
+        "timestamp": "2026-04-22T05:01:00Z",
+        "principal": {
+         "type": "system"
+        },
+        "payload": null
+       },
+       {
+        "sequence": 3,
+        "event_type": "Marker",
+        "timestamp": "2026-04-22T05:01:00Z"
+       }
+      ],
+      "next_page_token": null,
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "history",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow history JSON",
+   "argv": [
+    "workflow:history",
+    "chk-42",
+    "run-7",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/runs/run-7/history": {
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "events": [
+       {
+        "sequence": 1,
+        "event_type": "WorkflowStarted",
+        "timestamp": "2026-04-22T05:00:00Z",
+        "principal": {
+         "id": "user-1",
+         "type": "user",
+         "label": " Ada "
+        },
+        "payload": {
+         "input": [
+          "a/b"
+         ]
+        }
+       },
+       {
+        "sequence": 2,
+        "event_type": "WorkflowCompleted",
+        "timestamp": "2026-04-22T05:01:00Z",
+        "principal": {
+         "type": "system"
+        },
+        "payload": null
+       },
+       {
+        "sequence": 3,
+        "event_type": "Marker",
+        "timestamp": "2026-04-22T05:01:00Z"
+       }
+      ],
+      "next_page_token": null,
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "history",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow history JSONL",
+   "argv": [
+    "workflow:history",
+    "chk-42",
+    "run-7",
+    "--server={mock}",
+    "--output=jsonl"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/runs/run-7/history": {
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "events": [
+       {
+        "sequence": 1,
+        "event_type": "WorkflowStarted",
+        "timestamp": "2026-04-22T05:00:00Z",
+        "principal": {
+         "id": "user-1",
+         "type": "user",
+         "label": " Ada "
+        },
+        "payload": {
+         "input": [
+          "a/b"
+         ]
+        }
+       },
+       {
+        "sequence": 2,
+        "event_type": "WorkflowCompleted",
+        "timestamp": "2026-04-22T05:01:00Z",
+        "principal": {
+         "type": "system"
+        },
+        "payload": null
+       },
+       {
+        "sequence": 3,
+        "event_type": "Marker",
+        "timestamp": "2026-04-22T05:01:00Z"
+       }
+      ],
+      "next_page_token": null,
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "history",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow history page size JSON",
+   "argv": [
+    "workflow:history",
+    "chk-42",
+    "run-7",
+    "--page-size=2",
+    "--server={mock}",
+    "--output=json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/runs/run-7/history": {
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "events": [
+       {
+        "sequence": 1,
+        "event_type": "WorkflowStarted",
+        "timestamp": "2026-04-22T05:00:00Z",
+        "principal": {
+         "id": "user-1",
+         "type": "user",
+         "label": " Ada "
+        },
+        "payload": {
+         "input": [
+          "a/b"
+         ]
+        }
+       },
+       {
+        "sequence": 2,
+        "event_type": "WorkflowCompleted",
+        "timestamp": "2026-04-22T05:01:00Z",
+        "principal": {
+         "type": "system"
+        },
+        "payload": null
+       },
+       {
+        "sequence": 3,
+        "event_type": "Marker",
+        "timestamp": "2026-04-22T05:01:00Z"
+       }
+      ],
+      "next_page_token": null,
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "history",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow history empty human",
+   "argv": [
+    "workflow:history",
+    "chk-42",
+    "run-7",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/runs/run-7/history": {
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "events": [],
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "history",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       },
+       "workflow_id": "chk-42"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow history-export stdout",
+   "argv": [
+    "workflow:history-export",
+    "chk-42",
+    "run-7",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/runs/run-7/history/export": {
+     "status": 200,
+     "body": {
+      "schema": "durable-workflow.v2.history-export",
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "history_events": [
+       {
+        "sequence": 1,
+        "payload": "x/y"
+       }
+      ],
+      "payloads": {}
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow history-export namespace kept",
+   "argv": [
+    "workflow:history-export",
+    "chk-42",
+    "run-7",
+    "--server={mock}",
+    "--namespace=billing"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/runs/run-7/history/export": {
+     "status": 200,
+     "body": {
+      "schema": "durable-workflow.v2.history-export",
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "history_events": [
+       {
+        "sequence": 1,
+        "payload": "x/y"
+       }
+      ],
+      "payloads": {},
+      "namespace": "server-ns"
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow history-export server error",
+   "argv": [
+    "workflow:history-export",
+    "chk-42",
+    "run-7",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/runs/run-7/history/export": {
+     "status": 409,
+     "body": {
+      "message": "History is pruned."
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow describe non-integer timeout",
+   "argv": [
+    "workflow:describe",
+    "chk-42",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42": {
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "status": "running",
+      "execution_timeout_seconds": "30",
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "describe",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {},
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   },
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "stderr"
+     ],
+     "reason": "2.x stops at the same line with a PHP TypeError naming its internal source path; this build names the malformed Server field instead (cli#72)."
+    }
+   }
   }
  ]
 }

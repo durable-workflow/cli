@@ -144,6 +144,20 @@ cargo build
 python3 parity/parity.py       # --build release, --report, --verbose
 ```
 
+Behaviour merged on PHP main after 2.3.5, such as signal and update command
+keys (#61), is compared against PHP main built from this repository's source.
+Cases marked `"reference": "php-main"` use it, and so does `--help` for
+`workflow:signal`. Set `DW_PARITY_PHP_MAIN` to a checkout with
+`composer install --no-dev` done. Set `DW_PARITY_PHP` to the PHP to run it
+with: the default is `php`, and `parity/php-docker.sh` runs the local
+`php:8.4-cli` image instead. The source run reports this build's version,
+commit and build date. Without `DW_PARITY_PHP_MAIN` those cases fail; they
+never fall back to 2.3.5. CI's `rust` job runs them.
+
+```bash
+DW_PARITY_PHP_MAIN=.. DW_PARITY_PHP=parity/php-docker.sh python3 parity/parity.py
+```
+
 Cases with a `mock` entry run against a loopback Server that serves the
 published PHP 2.11.8 cluster info with the case's patch applied, so
 compatibility warnings and refusals are compared without a broken Server.

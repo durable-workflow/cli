@@ -1,7 +1,10 @@
 import copy
 import hashlib
 import json
+import os
 from pathlib import Path
+import shutil
+import tempfile
 import unittest
 import urllib.error
 import urllib.request
@@ -162,6 +165,67 @@ class CatalogMetadataParityTest(unittest.TestCase):
             "reference": "<info>before help</info>", "candidate": "<info>after help</info>"}
         self.assertEqual(self.normalize("target:command\nbefore help\n", "reference"),
                          self.normalize("target:command\nafter help\n", "candidate"))
+
+
+class PhpMainReferenceTest(unittest.TestCase):
+    def setUp(self):
+        self.directories = list(parity.BIN_DIRECTORIES)
+        self.environment = {name: os.environ.get(name) for name in ("DW_PARITY_PHP_MAIN", "DW_PARITY_PHP")}
+
+    def tearDown(self):
+        parity.BIN_DIRECTORIES[:] = self.directories
+        for name, value in self.environment.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+
+    def checkout(self):
+        root = Path(tempfile.mkdtemp(prefix="dw-php-main-"))
+        self.addCleanup(shutil.rmtree, root, True)
+        (root / "bin").mkdir()
+        (root / "vendor").mkdir()
+        (root / "bin" / "dw").write_text("<?php\n")
+        (root / "vendor" / "autoload.php").write_text("<?php\n")
+        return root
+
+    def test_unconfigured_reference_is_absent(self):
+        os.environ.pop("DW_PARITY_PHP_MAIN", None)
+        self.assertIsNone(parity.php_main_runner({"version": "2.5.0"}))
+
+    def test_runner_uses_the_checkout_and_the_candidate_identity(self):
+        root = self.checkout()
+        os.environ["DW_PARITY_PHP_MAIN"] = str(root)
+        os.environ["DW_PARITY_PHP"] = "php"
+        runner = parity.php_main_runner({"version": "2.5.0-rc.3", "commit": "abc", "build_date": "today"})
+        self.assertEqual(["php", str(root / "bin" / "dw")], runner.command)
+        self.assertEqual({"DW_PARITY_PHP_MAIN": str(root), "DW_CLI_VERSION": "2.5.0-rc.3",
+                          "DW_CLI_COMMIT": "abc", "DW_CLI_BUILD_DATE": "today"}, runner.env)
+        self.assertEqual("Run <bin>/dw workflow:signal",
+                         parity.normalize_text(f"Run {root}/bin/dw workflow:signal", "/nowhere"))
+
+    def test_checkout_without_dependencies_is_refused(self):
+        root = self.checkout()
+        (root / "vendor" / "autoload.php").unlink()
+        os.environ["DW_PARITY_PHP_MAIN"] = str(root)
+        with self.assertRaises(SystemExit):
+            parity.php_main_runner({})
+
+    def test_signal_help_compares_against_php_main(self):
+        cases = {case["name"]: case for case in parity.help_cases()}
+        self.assertEqual("php-main", cases["--help for workflow:signal"].get("reference"))
+        self.assertNotIn("expected_difference", cases["--help for workflow:signal"])
+        self.assertNotIn("reference", cases["--help for workflow:list"])
+
+    def test_php_main_cases_do_not_excuse_the_2x_release_gap(self):
+        with open(parity.CASES, encoding="utf-8") as handle:
+            cases = json.load(handle)["cases"]
+        tagged = [case for case in cases if case.get("reference") == "php-main"]
+        self.assertTrue(any(case["argv"][0] == "workflow:signal" for case in tagged))
+        for case in tagged:
+            for reason in case.get("expected_difference", {}).values():
+                self.assertNotIn("2.3.5", reason["reason"], case["name"])
+                self.assertNotIn("cli#61", reason["reason"], case["name"])
 
 
 if __name__ == "__main__":

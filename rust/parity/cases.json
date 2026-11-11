@@ -4302,17 +4302,6 @@
   },
   {
    "name": "workflow list invalid status filter",
-   "expected_difference": {
-    "*": {
-     "fields": [
-      "stderr_category",
-      "stderr",
-      "stdout_json",
-      "stdout_text"
-     ],
-     "reason": "Published PHP 2.3.5 writes canonical-filter validation failures to stderr even with --json. This port follows accepted PHP main's structured JSON error, exit 2 and namespace context (cli#61/#72); focused tests assert the exact envelope and zero list requests."
-    }
-   },
    "argv": [
     "workflow:list",
     "--server={mock}",
@@ -4369,7 +4358,8 @@
       }
      }
     }
-   }
+   },
+   "reference": "php-main"
   },
   {
    "name": "workflow list incompatible preflight",
@@ -12958,17 +12948,7 @@
      }
     }
    },
-   "expected_difference": {
-    "*": {
-     "fields": [
-      "stderr_category",
-      "stderr",
-      "stdout_json",
-      "stdout_text"
-     ],
-     "reason": "Published PHP 2.3.5 writes canonical-filter validation failures to stderr even with --json. Like workflow:list, this port returns the structured JSON error and exit 2 (cli#61/#72)."
-    }
-   }
+   "reference": "php-main"
   },
   {
    "name": "workflow cancel batch any status",
@@ -14401,17 +14381,7 @@
      }
     }
    },
-   "expected_difference": {
-    "*": {
-     "fields": [
-      "exit_code",
-      "stderr",
-      "stderr_category",
-      "stdout_text"
-     ],
-     "reason": "Published 2.3.5 sends signals without a command key and has no --request-id. This port follows PHP main's signal command key (cli#61): a generated or caller key, its receipt lines and its error context (cli#72)."
-    }
-   }
+   "reference": "php-main"
   },
   {
    "name": "workflow signal JSON",
@@ -14459,18 +14429,7 @@
      }
     }
    },
-   "expected_difference": {
-    "*": {
-     "fields": [
-      "exit_code",
-      "stderr",
-      "stderr_category",
-      "stdout_json",
-      "stdout_text"
-     ],
-     "reason": "Published 2.3.5 sends signals without a command key and has no --request-id. This port follows PHP main's signal command key (cli#61): a generated or caller key, its receipt lines and its error context (cli#72)."
-    }
-   }
+   "reference": "php-main"
   },
   {
    "name": "workflow signal legacy server keeps the key",
@@ -14515,18 +14474,7 @@
      }
     }
    },
-   "expected_difference": {
-    "*": {
-     "fields": [
-      "exit_code",
-      "stderr",
-      "stderr_category",
-      "stdout_json",
-      "stdout_text"
-     ],
-     "reason": "Published 2.3.5 sends signals without a command key and has no --request-id. This port follows PHP main's signal command key (cli#61): a generated or caller key, its receipt lines and its error context (cli#72)."
-    }
-   }
+   "reference": "php-main"
   },
   {
    "name": "workflow signal legacy server human",
@@ -14570,17 +14518,7 @@
      }
     }
    },
-   "expected_difference": {
-    "*": {
-     "fields": [
-      "exit_code",
-      "stderr",
-      "stderr_category",
-      "stdout_text"
-     ],
-     "reason": "Published 2.3.5 sends signals without a command key and has no --request-id. This port follows PHP main's signal command key (cli#61): a generated or caller key, its receipt lines and its error context (cli#72)."
-    }
-   }
+   "reference": "php-main"
   },
   {
    "name": "workflow signal input JSON",
@@ -14630,18 +14568,7 @@
      }
     }
    },
-   "expected_difference": {
-    "*": {
-     "fields": [
-      "exit_code",
-      "stderr",
-      "stderr_category",
-      "stdout_json",
-      "stdout_text"
-     ],
-     "reason": "Published 2.3.5 sends signals without a command key and has no --request-id. This port follows PHP main's signal command key (cli#61): a generated or caller key, its receipt lines and its error context (cli#72)."
-    }
-   }
+   "reference": "php-main"
   },
   {
    "name": "workflow signal run-id",
@@ -14690,18 +14617,7 @@
      }
     }
    },
-   "expected_difference": {
-    "*": {
-     "fields": [
-      "exit_code",
-      "stderr",
-      "stderr_category",
-      "stdout_json",
-      "stdout_text"
-     ],
-     "reason": "Published 2.3.5 sends signals without a command key and has no --request-id. This port follows PHP main's signal command key (cli#61): a generated or caller key, its receipt lines and its error context (cli#72)."
-    }
-   }
+   "reference": "php-main"
   },
   {
    "name": "workflow signal blank request id",
@@ -14749,18 +14665,7 @@
      }
     }
    },
-   "expected_difference": {
-    "*": {
-     "fields": [
-      "exit_code",
-      "stderr",
-      "stderr_category",
-      "stdout_json",
-      "stdout_text"
-     ],
-     "reason": "Published 2.3.5 sends signals without a command key and has no --request-id. This port follows PHP main's signal command key (cli#61): a generated or caller key, its receipt lines and its error context (cli#72)."
-    }
-   }
+   "reference": "php-main"
   },
   {
    "name": "workflow signal blank request id human",
@@ -14807,16 +14712,7 @@
      }
     }
    },
-   "expected_difference": {
-    "*": {
-     "fields": [
-      "exit_code",
-      "stderr",
-      "stderr_category"
-     ],
-     "reason": "Published 2.3.5 sends signals without a command key and has no --request-id. This port follows PHP main's signal command key (cli#61): a generated or caller key, its receipt lines and its error context (cli#72)."
-    }
-   }
+   "reference": "php-main"
   },
   {
    "name": "workflow signal request id without value",
@@ -14864,18 +14760,7 @@
      }
     }
    },
-   "expected_difference": {
-    "*": {
-     "fields": [
-      "exit_code",
-      "stderr",
-      "stderr_category",
-      "stdout_json",
-      "stdout_text"
-     ],
-     "reason": "Published 2.3.5 sends signals without a command key and has no --request-id. This port follows PHP main's signal command key (cli#61): a generated or caller key, its receipt lines and its error context (cli#72)."
-    }
-   }
+   "reference": "php-main"
   },
   {
    "name": "workflow signal request id too long",
@@ -14923,18 +14808,7 @@
      }
     }
    },
-   "expected_difference": {
-    "*": {
-     "fields": [
-      "exit_code",
-      "stderr",
-      "stderr_category",
-      "stdout_json",
-      "stdout_text"
-     ],
-     "reason": "Published 2.3.5 sends signals without a command key and has no --request-id. This port follows PHP main's signal command key (cli#61): a generated or caller key, its receipt lines and its error context (cli#72)."
-    }
-   }
+   "reference": "php-main"
   },
   {
    "name": "workflow signal request id conflict JSON",
@@ -14968,18 +14842,7 @@
      }
     }
    },
-   "expected_difference": {
-    "*": {
-     "fields": [
-      "exit_code",
-      "stderr",
-      "stderr_category",
-      "stdout_json",
-      "stdout_text"
-     ],
-     "reason": "Published 2.3.5 sends signals without a command key and has no --request-id. This port follows PHP main's signal command key (cli#61): a generated or caller key, its receipt lines and its error context (cli#72)."
-    }
-   }
+   "reference": "php-main"
   },
   {
    "name": "workflow signal request id conflict human",
@@ -15012,16 +14875,7 @@
      }
     }
    },
-   "expected_difference": {
-    "*": {
-     "fields": [
-      "exit_code",
-      "stderr",
-      "stderr_category"
-     ],
-     "reason": "Published 2.3.5 sends signals without a command key and has no --request-id. This port follows PHP main's signal command key (cli#61): a generated or caller key, its receipt lines and its error context (cli#72)."
-    }
-   }
+   "reference": "php-main"
   },
   {
    "name": "workflow signal server error is unknown outcome JSON",
@@ -15046,18 +14900,7 @@
      }
     }
    },
-   "expected_difference": {
-    "*": {
-     "fields": [
-      "exit_code",
-      "stderr",
-      "stderr_category",
-      "stdout_json",
-      "stdout_text"
-     ],
-     "reason": "Published 2.3.5 sends signals without a command key and has no --request-id. This port follows PHP main's signal command key (cli#61): a generated or caller key, its receipt lines and its error context (cli#72)."
-    }
-   }
+   "reference": "php-main"
   },
   {
    "name": "workflow signal server error is unknown outcome human",
@@ -15081,16 +14924,7 @@
      }
     }
    },
-   "expected_difference": {
-    "*": {
-     "fields": [
-      "exit_code",
-      "stderr",
-      "stderr_category"
-     ],
-     "reason": "Published 2.3.5 sends signals without a command key and has no --request-id. This port follows PHP main's signal command key (cli#61): a generated or caller key, its receipt lines and its error context (cli#72)."
-    }
-   }
+   "reference": "php-main"
   },
   {
    "name": "workflow signal not found",
@@ -15115,18 +14949,7 @@
      }
     }
    },
-   "expected_difference": {
-    "*": {
-     "fields": [
-      "exit_code",
-      "stderr",
-      "stderr_category",
-      "stdout_json",
-      "stdout_text"
-     ],
-     "reason": "Published 2.3.5 sends signals without a command key and has no --request-id. This port follows PHP main's signal command key (cli#61): a generated or caller key, its receipt lines and its error context (cli#72)."
-    }
-   }
+   "reference": "php-main"
   },
   {
    "name": "workflow signal invalid input keeps the key",
@@ -15175,18 +14998,7 @@
      }
     }
    },
-   "expected_difference": {
-    "*": {
-     "fields": [
-      "exit_code",
-      "stderr",
-      "stderr_category",
-      "stdout_json",
-      "stdout_text"
-     ],
-     "reason": "Published 2.3.5 sends signals without a command key and has no --request-id. This port follows PHP main's signal command key (cli#61): a generated or caller key, its receipt lines and its error context (cli#72)."
-    }
-   }
+   "reference": "php-main"
   },
   {
    "name": "workflow update human",
@@ -15243,14 +15055,7 @@
      }
     }
    },
-   "expected_difference": {
-    "*": {
-     "fields": [
-      "stdout_text"
-     ],
-     "reason": "Published 2.3.5 predates the command-key contract merged on PHP main in cli#61: update receipts with retained/intent fields, request-ID error context, conflict and unknown-outcome guidance, and refusal of blank keys. This port follows PHP main (cli#72)."
-    }
-   }
+   "reference": "php-main"
   },
   {
    "name": "workflow update JSON",
@@ -15308,14 +15113,7 @@
      }
     }
    },
-   "expected_difference": {
-    "*": {
-     "fields": [
-      "stdout_json"
-     ],
-     "reason": "Published 2.3.5 predates the command-key contract merged on PHP main in cli#61: update receipts with retained/intent fields, request-ID error context, conflict and unknown-outcome guidance, and refusal of blank keys. This port follows PHP main (cli#72)."
-    }
-   }
+   "reference": "php-main"
   },
   {
    "name": "workflow update minimal response JSON",
@@ -15399,12 +15197,13 @@
      }
     }
    },
+   "reference": "php-main",
    "expected_difference": {
     "*": {
      "fields": [
       "stdout_text"
      ],
-     "reason": "Published 2.3.5 predates the command-key contract merged on PHP main in cli#61: update receipts with retained/intent fields, request-ID error context, conflict and unknown-outcome guidance, and refusal of blank keys. This port follows PHP main (cli#72). 2.3.5 also prints a PHP 'Undefined array key' warning for a response without outcome."
+     "reason": "PHP main prints a PHP 'Undefined array key \"outcome\"' warning (with its source path) to stdout when the Server omits outcome; this build prints the empty Outcome line without the warning."
     }
    }
   },
@@ -15580,17 +15379,7 @@
      }
     }
    },
-   "expected_difference": {
-    "*": {
-     "fields": [
-      "stderr_category",
-      "stderr",
-      "stdout_json",
-      "stdout_text"
-     ],
-     "reason": "Published PHP 2.3.5 writes canonical-option validation failures to stderr even with --json. This port follows accepted PHP main's structured error, exit 2 and namespace context (cli#61/#72)."
-    }
-   }
+   "reference": "php-main"
   },
   {
    "name": "workflow update unknown wait policy human",
@@ -15632,14 +15421,7 @@
      }
     }
    },
-   "expected_difference": {
-    "*": {
-     "fields": [
-      "stderr"
-     ],
-     "reason": "Published PHP 2.3.5 writes canonical-option validation failures to stderr even with --json. This port follows accepted PHP main's structured error, exit 2 and namespace context (cli#61/#72)."
-    }
-   }
+   "reference": "php-main"
   },
   {
    "name": "workflow update rejected JSON",
@@ -15703,14 +15485,7 @@
      }
     }
    },
-   "expected_difference": {
-    "*": {
-     "fields": [
-      "stderr"
-     ],
-     "reason": "Published 2.3.5 predates the command-key contract merged on PHP main in cli#61: update receipts with retained/intent fields, request-ID error context, conflict and unknown-outcome guidance, and refusal of blank keys. This port follows PHP main (cli#72)."
-    }
-   }
+   "reference": "php-main"
   },
   {
    "name": "workflow update conflict JSON",
@@ -15745,14 +15520,7 @@
      }
     }
    },
-   "expected_difference": {
-    "*": {
-     "fields": [
-      "stdout_json"
-     ],
-     "reason": "Published 2.3.5 predates the command-key contract merged on PHP main in cli#61: update receipts with retained/intent fields, request-ID error context, conflict and unknown-outcome guidance, and refusal of blank keys. This port follows PHP main (cli#72)."
-    }
-   }
+   "reference": "php-main"
   },
   {
    "name": "workflow update server error JSON",
@@ -15777,14 +15545,7 @@
      }
     }
    },
-   "expected_difference": {
-    "*": {
-     "fields": [
-      "stdout_json"
-     ],
-     "reason": "Published 2.3.5 predates the command-key contract merged on PHP main in cli#61: update receipts with retained/intent fields, request-ID error context, conflict and unknown-outcome guidance, and refusal of blank keys. This port follows PHP main (cli#72)."
-    }
-   }
+   "reference": "php-main"
   },
   {
    "name": "workflow update not found JSON",
@@ -15896,15 +15657,7 @@
      }
     }
    },
-   "expected_difference": {
-    "*": {
-     "fields": [
-      "exit_code",
-      "stdout_json"
-     ],
-     "reason": "Published 2.3.5 predates the command-key contract merged on PHP main in cli#61: update receipts with retained/intent fields, request-ID error context, conflict and unknown-outcome guidance, and refusal of blank keys. This port follows PHP main (cli#72)."
-    }
-   }
+   "reference": "php-main"
   },
   {
    "name": "workflow start human",
@@ -16133,17 +15886,7 @@
      }
     }
    },
-   "expected_difference": {
-    "*": {
-     "fields": [
-      "stderr_category",
-      "stderr",
-      "stdout_json",
-      "stdout_text"
-     ],
-     "reason": "Published PHP 2.3.5 writes canonical-option validation failures to stderr even with --json. This port follows accepted PHP main's structured error, exit 2 and namespace context (cli#61/#72)."
-    }
-   }
+   "reference": "php-main"
   },
   {
    "name": "workflow start duplicate policy alias",
@@ -16187,14 +15930,7 @@
      }
     }
    },
-   "expected_difference": {
-    "*": {
-     "fields": [
-      "stderr"
-     ],
-     "reason": "Published PHP 2.3.5 writes canonical-option validation failures to stderr even with --json. This port follows accepted PHP main's structured error, exit 2 and namespace context (cli#61/#72)."
-    }
-   }
+   "reference": "php-main"
   },
   {
    "name": "workflow start invalid memo",

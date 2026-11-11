@@ -248,7 +248,10 @@ jobs:
         run: |
           set -euo pipefail
           chmod +x candidate/dw-linux-x86_64
-          python3 -I rust/parity/parity.py --candidate candidate/dw-linux-x86_64 --verbose
+          # Cases compared against PHP main built from source (cli#61
+          # behaviour) run in build.yml's rust job on every pull request;
+          # this job compares the release binary with published 2.x only.
+          python3 -I rust/parity/parity.py --candidate candidate/dw-linux-x86_64 --skip-reference php-main --verbose
 
   assemble:
     name: Assemble release assets

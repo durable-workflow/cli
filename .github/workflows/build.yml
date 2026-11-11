@@ -186,7 +186,7 @@ jobs:
       - name: Bootstrap verified dependency trust
         uses: durable-workflow/.github/.github/actions/bootstrap-patched-pip@75587fc33ff40c34f32ef777293dad56bb6f48c7  # clean-trust
         with:
-          clients: pip,python,cargo,curl,git
+          clients: pip,python,composer,cargo,curl,git
       - name: Install Rust 1.86
         uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4  # stable
         with:
@@ -204,11 +204,11 @@ jobs:
         env:
           DW_REQUIRE_COMPLETION_SHELLS: '1'
       - run: cargo build --locked
-      - name: Set up PHP for the 2.x compatibility vectors
+      - name: Set up PHP for the 2.x compatibility vectors and PHP main
         uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240  # v2
         with:
           php-version: '8.4'
-          tools: none
+          tools: composer:2.10.3
           coverage: none
       - name: Compare compatibility checks with the 2.x PHP classes
         run: |
@@ -216,10 +216,61 @@ jobs:
           DW_COMPAT_PHP_VECTORS=target/php-vectors.json cargo test --locked -- --ignored
       - name: Fetch the pinned 2.x reference CLI
         run: parity/fetch-reference.sh
+      - name: Verify actual Composer dependency trust
+        uses: durable-workflow/.github/.github/actions/verify-composer-trust@75587fc33ff40c34f32ef777293dad56bb6f48c7  # clean-trust
+        with:
+          working-directory: ${{ github.workspace }}
+      - name: Install PHP main for the source reference
+        # Cases marked "reference": "php-main" compare against this
+        # checkout's PHP CLI (cli#61 behaviour 2.3.5 lacks).
+        working-directory: ${{ github.workspace }}
+        run: composer install --no-dev --prefer-dist --no-interaction
       - name: Compare against the 2.x CLI
+        env:
+          DW_PARITY_PHP_MAIN: ${{ github.workspace }}
         run: |
           python3 -m unittest discover -s parity -p 'test_*.py'
           python3 parity/parity.py --verbose
+
+  rust-live-parity:
+    name: Rust CLI (2.x parity against published Servers)
+    if: ${{ github.server_url == 'https://github.com' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6
+        with:
+          python-version: '3.13'
+      - name: Bootstrap verified dependency trust
+        uses: durable-workflow/.github/.github/actions/bootstrap-patched-pip@75587fc33ff40c34f32ef777293dad56bb6f48c7  # clean-trust
+        with:
+          clients: pip,python,cargo,curl,git
+      - name: Install Rust 1.86
+        uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4  # stable
+        with:
+          toolchain: 1.86.0
+      - run: cargo build --locked
+      - name: Fetch the pinned 2.x reference CLI
+        run: parity/fetch-reference.sh
+      - name: Start the published PHP and native Servers
+        # Compose files are checksum-verified and images pinned by digest
+        # (parity/servers.json).
+        env:
+          DW_PARITY_TOKEN: parity-token
+        run: echo "DW_PARITY_SERVERS=$(parity/start-servers.sh)" >> "$GITHUB_ENV"
+      - name: Compare against the 2.x CLI on both Servers
+        env:
+          DW_PARITY_TOKEN: parity-token
+        run: python3 parity/parity.py --server-cases-only --verbose
+      - name: Stop the Servers
+        if: always()
+        run: parity/start-servers.sh down
 
   target-branch-qualification:
     name: Target branch qualification

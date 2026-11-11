@@ -338,6 +338,13 @@ const SERVER_DIAGNOSTIC_FIELDS: &[&str] = &[
     "rejection_reason",
     "rejection_category",
     "request_id",
+    // PHP main's command-key receipts (cli#61).
+    "retained",
+    "intent_verified",
+    "retained_command_id",
+    "retained_command_type",
+    "retained_outcome",
+    "conflict",
     "workflow_sequence",
     "result",
     "result_envelope",

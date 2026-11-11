@@ -31,7 +31,7 @@ every command group reaches parity.
 | `workflow:history`: every page, `--follow` long-poll, JSON and streamed JSONL | Ported |
 | `workflow:history-export`: the Server bundle to stdout or `--output-file` | Ported |
 | Remaining workflow, schedule and other command groups | Next slices ([gap list](https://github.com/durable-workflow/cli/issues/72#issuecomment-6801944950)) |
-| `--tls-verify=false` against HTTPS | CLI support pending |
+| `--tls-verify=false` against HTTPS: no certificate or hostname checks, as in 2.x, plus a stderr warning on every such command (also with `--json` and `-q`) | Ported, intentional addition |
 
 Server calls go through the published `durable-workflow` crate, pinned to
 the latest qualified release.

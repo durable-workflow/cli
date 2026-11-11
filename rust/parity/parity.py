@@ -25,6 +25,7 @@ import http.server
 import json
 import os
 import re
+import secrets
 import shutil
 import subprocess
 import sys
@@ -46,6 +47,15 @@ MOCK_CLUSTER_INFO = os.path.join(CRATE, "src", "compat", "fixtures", "cluster-in
 
 TIME = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d[0-9.:+Z-]*")
 ULID = re.compile(r"\b[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}\b")
+UUID = re.compile(r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b")
+CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+
+
+def unique_id():
+    """A fresh ULID-shaped value. Server cases that create state use
+    {unique} so the reference and candidate runs touch different
+    resources; the value normalizes to <id> like any ULID."""
+    return "".join(secrets.choice(CROCKFORD) for _ in range(26))
 VERSION_LINE = re.compile(r"dw \S+ \(commit [^,]+, built [^)]+\)")
 BUILD_IDENTITY = re.compile(r"\(commit [^,]+, built [^)]+\)")
 MARKDOWN_TITLE = re.compile(r"^(dw <version>)\n=+$", re.M)
@@ -114,7 +124,7 @@ def normalize_text(text, config_dir, version=None):
     text = TRANSPORT_LINE.sub("<transport error>", text)
     text = DOCTOR_TRANSPORT_LINE.sub(r"\1<transport error>", text)
     text = LOOPBACK_PORT.sub("127.0.0.1:<port>", text)
-    return ULID.sub("<id>", text)
+    return UUID.sub("<id>", ULID.sub("<id>", text))
 
 
 def normalize_value(value, config_dir, version=None):
@@ -161,6 +171,7 @@ def read_config(config_dir):
 def run_case(binary, case, env_base, identity=None):
     identity = identity or {}
     version = identity.get("version")
+    case = dict(case, vars={**case.get("vars", {}), "unique": unique_id()})
     config_dir = tempfile.mkdtemp(prefix="dw-parity-")
     try:
         env = dict(env_base)

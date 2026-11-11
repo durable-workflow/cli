@@ -359,6 +359,11 @@ SH;
             'sudo apt-get install --no-install-recommends -y build-essential pkg-config',
             $releaseWorkflow,
         );
+        // CVE-2026-109518: APT must not retry downloads before the first
+        // networked apt-get on hosted runners (durable-workflow/.github#295).
+        $noRetries = strpos($releaseWorkflow, 'Acquire::Retries "0";');
+        self::assertIsInt($noRetries);
+        self::assertLessThan(strpos($releaseWorkflow, 'sudo apt-get update'), $noRetries);
         self::assertStringContainsString('brew install pkgconf', $releaseWorkflow);
         self::assertStringContainsString(
             '-requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64',

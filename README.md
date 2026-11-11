@@ -39,6 +39,17 @@ See the [distribution guide](docs/distribution.md) for exact-version installs,
 direct downloads, checksum and attestation verification, Homebrew, PHAR, and
 reproducible builds.
 
+### Known issue in 2.3.x
+
+The latest stable release, 2.3.6, bundles Symfony HttpClient 7.4.8, which is
+affected by two advisories published 2026-11-04
+([GHSA-gq53-v8w2-gjhj](https://github.com/symfony/symfony/security/advisories/GHSA-gq53-v8w2-gjhj),
+[GHSA-c7hm-wqwp-f9v8](https://github.com/symfony/symfony/security/advisories/GHSA-c7hm-wqwp-f9v8)).
+Exploiting them requires a malicious or compromised Server. `dw` only connects
+to the Server you configure, so the risk is low. CLI 2.5.0, the Rust
+implementation, removes the dependency, and `dw upgrade` installs it once it is
+the latest stable release ([#72](https://github.com/durable-workflow/cli/issues/72)).
+
 ## Connect
 
 Named profiles keep a runtime URL, namespace, token source, TLS policy, and

@@ -22473,6 +22473,296 @@
      }
     }
    }
+  },
+  {
+   "name": "live namespace list JSON",
+   "argv": [
+    "namespace:list",
+    "--server={server}",
+    "--json"
+   ],
+   "server": true
+  },
+  {
+   "name": "live namespace describe default JSON",
+   "argv": [
+    "namespace:describe",
+    "default",
+    "--server={server}",
+    "--json"
+   ],
+   "server": true
+  },
+  {
+   "name": "live workflow start JSON",
+   "argv": [
+    "workflow:start",
+    "--type=parity.{unique}",
+    "--task-queue=parity",
+    "--workflow-id={unique}",
+    "--server={server}",
+    "--json"
+   ],
+   "server": true
+  },
+  {
+   "name": "live workflow start human",
+   "argv": [
+    "workflow:start",
+    "--type=parity.{unique}",
+    "--task-queue=parity",
+    "--workflow-id={unique}",
+    "--server={server}"
+   ],
+   "server": true
+  },
+  {
+   "name": "live workflow start duplicate",
+   "argv": [
+    "workflow:start",
+    "--type=parity.{unique}",
+    "--task-queue=parity",
+    "--workflow-id={unique}",
+    "--server={server}",
+    "--json"
+   ],
+   "server": true,
+   "setup": [
+    [
+     "workflow:start",
+     "--type=parity.{unique}",
+     "--task-queue=parity",
+     "--workflow-id={unique}",
+     "--server={server}",
+     "--json"
+    ]
+   ]
+  },
+  {
+   "name": "live workflow describe JSON",
+   "argv": [
+    "workflow:describe",
+    "{unique}",
+    "--server={server}",
+    "--json"
+   ],
+   "server": true,
+   "setup": [
+    [
+     "workflow:start",
+     "--type=parity.{unique}",
+     "--task-queue=parity",
+     "--workflow-id={unique}",
+     "--server={server}",
+     "--json"
+    ]
+   ],
+   "normalize_fields": [
+    "request_fingerprint"
+   ]
+  },
+  {
+   "name": "live workflow describe human",
+   "argv": [
+    "workflow:describe",
+    "{unique}",
+    "--server={server}"
+   ],
+   "server": true,
+   "setup": [
+    [
+     "workflow:start",
+     "--type=parity.{unique}",
+     "--task-queue=parity",
+     "--workflow-id={unique}",
+     "--server={server}",
+     "--json"
+    ]
+   ]
+  },
+  {
+   "name": "live workflow describe missing",
+   "argv": [
+    "workflow:describe",
+    "{unique}",
+    "--server={server}",
+    "--json"
+   ],
+   "server": true
+  },
+  {
+   "name": "live workflow list by type JSON",
+   "argv": [
+    "workflow:list",
+    "--type=parity.{unique}",
+    "--server={server}",
+    "--json"
+   ],
+   "server": true,
+   "setup": [
+    [
+     "workflow:start",
+     "--type=parity.{unique}",
+     "--task-queue=parity",
+     "--workflow-id={unique}",
+     "--server={server}",
+     "--json"
+    ]
+   ]
+  },
+  {
+   "name": "live workflow list by type human",
+   "argv": [
+    "workflow:list",
+    "--type=parity.{unique}",
+    "--server={server}"
+   ],
+   "server": true,
+   "setup": [
+    [
+     "workflow:start",
+     "--type=parity.{unique}",
+     "--task-queue=parity",
+     "--workflow-id={unique}",
+     "--server={server}",
+     "--json"
+    ]
+   ]
+  },
+  {
+   "name": "live workflow list-runs JSON",
+   "argv": [
+    "workflow:list-runs",
+    "{unique}",
+    "--server={server}",
+    "--json"
+   ],
+   "server": true,
+   "setup": [
+    [
+     "workflow:start",
+     "--type=parity.{unique}",
+     "--task-queue=parity",
+     "--workflow-id={unique}",
+     "--server={server}",
+     "--json"
+    ]
+   ]
+  },
+  {
+   "name": "live workflow cancel JSON",
+   "argv": [
+    "workflow:cancel",
+    "{unique}",
+    "--reason=parity",
+    "--server={server}",
+    "--json"
+   ],
+   "server": true,
+   "setup": [
+    [
+     "workflow:start",
+     "--type=parity.{unique}",
+     "--task-queue=parity",
+     "--workflow-id={unique}",
+     "--server={server}",
+     "--json"
+    ]
+   ]
+  },
+  {
+   "name": "live workflow cancel human",
+   "argv": [
+    "workflow:cancel",
+    "{unique}",
+    "--server={server}"
+   ],
+   "server": true,
+   "setup": [
+    [
+     "workflow:start",
+     "--type=parity.{unique}",
+     "--task-queue=parity",
+     "--workflow-id={unique}",
+     "--server={server}",
+     "--json"
+    ]
+   ]
+  },
+  {
+   "name": "live workflow terminate JSON",
+   "argv": [
+    "workflow:terminate",
+    "{unique}",
+    "--reason=parity",
+    "--server={server}",
+    "--json"
+   ],
+   "server": true,
+   "setup": [
+    [
+     "workflow:start",
+     "--type=parity.{unique}",
+     "--task-queue=parity",
+     "--workflow-id={unique}",
+     "--server={server}",
+     "--json"
+    ]
+   ]
+  },
+  {
+   "name": "live workflow terminate after cancel",
+   "argv": [
+    "workflow:terminate",
+    "{unique}",
+    "--server={server}",
+    "--json"
+   ],
+   "server": true,
+   "setup": [
+    [
+     "workflow:start",
+     "--type=parity.{unique}",
+     "--task-queue=parity",
+     "--workflow-id={unique}",
+     "--server={server}",
+     "--json"
+    ],
+    [
+     "workflow:cancel",
+     "{unique}",
+     "--server={server}",
+     "--json"
+    ]
+   ]
+  },
+  {
+   "name": "live schedule describe missing",
+   "argv": [
+    "schedule:describe",
+    "{unique}",
+    "--server={server}",
+    "--json"
+   ],
+   "server": true
+  },
+  {
+   "name": "live search-attribute list JSON",
+   "argv": [
+    "search-attribute:list",
+    "--server={server}",
+    "--json"
+   ],
+   "server": true
+  },
+  {
+   "name": "live worker list JSON",
+   "argv": [
+    "worker:list",
+    "--server={server}",
+    "--json"
+   ],
+   "server": true
   }
  ]
 }

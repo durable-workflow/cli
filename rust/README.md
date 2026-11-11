@@ -162,10 +162,24 @@ Cases with a `mock` entry run against a loopback Server that serves the
 published PHP 2.11.8 cluster info with the case's patch applied, so
 compatibility warnings and refusals are compared without a broken Server.
 
-To also run the Server cases, start the published Servers pinned in
-`parity/servers.json`, set `DW_PARITY_SERVERS` to them (for example
-`php=http://127.0.0.1:18080,native=http://127.0.0.1:18081`) and
-`DW_PARITY_TOKEN` to their auth token.
+Server cases run both CLIs against the published Servers pinned in
+`parity/servers.json` (PHP 2.11.8 and native 3.0.5). `parity/start-servers.sh`
+checks each Compose file's SHA-256, starts it with the image pinned by digest,
+waits until it is healthy and prints the `DW_PARITY_SERVERS` value;
+`parity/start-servers.sh down` removes them. CI runs these cases in the
+`rust-live-parity` job:
+
+```bash
+export DW_PARITY_TOKEN=parity-token
+export DW_PARITY_SERVERS="$(parity/start-servers.sh)"
+python3 parity/parity.py --server-cases-only
+parity/start-servers.sh down
+```
+
+Cases that create state use `{unique}`, a fresh ULID-shaped value per run,
+so the reference and candidate touch different workflows; it normalizes to
+`<id>` like other IDs. A case's `normalize_fields` masks values derived
+from that input, such as a Server's request fingerprint.
 
 `src/catalog.json` is the 2.x command surface (names, aliases, usage lines,
 option definitions and help text), generated from the pinned reference by

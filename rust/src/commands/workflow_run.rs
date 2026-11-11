@@ -386,3 +386,91 @@ pub fn history_export(context: &Context, input: &Input) -> Result<i32, CliError>
     ));
     Ok(0)
 }
+
+/// 2.x waits at least this long for a query response.
+const QUERY_TIMEOUT: f64 = 35.0;
+/// Added to the Server's advertised query task timeout.
+const QUERY_TIMEOUT_GRACE: f64 = 10.0;
+const QUERY_TIMEOUT_MAX: f64 = 300.0;
+
+pub fn query(context: &Context, input: &Input) -> Result<i32, CliError> {
+    let workflow_id = input.arg("workflow-id").unwrap_or_default();
+    let query_name = input.arg("query-name").unwrap_or_default();
+    // 2.x reads the payload before any request.
+    let mut body = serde_json::Map::new();
+    if let Some(arguments) = crate::input::parse_arguments(input)? {
+        body.insert("input".into(), arguments);
+    }
+    let info = context.preflight(false)?;
+    let run_id = input.opt("run-id").flatten();
+    let (segments, path) = match run_id {
+        Some(run_id) => (
+            vec![
+                "workflows",
+                workflow_id,
+                "runs",
+                run_id,
+                "query",
+                query_name,
+            ],
+            format!("/workflows/{workflow_id}/runs/{run_id}/query/{query_name}"),
+        ),
+        None => (
+            vec!["workflows", workflow_id, "query", query_name],
+            format!("/workflows/{workflow_id}/query/{query_name}"),
+        ),
+    };
+    let body = if body.is_empty() {
+        Value::Array(Vec::new())
+    } else {
+        Value::Object(body)
+    };
+    let result = with_namespace(
+        context.workflow_post(&segments, body, &path, Some(query_timeout(&info)))?,
+        &context.connection.namespace,
+        None,
+    );
+    if context.mode.machine_readable() {
+        output::print_json(&result);
+        return Ok(0);
+    }
+    formatter::writeln_out("<info>Query result</info>");
+    let namespace = result
+        .get("namespace")
+        .filter(|value| {
+            php::is_scalar(Some(value)) && !php::trim(&php::to_string(Some(value))).is_empty()
+        })
+        .map(|value| php::to_string(Some(value)))
+        .unwrap_or_else(|| "-".into());
+    formatter::writeln_out(&format!(
+        "  Namespace: {}",
+        formatter::display_text(&namespace)
+    ));
+    if let Some(name) = result.get("query_name").filter(|value| !value.is_null()) {
+        formatter::writeln_out(&format!(
+            "  Query: {}",
+            formatter::display_text(&php::to_string(Some(name)))
+        ));
+    }
+    // Pretty JSON keeps its line breaks; only console markup is escaped.
+    formatter::writeln_out(&formatter::escape(&php::json_encode_pretty(
+        result.get("result").unwrap_or(&Value::Null),
+    )));
+    Ok(0)
+}
+
+/// 2.x `queryHttpTimeoutSeconds()`: at least 35 s, or the Server's query task
+/// timeout plus 10 s, at most 300 s.
+fn query_timeout(info: &Value) -> Duration {
+    let advertised = php::get(info, "worker_protocol")
+        .and_then(|value| php::get(value, "server_capabilities"))
+        .and_then(|value| php::get(value, "query_task_timeouts"))
+        .and_then(|value| php::get(value, "control_plane_timeout_seconds"))
+        .and_then(Value::as_f64)
+        .map(|seconds| seconds.max(0.0));
+    let mut seconds = QUERY_TIMEOUT;
+    if let Some(advertised) = advertised {
+        seconds = seconds.max(advertised + QUERY_TIMEOUT_GRACE);
+    }
+    Duration::from_secs_f64(seconds.min(QUERY_TIMEOUT_MAX))
+}

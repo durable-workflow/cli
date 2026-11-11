@@ -9619,6 +9619,856 @@
      "reason": "2.x stops at the same line with a PHP TypeError naming its internal source path; this build names the malformed Server field instead (cli#72)."
     }
    }
+  },
+  {
+   "name": "workflow query human",
+   "argv": [
+    "workflow:query",
+    "chk-42",
+    "status",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/query/status": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "query_name": "status",
+      "result": {
+       "stage": "<b>shipping</b>",
+       "items": [
+        1,
+        2
+       ],
+       "path": "a/b"
+      },
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "query",
+       "operation_name": "status",
+       "operation_name_field": "query_name",
+       "workflow_id": "chk-42",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow query JSON",
+   "argv": [
+    "workflow:query",
+    "chk-42",
+    "status",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/query/status": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "query_name": "status",
+      "result": {
+       "stage": "<b>shipping</b>",
+       "items": [
+        1,
+        2
+       ],
+       "path": "a/b"
+      },
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "query",
+       "operation_name": "status",
+       "operation_name_field": "query_name",
+       "workflow_id": "chk-42",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow query input JSON",
+   "argv": [
+    "workflow:query",
+    "chk-42",
+    "status",
+    "--server={mock}",
+    "--input={\"currency\":\"USD\"}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/query/status": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "query_name": "status",
+      "result": {
+       "stage": "<b>shipping</b>",
+       "items": [
+        1,
+        2
+       ],
+       "path": "a/b"
+      },
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "query",
+       "operation_name": "status",
+       "operation_name_field": "query_name",
+       "workflow_id": "chk-42",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow query scalar input",
+   "argv": [
+    "workflow:query",
+    "chk-42",
+    "status",
+    "--server={mock}",
+    "-i",
+    "42",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/query/status": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "query_name": "status",
+      "result": {
+       "stage": "<b>shipping</b>",
+       "items": [
+        1,
+        2
+       ],
+       "path": "a/b"
+      },
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "query",
+       "operation_name": "status",
+       "operation_name_field": "query_name",
+       "workflow_id": "chk-42",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow query raw input",
+   "argv": [
+    "workflow:query",
+    "chk-42",
+    "status",
+    "--server={mock}",
+    "--input=plain text",
+    "--input-encoding=raw",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/query/status": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "query_name": "status",
+      "result": {
+       "stage": "<b>shipping</b>",
+       "items": [
+        1,
+        2
+       ],
+       "path": "a/b"
+      },
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "query",
+       "operation_name": "status",
+       "operation_name_field": "query_name",
+       "workflow_id": "chk-42",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow query base64 input",
+   "argv": [
+    "workflow:query",
+    "chk-42",
+    "status",
+    "--server={mock}",
+    "--input=eyJhIjoxfQ==",
+    "--input-encoding=base64",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/query/status": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "query_name": "status",
+      "result": {
+       "stage": "<b>shipping</b>",
+       "items": [
+        1,
+        2
+       ],
+       "path": "a/b"
+      },
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "query",
+       "operation_name": "status",
+       "operation_name_field": "query_name",
+       "workflow_id": "chk-42",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow query run-id",
+   "argv": [
+    "workflow:query",
+    "chk-42",
+    "status",
+    "--server={mock}",
+    "--run-id=run-7",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/runs/run-7/query/status": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "query_name": "status",
+      "result": {
+       "stage": "<b>shipping</b>",
+       "items": [
+        1,
+        2
+       ],
+       "path": "a/b"
+      },
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "query",
+       "operation_name": "status",
+       "operation_name_field": "query_name",
+       "workflow_id": "chk-42",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow query invalid JSON input",
+   "argv": [
+    "workflow:query",
+    "chk-42",
+    "status",
+    "--server={mock}",
+    "--input={\"a\":",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/query/status": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "query_name": "status",
+      "result": {
+       "stage": "<b>shipping</b>",
+       "items": [
+        1,
+        2
+       ],
+       "path": "a/b"
+      },
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "query",
+       "operation_name": "status",
+       "operation_name_field": "query_name",
+       "workflow_id": "chk-42",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow query invalid JSON input human",
+   "argv": [
+    "workflow:query",
+    "chk-42",
+    "status",
+    "--server={mock}",
+    "--input=[1,]"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/query/status": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "query_name": "status",
+      "result": {
+       "stage": "<b>shipping</b>",
+       "items": [
+        1,
+        2
+       ],
+       "path": "a/b"
+      },
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "query",
+       "operation_name": "status",
+       "operation_name_field": "query_name",
+       "workflow_id": "chk-42",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow query control character input",
+   "argv": [
+    "workflow:query",
+    "chk-42",
+    "status",
+    "--server={mock}",
+    "--input=\"a\u0001\"",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/query/status": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "query_name": "status",
+      "result": {
+       "stage": "<b>shipping</b>",
+       "items": [
+        1,
+        2
+       ],
+       "path": "a/b"
+      },
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "query",
+       "operation_name": "status",
+       "operation_name_field": "query_name",
+       "workflow_id": "chk-42",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow query invalid base64",
+   "argv": [
+    "workflow:query",
+    "chk-42",
+    "status",
+    "--server={mock}",
+    "--input=Y",
+    "--input-encoding=base64",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/query/status": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "query_name": "status",
+      "result": {
+       "stage": "<b>shipping</b>",
+       "items": [
+        1,
+        2
+       ],
+       "path": "a/b"
+      },
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "query",
+       "operation_name": "status",
+       "operation_name_field": "query_name",
+       "workflow_id": "chk-42",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow query unknown encoding",
+   "argv": [
+    "workflow:query",
+    "chk-42",
+    "status",
+    "--server={mock}",
+    "--input=1",
+    "--input-encoding=yaml",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/query/status": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "query_name": "status",
+      "result": {
+       "stage": "<b>shipping</b>",
+       "items": [
+        1,
+        2
+       ],
+       "path": "a/b"
+      },
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "query",
+       "operation_name": "status",
+       "operation_name_field": "query_name",
+       "workflow_id": "chk-42",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow query unknown encoding without input",
+   "argv": [
+    "workflow:query",
+    "chk-42",
+    "status",
+    "--server={mock}",
+    "--input-encoding=yaml",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/query/status": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "query_name": "status",
+      "result": {
+       "stage": "<b>shipping</b>",
+       "items": [
+        1,
+        2
+       ],
+       "path": "a/b"
+      },
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "query",
+       "operation_name": "status",
+       "operation_name_field": "query_name",
+       "workflow_id": "chk-42",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow query input and file",
+   "argv": [
+    "workflow:query",
+    "chk-42",
+    "status",
+    "--server={mock}",
+    "--input=1",
+    "--input-file=x.json",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/query/status": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "query_name": "status",
+      "result": {
+       "stage": "<b>shipping</b>",
+       "items": [
+        1,
+        2
+       ],
+       "path": "a/b"
+      },
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "query",
+       "operation_name": "status",
+       "operation_name_field": "query_name",
+       "workflow_id": "chk-42",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow query missing input file",
+   "argv": [
+    "workflow:query",
+    "chk-42",
+    "status",
+    "--server={mock}",
+    "--input-file=/nonexistent/dw-parity.json",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/query/status": {
+     "method": "POST",
+     "status": 200,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "workflow_id": "chk-42",
+      "run_id": "run-7",
+      "query_name": "status",
+      "result": {
+       "stage": "<b>shipping</b>",
+       "items": [
+        1,
+        2
+       ],
+       "path": "a/b"
+      },
+      "control_plane": {
+       "schema": "durable-workflow.v2.control-plane-response",
+       "version": 1,
+       "operation": "query",
+       "operation_name": "status",
+       "operation_name_field": "query_name",
+       "workflow_id": "chk-42",
+       "contract": {
+        "schema": "durable-workflow.v2.control-plane-response.contract",
+        "version": 1,
+        "legacy_field_policy": "reject_non_canonical",
+        "legacy_fields": {
+         "query": "query_name"
+        },
+        "required_fields": [],
+        "success_fields": []
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow query not found",
+   "argv": [
+    "workflow:query",
+    "chk-42",
+    "status",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/query/status": {
+     "method": "POST",
+     "status": 404,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "message": "Workflow not found."
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow query rejected human",
+   "argv": [
+    "workflow:query",
+    "chk-42",
+    "status",
+    "--server={mock}"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/query/status": {
+     "method": "POST",
+     "status": 409,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "message": "Query rejected.",
+      "reason": "query_rejected"
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow describe run-id not found JSON",
+   "argv": [
+    "workflow:describe",
+    "chk-42",
+    "--run-id=run-7",
+    "--server={mock}",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/runs/run-7": {
+     "status": 404,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "message": "Run not found."
+     }
+    }
+   }
   }
  ]
 }

@@ -10,6 +10,7 @@ mod config;
 mod descriptor;
 mod error;
 mod formatter;
+mod input;
 mod lookup;
 mod output;
 mod php;
@@ -59,6 +60,7 @@ fn handler(name: &str) -> Option<Handler> {
         "workflow:show-run" => Handler::Server(workflow_run::show_run),
         "workflow:history" => Handler::Server(workflow_run::history),
         "workflow:history-export" => Handler::Server(workflow_run::history_export),
+        "workflow:query" => Handler::Server(workflow_run::query),
         "env:list" => Handler::Local(env::list),
         "env:set" => Handler::Local(env::set),
         "env:use" => Handler::Local(env::use_env),
@@ -76,6 +78,7 @@ const NAMESPACE_SCOPED: &[&str] = &[
     "workflow:show-run",
     "workflow:history",
     "workflow:history-export",
+    "workflow:query",
 ];
 
 /// Verbs of a group and the command each one names.
@@ -317,6 +320,22 @@ fn error_mode(input: &Input, server_command: bool) -> Mode {
     .unwrap_or(Mode::Table)
 }
 
+/// 2.x `errorArgumentContext()`: these arguments, then the `--run-id` option.
+fn argument_context(input: &Input) -> Vec<(&'static str, String)> {
+    [
+        ("workflow-id", "workflow_id"),
+        ("signal-name", "signal_name"),
+        ("query-name", "query_name"),
+        ("update-name", "update_name"),
+    ]
+    .into_iter()
+    .filter_map(|(argument, field)| input.arg(argument).map(|value| (field, value)))
+    .chain(input.opt("run-id").flatten().map(|value| ("run_id", value)))
+    .map(|(field, value)| (field, php::trim(value).to_owned()))
+    .filter(|(_, value)| !value.is_empty())
+    .collect()
+}
+
 fn report(error: &CliError, input: &Input, server_command: bool) -> i32 {
     let namespace = if NAMESPACE_SCOPED.contains(&input.command.as_str()) {
         client::Context::new(input)
@@ -328,11 +347,7 @@ fn report(error: &CliError, input: &Input, server_command: bool) -> i32 {
     let context = ErrorContext {
         command: &input.command,
         namespace,
-        workflow_id: input
-            .arg("workflow-id")
-            .map(php::trim)
-            .filter(|value| !value.is_empty())
-            .map(str::to_owned),
+        arguments: argument_context(input),
         server_flag: input.opt_str("server").map(str::to_string),
         env_flag: input.opt_str("env").map(str::to_string),
     };

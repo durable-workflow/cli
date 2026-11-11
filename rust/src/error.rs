@@ -150,7 +150,9 @@ fn first_validation_message(body: &Map<String, Value>) -> Option<String> {
 pub struct ErrorContext<'a> {
     pub command: &'a str,
     pub namespace: Option<String>,
-    pub workflow_id: Option<String>,
+    /// 2.x `errorArgumentContext()`: trimmed, non-empty identifiers from
+    /// the command line, such as `workflow_id`, in that order.
+    pub arguments: Vec<(&'static str, String)>,
     pub server_flag: Option<String>,
     pub env_flag: Option<String>,
 }
@@ -340,10 +342,8 @@ pub fn envelope(error: &CliError, context: &ErrorContext) -> Value {
     if let CliError::Http { status, body, .. } = error {
         add_http_details(&mut envelope, error, *status, body.as_ref());
     }
-    if let Some(workflow_id) = &context.workflow_id {
-        envelope
-            .entry("workflow_id")
-            .or_insert_with(|| json!(workflow_id));
+    for (field, value) in &context.arguments {
+        envelope.entry(*field).or_insert_with(|| json!(value));
     }
     if let CliError::Compatibility(failure) = error {
         envelope.insert(
@@ -458,7 +458,7 @@ mod tests {
         ErrorContext {
             command: "workflow:cancel",
             namespace: Some("default".into()),
-            workflow_id: None,
+            arguments: Vec::new(),
             server_flag: None,
             env_flag: None,
         }
@@ -523,7 +523,7 @@ mod tests {
         let context = ErrorContext {
             command: "server:health",
             namespace: None,
-            workflow_id: None,
+            arguments: Vec::new(),
             server_flag: Some("http://127.0.0.1:1".into()),
             env_flag: None,
         };

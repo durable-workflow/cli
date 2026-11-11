@@ -1,0 +1,250 @@
+{
+    "json": [
+        {
+            "in": "",
+            "err": "Syntax error"
+        },
+        {
+            "in": "IA==",
+            "err": "Syntax error"
+        },
+        {
+            "in": "MQ==",
+            "ok": "1"
+        },
+        {
+            "in": "IDEg",
+            "ok": "1"
+        },
+        {
+            "in": "ImEi",
+            "ok": "\"a\""
+        },
+        {
+            "in": "dHJ1ZQ==",
+            "ok": "true"
+        },
+        {
+            "in": "bnVsbA==",
+            "ok": "null"
+        },
+        {
+            "in": "W10=",
+            "ok": "[]"
+        },
+        {
+            "in": "e30=",
+            "ok": "[]"
+        },
+        {
+            "in": "eyJhIjoxLCJhIjoyfQ==",
+            "ok": "{\"a\":2}"
+        },
+        {
+            "in": "eyJhIjo=",
+            "err": "Syntax error"
+        },
+        {
+            "in": "dHJ1",
+            "err": "Syntax error"
+        },
+        {
+            "in": "ImEBIg==",
+            "err": "Control character error, possibly incorrectly encoded"
+        },
+        {
+            "in": "Ilx1ZDgwMCI=",
+            "err": "Single unpaired UTF-16 surrogate in unicode escape"
+        },
+        {
+            "in": "Ilx1ZGMwMHgi",
+            "err": "Single unpaired UTF-16 surrogate in unicode escape"
+        },
+        {
+            "in": "Iv8i",
+            "err": "Malformed UTF-8 characters, possibly incorrectly encoded"
+        },
+        {
+            "in": "WzEsXQ==",
+            "err": "Syntax error"
+        },
+        {
+            "in": "MDE=",
+            "err": "Syntax error"
+        },
+        {
+            "in": "MS4w",
+            "ok": "1.0"
+        },
+        {
+            "in": "LTA=",
+            "ok": "0"
+        },
+        {
+            "in": "LTAuMA==",
+            "ok": "-0.0"
+        },
+        {
+            "in": "MWUy",
+            "ok": "100.0"
+        },
+        {
+            "in": "OTIyMzM3MjAzNjg1NDc3NTgwNw==",
+            "ok": "9223372036854775807"
+        },
+        {
+            "in": "OTIyMzM3MjAzNjg1NDc3NTgwOA==",
+            "ok": "9.223372036854776e+18"
+        },
+        {
+            "in": "MTg0NDY3NDQwNzM3MDk1NTE2MTY=",
+            "ok": "1.8446744073709552e+19"
+        },
+        {
+            "in": "MUU0MDA=",
+            "ok": false
+        },
+        {
+            "in": "eyIiOjF9",
+            "ok": "{\"\":1}"
+        },
+        {
+            "in": "eyJfZW1wdHlfIjoxfQ==",
+            "ok": "{\"_empty_\":1}"
+        },
+        {
+            "in": "W1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tdXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXQ==",
+            "err": "Maximum stack depth exceeded"
+        },
+        {
+            "in": "W1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1d",
+            "err": "Maximum stack depth exceeded"
+        },
+        {
+            "in": "W1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tdXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXQ==",
+            "ok": "[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]"
+        },
+        {
+            "in": "Ilx1MDAwMCI=",
+            "ok": "\"\\u0000\""
+        },
+        {
+            "in": "77u/MQ==",
+            "err": "Syntax error"
+        },
+        {
+            "in": "WzFdIHg=",
+            "err": "Syntax error"
+        },
+        {
+            "in": "TmFO",
+            "err": "Syntax error"
+        },
+        {
+            "in": "IlwvIg==",
+            "ok": "\"/\""
+        },
+        {
+            "in": "eyJhIjp7ImIiOlsxLDIseyJjIjpudWxsfV19fQ==",
+            "ok": "{\"a\":{\"b\":[1,2,{\"c\":null}]}}"
+        },
+        {
+            "in": "WwkxCiwNMiBd",
+            "ok": "[1,2]"
+        },
+        {
+            "in": "IsOpIg==",
+            "ok": "\"\\u00e9\""
+        },
+        {
+            "in": "MQA=",
+            "err": "Control character error, possibly incorrectly encoded"
+        }
+    ],
+    "base64": [
+        {
+            "in": "",
+            "out": ""
+        },
+        {
+            "in": "YQ==",
+            "out": "YQ=="
+        },
+        {
+            "in": "YQ",
+            "out": "YQ=="
+        },
+        {
+            "in": "YQ=",
+            "out": null
+        },
+        {
+            "in": "Y Q==",
+            "out": "YQ=="
+        },
+        {
+            "in": "YQ==\n",
+            "out": "YQ=="
+        },
+        {
+            "in": " YQ== ",
+            "out": "YQ=="
+        },
+        {
+            "in": "YWJj",
+            "out": "YWJj"
+        },
+        {
+            "in": "YW Jj",
+            "out": "YWJj"
+        },
+        {
+            "in": "YW\nJj",
+            "out": "YWJj"
+        },
+        {
+            "in": "Y",
+            "out": null
+        },
+        {
+            "in": "YQ===",
+            "out": null
+        },
+        {
+            "in": "=YQ",
+            "out": null
+        },
+        {
+            "in": "Y=Q=",
+            "out": null
+        },
+        {
+            "in": "YQ==YQ==",
+            "out": null
+        },
+        {
+            "in": "@@@@",
+            "out": null
+        },
+        {
+            "in": "YWJ",
+            "out": "YWI="
+        },
+        {
+            "in": "_-8=",
+            "out": null
+        },
+        {
+            "in": "+/8=",
+            "out": "+/8="
+        },
+        {
+            "in": "YWJj\t",
+            "out": "YWJj"
+        },
+        {
+            "in": "YQ=x",
+            "out": null
+        }
+    ]
+}

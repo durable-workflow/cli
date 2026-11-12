@@ -644,6 +644,38 @@ class ReleaseRustWorkflowTest(unittest.TestCase):
         if crate != core and not crate.endswith("-dev"):
             self.assertTrue((ROOT / f"docs/release-notes/{crate}.md").is_file(), crate)
 
+    def test_install_sh_selects_the_intel_macos_binary(self):
+        # cli#135: 2.5.0 publishes dw-macos-x86_64 and no PHAR, so an Intel
+        # Mac gets the binary; an explicit pre-2.5.0 tag is refused clearly.
+        with tempfile.TemporaryDirectory() as directory:
+            bin_dir = Path(directory, "bin")
+            bin_dir.mkdir()
+            (bin_dir / "uname").write_text(
+                '#!/bin/sh\ncase "$1" in -s) echo Darwin ;; -m) echo x86_64 ;; *) echo Darwin ;; esac\n')
+            log = Path(directory, "curl.log")
+            (bin_dir / "curl").write_text(f'#!/bin/sh\nprintf "%s\\n" "$*" >> {log}\nexit 22\n')
+            for tool in bin_dir.iterdir():
+                tool.chmod(0o755)
+            env = {"PATH": f"{bin_dir}:/usr/bin:/bin", "HOME": directory,
+                   "DURABLE_WORKFLOW_INSTALL_DIR": str(Path(directory, "install"))}
+
+            def run(version=None):
+                log.unlink(missing_ok=True)
+                run_env = dict(env, **({"VERSION": version} if version else {}))
+                result = subprocess.run(["sh", str(ROOT / "scripts/install.sh")], env=run_env,
+                                        capture_output=True, text=True, timeout=30)
+                return result, log.read_text() if log.exists() else ""
+
+            for version in (None, "stable", "2.5.0", "2.10.0"):
+                result, calls = run(version)
+                self.assertIn("dw-macos-x86_64", calls, version)
+                self.assertNotIn("PHAR", result.stderr, version)
+            for version in ("2.3.6", "v2.4.0-rc.1"):
+                result, calls = run(version)
+                self.assertNotEqual(0, result.returncode, version)
+                self.assertIn("published from 2.5.0", result.stderr, version)
+                self.assertEqual("", calls, version)
+
     def test_every_installer_run_puts_its_install_directory_on_path(self):
         # install.sh exits 1 ("not ready") when the install directory is not
         # on PATH; rc.1's verify-release failed this way.

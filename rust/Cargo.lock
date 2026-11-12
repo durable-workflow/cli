@@ -289,7 +289,7 @@ dependencies = [
 
 [[package]]
 name = "dw"
-version = "2.5.0"
+version = "2.5.1"
 dependencies = [
  "durable-workflow",
  "getrandom 0.2.17",

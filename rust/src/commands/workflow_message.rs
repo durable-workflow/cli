@@ -160,7 +160,7 @@ fn optional_string<'a>(input: &'a Input, name: &str) -> Option<&'a str> {
 }
 
 /// The path a workflow message targets, as segments and as 2.x names it.
-fn message_path<'a>(
+pub(crate) fn message_path<'a>(
     workflow_id: &'a str,
     run_id: Option<&'a str>,
     kind: &'a str,

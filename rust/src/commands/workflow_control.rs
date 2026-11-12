@@ -306,9 +306,45 @@ fn namespace_text(result: &Value) -> String {
 }
 
 /// One workflow the batch selected, pinned to the run the list reported.
-struct Target {
-    workflow_id: String,
-    run_id: Option<String>,
+pub(crate) struct Target {
+    pub(crate) workflow_id: String,
+    pub(crate) run_id: Option<String>,
+}
+
+/// The visibility filters a batch selection takes: `--type`, `--status`
+/// (checked against the Server's canonical values) and `--limit`.
+pub(crate) struct Filters<'a> {
+    pub(crate) workflow_type: Option<&'a str>,
+    pub(crate) status: Option<&'a str>,
+    pub(crate) limit: i64,
+}
+
+pub(crate) fn filters<'a>(input: &'a Input, info: &Value) -> Result<Filters<'a>, CliError> {
+    let status = input
+        .opt("status")
+        .flatten()
+        .filter(|value| !value.is_empty());
+    if let Some(status) = status {
+        RequestContract::from_cluster_info(info)
+            .map_err(CliError::Failure)?
+            .assert_canonical_value("list", "status", Some(status), Some("--status"))
+            .map_err(CliError::Invalid)?;
+    }
+    let workflow_type = input
+        .opt("type")
+        .flatten()
+        .filter(|value| !value.is_empty());
+    let limit = input
+        .opt("limit")
+        .flatten()
+        .filter(|value| php::ctype_digit(value) && php::string_to_int(value) >= 1)
+        .map(php::string_to_int)
+        .ok_or_else(|| CliError::Invalid("--limit must be a positive integer.".into()))?;
+    Ok(Filters {
+        workflow_type,
+        status,
+        limit,
+    })
 }
 
 fn batch_cancel(context: &Context, input: &Input, query: &str) -> Result<i32, CliError> {
@@ -332,27 +368,19 @@ fn batch_cancel(context: &Context, input: &Input, query: &str) -> Result<i32, Cl
     }
     let info = context.preflight(false)?;
     let namespace = context.connection.namespace.clone();
-    let status = input
-        .opt("status")
-        .flatten()
-        .filter(|value| !value.is_empty());
-    if let Some(status) = status {
-        RequestContract::from_cluster_info(&info)
-            .map_err(CliError::Failure)?
-            .assert_canonical_value("list", "status", Some(status), Some("--status"))
-            .map_err(CliError::Invalid)?;
-    }
-    let workflow_type = input
-        .opt("type")
-        .flatten()
-        .filter(|value| !value.is_empty());
-    let limit = input
-        .opt("limit")
-        .flatten()
-        .filter(|value| php::ctype_digit(value) && php::string_to_int(value) >= 1)
-        .map(php::string_to_int)
-        .ok_or_else(|| CliError::Invalid("--limit must be a positive integer.".into()))?;
-    let targets = select(context, query, workflow_type, status, limit)?;
+    let Filters {
+        workflow_type,
+        status,
+        limit,
+    } = filters(input, &info)?;
+    let targets = select(
+        context,
+        query,
+        workflow_type,
+        status,
+        limit,
+        "No workflows were cancelled.",
+    )?;
     let summary_base = |targets: &[Target], results: Vec<Value>, failures: Vec<Value>| {
         let mut summary = Map::new();
         summary.insert("query".into(), json!(query));
@@ -403,7 +431,7 @@ fn batch_cancel(context: &Context, input: &Input, query: &str) -> Result<i32, Cl
         return Ok(0);
     }
 
-    if !skip_confirmation && !confirm(input, targets.len(), query) {
+    if !skip_confirmation && !confirm(input, &cancel_question(targets.len(), query)) {
         formatter::writeln_out("<comment>Batch cancellation aborted.</comment>");
         return Ok(0);
     }
@@ -524,12 +552,13 @@ fn print_batch_json(summary: &Value) {
 /// run its first listing reported. Visibility pages are not a snapshot, so a
 /// workflow seen again keeps its first run. A page that adds nothing new, or
 /// a repeated page token, stops selection before anything is cancelled.
-fn select(
+pub(crate) fn select(
     context: &Context,
     query: &str,
     workflow_type: Option<&str>,
     status: Option<&str>,
     limit: i64,
+    nothing_done: &str,
 ) -> Result<Vec<Target>, CliError> {
     let mut targets: Vec<Target> = Vec::new();
     let mut seen_workflows = HashSet::new();
@@ -584,12 +613,12 @@ fn select(
         };
         if seen_tokens.contains(&token) {
             return Err(CliError::Failure(
-                "Stopped selecting workflows: the server returned the same page token twice. No workflows were cancelled.".into(),
+                format!("Stopped selecting workflows: the server returned the same page token twice. {nothing_done}"),
             ));
         }
         if targets.len() == matched_before {
             return Err(CliError::Failure(
-                "Stopped selecting workflows: a page added no new workflows but the server reported more pages. No workflows were cancelled.".into(),
+                format!("Stopped selecting workflows: a page added no new workflows but the server reported more pages. {nothing_done}"),
             ));
         }
         seen_tokens.insert(token);
@@ -599,20 +628,23 @@ fn select(
 
 /// 2.x's confirmation: the question on stderr and one answer line from
 /// stdin, also when stdin is a pipe. `-n`, `-q` or end of input mean no.
-fn confirm(input: &Input, count: usize, query: &str) -> bool {
+fn cancel_question(count: usize, query: &str) -> String {
+    format!(
+        "Cancel {count} workflow{} matching [{}]? [y/N] ",
+        if count == 1 { "" } else { "s" },
+        formatter::escape(query)
+    )
+}
+
+/// Ask `question` (console markup, already escaped) as 2.x asks for batch
+/// confirmation: on stderr, with one answer line read from stdin.
+pub(crate) fn confirm(input: &Input, question: &str) -> bool {
     if input.flag("no-interaction") || formatter::verbosity() != formatter::Verbosity::Normal {
         return false;
     }
     formatter::emit(
         formatter::Stream::Stderr,
-        &formatter::format(
-            &format!(
-                "Cancel {count} workflow{} matching [{}]? [y/N] ",
-                if count == 1 { "" } else { "s" },
-                formatter::escape(query)
-            ),
-            formatter::decorated(formatter::Stream::Stderr),
-        ),
+        &formatter::format(question, formatter::decorated(formatter::Stream::Stderr)),
     );
     let _ = std::io::stderr().flush();
     let mut answer = String::new();

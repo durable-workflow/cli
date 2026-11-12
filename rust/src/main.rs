@@ -1,5 +1,6 @@
 //! `dw`, the Durable Workflow command-line interface.
 
+mod batch_manifest;
 mod build_info;
 mod catalog;
 mod cli;
@@ -35,7 +36,7 @@ enum Handler {
 /// reported as not yet available.
 fn handler(name: &str) -> Option<Handler> {
     use commands::{
-        activity_task, completion, debug, doctor, env, namespace, runtime, schedule, schema,
+        activity_task, batch, completion, debug, doctor, env, namespace, runtime, schedule, schema,
         search_attribute, server, start_dev, system, task_queue, upgrade, worker, workflow,
         workflow_control, workflow_message, workflow_run,
     };
@@ -52,6 +53,10 @@ fn handler(name: &str) -> Option<Handler> {
         "server:health" => Handler::Server(server::health),
         "server:info" => Handler::Server(server::info),
         "workflow:list" => Handler::Server(workflow::list),
+        "batch:cancel" => Handler::Server(batch::cancel),
+        "batch:signal" => Handler::Server(batch::signal),
+        "batch:resume" => Handler::Server(batch::resume),
+        "batch:show" => Handler::Local(batch::show),
         "namespace:list" => Handler::Server(namespace::list),
         "namespace:describe" => Handler::Server(namespace::describe),
         "namespace:create" => Handler::Server(namespace::create),
@@ -146,6 +151,9 @@ const NAMESPACE_SCOPED: &[&str] = &[
     "workflow:redrive",
     "workflow:repair",
     "workflow:migrate-v1",
+    "batch:cancel",
+    "batch:resume",
+    "batch:signal",
     "schedule:backfill",
     "schedule:create",
     "schedule:delete",

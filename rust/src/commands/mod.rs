@@ -1,4 +1,5 @@
 pub mod activity_task;
+pub mod batch;
 pub mod completion;
 mod completion_log;
 pub mod debug;

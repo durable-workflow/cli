@@ -9,11 +9,18 @@
       "port": 18080
     },
     "native": {
+      "version": "3.5.0",
+      "image": "durableworkflow/server@sha256:b5776fea2a4627ebc477b3b350caaf600dc220e7ab75aa29d32b70e404fd7a68",
+      "compose": "https://raw.githubusercontent.com/durable-workflow/server/3.5.0/docker-compose.published.yml",
+      "compose_sha256": "f129f0279513d57b94abbfb5ca68b47ea1fa801d91e6efce53c589ffd0664402",
+      "port": 18081
+    },
+    "native-3-0": {
       "version": "3.0.5",
       "image": "durableworkflow/server@sha256:3cb6e5bf8ec766ac2abd933369b40a77af62794b6d7b921ce21d3fb263e88b72",
       "compose": "https://raw.githubusercontent.com/durable-workflow/server/3.0.5/docker-compose.published.yml",
       "compose_sha256": "5988f5ed4c92d97834936964d5ce185cb903420e2afb634ca0e25d127bda9924",
-      "port": 18081
+      "port": 18082
     }
   }
 }

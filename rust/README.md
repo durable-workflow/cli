@@ -42,7 +42,7 @@ command is ported.
 | `service-call:describe`, `bridge:webhook`: one GET; one POST with the 2.x target/correlation/input checks before any request | Ported |
 | `debug workflow` (with the cancellation cascade view) and `watch workflow`: every poll is one read; `watch` exits 0 on completed, 1 on another terminal state and 7 at `--max-polls` | Ported |
 | `--tls-verify=false` against HTTPS: no certificate or hostname checks, as in 2.x, plus a stderr warning on every such command (also with `--json` and `-q`) | Ported, intentional addition |
-| `batch:cancel`, `batch:signal`, `batch:show`, `batch:resume`: resumable bulk operations with a private manifest ([runbook](../docs/batch-operations.md), cli#60) | Rust-only, new |
+| `batch:cancel`, `batch:signal`, `batch:update`, `batch:show`, `batch:resume`: resumable bulk operations with a private manifest and an optional `--deadline` ([runbook](../docs/batch-operations.md), cli#60). `parity/live_batch.py` runs them against the published Servers in CI | Rust-only, new |
 
 Server calls go through the published `durable-workflow` crate, pinned to
 the latest qualified release.

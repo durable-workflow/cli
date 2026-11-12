@@ -4,7 +4,7 @@
   {
    "name": "batch:cancel",
    "description": "Cancel the workflows a visibility query selects, with a resumable manifest",
-   "synopsis": "batch:cancel [-s|--server [SERVER]] [--namespace [NAMESPACE]] [--token [TOKEN]] [--tls-verify TLS-VERIFY] [--env ENV] [--output OUTPUT] [--query QUERY] [-t|--type [TYPE]] [--status [STATUS]] [-l|--limit [LIMIT]] [--reason [REASON]] [--manifest MANIFEST] [--rate [RATE]] [-y|--yes] [--json]",
+   "synopsis": "batch:cancel [-s|--server [SERVER]] [--namespace [NAMESPACE]] [--token [TOKEN]] [--tls-verify TLS-VERIFY] [--env ENV] [--output OUTPUT] [--query QUERY] [-t|--type [TYPE]] [--status [STATUS]] [-l|--limit [LIMIT]] [--reason [REASON]] [--manifest MANIFEST] [--rate [RATE]] [--deadline DEADLINE] [-y|--yes] [--json]",
    "aliases": [],
    "hidden": false,
    "help": "Select up to <comment>--limit</comment> workflows with a visibility query, pin each to the run\nthe listing reported, and record the selection in a new private manifest\nbefore cancelling anything. Each run is cancelled with exactly one request\nand its outcome is recorded as it arrives. If the batch stops, resume it\nwith <comment>dw batch:resume</comment>: targets already done are never sent again, and a\ntarget whose outcome is unknown is reported for inspection, never resent.\nSee docs/batch-operations.md for the manifest format and recovery steps.\n\n<comment>Examples:</comment>\n\n  <info>dw batch:cancel --query='customer-42' --manifest=cancel-42.jsonl</info>\n  <info>dw batch:cancel --query='customer-42' --reason=offboarded --manifest=c.jsonl --yes --json</info>",
@@ -128,6 +128,15 @@
       "description": "Requests per second, 1 to 100",
       "default": "10"
      },
+     "deadline": {
+      "name": "--deadline",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": true,
+      "is_multiple": false,
+      "description": "Stop sending new targets after this long (seconds, or a duration such as 90s, 5m, 1h30m); unsent targets stay pending",
+      "default": null
+     },
      "yes": {
       "name": "--yes",
       "shortcut": "-y",
@@ -225,7 +234,7 @@
   {
    "name": "batch:signal",
    "description": "Signal the workflows a visibility query selects, with a resumable manifest",
-   "synopsis": "batch:signal [-s|--server [SERVER]] [--namespace [NAMESPACE]] [--token [TOKEN]] [--tls-verify TLS-VERIFY] [--env ENV] [--output OUTPUT] [--query QUERY] [-t|--type [TYPE]] [--status [STATUS]] [-l|--limit [LIMIT]] [--manifest MANIFEST] [--rate [RATE]] [-y|--yes] [--json] [-i|--input [INPUT]] [--input-file [INPUT-FILE]] [--input-encoding [INPUT-ENCODING]] [--] <signal-name>",
+   "synopsis": "batch:signal [-s|--server [SERVER]] [--namespace [NAMESPACE]] [--token [TOKEN]] [--tls-verify TLS-VERIFY] [--env ENV] [--output OUTPUT] [--query QUERY] [-t|--type [TYPE]] [--status [STATUS]] [-l|--limit [LIMIT]] [--manifest MANIFEST] [--rate [RATE]] [--deadline DEADLINE] [-y|--yes] [--json] [-i|--input [INPUT]] [--input-file [INPUT-FILE]] [--input-encoding [INPUT-ENCODING]] [--] <signal-name>",
    "aliases": [],
    "hidden": false,
    "help": "Select up to <comment>--limit</comment> workflows with a visibility query, pin each to the run\nthe listing reported, and record the selection, the signal and its input in\na new private manifest before sending anything. Each target gets its own\ncommand key (<comment>request_id</comment>), reused unchanged on resume. A target whose\noutcome is unknown is reported for inspection and never resent: a request ID\nalone does not prove a repeated signal is safe.\nSee docs/batch-operations.md for the manifest format and recovery steps.\n\n<comment>Examples:</comment>\n\n  <info>dw batch:signal approve --query='queue-7' --manifest=approve.jsonl</info>\n  <info>dw batch:signal payment_received --query='batch-9' -i '{\"amount\":10}' --manifest=pay.jsonl --yes</info>",
@@ -347,6 +356,15 @@
       "is_multiple": false,
       "description": "Requests per second, 1 to 100",
       "default": "10"
+     },
+     "deadline": {
+      "name": "--deadline",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": true,
+      "is_multiple": false,
+      "description": "Stop sending new targets after this long (seconds, or a duration such as 90s, 5m, 1h30m); unsent targets stay pending",
+      "default": null
      },
      "yes": {
       "name": "--yes",
@@ -470,9 +488,274 @@
    "rust_only": true
   },
   {
+   "name": "batch:update",
+   "description": "Send an update to the workflows a visibility query selects, with a resumable manifest",
+   "synopsis": "batch:update [-s|--server [SERVER]] [--namespace [NAMESPACE]] [--token [TOKEN]] [--tls-verify TLS-VERIFY] [--env ENV] [--output OUTPUT] [--query QUERY] [-t|--type [TYPE]] [--status [STATUS]] [-l|--limit [LIMIT]] [--wait [WAIT]] [--manifest MANIFEST] [--rate [RATE]] [--deadline DEADLINE] [-y|--yes] [--json] [-i|--input [INPUT]] [--input-file [INPUT-FILE]] [--input-encoding [INPUT-ENCODING]] [--] <update-name>",
+   "aliases": [],
+   "hidden": false,
+   "help": "Select up to <comment>--limit</comment> workflows with a visibility query, pin each to the run\nthe listing reported, and record the selection, the update, its wait policy\nand its input in a new private manifest before sending anything. Each target\ngets its own command key (<comment>request_id</comment>), reused unchanged on resume. An\naccepted or completed update is acknowledged; a rejected or failed one is\nrefused and never resent. A target whose outcome is unknown is reported for\ninspection and never resent.\nSee docs/batch-operations.md for the manifest format and recovery steps.\n\n<comment>Examples:</comment>\n\n  <info>dw batch:update approve --query='queue-7' --manifest=approve.jsonl</info>\n  <info>dw batch:update set-limit --query='tier-2' -i '{\"limit\":5}' --wait=completed --manifest=limits.jsonl --yes</info>",
+   "definition": {
+    "arguments": {
+     "update-name": {
+      "name": "update-name",
+      "is_required": true,
+      "is_array": false,
+      "description": "Update name",
+      "default": null
+     }
+    },
+    "options": {
+     "server": {
+      "name": "--server",
+      "shortcut": "-s",
+      "accept_value": true,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Server URL",
+      "default": null
+     },
+     "namespace": {
+      "name": "--namespace",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Target namespace",
+      "default": null
+     },
+     "token": {
+      "name": "--token",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Auth token",
+      "default": null
+     },
+     "tls-verify": {
+      "name": "--tls-verify",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": true,
+      "is_multiple": false,
+      "description": "Verify TLS certificates (true/false). Defaults to $DURABLE_WORKFLOW_TLS_VERIFY, then the selected profile, then true.",
+      "default": null
+     },
+     "env": {
+      "name": "--env",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": true,
+      "is_multiple": false,
+      "description": "Named dw environment to use (overrides $DW_ENV and any env set via `dw env:use`). Hard-fails when the profile does not exist.",
+      "default": null
+     },
+     "output": {
+      "name": "--output",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": true,
+      "is_multiple": false,
+      "description": "Output format: table (human-readable), json (single JSON document), jsonl (one JSON object per line, for list commands)",
+      "default": "table"
+     },
+     "query": {
+      "name": "--query",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": true,
+      "is_multiple": false,
+      "description": "Visibility query selecting the workflows",
+      "default": null
+     },
+     "type": {
+      "name": "--type",
+      "shortcut": "-t",
+      "accept_value": true,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Batch filter by workflow type",
+      "default": null
+     },
+     "status": {
+      "name": "--status",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Batch filter by status bucket",
+      "default": "running"
+     },
+     "limit": {
+      "name": "--limit",
+      "shortcut": "-l",
+      "accept_value": true,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Maximum matching workflows (at most 1000)",
+      "default": "100"
+     },
+     "wait": {
+      "name": "--wait",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Wait policy for each update (accepted, completed)",
+      "default": "accepted"
+     },
+     "manifest": {
+      "name": "--manifest",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": true,
+      "is_multiple": false,
+      "description": "New manifest file that records the selection and every outcome",
+      "default": null
+     },
+     "rate": {
+      "name": "--rate",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Requests per second, 1 to 100",
+      "default": "10"
+     },
+     "deadline": {
+      "name": "--deadline",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": true,
+      "is_multiple": false,
+      "description": "Stop sending new targets after this long (seconds, or a duration such as 90s, 5m, 1h30m); unsent targets stay pending",
+      "default": null
+     },
+     "yes": {
+      "name": "--yes",
+      "shortcut": "-y",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Skip the confirmation prompt",
+      "default": false
+     },
+     "json": {
+      "name": "--json",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Output the command response as JSON",
+      "default": false
+     },
+     "input": {
+      "name": "--input",
+      "shortcut": "-i",
+      "accept_value": true,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Update input payload (inline)",
+      "default": null
+     },
+     "input-file": {
+      "name": "--input-file",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Update input payload file path; use - for stdin",
+      "default": null
+     },
+     "input-encoding": {
+      "name": "--input-encoding",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Input encoding: json (default), raw, base64",
+      "default": "json"
+     },
+     "help": {
+      "name": "--help",
+      "shortcut": "-h",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Display help for the given command. When no command is given display help for the <info>list</info> command",
+      "default": false
+     },
+     "silent": {
+      "name": "--silent",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Do not output any message",
+      "default": false
+     },
+     "quiet": {
+      "name": "--quiet",
+      "shortcut": "-q",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Only errors are displayed. All other output is suppressed",
+      "default": false
+     },
+     "verbose": {
+      "name": "--verbose",
+      "shortcut": "-v|-vv|-vvv",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug",
+      "default": false
+     },
+     "version": {
+      "name": "--version",
+      "shortcut": "-V",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Display this application version",
+      "default": false
+     },
+     "ansi": {
+      "name": "--ansi",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Force (or disable --no-ansi) ANSI output",
+      "default": null
+     },
+     "no-ansi": {
+      "name": "--no-ansi",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Negate the \"--ansi\" option",
+      "default": null
+     },
+     "no-interaction": {
+      "name": "--no-interaction",
+      "shortcut": "-n",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Do not ask any interactive question",
+      "default": false
+     }
+    }
+   },
+   "rust_only": true
+  },
+  {
    "name": "batch:resume",
    "description": "Continue a batch from its manifest without relisting or resending",
-   "synopsis": "batch:resume [-s|--server [SERVER]] [--namespace [NAMESPACE]] [--token [TOKEN]] [--tls-verify TLS-VERIFY] [--env ENV] [--output OUTPUT] [--rate [RATE]] [-y|--yes] [--json] [--] <manifest>",
+   "synopsis": "batch:resume [-s|--server [SERVER]] [--namespace [NAMESPACE]] [--token [TOKEN]] [--tls-verify TLS-VERIFY] [--env ENV] [--output OUTPUT] [--rate [RATE]] [--deadline DEADLINE] [-y|--yes] [--json] [--] <manifest>",
    "aliases": [],
    "hidden": false,
    "help": "Continue the targets of a recorded batch that have no definite outcome:\nnever dispatched, refused for authentication, or still under Server pressure.\nResume never relists, so it never retargets a successor run, and it reuses\neach target's command key. It never resends acknowledged, refused, skipped\nor unknown targets. The connection must name the same Server and namespace\nthe batch recorded.\nSee docs/batch-operations.md for the manifest format and recovery steps.\n\n<comment>Examples:</comment>\n\n  <info>dw batch:resume cancel-42.jsonl</info>\n  <info>dw batch:resume approve.jsonl --yes --json</info>",
@@ -549,6 +832,15 @@
       "is_multiple": false,
       "description": "Requests per second, 1 to 100",
       "default": "10"
+     },
+     "deadline": {
+      "name": "--deadline",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": true,
+      "is_multiple": false,
+      "description": "Stop sending new targets after this long (seconds, or a duration such as 90s, 5m, 1h30m); unsent targets stay pending",
+      "default": null
      },
      "yes": {
       "name": "--yes",

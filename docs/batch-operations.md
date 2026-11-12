@@ -1,6 +1,6 @@
 # Resumable batch operations
 
-`dw batch:cancel` and `dw batch:signal` act on every workflow a visibility
+`dw batch:cancel`, `dw batch:signal` and `dw batch:update` act on every workflow a visibility
 query selects, and survive interruption. Before anything is sent, the
 selection is written to a **manifest**: a private file on your machine.
 Each target's outcome is added to the manifest as it happens.
@@ -15,7 +15,8 @@ These commands are new in the Rust CLI. The 2.x `workflow:cancel
 
 ```bash
 dw batch:cancel --query='customer-42' --reason=offboarded --manifest=cancel-42.jsonl
-dw batch:signal approve --query='queue-7' -i '{"by":"ops"}' --manifest=approve-7.jsonl
+dw batch:signal approve --query='queue-7' -i '["ops"]' --manifest=approve-7.jsonl
+dw batch:update set-limit --query='tier-2' -i '[5]' --wait=completed --manifest=limits.jsonl
 ```
 
 - `--query` is a visibility query; `--type` and `--status` (default
@@ -27,10 +28,15 @@ dw batch:signal approve --query='queue-7' -i '{"by":"ops"}' --manifest=approve-7
   `--output=json`, `--yes` is required.
 - Targets are sent one at a time, at most `--rate` requests per second
   (default 10).
+- `--deadline` bounds the run: whole seconds, or a duration such as `90s`,
+  `5m` or `1h30m` (at most 7 days). See [Deadlines](#deadlines).
+- `batch:update` sends each update with `--wait` (`accepted`, the default, or
+  `completed`), checked against the Server's request contract before
+  anything is selected.
 
 The manifest holds the Server URL, namespace, operation, its parameters (the
 cancellation reason, or the signal name and its input exactly as sent) and
-every selected target. It never holds your token. Keep it as long as you
+every selected target (for an update, also its wait policy). It never holds your token. Keep it as long as you
 need the record: it can contain workflow IDs and signal input.
 
 ### What is selected
@@ -42,7 +48,7 @@ transactional snapshot: the manifest records what was seen while paging,
 and resume never lists again.
 
 Each target has its own command key, `batch-<manifest-id>-<index>`. Signals
-send it as `request_id`, and resume sends the same key again. Cancellation
+and updates send it as `request_id`, and resume sends the same key again. Cancellation
 has no command-key field on the Server; the key is recorded so that every
 target can be correlated.
 
@@ -50,17 +56,34 @@ target can be correlated.
 
 | State | Meaning | Resume |
 |---|---|---|
-| `acknowledged` | The Server accepted the command. | Not sent again. |
+| `acknowledged` | The Server accepted the command. For an update: accepted or completed. | Not sent again. |
 | `skipped` | Nothing to do: the run is closed or not found (404, 409, 410), or the listing gave no run ID. | Not sent again. |
-| `refused` | A permanent refusal, such as invalid input or a request-ID conflict. | Not sent again. |
+| `refused` | A permanent refusal, such as invalid input or a request-ID conflict, or an update the workflow rejected or failed. | Not sent again. |
 | `pressure` | The Server asked the client to slow down (429, or 503 with `Retry-After`). | Sent again with the same key, up to 3 attempts per target in total. |
-| `unknown` | Sent, but `dw` does not know whether the Server admitted it: the response was lost, the Server failed (5xx), or `dw` stopped while waiting. | **Never sent again automatically.** |
+| `unknown` | Sent, but `dw` does not know whether the Server admitted it: the response was lost or timed out, the Server failed (5xx), or `dw` stopped while waiting. | **Never sent again automatically.** |
 | `pending` | Not sent yet, or refused before admission (401/403). | Sent. |
 
 During a run, `dw` honours `Retry-After` (up to 60 seconds) and retries a
 `pressure` target in place. It **stops the batch** at the first `unknown`
 outcome, at an authentication refusal, or when a target runs out of attempts
-under pressure. The remaining targets stay `pending` for a later resume.
+under pressure, or when its deadline passes. The remaining targets stay
+`pending` for a later resume, and the reason is recorded in the manifest.
+
+## Deadlines
+
+`--deadline` on `batch:cancel`, `batch:signal`, `batch:update` and
+`batch:resume` bounds one run:
+
+- No new request starts once the deadline has passed, or with less than half
+  a second left. Unsent targets stay `pending`.
+- A `pressure` retry whose `Retry-After` would end after the deadline is not
+  waited for: the target stays `pressure` and is retried on resume.
+- A request already sent keeps its own timeout (60 seconds), shortened so it
+  never runs past the deadline. If that shortened timeout expires after the
+  request left, the target is `unknown` and is **never resent**.
+
+Resume the rest with `dw batch:resume`, with a new `--deadline` if you want
+one.
 
 The exit code is 0 when every target ended `acknowledged` or `skipped`, and 1
 otherwise.
@@ -96,12 +119,12 @@ about it:
 
 1. Look at the workflow: `dw workflow:describe <workflow-id> --run-id=<run-id>`.
    A cancelled run shows a closed status.
-2. For a signal, check the history for the signal and its command receipt:
+2. For a signal or update, check the history for it and its command receipt:
    `dw workflow:history <workflow-id> <run-id>`, and look for the target's
    `request_id` (`batch-<manifest-id>-<index>`).
 3. If it did not take effect and you still want it, send it once by hand,
    for example `dw workflow:signal <workflow-id> <signal> --run-id=<run-id>
-   --request-id=<the same key>`.
+   --request-id=<the same key>`, or the matching `dw workflow:update`.
 
 A request ID alone does not prove that repeating a signal is safe. Rely on
 retained admission and intent-conflict guarantees only when the Server
@@ -112,13 +135,17 @@ advertises them; until it does, `dw` never resends an `unknown` target.
 The file is JSON Lines with schema `durable-workflow.cli.batch-manifest/v1`.
 
 - **Line 1, the header:** `schema`, `manifest_id`, `created_at`,
-  `cli_version`, `server`, `namespace`, `operation` (`cancel` or `signal`),
+  `cli_version`, `server`, `namespace`, `operation` (`cancel`, `signal` or `update`),
   `parameters`, `selection` (query, filters, limit and a note about
   snapshots) and `targets`. Each target has `index`, `workflow_id`, `run_id`
   and `command_key`.
 - **Every later line is an event.** `{"event":"dispatching","index":n,"attempt":k,"at":…}`
   is written before a request leaves. `{"event":"outcome","index":n,"attempt":k,"state":…,"http_status":…,"reason":…,"message":…,"at":…}`
   is written after it returns.
+- `{"event":"stopped","reason":…,"message":…,"at":…}` names no target. It
+  records why a run stopped early: `deadline`, `unknown`, `pressure` or
+  `authentication`. `batch:show` reports the latest one, and `--json` output
+  lists them all under `stops`.
 
 Each line is synced to disk before `dw` continues. A target whose last event
 is `dispatching` is `unknown`. A final line cut short by a crash is ignored

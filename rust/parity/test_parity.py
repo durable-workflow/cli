@@ -232,7 +232,7 @@ class RustOnlyCommandTest(unittest.TestCase):
     NAMES = {"batch:cancel", "batch:show"}
 
     def test_the_catalog_marks_the_batch_commands_rust_only(self):
-        self.assertEqual(["batch:cancel", "batch:resume", "batch:show", "batch:signal"],
+        self.assertEqual(["batch:cancel", "batch:resume", "batch:show", "batch:signal", "batch:update"],
                          parity.rust_only_commands())
 
     def test_rust_only_help_is_skipped_but_2x_help_is_kept(self):

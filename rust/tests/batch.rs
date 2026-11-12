@@ -217,12 +217,19 @@ fn page(workflows: Value, token: Option<&str>) -> Reply {
 }
 
 fn receipt(line: &str) -> Value {
+    if line.contains("/update/") {
+        return update_receipt("update_accepted");
+    }
     let operation = if line.contains("/signal/") {
         "signal"
     } else {
         "cancel"
     };
     json!({"outcome": "accepted", "command_id": "cmd-1", "control_plane": contract(operation)})
+}
+
+fn update_receipt(outcome: &str) -> Value {
+    json!({"outcome": outcome, "update_id": "upd-1", "command_id": "cmd-1", "control_plane": contract("update")})
 }
 
 fn three() -> Value {
@@ -707,4 +714,274 @@ fn declining_the_prompt_writes_nothing() {
     assert!(String::from_utf8_lossy(&output.stdout).contains("No manifest was written"));
     assert!(!scratch.manifest().exists());
     assert!(server.posts().is_empty());
+}
+
+fn states(summary: &Value) -> Vec<String> {
+    summary["targets"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|target| target["state"].as_str().unwrap().to_owned())
+        .collect()
+}
+
+fn start_update(scratch: &Scratch, url: &str, extra: &[&str]) -> Output {
+    let manifest = format!("--manifest={}", scratch.manifest().display());
+    let mut args = vec![
+        "batch:update",
+        "approve",
+        "--query=customer-42",
+        manifest.as_str(),
+        "--rate=100",
+        "--yes",
+        "--json",
+    ];
+    args.extend_from_slice(extra);
+    scratch.run(url, &args)
+}
+
+#[test]
+fn update_sends_one_keyed_request_per_target_and_never_resends_a_rejection() {
+    let scratch = Scratch::new();
+    let server = server(three(), |line, _| {
+        if line.contains("/wf-b/") {
+            Reply::Json(200, update_receipt("rejected_by_validator"))
+        } else if line.contains("/wf-c/") {
+            Reply::Json(200, update_receipt("update_completed"))
+        } else {
+            Reply::Json(200, receipt(line))
+        }
+    });
+    let first = start_update(
+        &scratch,
+        &server.url,
+        &["--wait=completed", "--input={\"limit\":5}"],
+    );
+    assert_eq!(first.status.code(), Some(1), "{first:?}");
+    let summary = json_stdout(&first);
+    assert_eq!(summary["operation"], "update");
+    assert_eq!(
+        states(&summary),
+        ["acknowledged", "refused", "acknowledged"]
+    );
+    assert_eq!(
+        server.posts(),
+        [
+            "POST /prefix/api/workflows/wf-a/runs/run-a/update/approve HTTP/1.1",
+            "POST /prefix/api/workflows/wf-b/runs/run-b/update/approve HTTP/1.1",
+            "POST /prefix/api/workflows/wf-c/runs/run-c/update/approve HTTP/1.1",
+        ]
+    );
+    let id = lines(&scratch.manifest())[0]["manifest_id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    for (index, body) in server.post_bodies().iter().enumerate() {
+        assert_eq!(body["wait_for"], "completed");
+        assert_eq!(body["request_id"], format!("batch-{id}-{index}"));
+        assert_eq!(body["input"], json!({"limit": 5}));
+    }
+    let header = &lines(&scratch.manifest())[0];
+    assert_eq!(header["parameters"]["update_name"], "approve");
+    assert_eq!(header["parameters"]["wait_for"], "completed");
+
+    // A refused update is a definite answer: resume sends nothing.
+    let second = resume(&scratch, &server.url);
+    assert_eq!(second.status.code(), Some(1), "{second:?}");
+    assert_eq!(server.posts().len(), 3);
+}
+
+#[test]
+fn an_update_with_an_unknown_outcome_is_never_resent() {
+    let scratch = Scratch::new();
+    let server = server(three(), |line, _| {
+        if line.contains("/wf-b/") {
+            Reply::Drop
+        } else {
+            Reply::Json(200, receipt(line))
+        }
+    });
+    let first = start_update(&scratch, &server.url, &[]);
+    assert_eq!(first.status.code(), Some(1), "{first:?}");
+    assert_eq!(
+        states(&json_stdout(&first)),
+        ["acknowledged", "unknown", "pending"]
+    );
+    let second = resume(&scratch, &server.url);
+    assert_eq!(second.status.code(), Some(1), "{second:?}");
+    assert_eq!(
+        states(&json_stdout(&second)),
+        ["acknowledged", "unknown", "acknowledged"]
+    );
+    let posts = server.posts();
+    assert_eq!(
+        posts.iter().filter(|post| post.contains("/wf-b/")).count(),
+        1
+    );
+    assert_eq!(posts.len(), 3);
+    // The resumed update carried the key recorded at the start.
+    let keys: Vec<Value> = server
+        .post_bodies()
+        .iter()
+        .map(|body| body["request_id"].clone())
+        .collect();
+    assert_eq!(
+        keys[2],
+        lines(&scratch.manifest())[0]["targets"][2]["command_key"]
+    );
+}
+
+#[test]
+fn a_deadline_stops_dispatch_leaves_the_rest_pending_and_resume_completes() {
+    let scratch = Scratch::new();
+    let slow_down = Arc::new(Mutex::new(true));
+    let toggle = Arc::clone(&slow_down);
+    let server = server(three(), move |line, _| {
+        if line.contains("/wf-b/") && *toggle.lock().unwrap() {
+            Reply::Retry(429, 5)
+        } else {
+            Reply::Json(200, receipt(line))
+        }
+    });
+    let manifest = format!("--manifest={}", scratch.manifest().display());
+    let started = Instant::now();
+    let first = scratch.run(
+        &server.url,
+        &[
+            "batch:cancel",
+            "--query=customer-42",
+            &manifest,
+            "--rate=100",
+            "--deadline=2",
+            "--yes",
+            "--json",
+        ],
+    );
+    // Retry-After 5 cannot fit in the 2 s deadline: the batch stops at once.
+    assert!(
+        started.elapsed() < Duration::from_secs(4),
+        "{:?}",
+        started.elapsed()
+    );
+    assert_eq!(first.status.code(), Some(1), "{first:?}");
+    let summary = json_stdout(&first);
+    assert_eq!(summary["stopped"]["reason"], "deadline");
+    assert_eq!(states(&summary), ["acknowledged", "pressure", "pending"]);
+    let recorded = lines(&scratch.manifest());
+    let stop = recorded.last().unwrap();
+    assert_eq!(stop["event"], "stopped");
+    assert_eq!(stop["reason"], "deadline");
+    assert!(stop.get("index").is_none());
+
+    // show reads the recorded stop without any request.
+    let before = server.requests.lock().unwrap().len();
+    let show = scratch
+        .plain(&["batch:show", scratch.manifest().to_str().unwrap(), "--json"])
+        .output()
+        .unwrap();
+    assert_eq!(json_stdout(&show)["stops"][0]["reason"], "deadline");
+    assert_eq!(server.requests.lock().unwrap().len(), before);
+
+    *slow_down.lock().unwrap() = false;
+    let second = resume(&scratch, &server.url);
+    assert_eq!(second.status.code(), Some(0), "{second:?}");
+    assert_eq!(
+        states(&json_stdout(&second)),
+        ["acknowledged", "acknowledged", "acknowledged"]
+    );
+    let posts = server.posts();
+    assert_eq!(
+        posts.iter().filter(|post| post.contains("/wf-a/")).count(),
+        1
+    );
+    assert_eq!(
+        posts.iter().filter(|post| post.contains("/wf-b/")).count(),
+        2
+    );
+    assert_eq!(
+        posts.iter().filter(|post| post.contains("/wf-c/")).count(),
+        1
+    );
+}
+
+#[test]
+fn a_deadline_caps_the_request_timeout_and_a_capped_timeout_is_unknown() {
+    let scratch = Scratch::new();
+    let server = server(three(), |line, _| {
+        if line.contains("/wf-a/") {
+            Reply::Slow(Duration::from_secs(3), receipt(line))
+        } else {
+            Reply::Json(200, receipt(line))
+        }
+    });
+    let manifest = format!("--manifest={}", scratch.manifest().display());
+    let started = Instant::now();
+    let first = scratch.run(
+        &server.url,
+        &[
+            "batch:cancel",
+            "--query=customer-42",
+            &manifest,
+            "--deadline=1",
+            "--yes",
+            "--json",
+        ],
+    );
+    assert!(
+        started.elapsed() < Duration::from_millis(2900),
+        "{:?}",
+        started.elapsed()
+    );
+    assert_eq!(first.status.code(), Some(1), "{first:?}");
+    let summary = json_stdout(&first);
+    assert_eq!(summary["stopped"]["reason"], "unknown");
+    assert_eq!(states(&summary), ["unknown", "pending", "pending"]);
+
+    // Resume never resends the timed-out request.
+    let second = resume(&scratch, &server.url);
+    assert_eq!(
+        states(&json_stdout(&second)),
+        ["unknown", "acknowledged", "acknowledged"]
+    );
+    assert_eq!(
+        server
+            .posts()
+            .iter()
+            .filter(|post| post.contains("/wf-a/"))
+            .count(),
+        1
+    );
+}
+
+#[test]
+fn an_invalid_deadline_is_refused_before_any_request() {
+    let scratch = Scratch::new();
+    let server = server(three(), |line, _| Reply::Json(200, receipt(line)));
+    for deadline in ["0", "5x", "1h-", "", "8d"] {
+        let manifest = format!("--manifest={}", scratch.manifest().display());
+        let output = scratch.run(
+            &server.url,
+            &[
+                "batch:cancel",
+                "--query=customer-42",
+                &manifest,
+                &format!("--deadline={deadline}"),
+                "--yes",
+                "--json",
+            ],
+        );
+        assert_eq!(output.status.code(), Some(2), "{deadline}: {output:?}");
+    }
+    assert!(server.requests.lock().unwrap().is_empty());
+    assert!(!scratch.manifest().exists());
+}
+
+#[test]
+fn update_refuses_a_wait_policy_the_server_contract_does_not_allow() {
+    let scratch = Scratch::new();
+    let server = server(three(), |line, _| Reply::Json(200, receipt(line)));
+    let output = start_update(&scratch, &server.url, &["--wait=eventually"]);
+    assert_eq!(output.status.code(), Some(2), "{output:?}");
+    assert!(server.posts().is_empty());
+    assert!(!scratch.manifest().exists());
 }

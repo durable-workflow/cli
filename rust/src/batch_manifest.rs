@@ -101,6 +101,8 @@ pub struct Manifest {
     pub path: PathBuf,
     pub header: Map<String, Value>,
     pub targets: Vec<Target>,
+    /// Why earlier runs stopped before sending every target, oldest first.
+    pub stops: Vec<Map<String, Value>>,
     file: Option<File>,
 }
 
@@ -134,6 +136,7 @@ impl Manifest {
             path: path.to_path_buf(),
             header,
             targets,
+            stops: Vec::new(),
             file: Some(file),
         };
         let line = Value::Object(manifest.header.clone());
@@ -197,9 +200,15 @@ impl Manifest {
         }
         let mut targets = targets_from(&header, path)?;
         let mut in_flight = vec![false; targets.len()];
+        let mut stops = Vec::new();
         for (number, line) in lines.enumerate() {
             let event = parse(&line)
                 .ok_or_else(|| invalid(&format!("line {} is not a JSON object", number + 2)))?;
+            // A run-level record, such as a deadline, names no target.
+            if event.get("event").and_then(Value::as_str) == Some("stopped") {
+                stops.push(event);
+                continue;
+            }
             let target = event
                 .get("index")
                 .and_then(Value::as_u64)
@@ -240,6 +249,7 @@ impl Manifest {
             path: path.to_path_buf(),
             header,
             targets,
+            stops,
             file: writable.then_some(file),
         })
     }
@@ -284,6 +294,18 @@ impl Manifest {
         self.write_line(&Value::Object(event.clone()))?;
         self.targets[index].state = state;
         self.targets[index].last_outcome = Some(event);
+        Ok(())
+    }
+
+    /// Record why this run stopped before sending every eligible target.
+    pub fn stopped(&mut self, reason: &str, message: &str) -> Result<(), CliError> {
+        let mut event = Map::new();
+        event.insert("event".into(), json!("stopped"));
+        event.insert("reason".into(), json!(reason));
+        event.insert("message".into(), json!(message));
+        event.insert("at".into(), json!(utc_now()));
+        self.write_line(&Value::Object(event.clone()))?;
+        self.stops.push(event);
         Ok(())
     }
 

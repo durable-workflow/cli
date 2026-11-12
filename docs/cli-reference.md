@@ -648,7 +648,29 @@ dw task-queue:build-ids orders
 dw task-queue:promote orders --build-id build-2026.04.21-z9
 dw task-queue:drain orders --build-id build-2026.04.20-a3f
 dw task-queue:resume orders --build-id build-2026.04.20-a3f
+
+# Pause and resume activity dispatch on one queue (native Server 3.8.0+)
+dw task-queue:pause-activities orders --reason="payments vendor outage"
+dw task-queue:activity-dispatch orders
+dw task-queue:resume-activities orders
 ```
+
+An activity dispatch pause holds every new activity lease on one task queue
+of the selected namespace until it is resumed (Server #577). Ready tasks stay
+ready and keep their attempt count; activities already running keep running;
+activity deadlines keep running, so a schedule-to-start or schedule-to-close
+deadline that passes during the pause times the activity out. Workflow tasks,
+signals, queries and updates are delivered as before. Pause and resume are
+idempotent: `--json` returns the Server's `outcome` (`paused`,
+`already_paused`, `resumed` or `not_paused`) with the `activity_dispatch`
+state. A pause is not a build-id drain (`task-queue:drain` stops one build's
+workers) and not a concurrency cap.
+
+These commands need a Server that advertises
+`capabilities.task_queue_activity_dispatch_pause`; on any other Server, such
+as published PHP Server 2.x, `dw` refuses with exit 8 before sending the
+request. `task-queue:describe` and `task-queue:list` show the activity
+dispatch state when the Server reports it, and print nothing new otherwise.
 
 ### Worker Protocol Diagnostics
 

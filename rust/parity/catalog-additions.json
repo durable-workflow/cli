@@ -1,5 +1,5 @@
 {
- "comment": "Rust-only commands (cli#60) appended to the 2.x catalog by update-catalog.sh. 2.x has no equivalent, so parity skips their help and strips them from listings.",
+ "comment": "Rust-only commands appended to the 2.x catalog by update-catalog.sh: batch:* (cli#60) and the task queue activity dispatch pause (task-queue:activity-dispatch, task-queue:pause-activities, task-queue:resume-activities; Server #577). 2.x has no equivalent, so parity skips their help and strips them from listings.",
  "commands": [
   {
    "name": "batch:cancel",
@@ -970,6 +970,486 @@
       "is_value_required": false,
       "is_multiple": false,
       "description": "Output the command response as JSON",
+      "default": false
+     },
+     "help": {
+      "name": "--help",
+      "shortcut": "-h",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Display help for the given command. When no command is given display help for the <info>list</info> command",
+      "default": false
+     },
+     "silent": {
+      "name": "--silent",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Do not output any message",
+      "default": false
+     },
+     "quiet": {
+      "name": "--quiet",
+      "shortcut": "-q",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Only errors are displayed. All other output is suppressed",
+      "default": false
+     },
+     "verbose": {
+      "name": "--verbose",
+      "shortcut": "-v|-vv|-vvv",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug",
+      "default": false
+     },
+     "version": {
+      "name": "--version",
+      "shortcut": "-V",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Display this application version",
+      "default": false
+     },
+     "ansi": {
+      "name": "--ansi",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Force (or disable --no-ansi) ANSI output",
+      "default": null
+     },
+     "no-ansi": {
+      "name": "--no-ansi",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Negate the \"--ansi\" option",
+      "default": null
+     },
+     "no-interaction": {
+      "name": "--no-interaction",
+      "shortcut": "-n",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Do not ask any interactive question",
+      "default": false
+     }
+    }
+   },
+   "rust_only": true
+  },
+  {
+   "name": "task-queue:activity-dispatch",
+   "description": "Show whether activity dispatch on a task queue is paused",
+   "synopsis": "task-queue:activity-dispatch [-s|--server [SERVER]] [--namespace [NAMESPACE]] [--token [TOKEN]] [--tls-verify TLS-VERIFY] [--env ENV] [--output OUTPUT] [--json] [--] <task-queue>",
+   "aliases": [],
+   "hidden": false,
+   "help": "Show whether activity dispatch on one task queue of the selected namespace\nis paused, with the last pause (reason, when and by whom) and, once it\nended, its resume. <info>dw task-queue:describe</info> and <info>dw task-queue:list</info> also\nshow the state when the Server reports it.\n\nNeeds a Server that advertises the task_queue_activity_dispatch_pause\ncapability (native Server 3.8.0 or later). dw reads cluster info first\nand refuses with exit 8, without sending the request, when it is\nmissing; published PHP Server 2.x has no activity dispatch pause.\n\n<comment>Examples:</comment>\n\n  <info>dw task-queue:activity-dispatch orders</info>\n  <info>dw task-queue:activity-dispatch orders --json | jq '.activity_dispatch.state'</info>",
+   "definition": {
+    "arguments": {
+     "task-queue": {
+      "name": "task-queue",
+      "is_required": true,
+      "is_array": false,
+      "description": "Task queue name, exactly as workers register it",
+      "default": null
+     }
+    },
+    "options": {
+     "server": {
+      "name": "--server",
+      "shortcut": "-s",
+      "accept_value": true,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Server URL",
+      "default": null
+     },
+     "namespace": {
+      "name": "--namespace",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Target namespace",
+      "default": null
+     },
+     "token": {
+      "name": "--token",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Auth token",
+      "default": null
+     },
+     "tls-verify": {
+      "name": "--tls-verify",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": true,
+      "is_multiple": false,
+      "description": "Verify TLS certificates (true/false). Defaults to $DURABLE_WORKFLOW_TLS_VERIFY, then the selected profile, then true.",
+      "default": null
+     },
+     "env": {
+      "name": "--env",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": true,
+      "is_multiple": false,
+      "description": "Named dw environment to use (overrides $DW_ENV and any env set via `dw env:use`). Hard-fails when the profile does not exist.",
+      "default": null
+     },
+     "output": {
+      "name": "--output",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": true,
+      "is_multiple": false,
+      "description": "Output format: table (human-readable), json (single JSON document), jsonl (one JSON object per line, for list commands)",
+      "default": "table"
+     },
+     "json": {
+      "name": "--json",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Output the command response as JSON (alias for --output=json)",
+      "default": false
+     },
+     "help": {
+      "name": "--help",
+      "shortcut": "-h",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Display help for the given command. When no command is given display help for the <info>list</info> command",
+      "default": false
+     },
+     "silent": {
+      "name": "--silent",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Do not output any message",
+      "default": false
+     },
+     "quiet": {
+      "name": "--quiet",
+      "shortcut": "-q",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Only errors are displayed. All other output is suppressed",
+      "default": false
+     },
+     "verbose": {
+      "name": "--verbose",
+      "shortcut": "-v|-vv|-vvv",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug",
+      "default": false
+     },
+     "version": {
+      "name": "--version",
+      "shortcut": "-V",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Display this application version",
+      "default": false
+     },
+     "ansi": {
+      "name": "--ansi",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Force (or disable --no-ansi) ANSI output",
+      "default": null
+     },
+     "no-ansi": {
+      "name": "--no-ansi",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Negate the \"--ansi\" option",
+      "default": null
+     },
+     "no-interaction": {
+      "name": "--no-interaction",
+      "shortcut": "-n",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Do not ask any interactive question",
+      "default": false
+     }
+    }
+   },
+   "rust_only": true
+  },
+  {
+   "name": "task-queue:pause-activities",
+   "description": "Pause activity dispatch on a task queue",
+   "synopsis": "task-queue:pause-activities [-s|--server [SERVER]] [--namespace [NAMESPACE]] [--token [TOKEN]] [--tls-verify TLS-VERIFY] [--env ENV] [--output OUTPUT] [--reason REASON] [--json] [--] <task-queue>",
+   "aliases": [],
+   "hidden": false,
+   "help": "Hold every new activity lease on one task queue of the selected namespace\nuntil <info>dw task-queue:resume-activities</info> lifts the pause. The queue name\nis compared byte for byte, and a queue need not exist yet.\n\nWhile the queue is paused:\n\n  - no activity task on it is leased; ready tasks stay ready and keep\n    their attempt count, and activity polls come back empty;\n  - activities already running keep running, and their heartbeats,\n    completions and failures are accepted;\n  - activity deadlines keep running: a schedule-to-start or\n    schedule-to-close deadline that passes times the activity out;\n  - workflow tasks, signals, queries and updates are delivered as before.\n\nPausing is idempotent: pausing a paused queue changes nothing and reports\nthe original pause. It is not a build-id drain (use\n<info>dw task-queue:drain</info> to stop one build's workers) and not a concurrency\ncap.\n\nNeeds a Server that advertises the task_queue_activity_dispatch_pause\ncapability (native Server 3.8.0 or later). dw reads cluster info first\nand refuses with exit 8, without sending the request, when it is\nmissing; published PHP Server 2.x has no activity dispatch pause.\n\n<comment>Examples:</comment>\n\n  <info>dw task-queue:pause-activities orders --reason=\"payments vendor outage\"</info>\n  <info>dw task-queue:pause-activities orders --json</info>",
+   "definition": {
+    "arguments": {
+     "task-queue": {
+      "name": "task-queue",
+      "is_required": true,
+      "is_array": false,
+      "description": "Task queue name, exactly as workers register it",
+      "default": null
+     }
+    },
+    "options": {
+     "server": {
+      "name": "--server",
+      "shortcut": "-s",
+      "accept_value": true,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Server URL",
+      "default": null
+     },
+     "namespace": {
+      "name": "--namespace",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Target namespace",
+      "default": null
+     },
+     "token": {
+      "name": "--token",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Auth token",
+      "default": null
+     },
+     "tls-verify": {
+      "name": "--tls-verify",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": true,
+      "is_multiple": false,
+      "description": "Verify TLS certificates (true/false). Defaults to $DURABLE_WORKFLOW_TLS_VERIFY, then the selected profile, then true.",
+      "default": null
+     },
+     "env": {
+      "name": "--env",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": true,
+      "is_multiple": false,
+      "description": "Named dw environment to use (overrides $DW_ENV and any env set via `dw env:use`). Hard-fails when the profile does not exist.",
+      "default": null
+     },
+     "output": {
+      "name": "--output",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": true,
+      "is_multiple": false,
+      "description": "Output format: table (human-readable), json (single JSON document), jsonl (one JSON object per line, for list commands)",
+      "default": "table"
+     },
+     "reason": {
+      "name": "--reason",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": true,
+      "is_multiple": false,
+      "description": "Why the queue is paused (at most 1000 characters), recorded with the pause",
+      "default": null
+     },
+     "json": {
+      "name": "--json",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Output the command response as JSON (alias for --output=json)",
+      "default": false
+     },
+     "help": {
+      "name": "--help",
+      "shortcut": "-h",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Display help for the given command. When no command is given display help for the <info>list</info> command",
+      "default": false
+     },
+     "silent": {
+      "name": "--silent",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Do not output any message",
+      "default": false
+     },
+     "quiet": {
+      "name": "--quiet",
+      "shortcut": "-q",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Only errors are displayed. All other output is suppressed",
+      "default": false
+     },
+     "verbose": {
+      "name": "--verbose",
+      "shortcut": "-v|-vv|-vvv",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug",
+      "default": false
+     },
+     "version": {
+      "name": "--version",
+      "shortcut": "-V",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Display this application version",
+      "default": false
+     },
+     "ansi": {
+      "name": "--ansi",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Force (or disable --no-ansi) ANSI output",
+      "default": null
+     },
+     "no-ansi": {
+      "name": "--no-ansi",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Negate the \"--ansi\" option",
+      "default": null
+     },
+     "no-interaction": {
+      "name": "--no-interaction",
+      "shortcut": "-n",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Do not ask any interactive question",
+      "default": false
+     }
+    }
+   },
+   "rust_only": true
+  },
+  {
+   "name": "task-queue:resume-activities",
+   "description": "Resume activity dispatch on a paused task queue",
+   "synopsis": "task-queue:resume-activities [-s|--server [SERVER]] [--namespace [NAMESPACE]] [--token [TOKEN]] [--tls-verify TLS-VERIFY] [--env ENV] [--output OUTPUT] [--json] [--] <task-queue>",
+   "aliases": [],
+   "hidden": false,
+   "help": "Lift the activity dispatch pause on one task queue of the selected\nnamespace. Held activity polls on the node that serves the resume wake at\nonce; polls held on other nodes see it at their next readiness read.\nReady tasks are then leased as the attempt they would have been. An\nactivity that timed out during the pause stays timed out.\n\nResuming is idempotent: resuming a queue that is not paused changes\nnothing. This does not touch build-id drains; use\n<info>dw task-queue:resume</info> for those.\n\nNeeds a Server that advertises the task_queue_activity_dispatch_pause\ncapability (native Server 3.8.0 or later). dw reads cluster info first\nand refuses with exit 8, without sending the request, when it is\nmissing; published PHP Server 2.x has no activity dispatch pause.\n\n<comment>Examples:</comment>\n\n  <info>dw task-queue:resume-activities orders</info>\n  <info>dw task-queue:resume-activities orders --json</info>",
+   "definition": {
+    "arguments": {
+     "task-queue": {
+      "name": "task-queue",
+      "is_required": true,
+      "is_array": false,
+      "description": "Task queue name, exactly as workers register it",
+      "default": null
+     }
+    },
+    "options": {
+     "server": {
+      "name": "--server",
+      "shortcut": "-s",
+      "accept_value": true,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Server URL",
+      "default": null
+     },
+     "namespace": {
+      "name": "--namespace",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Target namespace",
+      "default": null
+     },
+     "token": {
+      "name": "--token",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Auth token",
+      "default": null
+     },
+     "tls-verify": {
+      "name": "--tls-verify",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": true,
+      "is_multiple": false,
+      "description": "Verify TLS certificates (true/false). Defaults to $DURABLE_WORKFLOW_TLS_VERIFY, then the selected profile, then true.",
+      "default": null
+     },
+     "env": {
+      "name": "--env",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": true,
+      "is_multiple": false,
+      "description": "Named dw environment to use (overrides $DW_ENV and any env set via `dw env:use`). Hard-fails when the profile does not exist.",
+      "default": null
+     },
+     "output": {
+      "name": "--output",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": true,
+      "is_multiple": false,
+      "description": "Output format: table (human-readable), json (single JSON document), jsonl (one JSON object per line, for list commands)",
+      "default": "table"
+     },
+     "json": {
+      "name": "--json",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Output the command response as JSON (alias for --output=json)",
       "default": false
      },
      "help": {

@@ -478,15 +478,25 @@ def print_result(case, differences, reason, reference, candidate, verbose):
 
 
 def rust_only_commands():
-    """Catalog commands with no 2.x equivalent (cli#60), in catalog order."""
+    """Catalog commands with no 2.x equivalent (cli#60, Server #577), in
+    catalog order."""
     with open(os.path.join(CRATE, "src", "catalog.json"), encoding="utf-8") as handle:
         return [command["name"] for command in json.load(handle)["commands"] if command.get("rust_only")]
 
 
+def shared_namespaces():
+    """Namespaces that hold at least one 2.x command, such as task-queue.
+    Their listing headers stay when Rust-only commands are stripped."""
+    with open(os.path.join(CRATE, "src", "catalog.json"), encoding="utf-8") as handle:
+        return {command["name"].split(":")[0] for command in json.load(handle)["commands"]
+                if ":" in command["name"] and not command.get("rust_only")}
+
+
 def rust_only_pattern(names):
-    """A line that starts with a Rust-only command or its namespace, as
-    listings print them (optionally styled with ANSI codes)."""
-    namespaces = sorted({name.split(":")[0] for name in names if ":" in name})
+    """A line that starts with a Rust-only command, or with a namespace that
+    holds only Rust-only commands, as listings print them (optionally styled
+    with ANSI codes)."""
+    namespaces = sorted({name.split(":")[0] for name in names if ":" in name} - shared_namespaces())
     alternatives = [re.escape(name) for name in names] + [re.escape(namespace) for namespace in namespaces]
     style = r"(?:\x1b\[[0-9;]*m)*"
     return re.compile(r"^\s*" + style + "(?:" + "|".join(alternatives) + ")" + style + r"(?:\s|$)")
@@ -585,7 +595,7 @@ def run_all(candidate_binary, servers, verbose, server_only=False, skip_referenc
     rust_only = rust_only_commands()
     if rust_only:
         # Said out loud so a skip never reads as a pass.
-        print(f"Rust-only commands (no 2.x equivalent, cli#60): {', '.join(rust_only)}. "
+        print(f"Rust-only commands (no 2.x equivalent): {', '.join(rust_only)}. "
               "Their --help is not compared, and they are removed from candidate listings before comparison.")
     results = []
     for case in expand_cases(cases, servers):

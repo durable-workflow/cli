@@ -43,6 +43,7 @@ command is ported.
 | `debug workflow` (with the cancellation cascade view) and `watch workflow`: every poll is one read; `watch` exits 0 on completed, 1 on another terminal state and 7 at `--max-polls` | Ported |
 | `--tls-verify=false` against HTTPS: no certificate or hostname checks, as in 2.x, plus a stderr warning on every such command (also with `--json` and `-q`) | Ported, intentional addition |
 | `batch:cancel`, `batch:signal`, `batch:update`, `batch:show`, `batch:resume`: resumable bulk operations with a private manifest and an optional `--deadline` ([runbook](../docs/batch-operations.md), cli#60). `parity/live_batch.py` runs them against the published Servers in CI | Rust-only, new |
+| `task-queue:pause-activities`, `task-queue:resume-activities`, `task-queue:activity-dispatch`: pause, resume and read activity dispatch on one task queue (Server #577), one request each after checking cluster info for `capabilities.task_queue_activity_dispatch_pause`; `task-queue:describe` and `task-queue:list` show the state when the Server reports it | Rust-only, new |
 
 Server calls go through the published `durable-workflow` crate, pinned to
 the latest qualified release.
@@ -188,11 +189,13 @@ option definitions and help text), generated from the pinned reference by
 read it, so they match 2.x even for commands not ported yet. The harness
 also checks `--help` for every catalog command.
 
-Commands with no 2.x equivalent (the `batch:*` commands, cli#60) are added
-from `parity/catalog-additions.json` and marked `rust_only`. The harness
+Commands with no 2.x equivalent (the `batch:*` commands, cli#60, and the
+task queue activity dispatch commands, Server #577) are added from
+`parity/catalog-additions.json` and marked `rust_only`. The harness
 announces them, does not compare their `--help`, and removes only them from
 the candidate's listings and completions before comparing, so the rest of
-each listing is still checked against 2.x.
+each listing is still checked against 2.x. A namespace header is removed
+only when every command in it is Rust-only, so `task-queue` stays.
 
 Catalog regeneration applies the reviewed description/help changes in
 `parity/catalog-updates.json`. Comparisons reconcile only those exact fields

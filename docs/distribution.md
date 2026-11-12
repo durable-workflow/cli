@@ -2,7 +2,9 @@
 
 This document describes how `dw` is distributed, how operators verify the
 artifacts they install, and which optional distribution-hardening surfaces
-are deliberately out of scope for the 2.0 line.
+are deliberately out of scope for the 2.x line. From 2.5.0, `dw` is a
+native Rust binary; earlier 2.x releases shipped a PHAR and static-PHP
+binaries.
 
 It is the canonical reference for security-conscious users who need to
 answer "is this binary the one the project built?" and "what does this CLI
@@ -17,8 +19,12 @@ CLI talks to the configured server and nothing else.
 | One-line installer (`install.sh` / `install.ps1`) | Most users | SHA256 against the release `SHA256SUMS` manifest, optional GitHub artifact attestation when `gh` is installed and `DURABLE_WORKFLOW_INSTALL_VERIFY_ATTESTATIONS=1` is set. |
 | Exact-version installer (`VERSION=<tag>`) | CI, conformance, and reproducible automation | Same checksum and optional attestation path as the one-line installer, pinned to a named release tag. |
 | Direct download from the GitHub release | Operators bringing their own automation | `verify-release.sh` (bundled with each tagged release) plus `gh attestation verify` for end-to-end provenance. |
-| Homebrew formula (`dw.rb`) | macOS arm64 users on Homebrew | The release-bundled formula pins the exact release URL and SHA256; `brew install` verifies the checksum before linking. |
-| PHAR (`dw.phar`) plus a system PHP | PHP-aware operators | Same `SHA256SUMS` plus attestation surface as the native binaries. |
+| Homebrew formula (`dw.rb`) | macOS users on Homebrew (Apple Silicon and, from 2.5.0, Intel) | The release-bundled formula pins the exact release URL and SHA256; `brew install` verifies the checksum before linking. |
+
+2.5.0 and later publish no PHAR. The 2.3.x PHAR line receives security
+fixes only until **2027-02-28** and is unsupported after that date; move
+PHAR installs to the standalone binary as described in the
+[2.5.0 notes](release-notes/2.5.0.md).
 
 The one-line installer is the recommended path on every supported platform.
 Both `install.sh` and `install.ps1` download the matching `SHA256SUMS` manifest,
@@ -55,15 +61,17 @@ SDK compatibility documentation for your deployment.
 
 ## Provenance boundary
 
-The provenance boundary for the 2.0 line is:
+The provenance boundary for the 2.x line is:
 
 1. **The git tag** — every release is built from a tag pushed to
    `durable-workflow/cli`. The release workflow runs only on
    `refs/tags/<MAJOR>.<MINOR>.<PATCH>*`.
 2. **`SHA256SUMS`** — generated inside the release workflow over every
-   supported release asset for the tag (PHAR, Linux x86_64, Linux
-   aarch64, macOS aarch64, Windows x86_64, the installer scripts, the
-   `verify-release.sh` helper, and the generated Homebrew formula).
+   supported release asset for the tag (Linux x86_64, Linux aarch64,
+   macOS aarch64, macOS x86_64, Windows x86_64, their dependency
+   inventories, the installer scripts, the `verify-release.sh` helper,
+   and the generated Homebrew formula; 2.x releases before 2.5.0 also
+   listed the PHAR).
 3. **GitHub artifact attestations** — the release workflow signs every
    asset (including `SHA256SUMS`) with the GitHub Actions OIDC identity
    via `actions/attest-build-provenance`. Anyone can replay that signature
@@ -91,20 +99,19 @@ is pinned to the same tag as the binaries it checks.
 
 ## Code signing and notarization
 
-**Decision: explicitly out of scope for the 2.0 line. GitHub artifact
+**Decision: explicitly out of scope for the 2.x line. GitHub artifact
 attestations are the primary provenance mechanism.**
 
 ### Why
 
-`dw` is distributed as a PHAR plus an embedded-PHAR static binary built
-with `static-php-cli`'s `phpmicro` SAPI. The native binaries are not the
-output of a platform-native toolchain (Xcode, MSBuild) and the maintainers
-do not currently hold the signing identities required to produce binaries
+From 2.5.0 `dw` is a native Rust binary (earlier releases embedded a PHAR
+in a `static-php-cli` `phpmicro` SAPI). The maintainers do not currently
+hold the signing identities required to produce binaries
 that pass Apple Notary Service review or carry an Authenticode signature
 trusted by SmartScreen. Acquiring those identities, holding the signing
 keys correctly, and integrating them into a hosted release workflow is a
 distinct piece of operational work that we have intentionally not taken
-on for the 2.0 line — it would not strengthen the cryptographic
+on for the 2.x line — it would not strengthen the cryptographic
 provenance of the binary, only its handling by the OS-level publisher
 trust UX.
 
@@ -141,13 +148,13 @@ This decision is reviewable when one of the following becomes true:
 - A maintainer-held Apple Developer ID and Authenticode signing identity
   are donated to the project alongside the operational commitment to
   protect those keys.
-- A platform-native rebuild is added (for example, a Go or Rust port of
-  the CLI front-end) that makes signing the build output trivial.
+- Signing identities become available for the native Rust build that
+  2.5.0 introduced, which removes the toolchain obstacle described above.
 
 ## Telemetry
 
 **Decision: permanently out of scope. The CLI does not collect telemetry
-and will not gain a telemetry surface in the 2.0 line.**
+and will not gain a telemetry surface in the 2.x line.**
 
 ### Behavior contract
 
@@ -194,7 +201,7 @@ assertion is to never ship a telemetry surface at all.
 
 ### What would change this
 
-This decision is fixed for the 2.0 line. Any future telemetry surface
+This decision is fixed for the 2.x line. Any future telemetry surface
 would be opt-in by default, would be documented here before it shipped,
 and would be subject to the same provenance and verification expectations
 as the rest of the binary.
@@ -270,10 +277,12 @@ $ dw upgrade --tag="$OLDER_RELEASE" --dry-run --output=json | jq -c '{status,cur
 {"status":"dry-run","current_version":"<newer-release>","target_version":"<older-release>","direction":"downgrade"}
 ```
 
-The command refuses to overwrite Composer-managed PHAR installs and
+The command refuses to overwrite Composer-managed installs and
 Homebrew-managed binaries because the package manager owns those install
-paths. Composer package metadata is not a supported public CLI distribution
-channel for the 2.0 line; use the exact-version installer or direct release
+paths. A 2.x PHAR install cannot upgrade itself to 2.5.0 or later, which
+ship no PHAR; follow the [2.5.0 notes](release-notes/2.5.0.md). Composer
+package metadata is not a supported public CLI distribution channel for
+the 2.x line; use the exact-version installer or direct release
 assets for public, source-free automation. Checksum verification remains
 mandatory for every download.
 
@@ -281,6 +290,11 @@ There is no background update poll. The CLI never upgrades itself
 without an explicit `dw upgrade` invocation.
 
 ## Reproducible release builds
+
+This section describes the 2.3.x PHAR line. The 2.5.0+ native binaries are
+built by `release-rust.yml` from the tagged source with `cargo build
+--release --locked`, path prefixes remapped, and every asset attested; each
+binary's `.dependencies.json` lists the exact Rust packages it links.
 
 **Decision: in scope. The build is bit-reproducible from the same source
 tree, and a verifier ships in the repo so anyone can confirm it.**
@@ -346,7 +360,8 @@ reproducibility regression — please open a release-blocking issue.
 ## Homebrew install path
 
 The release workflow generates `dw.rb`, a Homebrew formula that pins the
-exact release URL and SHA256 of `dw-macos-aarch64`, and publishes it as
+exact release URLs and SHA256s of `dw-macos-aarch64` and, from 2.5.0,
+`dw-macos-x86_64`, and publishes it as
 a release asset alongside the binary. Operators who consume the CLI via
 Homebrew today have two options until a public tap is registered. Homebrew
 only installs formulae from a tap (`brew install --formula ./dw.rb` is
@@ -393,6 +408,10 @@ Before promoting `dw` into a production runbook:
   rebuild from source for compliance attestation.
 
 ## Change history
+
+- 2.5.0 — `dw` became a native Rust binary; releases publish no PHAR and add
+  `dw-macos-x86_64`. The 2.3.x PHAR line receives security fixes only until
+  2027-02-28.
 
 - 2.0.0-rc.35 — Made Unix installs qualify the active `dw` path and version,
   including bounded remediation for path shadowing and stale shell caches.

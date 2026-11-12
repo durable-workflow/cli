@@ -30,7 +30,9 @@ The installers verify the downloaded binary against the release
 `SHA256SUMS` manifest. Releases also include GitHub artifact attestations,
 native binaries, installer scripts, and a Homebrew formula. From 2.5.0 `dw`
 is a native Rust binary and releases no longer include `dw.phar`; see the
-[2.5.0 notes](docs/release-notes/2.5.0.md) to move off a PHAR install.
+[2.5.0 notes](docs/release-notes/2.5.0.md) to move off a PHAR install. The
+2.3.x PHAR line receives security fixes only until **2027-02-28** and is
+unsupported after that date.
 
 ```bash
 dw --version
@@ -123,7 +125,8 @@ the patch-stable response envelopes.
 
 The released CLI is the Rust crate in [`rust/`](rust/README.md): build and
 test it with `cargo`, and compare it with 2.x through its parity harness.
-The PHP implementation below remains for the 2.3.x maintenance line.
+The PHP implementation below remains for the 2.3.x maintenance line, which
+receives security fixes only until 2027-02-28.
 
 ```bash
 composer install

@@ -560,6 +560,7 @@ pub fn human(error: &CliError, context: &ErrorContext) -> String {
                 | "namespace:update"
                 | "namespace:delete"
         ) || [
+            "batch:",
             "schedule:",
             "search-attribute:",
             "task-queue:",

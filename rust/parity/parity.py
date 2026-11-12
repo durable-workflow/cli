@@ -477,10 +477,60 @@ def print_result(case, differences, reason, reference, candidate, verbose):
             print(f"    candidate {field}: {json.dumps(candidate[field])[:600]}")
 
 
-def help_cases():
-    """`--help` for every 2.x command, ported or not, from the catalog."""
+def rust_only_commands():
+    """Catalog commands with no 2.x equivalent (cli#60), in catalog order."""
     with open(os.path.join(CRATE, "src", "catalog.json"), encoding="utf-8") as handle:
-        names = [command["name"] for command in json.load(handle)["commands"]]
+        return [command["name"] for command in json.load(handle)["commands"] if command.get("rust_only")]
+
+
+def rust_only_pattern(names):
+    """A line that starts with a Rust-only command or its namespace, as
+    listings print them (optionally styled with ANSI codes)."""
+    namespaces = sorted({name.split(":")[0] for name in names if ":" in name})
+    alternatives = [re.escape(name) for name in names] + [re.escape(namespace) for namespace in namespaces]
+    style = r"(?:\x1b\[[0-9;]*m)*"
+    return re.compile(r"^\s*" + style + "(?:" + "|".join(alternatives) + ")" + style + r"(?:\s|$)")
+
+
+def strip_rust_only(result, names):
+    """The candidate's output without the Rust-only commands, so listings
+    still compare everything 2.x has. Applied only to the candidate, only
+    for those names; a case that runs one of them is not stripped."""
+    if not names:
+        return result
+    pattern = rust_only_pattern(names)
+
+    def strip_json(value):
+        if isinstance(value, list):
+            kept = []
+            for item in value:
+                if isinstance(item, dict) and item.get("name") in names:
+                    continue
+                if isinstance(item, str) and item in names:
+                    continue
+                item = strip_json(item)
+                if isinstance(item, dict) and "id" in item and item.get("commands") == []:
+                    continue
+                kept.append(item)
+            return kept
+        if isinstance(value, dict):
+            return {key: strip_json(item) for key, item in value.items()}
+        return value
+
+    stripped = dict(result)
+    if stripped.get("stdout_json") is not None:
+        stripped["stdout_json"] = strip_json(stripped["stdout_json"])
+    if isinstance(stripped.get("stdout_text"), str):
+        stripped["stdout_text"] = "".join(
+            line for line in stripped["stdout_text"].splitlines(keepends=True) if not pattern.match(line))
+    return stripped
+
+
+def help_cases():
+    """`--help` for every 2.x command, ported or not, from the catalog.
+    Rust-only commands have no 2.x help to compare and are skipped."""
+    with open(os.path.join(CRATE, "src", "catalog.json"), encoding="utf-8") as handle:
+        names = [command["name"] for command in json.load(handle)["commands"] if not command.get("rust_only")]
     cases = [{"name": f"--help for {name}", "argv": [name, "--help"]} for name in names]
     for case in cases:
         if case["argv"][0] == "runtime:check":
@@ -532,6 +582,11 @@ def run_all(candidate_binary, servers, verbose, server_only=False, skip_referenc
     candidate_identity = own_identity(candidate_binary)
     identities = {reference_binary: own_identity(reference_binary), candidate_binary: candidate_identity}
     php_main = php_main_runner(candidate_identity)
+    rust_only = rust_only_commands()
+    if rust_only:
+        # Said out loud so a skip never reads as a pass.
+        print(f"Rust-only commands (no 2.x equivalent, cli#60): {', '.join(rust_only)}. "
+              "Their --help is not compared, and they are removed from candidate listings before comparison.")
     results = []
     for case in expand_cases(cases, servers):
         if case.get("reference") == "php-main" and php_main is None:
@@ -550,6 +605,8 @@ def run_all(candidate_binary, servers, verbose, server_only=False, skip_referenc
         try:
             reference = run_case(reference_runner, case, env_base, reference_identity)
             candidate = run_case(candidate_binary, case, env_base, identities[candidate_binary])
+            if not (case.get("argv") and case["argv"][0] in rust_only):
+                candidate = strip_rust_only(candidate, set(rust_only))
         finally:
             if mock:
                 mock.close()

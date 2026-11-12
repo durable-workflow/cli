@@ -228,5 +228,35 @@ class PhpMainReferenceTest(unittest.TestCase):
                 self.assertNotIn("cli#61", reason["reason"], case["name"])
 
 
+class RustOnlyCommandTest(unittest.TestCase):
+    NAMES = {"batch:cancel", "batch:show"}
+
+    def test_the_catalog_marks_the_batch_commands_rust_only(self):
+        self.assertEqual(["batch:cancel", "batch:resume", "batch:show", "batch:signal"],
+                         parity.rust_only_commands())
+
+    def test_rust_only_help_is_skipped_but_2x_help_is_kept(self):
+        names = [case["argv"][0] for case in parity.help_cases()]
+        self.assertNotIn("batch:cancel", names)
+        self.assertIn("workflow:cancel", names)
+
+    def test_listings_lose_only_the_rust_only_lines(self):
+        text = (" activity\n  activity:list  List activities\n \x1b[33mbatch\x1b[39m\n"
+                "  \x1b[32mbatch:cancel\x1b[39m  Cancel\n  batch:show     Show\n"
+                "  bridge:webhook Send\nbatching is a word\n")
+        stripped = parity.strip_rust_only({"stdout_text": text, "stdout_json": None}, self.NAMES)
+        self.assertEqual(" activity\n  activity:list  List activities\n  bridge:webhook Send\nbatching is a word\n",
+                         stripped["stdout_text"])
+
+    def test_json_listings_lose_the_commands_and_their_empty_namespace(self):
+        listing = [{"commands": [{"name": "batch:cancel"}, {"name": "env:list"}],
+                    "namespaces": [{"id": "batch", "commands": ["batch:cancel", "batch:show"]},
+                                   {"id": "env", "commands": ["env:list"]}]}]
+        stripped = parity.strip_rust_only({"stdout_text": None, "stdout_json": listing}, self.NAMES)
+        self.assertEqual([{"commands": [{"name": "env:list"}],
+                           "namespaces": [{"id": "env", "commands": ["env:list"]}]}],
+                         stripped["stdout_json"])
+
+
 if __name__ == "__main__":
     unittest.main()

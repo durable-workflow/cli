@@ -256,17 +256,50 @@ impl Context {
     }
 
     fn workflow_read(&self, request: RawRequest, path: &str) -> Result<Value, CliError> {
+        self.workflow_exchange(request, path).0
+    }
+
+    /// `workflow_post` that also reports the response's `Retry-After`, in
+    /// whole seconds, for callers that pace themselves under pressure.
+    pub fn workflow_post_observed(
+        &self,
+        segments: &[&str],
+        body: Value,
+        path: &str,
+    ) -> (Result<Value, CliError>, Option<u64>) {
+        self.workflow_exchange(RawRequest::post(segments.iter().copied()).json(body), path)
+    }
+
+    fn workflow_exchange(
+        &self,
+        request: RawRequest,
+        path: &str,
+    ) -> (Result<Value, CliError>, Option<u64>) {
         let request = request
             .protocol_version(compat::worker_protocol_version())
             .control_plane_version(compat::control_plane_version());
-        let response = self.runtime.block_on(async {
+        let response = match self.runtime.block_on(async {
             self.sdk()?
                 .control_plane_request(request)
                 .await
                 .map_err(map_error)
-        })?;
+        }) {
+            Ok(response) => response,
+            Err(error) => return (Err(error), None),
+        };
+        let retry_after = response
+            .header("retry-after")
+            .and_then(|value| value.trim().parse::<u64>().ok());
+        (self.workflow_response(&response, path), retry_after)
+    }
+
+    fn workflow_response(
+        &self,
+        response: &durable_workflow::RawResponse,
+        path: &str,
+    ) -> Result<Value, CliError> {
         let status = response.status();
-        let body = decode_body(&response);
+        let body = decode_body(response);
         let normalized = workflow_response::normalize(
             body.clone(),
             response.control_plane_version(),

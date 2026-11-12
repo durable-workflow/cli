@@ -10,7 +10,7 @@ reference="$crate/target/dw-reference"
 
 # Help texts embed the invoked path (%command.full_name%). Store placeholders
 # that the CLI fills from its own argv[0], never this machine's path.
-DW_CONFIG_HOME="$(mktemp -d)" "$reference" list --format=json | DW_REFERENCE="$reference" DW_CATALOG_UPDATES="$crate/parity/catalog-updates.json" python3 -c '
+DW_CONFIG_HOME="$(mktemp -d)" "$reference" list --format=json | DW_REFERENCE="$reference" DW_CATALOG_UPDATES="$crate/parity/catalog-updates.json" DW_CATALOG_ADDITIONS="$crate/parity/catalog-additions.json" python3 -c '
 import json, os, sys
 reference = os.environ["DW_REFERENCE"]
 
@@ -42,6 +42,13 @@ for command in listing["commands"]:
         if commands[-1][field] != update["reference"]:
             raise SystemExit("Reference catalog metadata changed: " + command["name"] + ":" + field)
         commands[-1][field] = update["candidate"]
+# Rust-only commands (cli#60) go into their namespace in name order.
+with open(os.environ["DW_CATALOG_ADDITIONS"], encoding="utf-8") as handle:
+    additions = json.load(handle)["commands"]
+for addition in additions:
+    position = next((index for index, command in enumerate(commands)
+                     if ":" in command["name"] and command["name"] > addition["name"]), len(commands))
+    commands.insert(position, addition)
 json.dump({"source": "dw " + listing["application"]["version"].split(" ")[0], "commands": commands},
           sys.stdout, indent=1, sort_keys=False)
 print()

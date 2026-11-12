@@ -1,11 +1,12 @@
 //! `task-queue:*` through the published SDK transport. Drain, promote and
-//! resume are one request each; a redirect is refused and a lost response is
-//! never submitted again.
+//! resume, and the activity dispatch pause and resume, are one request each;
+//! a redirect is refused and a lost response is never submitted again.
 
 use crate::cli::Input;
 use crate::client::Context;
 use crate::commands::schedule::{
-    status_cell, text, text_or, truthy, value_name, with_namespace, write_namespace_line,
+    nonempty_scalar, status_cell, text, text_or, truthy, value_name, with_namespace,
+    write_namespace_line,
 };
 use crate::error::CliError;
 use crate::{formatter, output, php};
@@ -33,26 +34,39 @@ pub fn list(context: &Context, _input: &Input) -> Result<i32, CliError> {
     }
     formatter::writeln_out(&format!("Namespace: {namespace}"));
     let queues = array_items(queues)?;
+    // Only a Server that reports activity_dispatch (native, Server #577)
+    // adds the column; 2.x output is unchanged.
+    let dispatch_column = queues
+        .iter()
+        .any(|queue| reported_dispatch(queue).is_some());
     let rows = queues
         .into_iter()
         .map(|queue| {
-            vec![
+            let mut row = vec![
                 text(php::get(queue, "name")),
                 status_cell(&json!(admission_status(queue, "workflow_tasks"))),
                 status_cell(&json!(admission_status(queue, "activity_tasks"))),
                 status_cell(&json!(admission_status(queue, "query_tasks"))),
-            ]
+            ];
+            if dispatch_column {
+                row.push(match reported_dispatch(queue) {
+                    Some(dispatch) => status_cell(&json!(dispatch_state(Some(dispatch)))),
+                    None => "-".into(),
+                });
+            }
+            row
         })
         .collect::<Vec<_>>();
-    formatter::writeln_out(&output::render_table(
-        &[
-            "Task Queue",
-            "Workflow Admission",
-            "Activity Admission",
-            "Query Admission",
-        ],
-        &rows,
-    ));
+    let mut headers = vec![
+        "Task Queue",
+        "Workflow Admission",
+        "Activity Admission",
+        "Query Admission",
+    ];
+    if dispatch_column {
+        headers.push("Activity Dispatch");
+    }
+    formatter::writeln_out(&output::render_table(&headers, &rows));
     Ok(0)
 }
 
@@ -210,6 +224,18 @@ pub fn describe(context: &Context, input: &Input) -> Result<i32, CliError> {
         php::int_cast(php::array_get(pollers, "stale_count")),
     ));
     lines.push(String::new());
+    if let Some(dispatch) = reported_dispatch(&result) {
+        lines.push(format!(
+            "Activity Dispatch: {}",
+            status_cell(&json!(dispatch_state(Some(dispatch))))
+        ));
+        lines.extend(
+            dispatch_detail_lines(Some(dispatch))
+                .into_iter()
+                .map(|line| format!("  {line}")),
+        );
+        lines.push(String::new());
+    }
     for line in lines {
         formatter::writeln_out(&line);
     }
@@ -692,4 +718,197 @@ fn target_build_id(input: &Input) -> Result<Option<&str>, &'static str> {
         (false, Some(id)) => Ok(Some(id)),
         (false, None) => Err("One of --build-id <value> or --unversioned is required."),
     }
+}
+
+/// Cluster info capability for the activity dispatch pause routes. Native
+/// Server advertises it (Server #577); published PHP Server 2.x has no such
+/// routes.
+const ACTIVITY_DISPATCH_PAUSE: &str = "task_queue_activity_dispatch_pause";
+
+const ACTIVITY_DISPATCH_UNSUPPORTED: &str = "Pausing activity dispatch on a task queue needs a native Durable Workflow Server 3.8.0 or later; published PHP Server 2.x has no such route.";
+
+const ACTIVITY_DISPATCH_NEXT_STEP: &str = "Connect to a Server that advertises this capability. To stop one build's workers from claiming tasks instead, use dw task-queue:drain.";
+
+/// `task-queue:activity-dispatch`: one read of the queue's pause state.
+pub fn activity_dispatch(context: &Context, input: &Input) -> Result<i32, CliError> {
+    activity_dispatch_request(context, input, None)
+}
+
+/// `task-queue:pause-activities`: one pause request, never resent.
+pub fn pause_activities(context: &Context, input: &Input) -> Result<i32, CliError> {
+    activity_dispatch_request(context, input, Some("pause"))
+}
+
+/// `task-queue:resume-activities`: one resume request, never resent.
+pub fn resume_activities(context: &Context, input: &Input) -> Result<i32, CliError> {
+    activity_dispatch_request(context, input, Some("resume"))
+}
+
+fn activity_dispatch_request(
+    context: &Context,
+    input: &Input,
+    action: Option<&str>,
+) -> Result<i32, CliError> {
+    let task_queue = input.arg("task-queue").unwrap_or_default();
+    // The Server validates the reason (at most 1000 characters, else 422);
+    // an empty one is no reason.
+    let reason = match action {
+        Some("pause") => input.opt_str("reason"),
+        _ => None,
+    };
+    let info = context.preflight(false)?;
+    crate::compat::require_capability(
+        &info,
+        crate::build_info::version(),
+        ACTIVITY_DISPATCH_PAUSE,
+        ACTIVITY_DISPATCH_UNSUPPORTED,
+        ACTIVITY_DISPATCH_NEXT_STEP,
+    )
+    .map_err(CliError::Compatibility)?;
+    let request = match action {
+        None => RawRequest::get(["task-queues", task_queue, "activity-dispatch"]),
+        Some(action) => {
+            let body = match reason {
+                Some(reason) => json!({ "reason": reason }),
+                None => json!({}),
+            };
+            RawRequest::post(["task-queues", task_queue, "activity-dispatch", action]).json(body)
+        }
+    };
+    let result = with_namespace(
+        context.resource_request(request)?,
+        &context.connection.namespace,
+        None,
+    );
+    if context.mode.machine_readable() {
+        output::print_json(&result);
+        return Ok(0);
+    }
+    let shown_queue = match php::get(&result, "task_queue").filter(|value| !value.is_null()) {
+        Some(value) => text(Some(value)),
+        None => formatter::display_text(task_queue),
+    };
+    let dispatch = php::get(&result, "activity_dispatch");
+    let outcome = php::get(&result, "outcome").and_then(Value::as_str);
+    let state = dispatch_state(dispatch);
+    let headline = match (action, outcome) {
+        (None, _) => format!("<info>Task Queue: {shown_queue}</info>"),
+        (_, Some("paused")) => {
+            format!("<info>Paused activity dispatch on task queue {shown_queue}.</info>")
+        }
+        (_, Some("already_paused")) => format!(
+            "<comment>Activity dispatch on task queue {shown_queue} was already paused; nothing changed.</comment>"
+        ),
+        (_, Some("resumed")) => {
+            format!("<info>Resumed activity dispatch on task queue {shown_queue}.</info>")
+        }
+        (_, Some("not_paused")) => format!(
+            "<comment>Activity dispatch on task queue {shown_queue} was not paused; nothing changed.</comment>"
+        ),
+        _ => format!("Activity dispatch on task queue {shown_queue} is {state}."),
+    };
+    formatter::writeln_out(&headline);
+    write_namespace_line(&result);
+    formatter::writeln_out(&format!(
+        "  Activity Dispatch: {}",
+        status_cell(&json!(state))
+    ));
+    for line in dispatch_detail_lines(dispatch) {
+        formatter::writeln_out(&format!("  {line}"));
+    }
+    let mut closing = Vec::new();
+    if outcome == Some("already_paused") && reason.is_some() {
+        closing.push(
+            "The original pause and its reason are kept; the --reason given here was not recorded."
+                .to_string(),
+        );
+    }
+    if action.is_some() && state == "paused" {
+        closing.push("No activity task on this queue is leased until the pause is lifted. Ready tasks keep their attempt count, activity deadlines keep running, and workflow tasks, signals, queries and updates are delivered as before. Use <info>dw task-queue:resume-activities</info> to resume.".to_string());
+    } else if outcome == Some("resumed") {
+        closing.push("Ready activity tasks on this queue can be leased again. An activity whose deadline passed during the pause stays timed out.".to_string());
+    }
+    if !closing.is_empty() {
+        formatter::writeln_out("");
+        for line in closing {
+            formatter::writeln_out(&line);
+        }
+    }
+    Ok(0)
+}
+
+/// `paused` or `active`: the Server's `state`, else its `paused` flag.
+fn dispatch_state(dispatch: Option<&Value>) -> String {
+    match php::array_get(dispatch, "state") {
+        Some(Value::String(state)) if !state.is_empty() => formatter::display_text(state),
+        _ => match php::array_get(dispatch, "paused") {
+            Some(Value::Bool(true)) => "paused".into(),
+            Some(Value::Bool(false)) => "active".into(),
+            _ => "-".into(),
+        },
+    }
+}
+
+/// The last pause and, once it ended, its resume, one `Label: value` line
+/// each. A queue that was never paused has none.
+fn dispatch_detail_lines(dispatch: Option<&Value>) -> Vec<String> {
+    let paused = dispatch_state(dispatch) == "paused";
+    let field = |key: &str| {
+        php::array_get(dispatch, key)
+            .filter(|value| nonempty_scalar(Some(value)))
+            .map(|value| text(Some(value)))
+    };
+    let principal = |key: &str| php::array_get(dispatch, key).and_then(principal_label);
+    // A new pause replaces the last cycle, so a paused queue has no resume.
+    let labels = if paused {
+        vec![
+            ("Reason", field("reason")),
+            ("Paused at", field("paused_at")),
+            ("Paused by", principal("paused_by")),
+        ]
+    } else {
+        vec![
+            ("Last pause reason", field("reason")),
+            ("Last paused at", field("paused_at")),
+            ("Last paused by", principal("paused_by")),
+            ("Resumed at", field("resumed_at")),
+            ("Resumed by", principal("resumed_by")),
+        ]
+    };
+    labels
+        .into_iter()
+        .filter_map(|(label, value)| value.map(|value| format!("{label}: {value}")))
+        .collect()
+}
+
+/// A recorded principal (`type`, `id`, optional `label`) as display text:
+/// `Operator (auth:token role:operator)`, or `auth:token role:operator`
+/// without a label.
+fn principal_label(principal: &Value) -> Option<String> {
+    if !php::is_array(principal) {
+        return nonempty_scalar(Some(principal)).then(|| text(Some(principal)));
+    }
+    let part = |key: &str| {
+        php::get(principal, key)
+            .filter(|value| nonempty_scalar(Some(value)))
+            .map(|value| text(Some(value)))
+    };
+    let identity = [part("type"), part("id")]
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>()
+        .join(" ");
+    match (part("label"), identity.is_empty()) {
+        (Some(label), false) => Some(format!("{label} ({identity})")),
+        (Some(label), true) => Some(label),
+        (None, false) => Some(identity),
+        (None, true) => None,
+    }
+}
+
+/// The queue's `activity_dispatch` object when the Server reports one
+/// (native Server with the pause capability); `None` leaves 2.x output
+/// unchanged.
+fn reported_dispatch(queue: &Value) -> Option<&Value> {
+    php::get(queue, "activity_dispatch").filter(|value| value.is_object())
 }

@@ -231,8 +231,10 @@ class PhpMainReferenceTest(unittest.TestCase):
 class RustOnlyCommandTest(unittest.TestCase):
     NAMES = {"batch:cancel", "batch:show"}
 
-    def test_the_catalog_marks_the_batch_commands_rust_only(self):
-        self.assertEqual(["batch:cancel", "batch:resume", "batch:show", "batch:signal", "batch:update"],
+    def test_the_catalog_marks_the_batch_and_activity_dispatch_commands_rust_only(self):
+        self.assertEqual(["batch:cancel", "batch:resume", "batch:show", "batch:signal", "batch:update",
+                          "task-queue:activity-dispatch", "task-queue:pause-activities",
+                          "task-queue:resume-activities"],
                          parity.rust_only_commands())
 
     def test_rust_only_help_is_skipped_but_2x_help_is_kept(self):
@@ -246,6 +248,14 @@ class RustOnlyCommandTest(unittest.TestCase):
                 "  bridge:webhook Send\nbatching is a word\n")
         stripped = parity.strip_rust_only({"stdout_text": text, "stdout_json": None}, self.NAMES)
         self.assertEqual(" activity\n  activity:list  List activities\n  bridge:webhook Send\nbatching is a word\n",
+                         stripped["stdout_text"])
+
+    def test_a_namespace_shared_with_2x_commands_keeps_its_header(self):
+        text = (" \x1b[33mtask-queue\x1b[39m\n  task-queue:activity-dispatch  Show\n"
+                "  task-queue:describe          Describe\n  task-queue:pause-activities  Pause\n")
+        stripped = parity.strip_rust_only({"stdout_text": text, "stdout_json": None},
+                                          {"task-queue:activity-dispatch", "task-queue:pause-activities"})
+        self.assertEqual(" \x1b[33mtask-queue\x1b[39m\n  task-queue:describe          Describe\n",
                          stripped["stdout_text"])
 
     def test_json_listings_lose_the_commands_and_their_empty_namespace(self):

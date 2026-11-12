@@ -388,6 +388,44 @@ impl CompatibilityFailure {
     }
 }
 
+/// True when cluster info advertises `capabilities.<name>: true`.
+pub fn advertises_capability(cluster_info: &Value, name: &str) -> bool {
+    php::array_get(php::get(cluster_info, "capabilities"), name) == Some(&Value::Bool(true))
+}
+
+/// Refuses a command whose Server does not advertise the capability it
+/// needs: exit 8 like the other compatibility refusals, the same JSON
+/// `compatibility` diagnostic, and the command's own message and next step
+/// instead of the version-window ones.
+pub fn require_capability(
+    cluster_info: &Value,
+    cli_version: &str,
+    name: &str,
+    unsupported: &str,
+    next_step: &str,
+) -> Result<(), CompatibilityFailure> {
+    if advertises_capability(cluster_info, name) {
+        return Ok(());
+    }
+    let detail = format!("server did not advertise capabilities.{name}.");
+    let mut diagnostic = failure_diagnostic(
+        cluster_info,
+        cli_version,
+        &detail,
+        Some(&control_plane_version()),
+        Some(&worker_protocol_version()),
+    );
+    diagnostic.insert("next_step".into(), Value::String(next_step.to_string()));
+    Err(CompatibilityFailure {
+        message: format!(
+            "Server compatibility error: server {} does not advertise capabilities.{name}, so dw refused before sending the request. {unsupported} Next step: {next_step}",
+            server_version(cluster_info)
+        ),
+        diagnostic,
+        next_step: next_step.to_string(),
+    })
+}
+
 /// `ServerClient::assertServerCompatibility`: the control-plane checks, then
 /// the worker-protocol checks when asked, using the env-overridable client
 /// versions.
@@ -497,6 +535,50 @@ mod tests {
 
     fn parse(raw: &str) -> Value {
         serde_json::from_str(raw).expect("fixture is JSON")
+    }
+
+    #[test]
+    fn a_capability_counts_only_when_advertised_as_true() {
+        let mut info = parse(NATIVE_SERVER);
+        for value in [json!(null), json!(false), json!("true"), json!(1)] {
+            info["capabilities"] = json!({ "task_queue_activity_dispatch_pause": value });
+            assert!(!advertises_capability(
+                &info,
+                "task_queue_activity_dispatch_pause"
+            ));
+        }
+        info["capabilities"] = json!({ "task_queue_activity_dispatch_pause": true });
+        assert!(advertises_capability(
+            &info,
+            "task_queue_activity_dispatch_pause"
+        ));
+        assert!(
+            require_capability(&info, "2.6.0", "task_queue_activity_dispatch_pause", "", "")
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn a_missing_capability_is_a_compatibility_refusal_with_its_own_next_step() {
+        let failure = require_capability(
+            &parse(PHP_SERVER),
+            "2.6.0",
+            "task_queue_activity_dispatch_pause",
+            "Needs native.",
+            "Use drain.",
+        )
+        .unwrap_err();
+        assert_eq!(
+            failure.message,
+            "Server compatibility error: server 2.11.8 does not advertise capabilities.task_queue_activity_dispatch_pause, so dw refused before sending the request. Needs native. Next step: Use drain."
+        );
+        assert_eq!(failure.next_step, "Use drain.");
+        assert_eq!(failure.diagnostic["next_step"], json!("Use drain."));
+        assert_eq!(
+            failure.diagnostic["detail"],
+            json!("server did not advertise capabilities.task_queue_activity_dispatch_pause.")
+        );
+        assert_eq!(failure.diagnostic["server_version"], json!("2.11.8"));
     }
 
     /// `ServerClientTest::clusterInfo`.

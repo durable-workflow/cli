@@ -528,3 +528,365 @@ fn server_text_in_human_output_is_not_console_markup() {
     let stderr = String::from_utf8(output.stderr).unwrap();
     assert!(stderr.contains("<error>FORGED</error>"), "{stderr}");
 }
+
+/// Cluster info of a Server that advertises the activity dispatch pause
+/// (native Server, Server #577).
+fn pause_info() -> Value {
+    let mut info = info();
+    info["capabilities"] = json!({"task_queue_activity_dispatch_pause": true});
+    info
+}
+
+fn paused_dispatch() -> Value {
+    json!({
+        "state": "paused",
+        "paused": true,
+        "reason": "payments vendor outage",
+        "paused_at": "2026-11-12T10:00:00.123456Z",
+        "paused_by": {"type": "auth:token", "id": "role:operator", "label": "Operator"},
+        "resumed_at": null,
+        "resumed_by": null
+    })
+}
+
+fn resumed_dispatch() -> Value {
+    json!({
+        "state": "active",
+        "paused": false,
+        "reason": "payments vendor outage",
+        "paused_at": "2026-11-12T10:00:00.123456Z",
+        "paused_by": {"type": "auth:token", "id": "role:operator", "label": "Operator"},
+        "resumed_at": "2026-11-12T11:00:00.000000Z",
+        "resumed_by": {"type": "auth:token", "id": "role:admin"}
+    })
+}
+
+fn dispatch_answer(outcome: Option<&str>, dispatch: Value) -> Value {
+    let mut body = json!({
+        "namespace": "orders",
+        "task_queue": "orders",
+        "activity_dispatch": dispatch
+    });
+    if let Some(outcome) = outcome {
+        body["outcome"] = json!(outcome);
+    }
+    body
+}
+
+fn stdout_text(output: &Output) -> String {
+    assert_eq!(output.status.code(), Some(0), "{output:?}");
+    String::from_utf8(output.stdout.clone()).unwrap()
+}
+
+#[test]
+fn pause_activities_sends_one_pause_with_the_reason_and_reports_it() {
+    let scratch = Scratch::new();
+    let server = Server::new(
+        pause_info(),
+        vec![ok(dispatch_answer(Some("paused"), paused_dispatch()))],
+    );
+    let stdout = stdout_text(&scratch.run(
+        &server.url,
+        &[
+            "task-queue:pause-activities",
+            "orders",
+            "--reason=payments vendor outage",
+        ],
+    ));
+    assert_eq!(
+        server.request_lines(),
+        ["POST /prefix/api/task-queues/orders/activity-dispatch/pause HTTP/1.1"]
+    );
+    assert_eq!(server.body(0), json!({"reason": "payments vendor outage"}));
+    for expected in [
+        "Paused activity dispatch on task queue orders.",
+        "  Namespace: orders",
+        "  Activity Dispatch: paused",
+        "  Reason: payments vendor outage",
+        "  Paused at: 2026-11-12T10:00:00.123456Z",
+        "  Paused by: Operator (auth:token role:operator)",
+        "dw task-queue:resume-activities",
+    ] {
+        assert!(stdout.contains(expected), "{expected}: {stdout}");
+    }
+    assert!(!stdout.contains("Resumed"), "{stdout}");
+}
+
+#[test]
+fn pause_activities_without_a_reason_sends_an_empty_body_and_json_is_the_server_payload() {
+    let scratch = Scratch::new();
+    let mut dispatch = paused_dispatch();
+    dispatch["reason"] = Value::Null;
+    let answer = dispatch_answer(Some("paused"), dispatch);
+    let server = Server::new(pause_info(), vec![ok(answer.clone())]);
+    let output = scratch.run(
+        &server.url,
+        &[
+            "task-queue:pause-activities",
+            "orders",
+            "--reason=",
+            "--json",
+        ],
+    );
+    assert_eq!(json_stdout(&output), answer);
+    assert_eq!(server.body(0), json!({}));
+}
+
+#[test]
+fn an_already_paused_queue_reports_the_original_pause() {
+    let scratch = Scratch::new();
+    let server = Server::new(
+        pause_info(),
+        vec![ok(dispatch_answer(
+            Some("already_paused"),
+            paused_dispatch(),
+        ))],
+    );
+    let stdout = stdout_text(&scratch.run(
+        &server.url,
+        &["task-queue:pause-activities", "orders", "--reason=again"],
+    ));
+    assert_eq!(server.requests().len(), 1);
+    for expected in [
+        "Activity dispatch on task queue orders was already paused; nothing changed.",
+        "  Reason: payments vendor outage",
+        "  Paused by: Operator (auth:token role:operator)",
+        "the --reason given here was not recorded",
+    ] {
+        assert!(stdout.contains(expected), "{expected}: {stdout}");
+    }
+}
+
+#[test]
+fn resume_activities_sends_one_resume_and_reports_the_last_pause() {
+    let scratch = Scratch::new();
+    let server = Server::new(
+        pause_info(),
+        vec![ok(dispatch_answer(Some("resumed"), resumed_dispatch()))],
+    );
+    let stdout =
+        stdout_text(&scratch.run(&server.url, &["task-queue:resume-activities", "orders"]));
+    assert_eq!(
+        server.request_lines(),
+        ["POST /prefix/api/task-queues/orders/activity-dispatch/resume HTTP/1.1"]
+    );
+    assert_eq!(server.body(0), json!({}));
+    for expected in [
+        "Resumed activity dispatch on task queue orders.",
+        "  Activity Dispatch: active",
+        "  Last pause reason: payments vendor outage",
+        "  Resumed at: 2026-11-12T11:00:00.000000Z",
+        "  Resumed by: auth:token role:admin",
+        "can be leased again",
+    ] {
+        assert!(stdout.contains(expected), "{expected}: {stdout}");
+    }
+}
+
+#[test]
+fn resuming_a_queue_that_is_not_paused_changes_nothing() {
+    let scratch = Scratch::new();
+    let never_paused = json!({
+        "state": "active", "paused": false, "reason": null, "paused_at": null,
+        "paused_by": null, "resumed_at": null, "resumed_by": null
+    });
+    let answer = dispatch_answer(Some("not_paused"), never_paused);
+    let server = Server::new(pause_info(), vec![ok(answer.clone())]);
+    let stdout =
+        stdout_text(&scratch.run(&server.url, &["task-queue:resume-activities", "orders"]));
+    assert!(
+        stdout.contains("Activity dispatch on task queue orders was not paused; nothing changed."),
+        "{stdout}"
+    );
+    assert!(!stdout.contains("Last pause"), "{stdout}");
+
+    let server = Server::new(pause_info(), vec![ok(answer.clone())]);
+    let output = scratch.run(
+        &server.url,
+        &["task-queue:resume-activities", "orders", "--json"],
+    );
+    assert_eq!(json_stdout(&output), answer);
+}
+
+#[test]
+fn activity_dispatch_reads_the_state_once() {
+    let scratch = Scratch::new();
+    let answer = dispatch_answer(None, paused_dispatch());
+    let server = Server::new(pause_info(), vec![ok(answer.clone())]);
+    let stdout = stdout_text(&scratch.run(&server.url, &["task-queue:activity-dispatch", "a/b"]));
+    assert_eq!(
+        server.request_lines(),
+        ["GET /prefix/api/task-queues/a%2Fb/activity-dispatch HTTP/1.1"]
+    );
+    assert!(stdout.contains("Task Queue: orders"), "{stdout}");
+    assert!(stdout.contains("  Activity Dispatch: paused"), "{stdout}");
+    assert!(
+        stdout.contains("  Reason: payments vendor outage"),
+        "{stdout}"
+    );
+
+    let server = Server::new(pause_info(), vec![ok(answer.clone())]);
+    let output = scratch.run(
+        &server.url,
+        &["task-queue:activity-dispatch", "orders", "--output=json"],
+    );
+    assert_eq!(json_stdout(&output), answer);
+}
+
+#[test]
+fn a_server_without_the_pause_capability_is_refused_before_any_request() {
+    let scratch = Scratch::new();
+    let mut not_advertised = info();
+    not_advertised["capabilities"] = json!({"task_queue_activity_dispatch_pause": false});
+    for info in [info(), not_advertised] {
+        for args in [
+            vec!["task-queue:pause-activities", "orders", "--reason=r"],
+            vec!["task-queue:resume-activities", "orders"],
+            vec!["task-queue:activity-dispatch", "orders"],
+        ] {
+            let server = Server::new(info.clone(), vec![ok(json!({}))]);
+            let output = scratch.run(&server.url, &args);
+            assert_eq!(output.status.code(), Some(8), "{args:?}: {output:?}");
+            assert!(server.requests().is_empty(), "{args:?}");
+            let stderr = String::from_utf8(output.stderr).unwrap();
+            assert!(
+                stderr
+                    .contains("does not advertise capabilities.task_queue_activity_dispatch_pause"),
+                "{stderr}"
+            );
+            assert!(stderr.contains("dw task-queue:drain"), "{stderr}");
+
+            let server = Server::new(info.clone(), vec![ok(json!({}))]);
+            let mut json_args = args.clone();
+            json_args.push("--json");
+            let output = scratch.run(&server.url, &json_args);
+            assert_eq!(output.status.code(), Some(8), "{args:?}: {output:?}");
+            assert!(server.requests().is_empty(), "{args:?}");
+            let envelope: Value = serde_json::from_slice(&output.stdout).unwrap();
+            assert_eq!(envelope["exit_code"], json!(8), "{envelope}");
+            assert_eq!(
+                envelope["compatibility"]["detail"],
+                json!("server did not advertise capabilities.task_queue_activity_dispatch_pause."),
+                "{envelope}"
+            );
+        }
+    }
+}
+
+#[test]
+fn a_rejected_reason_is_reported_as_the_servers_validation_error() {
+    let scratch = Scratch::new();
+    let server = Server::new(
+        pause_info(),
+        vec![Reply {
+            status: 422,
+            headers: Vec::new(),
+            body: Some(json!({
+                "message": "The reason field must not be greater than 1000 characters.",
+                "errors": {"reason": ["The reason field must not be greater than 1000 characters."]}
+            })),
+        }],
+    );
+    let long = format!("--reason={}", "x".repeat(1001));
+    let output = scratch.run(
+        &server.url,
+        &["task-queue:pause-activities", "orders", &long],
+    );
+    assert_eq!(output.status.code(), Some(2), "{output:?}");
+    assert_eq!(server.requests().len(), 1);
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.contains("The reason field must not be greater than 1000 characters."),
+        "{stderr}"
+    );
+}
+
+#[test]
+fn a_lost_pause_or_resume_response_is_never_resent() {
+    let scratch = Scratch::new();
+    for args in [
+        vec!["task-queue:pause-activities", "orders"],
+        vec!["task-queue:resume-activities", "orders"],
+    ] {
+        let server = Server::new(pause_info(), vec![lost()]);
+        let mut args = args.clone();
+        args.push("--json");
+        let output = scratch.run(&server.url, &args);
+        assert_eq!(output.status.code(), Some(3), "{args:?}: {output:?}");
+        assert_eq!(server.requests().len(), 1, "{args:?}");
+    }
+}
+
+#[test]
+fn describe_shows_activity_dispatch_only_when_the_server_reports_it() {
+    let scratch = Scratch::new();
+    let server = Server::new(
+        info(),
+        vec![ok(json!({
+            "name": "orders",
+            "activity_dispatch": paused_dispatch()
+        }))],
+    );
+    let stdout = stdout_text(&scratch.run(&server.url, &["task-queue:describe", "orders"]));
+    for expected in [
+        "Activity Dispatch: paused\n",
+        "  Reason: payments vendor outage\n",
+        "  Paused by: Operator (auth:token role:operator)\n",
+    ] {
+        assert!(stdout.contains(expected), "{expected}: {stdout}");
+    }
+
+    let server = Server::new(
+        info(),
+        vec![ok(
+            json!({"name": "orders", "activity_dispatch": resumed_dispatch()}),
+        )],
+    );
+    let stdout = stdout_text(&scratch.run(&server.url, &["task-queue:describe", "orders"]));
+    assert!(stdout.contains("Activity Dispatch: active\n"), "{stdout}");
+    assert!(
+        stdout.contains("  Resumed at: 2026-11-12T11:00:00.000000Z\n"),
+        "{stdout}"
+    );
+
+    let server = Server::new(info(), vec![ok(json!({"name": "orders"}))]);
+    let stdout = stdout_text(&scratch.run(&server.url, &["task-queue:describe", "orders"]));
+    assert!(!stdout.contains("Activity Dispatch"), "{stdout}");
+}
+
+#[test]
+fn list_adds_the_activity_dispatch_column_only_when_the_server_reports_it() {
+    let scratch = Scratch::new();
+    let server = Server::new(
+        info(),
+        vec![ok(json!({
+            "task_queues": [
+                {"name": "orders", "activity_dispatch": paused_dispatch()},
+                {"name": "billing", "activity_dispatch": resumed_dispatch()},
+                {"name": "legacy"}
+            ]
+        }))],
+    );
+    let stdout = stdout_text(&scratch.run(&server.url, &["task-queue:list"]));
+    assert!(stdout.contains("Activity Dispatch"), "{stdout}");
+    let cells = |name: &str| {
+        stdout
+            .lines()
+            .find(|line| line.contains(&format!(" {name} ")))
+            .unwrap_or_default()
+            .split('|')
+            .map(str::trim)
+            .filter(|cell| !cell.is_empty())
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(cells("orders").last(), Some(&"paused"), "{stdout}");
+    assert_eq!(cells("billing").last(), Some(&"active"), "{stdout}");
+    assert_eq!(cells("legacy").last(), Some(&"-"), "{stdout}");
+
+    let server = Server::new(
+        info(),
+        vec![ok(json!({"task_queues": [{"name": "orders"}]}))],
+    );
+    let stdout = stdout_text(&scratch.run(&server.url, &["task-queue:list"]));
+    assert!(!stdout.contains("Activity Dispatch"), "{stdout}");
+}

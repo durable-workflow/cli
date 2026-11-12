@@ -28,7 +28,9 @@ irm https://durable-workflow.com/install.ps1 | iex
 
 The installers verify the downloaded binary against the release
 `SHA256SUMS` manifest. Releases also include GitHub artifact attestations,
-native binaries, `dw.phar`, installer scripts, and a Homebrew formula.
+native binaries, installer scripts, and a Homebrew formula. From 2.5.0 `dw`
+is a native Rust binary and releases no longer include `dw.phar`; see the
+[2.5.0 notes](docs/release-notes/2.5.0.md) to move off a PHAR install.
 
 ```bash
 dw --version
@@ -36,19 +38,8 @@ dw list
 ```
 
 See the [distribution guide](docs/distribution.md) for exact-version installs,
-direct downloads, checksum and attestation verification, Homebrew, PHAR, and
+direct downloads, checksum and attestation verification, Homebrew, and
 reproducible builds.
-
-### Known issue in 2.3.x
-
-The latest stable release, 2.3.6, bundles Symfony HttpClient 7.4.8, which is
-affected by two advisories published 2026-11-04
-([GHSA-gq53-v8w2-gjhj](https://github.com/symfony/symfony/security/advisories/GHSA-gq53-v8w2-gjhj),
-[GHSA-c7hm-wqwp-f9v8](https://github.com/symfony/symfony/security/advisories/GHSA-c7hm-wqwp-f9v8)).
-Exploiting them requires a malicious or compromised Server. `dw` only connects
-to the Server you configure, so the risk is low. CLI 2.5.0, the Rust
-implementation, removes the dependency, and `dw upgrade` installs it once it is
-the latest stable release ([#72](https://github.com/durable-workflow/cli/issues/72)).
 
 ## Connect
 
@@ -129,6 +120,10 @@ the patch-stable response envelopes.
 - [Durable Workflow Server](https://github.com/durable-workflow/server)
 
 ## Development
+
+The released CLI is the Rust crate in [`rust/`](rust/README.md): build and
+test it with `cargo`, and compare it with 2.x through its parity harness.
+The PHP implementation below remains for the 2.3.x maintenance line.
 
 ```bash
 composer install

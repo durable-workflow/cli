@@ -275,7 +275,7 @@ jobs:
   target-branch-qualification:
     name: Target branch qualification
     if: ${{ always() && github.server_url == 'https://github.com' }}
-    needs: [action-policy, test, build-phar, reproducible-build, rust]
+    needs: [action-policy, test, build-phar, reproducible-build, rust, rust-live-parity]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
@@ -291,8 +291,10 @@ jobs:
           PHAR_RESULT: ${{ needs.build-phar.result }}
           REPRODUCIBLE_RESULT: ${{ needs.reproducible-build.result }}
           RUST_RESULT: ${{ needs.rust.result }}
+          RUST_LIVE_PARITY_RESULT: ${{ needs.rust-live-parity.result }}
         run: |
           test "$TEST_RESULT" = success
           test "$PHAR_RESULT" = success
           test "$REPRODUCIBLE_RESULT" = success
           test "$RUST_RESULT" = success
+          test "$RUST_LIVE_PARITY_RESULT" = success

@@ -1,5 +1,5 @@
 //! Resumable bulk operations (cli#60): `batch:cancel`, `batch:signal`,
-//! `batch:show` and `batch:resume`.
+//! `batch:update`, `batch:show` and `batch:resume`.
 //!
 //! A batch writes its whole selection to a private manifest before the
 //! first mutation, then records each target's outcome as it happens. Each
@@ -13,6 +13,7 @@ use crate::cli::Input;
 use crate::client::Context;
 use crate::commands::workflow_control::{confirm, filters, select, Filters};
 use crate::commands::workflow_message::message_path;
+use crate::compat::RequestContract;
 use crate::error::CliError;
 use crate::output::{self, Mode};
 use crate::{build_info, formatter, payload, php};
@@ -29,6 +30,13 @@ const MAX_RETRY_WAIT: Duration = Duration::from_secs(60);
 /// The wait under pressure when the Server gives no `Retry-After`.
 const DEFAULT_RETRY_WAIT: Duration = Duration::from_secs(1);
 const MAX_RATE: i64 = 100;
+/// The SDK's own per-request timeout; a deadline only ever shortens it.
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
+/// A request does not start with less than this left before the deadline:
+/// its capped timeout would likely turn it into an unknown outcome.
+const MIN_REQUEST_WINDOW: Duration = Duration::from_millis(500);
+/// The longest `--deadline` accepted.
+const MAX_DEADLINE: Duration = Duration::from_secs(7 * 24 * 60 * 60);
 const SELECTION_NOTE: &str = "Visibility pages are not a transactional snapshot: these are the workflows and runs observed while paging. Resume never relists.";
 
 pub fn cancel(context: &Context, input: &Input) -> Result<i32, CliError> {
@@ -37,18 +45,44 @@ pub fn cancel(context: &Context, input: &Input) -> Result<i32, CliError> {
         "reason".into(),
         json!(input.opt("reason").flatten().map(str::to_owned)),
     );
-    start(context, input, "cancel", parameters)
+    start(context, input, "cancel", parameters, &|_| Ok(()))
 }
 
 pub fn signal(context: &Context, input: &Input) -> Result<i32, CliError> {
-    let signal_name = php::trim(input.arg("signal-name").unwrap_or_default());
-    if signal_name.is_empty() {
-        return Err(CliError::Invalid(
-            "The signal name must not be empty.".into(),
-        ));
+    let parameters = message_parameters(input, "signal")?;
+    start(context, input, "signal", parameters, &|_| Ok(()))
+}
+
+pub fn update(context: &Context, input: &Input) -> Result<i32, CliError> {
+    let mut parameters = message_parameters(input, "update")?;
+    let wait_for = input
+        .opt("wait")
+        .flatten()
+        .map(php::trim)
+        .filter(|wait| !wait.is_empty())
+        .unwrap_or("accepted")
+        .to_owned();
+    parameters.insert("wait_for".into(), json!(wait_for));
+    // Checked against the Server's request contract before anything is
+    // selected, as workflow:update does.
+    start(context, input, "update", parameters, &|info| {
+        RequestContract::from_cluster_info(info)
+            .map_err(CliError::Invalid)?
+            .assert_canonical_value("update", "wait_for", Some(&wait_for), Some("--wait"))
+            .map_err(CliError::Invalid)
+    })
+}
+
+/// The name and input a signal or update batch sends to every target. The
+/// input is decoded once, checked as the request will carry it, and kept in
+/// the manifest so resume sends exactly the same intent.
+fn message_parameters(input: &Input, kind: &str) -> Result<Map<String, Value>, CliError> {
+    let name = php::trim(input.arg(&format!("{kind}-name")).unwrap_or_default());
+    if name.is_empty() {
+        return Err(CliError::Invalid(format!(
+            "The {kind} name must not be empty."
+        )));
     }
-    // The input is decoded once, checked as the request will carry it, and
-    // kept in the manifest so resume sends exactly the same intent.
     let arguments = payload::parse_arguments(input)?;
     let mut probe = Map::new();
     if let Some(arguments) = &arguments {
@@ -56,11 +90,11 @@ pub fn signal(context: &Context, input: &Input) -> Result<i32, CliError> {
     }
     payload::request_body(Value::Object(probe), &[arguments.as_ref()])?;
     let mut parameters = Map::new();
-    parameters.insert("signal_name".into(), json!(signal_name));
+    parameters.insert(format!("{kind}_name"), json!(name));
     if let Some(arguments) = arguments {
         parameters.insert("input".into(), arguments.value);
     }
-    start(context, input, "signal", parameters)
+    Ok(parameters)
 }
 
 pub fn show(input: &Input) -> Result<i32, CliError> {
@@ -72,6 +106,7 @@ pub fn show(input: &Input) -> Result<i32, CliError> {
 pub fn resume(context: &Context, input: &Input) -> Result<i32, CliError> {
     let path = manifest_path(input.arg("manifest"))?;
     let rate = rate(input)?;
+    let deadline = deadline(input)?;
     let json_mode = context.mode.machine_readable();
     require_yes_for_json(input, json_mode)?;
     let mut manifest = Manifest::open(&path, true)?;
@@ -126,7 +161,7 @@ pub fn resume(context: &Context, input: &Input) -> Result<i32, CliError> {
         return Ok(0);
     }
     context.preflight(false)?;
-    let stopped = dispatch(context, &mut manifest, rate)?;
+    let stopped = dispatch(context, &mut manifest, rate, deadline)?;
     report(&manifest, context.mode, stopped.as_ref(), "Batch resumed")
 }
 
@@ -136,6 +171,7 @@ fn start(
     input: &Input,
     operation: &str,
     parameters: Map<String, Value>,
+    check: &dyn Fn(&Value) -> Result<(), CliError>,
 ) -> Result<i32, CliError> {
     let query = php::trim(input.opt("query").flatten().unwrap_or_default());
     if query.is_empty() {
@@ -151,9 +187,11 @@ fn start(
         )));
     }
     let rate = rate(input)?;
+    let deadline = deadline(input)?;
     let json_mode = context.mode.machine_readable();
     require_yes_for_json(input, json_mode)?;
     let info = context.preflight(false)?;
+    check(&info)?;
     let Filters {
         workflow_type,
         status,
@@ -240,7 +278,7 @@ fn start(
     );
     header.insert("targets".into(), Value::Array(targets));
     let mut manifest = Manifest::create(&path, header)?;
-    let stopped = dispatch(context, &mut manifest, rate)?;
+    let stopped = dispatch(context, &mut manifest, rate, deadline)?;
     report(&manifest, context.mode, stopped.as_ref(), "Batch")
 }
 
@@ -265,15 +303,61 @@ fn eligible(manifest: &Manifest) -> Vec<usize> {
         .collect()
 }
 
+/// Record why the run stopped, in the manifest and for the report.
+fn stop(
+    manifest: &mut Manifest,
+    reason: &'static str,
+    message: String,
+) -> Result<Option<Stop>, CliError> {
+    manifest.stopped(reason, &message)?;
+    Ok(Some(Stop { reason, message }))
+}
+
+/// The time left before `deadline`, or `None` once it has passed.
+fn remaining(deadline: Option<Instant>) -> Option<Option<Duration>> {
+    match deadline {
+        None => Some(None),
+        Some(deadline) => deadline
+            .checked_duration_since(Instant::now())
+            .filter(|left| !left.is_zero())
+            .map(Some),
+    }
+}
+
+/// Sleep for `wait`, unless the deadline passes first. Returns false then,
+/// without sleeping.
+fn wait_within(wait: Duration, deadline: Option<Instant>) -> bool {
+    match remaining(deadline) {
+        Some(Some(left)) if wait >= left => false,
+        None => false,
+        _ => {
+            std::thread::sleep(wait);
+            true
+        }
+    }
+}
+
+fn deadline_stop(manifest: &mut Manifest) -> Result<Option<Stop>, CliError> {
+    stop(
+        manifest,
+        "deadline",
+        "The --deadline passed, so no further targets were sent. Unsent targets stay pending; resume them with dw batch:resume.".into(),
+    )
+}
+
 /// Send each eligible target in order, one request at a time, recording a
 /// `dispatching` event before and an outcome after each request. Stops at
-/// the first unknown outcome, authentication refusal or exhausted pressure,
-/// so the remaining targets stay pending for a later resume.
+/// the first unknown outcome, authentication refusal, exhausted pressure or
+/// passed deadline, so the remaining targets stay pending for a later
+/// resume. A deadline also caps each request's timeout; a request that then
+/// times out after leaving is unknown, never resent.
 fn dispatch(
     context: &Context,
     manifest: &mut Manifest,
     rate: u32,
+    duration: Option<Duration>,
 ) -> Result<Option<Stop>, CliError> {
+    let deadline = duration.map(|duration| Instant::now() + duration);
     let operation = manifest.header_str("operation").to_owned();
     let parameters = manifest
         .header
@@ -305,13 +389,16 @@ fn dispatch(
                 format!("/workflows/{workflow_id}/runs/{run_id}/cancel"),
                 cancel_body(&parameters),
             ),
-            "signal" => {
+            kind @ ("signal" | "update") => {
                 let name = parameters
-                    .get("signal_name")
+                    .get(&format!("{kind}_name"))
                     .and_then(Value::as_str)
                     .unwrap_or_default();
-                let (segments, path) = message_path(&workflow_id, Some(&run_id), "signal", name);
+                let (segments, path) = message_path(&workflow_id, Some(&run_id), kind, name);
                 let mut body = Map::new();
+                if let Some(wait_for) = parameters.get("wait_for") {
+                    body.insert("wait_for".into(), wait_for.clone());
+                }
                 body.insert("request_id".into(), json!(key));
                 if let Some(input) = parameters.get("input") {
                     body.insert("input".into(), input.clone());
@@ -332,13 +419,26 @@ fn dispatch(
         let segments: Vec<&str> = segments.iter().map(String::as_str).collect();
         loop {
             if let Some(sent) = last_sent {
-                std::thread::sleep(interval.saturating_sub(sent.elapsed()));
+                if !wait_within(interval.saturating_sub(sent.elapsed()), deadline) {
+                    return deadline_stop(manifest);
+                }
             }
+            let left = match remaining(deadline) {
+                Some(Some(left)) if left < MIN_REQUEST_WINDOW => None,
+                other => other,
+            };
+            let Some(left) = left else {
+                return deadline_stop(manifest);
+            };
             manifest.dispatching(index)?;
             last_sent = Some(Instant::now());
-            let (result, retry_after) =
-                context.workflow_post_observed(&segments, body.clone(), &path);
-            let (state, details) = classify(result, retry_after);
+            let (result, retry_after) = context.workflow_post_observed(
+                &segments,
+                body.clone(),
+                &path,
+                left.map(|left| left.min(REQUEST_TIMEOUT)),
+            );
+            let (state, details) = classify(result, retry_after, &operation);
             manifest.outcome(index, state, details)?;
             match state {
                 State::Pressure if manifest.targets[index].attempts < MAX_ATTEMPTS => {
@@ -346,29 +446,34 @@ fn dispatch(
                         .map(Duration::from_secs)
                         .unwrap_or(DEFAULT_RETRY_WAIT)
                         .min(MAX_RETRY_WAIT);
-                    std::thread::sleep(wait);
+                    if !wait_within(wait, deadline) {
+                        return deadline_stop(manifest);
+                    }
                 }
                 State::Pressure => {
-                    return Ok(Some(Stop {
-                        reason: "pressure",
-                        message: format!(
+                    return stop(
+                        manifest,
+                        "pressure",
+                        format!(
                             "The Server kept asking to slow down after {MAX_ATTEMPTS} attempts for {workflow_id}. Resume later; the remaining targets were not sent."
                         ),
-                    }))
+                    )
                 }
                 State::Unknown => {
-                    return Ok(Some(Stop {
-                        reason: "unknown",
-                        message: format!(
+                    return stop(
+                        manifest,
+                        "unknown",
+                        format!(
                             "The outcome for {workflow_id} is unknown, so the batch stopped. Check its history and command receipts before deciding anything; resume never resends it."
                         ),
-                    }))
+                    )
                 }
                 State::Pending => {
-                    return Ok(Some(Stop {
-                        reason: "authentication",
-                        message: "The Server refused the credentials. Fix them and resume; the refused target was not admitted and will be sent again.".into(),
-                    }))
+                    return stop(
+                        manifest,
+                        "authentication",
+                        "The Server refused the credentials. Fix them and resume; the refused target was not admitted and will be sent again.".into(),
+                    )
                 }
                 _ => break,
             }
@@ -389,17 +494,28 @@ fn cancel_body(parameters: &Map<String, Value>) -> Value {
 fn classify(
     result: Result<Value, CliError>,
     retry_after: Option<u64>,
+    operation: &str,
 ) -> (State, Map<String, Value>) {
     let mut details = Map::new();
     let state = match &result {
         Ok(body) => {
             details.insert("http_status".into(), json!(200));
-            for key in ["outcome", "command_id", "command_status"] {
+            for key in [
+                "outcome",
+                "command_id",
+                "command_status",
+                "update_id",
+                "update_status",
+            ] {
                 if let Some(value) = body.get(key).filter(|value| !value.is_null()) {
                     details.insert(key.into(), value.clone());
                 }
             }
-            State::Acknowledged
+            if operation == "update" && update_refused(body) {
+                State::Refused
+            } else {
+                State::Acknowledged
+            }
         }
         Err(CliError::Http { status, body, .. }) => {
             details.insert("http_status".into(), json!(status));
@@ -437,6 +553,28 @@ fn classify(
     (state, details)
 }
 
+/// An admitted update with a definite unsuccessful answer: rejected by the
+/// workflow's validator, refused, or failed in its handler. It is never
+/// resent.
+fn update_refused(body: &Value) -> bool {
+    let text = |key: &str| {
+        body.get(key)
+            .and_then(Value::as_str)
+            .map(|value| php::trim(value).to_ascii_lowercase())
+            .unwrap_or_default()
+    };
+    let (status, outcome, update) = (
+        text("command_status"),
+        text("outcome"),
+        text("update_status"),
+    );
+    matches!(status.as_str(), "rejected" | "refused")
+        || outcome.starts_with("rejected")
+        || outcome.contains("refused")
+        || outcome.contains("failed")
+        || matches!(update.as_str(), "rejected" | "failed")
+}
+
 /// Print a batch's state: JSON for machines, a summary for people. Exit 0
 /// only when every target ended acknowledged or skipped.
 fn report(
@@ -468,6 +606,7 @@ fn report(
             "counts": manifest.counts(),
             "complete": complete,
             "stopped": stopped.map(|stop| json!({"reason": stop.reason, "message": stop.message})),
+            "stops": manifest.stops,
             "targets": manifest.targets.iter().map(batch_manifest::Target::to_json).collect::<Vec<_>>(),
         }));
         return Ok(exit);
@@ -494,6 +633,15 @@ fn report(
         formatter::writeln_out(&format!(
             "<comment>Stopped: {}</comment>",
             text(&stop.message)
+        ));
+    } else if let Some(last) = manifest.stops.last().filter(|_| !complete) {
+        formatter::writeln_out(&format!(
+            "  Last stop: {}",
+            text(
+                last.get("message")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+            )
         ));
     }
     if !unknown.is_empty() {
@@ -542,6 +690,53 @@ fn rate(input: &Input) -> Result<u32, CliError> {
         })
 }
 
+/// `--deadline`: whole seconds, or a duration such as `90s`, `5m`, `1h30m`.
+fn deadline(input: &Input) -> Result<Option<Duration>, CliError> {
+    let Some(value) = input.opt("deadline").flatten() else {
+        return Ok(None);
+    };
+    let invalid = || {
+        CliError::Invalid(format!(
+            "--deadline must be a positive duration such as 300, 90s, 5m or 1h30m, at most {} days.",
+            MAX_DEADLINE.as_secs() / 86_400
+        ))
+    };
+    let value = php::trim(value);
+    let seconds = if php::ctype_digit(value) {
+        value.parse::<u64>().map_err(|_| invalid())?
+    } else {
+        let mut total = 0u64;
+        let mut digits = String::new();
+        for character in value.chars() {
+            if character.is_ascii_digit() {
+                digits.push(character);
+                continue;
+            }
+            let unit = match character {
+                'h' => 3600,
+                'm' => 60,
+                's' => 1,
+                _ => return Err(invalid()),
+            };
+            let amount: u64 = digits.parse().map_err(|_| invalid())?;
+            total = amount
+                .checked_mul(unit)
+                .and_then(|part| total.checked_add(part))
+                .ok_or_else(invalid)?;
+            digits.clear();
+        }
+        if !digits.is_empty() {
+            return Err(invalid());
+        }
+        total
+    };
+    let duration = Duration::from_secs(seconds);
+    if duration.is_zero() || duration > MAX_DEADLINE {
+        return Err(invalid());
+    }
+    Ok(Some(duration))
+}
+
 fn require_yes_for_json(input: &Input, json_mode: bool) -> Result<(), CliError> {
     if json_mode && !input.flag("yes") {
         return Err(CliError::Invalid(
@@ -565,7 +760,7 @@ mod tests {
 
     #[test]
     fn classifies_responses_conservatively() {
-        let state = |result, retry| classify(result, retry).0;
+        let state = |result, retry| classify(result, retry, "cancel").0;
         assert_eq!(state(Ok(json!({})), None), State::Acknowledged);
         assert_eq!(state(http(429, json!({})), None), State::Pressure);
         assert_eq!(state(http(503, json!({})), Some(2)), State::Pressure);
@@ -588,6 +783,34 @@ mod tests {
         );
         assert_eq!(
             state(Err(CliError::Failure("malformed".into())), None),
+            State::Unknown
+        );
+    }
+
+    #[test]
+    fn classifies_update_answers() {
+        let state = |body: Value| classify(Ok(body), None, "update").0;
+        assert_eq!(
+            state(json!({"outcome": "update_accepted"})),
+            State::Acknowledged
+        );
+        assert_eq!(
+            state(json!({"outcome": "update_completed"})),
+            State::Acknowledged
+        );
+        assert_eq!(
+            state(json!({"outcome": "rejected_by_validator"})),
+            State::Refused
+        );
+        assert_eq!(state(json!({"command_status": "rejected"})), State::Refused);
+        assert_eq!(state(json!({"update_status": "failed"})), State::Refused);
+        // Signals and cancels are not judged by an update's outcome.
+        assert_eq!(
+            classify(Ok(json!({"outcome": "rejected"})), None, "signal").0,
+            State::Acknowledged
+        );
+        assert_eq!(
+            classify(Err(CliError::Timeout("timed out".into())), None, "update").0,
             State::Unknown
         );
     }

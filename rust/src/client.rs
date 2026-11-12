@@ -266,8 +266,13 @@ impl Context {
         segments: &[&str],
         body: Value,
         path: &str,
+        timeout: Option<Duration>,
     ) -> (Result<Value, CliError>, Option<u64>) {
-        self.workflow_exchange(RawRequest::post(segments.iter().copied()).json(body), path)
+        let mut request = RawRequest::post(segments.iter().copied()).json(body);
+        if let Some(timeout) = timeout {
+            request = request.timeout(timeout);
+        }
+        self.workflow_exchange(request, path)
     }
 
     fn workflow_exchange(

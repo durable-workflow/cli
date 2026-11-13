@@ -137,6 +137,13 @@ make phar
 
 Run `make help` for the complete local development surface.
 
+The PHP maintenance standalone builder acquires SPC through the fixed upstream
+release identities in [ensure-spc.sh](scripts/ci/ensure-spc.sh). It verifies both
+the compressed archive and extracted binary, and rechecks existing caches before
+use. Unknown platforms and altered caches fail before SPC executes. This binds
+the SPC component only; PHP, downloaded libraries, build caches and each host
+platform still require their applicable toolchain qualification.
+
 Standalone release builds use the reviewed [dependency source policy](scripts/ci/standalone-dependencies.json).
 The workflow verifies the OpenSSL archive before compilation and checks the
 produced runtime after both cold builds and cache restores. Each release includes

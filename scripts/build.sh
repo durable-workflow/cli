@@ -48,12 +48,7 @@ ensure_tools() {
 ensure_spc() {
     local platform
     platform="$(detect_platform)"
-    if [[ ! -x "$TOOLS_DIR/spc" ]]; then
-        echo ">> Downloading spc (static-php-cli) for ${platform}"
-        curl --proto '=https' --proto-redir '=https' -fsSL -o "$TOOLS_DIR/spc" \
-            "https://dl.static-php.dev/static-php-cli/spc-bin/nightly/spc-${platform}"
-        chmod +x "$TOOLS_DIR/spc"
-    fi
+    bash "$ROOT/scripts/ci/ensure-spc.sh" "$platform" "$TOOLS_DIR/spc"
 }
 
 install_composer_deps() {

@@ -121,3 +121,60 @@ replacement, a forged codec, sealed-content writes, foreign-name survival and
 schema-only mutations that the predecessor's row-only comparison accepted.
 Modern and legacy zero-write checks use the same bounded typed logical snapshot,
 including catalog SQL, columns, indexes, triggers, views and all table rows.
+
+## Physical 3.8 upgrade
+
+`physical_cli.py` consumes the producer-owned real 3.8 API seed after the
+[accepted handoff](https://github.com/durable-workflow/server/pull/1210#issuecomment-6860138558).
+It does not call the synthetic transform or seed a replacement baseline.
+The accepted fixture contract is Server commit
+`a09f156399416216d2f097c257a2164f83c7eda7`. The original seed actually executed
+commit `09a4ccda3da11853606af031a8970bbde4b2d6ec`, driver SHA256
+`01c0fa1251ac3c809723e58d71817881fe2c5c9498579bc4c2e6097324a3618b`.
+Keep these two provenance meanings distinct.
+
+Use another fresh private directory with the common staged inputs above and:
+
+| Input | Source/identity |
+| --- | --- |
+| `CLI_216_PHYSICAL_BASELINE` | Absolute original stopped-backup path supplied by its owner; SHA256 `7d1826f7681342bb3a5974509648e2e8d75e7a21d262f65f3ec1f58727ccbc0c` |
+| `CLI_216_PHYSICAL_PACKET` | Absolute original seed JSON path supplied by its owner; SHA256 `8c728ce827df3a11621dfb0e82cdd404bbab48784182a5e92c8d632d49047fc5` |
+| `physical-contract.json` | The legacy manifest at accepted Server `a09f1563`; SHA256 `ceb4695643e48c7bfe3f81eea380c6ab9aa0b973da830cb552d070344047319f` |
+| `0013_command_intents.sql` | `rust/migrations/sqlite/0013_command_intents.sql` at published Server source `5614274d2629d03f92932a07dfee0fb10349ddd9`; SHA256 `fc3ad1730682c09704027dcbabc17cd6ded9c642a3ff20d7988d5f4b4a5726fd` |
+
+The original backup and packet are held read-only and rechecked after use.
+Only a newly created owned copy is mounted into the published 3.9.2 image.
+The image runs its actual `schema-upgrade` command, requiring SQLite 12 → 13.
+The comparison preserves all old business rows and schema objects, allowing
+only tagged DDL plus explicitly validated schema-version/journal metadata.
+The intent table must be empty. The new journal checksum, description,
+version, success, timestamp interval and execution-time bound are checked.
+
+```bash
+env -i PATH=/usr/bin:/bin \
+  CLI_216_WORKDIR="$experiment" \
+  CLI_216_PROXY_SOURCE="$experiment/committed_response_loss.py" \
+  CLI_216_PHYSICAL_BASELINE="$original_backup" \
+  CLI_216_PHYSICAL_PACKET="$original_packet" \
+  timeout 180s python3 -I -B scripts/acceptance/command-keys/physical_cli.py
+```
+
+Created names are `cli-216-392-upgrade` and `cli-216-392-physical`; cleanup
+authority remains their captured IDs. The upgrade container is retained until
+its actual exit/log result is read, then removed. The runtime exercises the
+installed CLI's original keyed-update readbacks and name/run fences for all
+three old-run states. Original NULL-key signals are checked only for preserved
+identity/history, never manufactured retained-key or intent equality.
+Full request-window snapshots must agree. A later post-stop maintenance
+snapshot is a different observation and must not be relabeled as that window.
+
+The comparison's offline controls require the staged helper and tagged SQL:
+
+```bash
+CLI_216_TEST_HELPER="$experiment/sqlite_legacy.py" \
+  CLI_216_TEST_DELTA="$experiment/0013_command_intents.sql" \
+  python3 -I -B scripts/acceptance/command-keys/test_physical_cli.py -v
+```
+
+These controls are not a physical upgrade result. Source review, current
+normal gates, fresh actual execution and cleanup still qualify that cell.

@@ -155,6 +155,14 @@ unaffected. This binds the SPC component only. PHP, downloaded libraries, build
 caches and each host platform still require their applicable toolchain
 qualification.
 
+The PHAR smoke caller has a separate [runtime profile](docker/php-ci/phar.ini)
+and [launcher](scripts/ci/run-php-phar-container.sh). Its host controls and Box
+artifact stay read-only. Only dependencies, build output, generated build
+metadata and private runtime data are writable. The setup reuses the accepted
+PHP image build source, then independently probes the PHAR settings and runs
+the TLS and replacement controls. Source preparation alone does not qualify
+the hosted caller or the separate reproducibility and legacy release paths.
+
 Standalone release builds use the reviewed [dependency source policy](scripts/ci/standalone-dependencies.json).
 The workflow verifies the OpenSSL archive before compilation and checks the
 produced runtime after both cold builds and cache restores. Each release includes

@@ -52,7 +52,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        php: ['8.2', '8.3', '8.4', '8.5']
+        php: ['8.2', '8.4', '8.5']
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
         with:
@@ -100,6 +100,7 @@ jobs:
           python scripts/ci/test-release-cache-policy.py
           python scripts/ci/test-release-rust-workflow.py
           python scripts/ci/test-apt-no-retries.py
+          python scripts/ci/test-build-workflow.py
           node --test scripts/ci/test-rust-dependency-inventory.js
           python scripts/ci/test-native-prerequisites.py
           node --test scripts/ci/test-release-workflow-metadata.js
@@ -111,6 +112,98 @@ jobs:
           node --test scripts/ci/test-release-metadata.js
       - name: Reverify Composer before project scripts
         uses: durable-workflow/.github/.github/actions/verify-composer-trust@75587fc33ff40c34f32ef777293dad56bb6f48c7  # clean-trust
+      - run: composer test
+
+  test-php83:
+    name: Test (PHP 8.3)
+    if: ${{ github.server_url == 'https://github.com' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Select Ubuntu's Python 3.12
+        run: |
+          /usr/bin/python3 -I -S -c 'import sys; assert sys.version_info[:2] == (3, 12)'
+          echo /usr/bin >> "$GITHUB_PATH"
+      - name: Create isolated Composer state
+        run: |
+          state="$(mktemp -d "$RUNNER_TEMP/php83-check.XXXXXX")"
+          mkdir -m 700 "$state/home" "$state/cache" "$state/tmp"
+          {
+            echo "COMPOSER_HOME=$state/home"
+            echo "COMPOSER_CACHE_DIR=$state/cache"
+            echo "TMPDIR=$state/tmp"
+          } >> "$GITHUB_ENV"
+      - name: Bootstrap verified dependency trust
+        uses: durable-workflow/.github/.github/actions/bootstrap-patched-pip@242c2a7fb23459db2e1ada5f84dbee6d61d9b1e5  # clean-trust
+        with:
+          clients: pip,python,composer,curl,git
+      - name: Disable APT download retries (CVE-2026-109518)
+        run: echo 'Acquire::Retries "0";' | sudo tee /etc/apt/apt.conf.d/99-no-retries >/dev/null
+      - uses: durable-workflow/.github/.github/actions/setup-php-linux@411a14ac07d32073eed6ab4977f2825eba4739a7  # bound-linux-php
+        with:
+          php-version: '8.3'
+          ini-file: production
+          tools: composer:2.10.3,phpunit:11.5.57
+          coverage: none
+      - name: Require the existing process-control capabilities
+        # No extension override: these must be present in the qualified stock profile.
+        run: |
+          php -r '
+            foreach (["pcntl", "posix"] as $extension) {
+              if (!extension_loaded($extension)) {
+                fwrite(STDERR, "Required extension missing: ".$extension.PHP_EOL);
+                exit(1);
+              }
+            }
+            foreach (["pcntl_signal", "pcntl_async_signals", "posix_kill", "posix_getpgid", "posix_setsid"] as $function) {
+              if (!function_exists($function)) {
+                fwrite(STDERR, "Required function missing: ".$function.PHP_EOL);
+                exit(1);
+              }
+            }'
+      - name: Verify actual Composer dependency trust
+        uses: durable-workflow/.github/.github/actions/verify-composer-trust@242c2a7fb23459db2e1ada5f84dbee6d61d9b1e5  # clean-trust
+      - run: composer install --prefer-dist --no-interaction
+      - name: Validate installer scripts
+        run: |
+          sh -n scripts/install.sh
+          sh -n scripts/generate-homebrew-formula.sh
+          sh -n scripts/verify-release.sh
+          node --check scripts/ci/release-version.js
+          node --check scripts/ci/verify-cli-release-channel.js
+          node --check scripts/ci/verify-cli-upgrade-result.js
+          node --check scripts/ci/verify-standalone-runtime.js
+          node --check scripts/ci/verify-standalone-dependencies.js
+          node --check scripts/ci/rust-dependency-inventory.js
+          php -l scripts/ci/probe-standalone-runtime.php
+          bash -n scripts/ci/verify-release-tag-source.sh
+          bash -n scripts/ci/establish-native-prerequisites.sh
+          bash -n scripts/ci/reconcile-release-metadata.sh
+          bash -n scripts/verify-public-release-assets.sh
+          bash -n scripts/verify-reproducible-build.sh
+          pwsh -NoProfile -Command '$null = [scriptblock]::Create((Get-Content -Raw scripts/install.ps1))'
+      - name: Verify release contracts
+        run: |
+          python -m pip install --only-binary :all: PyYAML==6.0.2
+          python scripts/ci/test-release-cache-policy.py
+          python scripts/ci/test-release-rust-workflow.py
+          python scripts/ci/test-apt-no-retries.py
+          python scripts/ci/test-build-workflow.py
+          node --test scripts/ci/test-rust-dependency-inventory.js
+          python scripts/ci/test-native-prerequisites.py
+          node --test scripts/ci/test-release-workflow-metadata.js
+          pwsh -NoProfile -File scripts/ci/test-windows-installer-path.ps1
+          node --test scripts/ci/test-standalone-runtime.js
+          node --test scripts/ci/test-standalone-dependencies.js
+          node --test scripts/ci/test-cli-release-channel.js
+          node --test scripts/ci/test-cli-upgrade-result.js
+          node --test scripts/ci/test-release-metadata.js
+      - name: Reverify Composer before project scripts
+        uses: durable-workflow/.github/.github/actions/verify-composer-trust@242c2a7fb23459db2e1ada5f84dbee6d61d9b1e5  # clean-trust
       - run: composer test
 
   build-phar:
@@ -286,7 +379,7 @@ jobs:
   target-branch-qualification:
     name: Target branch qualification
     if: ${{ always() && github.server_url == 'https://github.com' }}
-    needs: [action-policy, test, build-phar, reproducible-build, rust, rust-live-parity]
+    needs: [action-policy, test, test-php83, build-phar, reproducible-build, rust, rust-live-parity]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
@@ -299,12 +392,14 @@ jobs:
       - name: Require every build cell
         env:
           TEST_RESULT: ${{ needs.test.result }}
+          BOUND_TEST_RESULT: ${{ needs.test-php83.result }}
           PHAR_RESULT: ${{ needs.build-phar.result }}
           REPRODUCIBLE_RESULT: ${{ needs.reproducible-build.result }}
           RUST_RESULT: ${{ needs.rust.result }}
           RUST_LIVE_PARITY_RESULT: ${{ needs.rust-live-parity.result }}
         run: |
           test "$TEST_RESULT" = success
+          test "$BOUND_TEST_RESULT" = success
           test "$PHAR_RESULT" = success
           test "$REPRODUCIBLE_RESULT" = success
           test "$RUST_RESULT" = success

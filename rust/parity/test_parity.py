@@ -231,10 +231,10 @@ class PhpMainReferenceTest(unittest.TestCase):
 class RustOnlyCommandTest(unittest.TestCase):
     NAMES = {"batch:cancel", "batch:show"}
 
-    def test_the_catalog_marks_the_batch_and_activity_dispatch_commands_rust_only(self):
+    def test_the_catalog_marks_the_batch_activity_dispatch_and_update_outcome_commands_rust_only(self):
         self.assertEqual(["batch:cancel", "batch:resume", "batch:show", "batch:signal", "batch:update",
                           "task-queue:activity-dispatch", "task-queue:pause-activities",
-                          "task-queue:resume-activities"],
+                          "task-queue:resume-activities", "workflow:update-outcome"],
                          parity.rust_only_commands())
 
     def test_rust_only_help_is_skipped_but_2x_help_is_kept(self):

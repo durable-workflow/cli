@@ -42,7 +42,7 @@ for command in listing["commands"]:
         if commands[-1][field] != update["reference"]:
             raise SystemExit("Reference catalog metadata changed: " + command["name"] + ":" + field)
         commands[-1][field] = update["candidate"]
-# Rust-only commands (cli#60, Server #577) go into their namespace in name order.
+# Rust-only commands (cli#60, Server #577, Server #1131) go into their namespace in name order.
 with open(os.environ["DW_CATALOG_ADDITIONS"], encoding="utf-8") as handle:
     additions = json.load(handle)["commands"]
 for addition in additions:

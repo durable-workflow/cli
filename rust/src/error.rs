@@ -268,6 +268,20 @@ fn base_recommendations(error: &CliError, context: &ErrorContext) -> Vec<Value> 
             })];
         }
     }
+    // A failed update read later is final, not a request to fix and retry.
+    if context.command == "workflow:update-outcome"
+        && error
+            .body()
+            .and_then(|body| body.get("update_status"))
+            .and_then(Value::as_str)
+            == Some("failed")
+    {
+        return vec![json!({
+            "id": "update.failed",
+            "severity": "error",
+            "message": "The update handler failed; this is the update's final outcome, and reading it again returns the same failure. Inspect the workflow history for details.",
+        })];
+    }
     match error {
         CliError::Network(_) => vec![item(
             "server.unreachable",
@@ -548,6 +562,7 @@ pub fn human(error: &CliError, context: &ErrorContext) -> String {
                 | "workflow:start"
                 | "workflow:signal"
                 | "workflow:update"
+                | "workflow:update-outcome"
                 | "workflow:cancel"
                 | "workflow:terminate"
                 | "workflow:archive"

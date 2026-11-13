@@ -1,6 +1,7 @@
-//! workflow:query, workflow:start, workflow:signal and workflow:update
-//! against a loopback Server that records every request and answers from a
-//! queue. A dropped reply stands in for a lost response.
+//! workflow:query, workflow:start, workflow:signal, workflow:update and
+//! workflow:update-outcome against a loopback Server that records every
+//! request and answers from a queue. A dropped reply stands in for a lost
+//! response.
 
 use serde_json::{json, Value};
 use std::collections::VecDeque;
@@ -81,10 +82,11 @@ struct Server {
 
 impl Server {
     fn new(replies: Vec<Reply>) -> Self {
-        let info: Value = serde_json::from_str(include_str!(
-            "../src/compat/fixtures/cluster-info-php-2.11.8.json"
-        ))
-        .unwrap();
+        Self::with_info(php_info(), replies)
+    }
+
+    /// A Server that answers cluster info with `info`.
+    fn with_info(info: Value, replies: Vec<Reply>) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let url = format!("http://{}/prefix", listener.local_addr().unwrap());
         let requests = Arc::new(Mutex::new(Vec::new()));
@@ -140,6 +142,14 @@ impl Server {
             .clone()
             .unwrap_or(Value::Null)
     }
+}
+
+/// Published PHP Server 2.11.8 cluster info.
+fn php_info() -> Value {
+    serde_json::from_str(include_str!(
+        "../src/compat/fixtures/cluster-info-php-2.11.8.json"
+    ))
+    .unwrap()
 }
 
 fn read_request(stream: &mut std::net::TcpStream) -> (String, Vec<u8>) {
@@ -595,4 +605,384 @@ fn query_posts_input_without_a_key_and_prints_the_result() {
         stdout.contains("\"stage\": \"<b>shipping</b>\""),
         "Server text is printed literally: {stdout}"
     );
+}
+
+/// Cluster info of a Server with the update outcome read route (native
+/// Server 3.6.0, Server #1131).
+fn outcome_info() -> Value {
+    let mut info = php_info();
+    info["capabilities"] = json!({"update_outcome_reads": true});
+    info
+}
+
+/// An update receipt as native Server answers a read, with `fields` on top.
+fn receipt(fields: Value) -> Value {
+    let mut receipt = json!({
+        "workflow_id": "chk-42",
+        "run_id": "run-8",
+        "requested_run_id": null,
+        "target_scope": "instance",
+        "command_id": "cmd-3",
+        "command_status": "accepted",
+        "update_id": "upd-1",
+        "update_name": "quota.adjust",
+        "update_status": "accepted",
+        "result": null,
+        "result_envelope": null,
+        "failure_id": null,
+        "failure_message": null,
+        "accepted_at": "2026-11-13T10:00:00.000000Z",
+        "closed_at": null,
+        "wait_for": "accepted",
+        "wait_timed_out": false,
+        "wait_timeout_seconds": null,
+        "control_plane": contract(
+            "update",
+            json!({"update_id": "upd-1", "operation_name_field": "update_name", "operation_name": "quota.adjust"})
+        ),
+    });
+    for (key, value) in fields.as_object().unwrap() {
+        receipt[key] = value.clone();
+    }
+    receipt
+}
+
+fn reply(status: u16, body: Value) -> Reply {
+    Reply::Json { status, body }
+}
+
+const OUTCOME_READ: &str =
+    "GET /prefix/api/workflows/chk-42/updates/upd-1?wait_for=accepted HTTP/1.1";
+
+#[test]
+fn update_outcome_reads_a_completed_result_once_without_resubmitting() {
+    let scratch = Scratch::new();
+    let envelope = json!({"codec": "json", "blob": "{\"quota\":50}"});
+    let completed = receipt(json!({
+        "update_status": "completed",
+        "result_envelope": envelope,
+        "closed_at": "2026-11-13T10:00:02.000000Z",
+    }));
+    let server = Server::with_info(outcome_info(), vec![ok(completed)]);
+    let output = scratch.run(
+        &server.url,
+        &["workflow:update-outcome", "chk-42", "upd-1", "--json"],
+    );
+    assert_eq!(output.status.code(), Some(0), "{output:?}");
+    assert_eq!(server.lines(), [OUTCOME_READ], "one read, never a POST");
+    let result = stdout_json(&output);
+    assert_eq!(result["update_status"], "completed");
+    assert_eq!(result["update_id"], "upd-1");
+    assert_eq!(result["run_id"], "run-8");
+    assert_eq!(result["result_envelope"], envelope);
+    assert_eq!(result["namespace"], "orders");
+    assert_eq!(result["wait_timed_out"], false);
+
+    let output = scratch.run(&server.url, &["workflow:update-outcome", "chk-42", "upd-1"]);
+    assert_eq!(output.status.code(), Some(0), "{output:?}");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.starts_with("Update completed\n"), "{stdout}");
+    assert!(stdout.contains("  Update ID: upd-1\n"), "{stdout}");
+    assert!(stdout.contains("  Run ID: run-8\n"), "{stdout}");
+    assert!(stdout.contains("  Namespace: orders\n"), "{stdout}");
+    assert!(stdout.contains("  Result Envelope:\n"), "{stdout}");
+    assert!(stdout.contains(r#""blob": "{\"quota\":50}""#), "{stdout}");
+    assert!(!stdout.contains("pending"), "{stdout}");
+    assert!(server.lines().iter().all(|line| line.starts_with("GET ")));
+}
+
+#[test]
+fn update_outcome_keeps_a_completed_null_result_distinct_from_pending() {
+    let scratch = Scratch::new();
+    let null_result = json!({"codec": "json", "blob": "null"});
+    let server = Server::with_info(
+        outcome_info(),
+        vec![ok(receipt(json!({
+            "update_status": "completed",
+            "result_envelope": null_result,
+        })))],
+    );
+    let output = scratch.run(
+        &server.url,
+        &["workflow:update-outcome", "chk-42", "upd-1", "--json"],
+    );
+    assert_eq!(output.status.code(), Some(0), "{output:?}");
+    let result = stdout_json(&output);
+    assert_eq!(result["update_status"], "completed");
+    assert_eq!(result["result_envelope"], null_result);
+
+    let output = scratch.run(&server.url, &["workflow:update-outcome", "chk-42", "upd-1"]);
+    assert_eq!(output.status.code(), Some(0), "{output:?}");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.starts_with("Update completed\n"), "{stdout}");
+    assert!(stdout.contains(r#""blob": "null""#), "{stdout}");
+    assert!(!stdout.contains("pending"), "{stdout}");
+}
+
+#[test]
+fn update_outcome_reports_a_pending_update_and_how_to_wait_for_it() {
+    let scratch = Scratch::new();
+    let server = Server::with_info(
+        outcome_info(),
+        vec![reply(
+            202,
+            receipt(json!({
+                "wait_for": "completed",
+                "wait_timed_out": true,
+                "wait_timeout_seconds": 5,
+            })),
+        )],
+    );
+    let args = [
+        "workflow:update-outcome",
+        "chk-42",
+        "upd-1",
+        "--wait=completed",
+        "--wait-timeout=5",
+    ];
+    let output = scratch.run(&server.url, &args);
+    assert_eq!(output.status.code(), Some(0), "{output:?}");
+    assert_eq!(
+        server.lines(),
+        ["GET /prefix/api/workflows/chk-42/updates/upd-1?wait_for=completed&wait_timeout_seconds=5 HTTP/1.1"]
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(
+        stdout.starts_with("Update accepted, not finished yet\n"),
+        "{stdout}"
+    );
+    assert!(stdout.contains("  Update Status: accepted\n"), "{stdout}");
+    assert!(
+        stdout.contains("The completion wait ended after 5 seconds before the update finished."),
+        "{stdout}"
+    );
+    assert!(stdout.contains("not a null result"), "{stdout}");
+    assert!(
+        stdout.contains("dw workflow:update-outcome chk-42 upd-1 --wait=completed"),
+        "{stdout}"
+    );
+    assert!(!stdout.contains("Result Envelope"), "{stdout}");
+
+    let mut json_args = args.to_vec();
+    json_args.push("--json");
+    let output = scratch.run(&server.url, &json_args);
+    assert_eq!(output.status.code(), Some(0), "{output:?}");
+    let result = stdout_json(&output);
+    assert_eq!(result["update_status"], "accepted");
+    assert_eq!(result["result_envelope"], Value::Null);
+    assert_eq!(result["wait_timed_out"], true);
+    assert_eq!(result["wait_timeout_seconds"], 5);
+    assert_eq!(server.lines().len(), 2);
+}
+
+#[test]
+fn update_outcome_reports_a_failed_update_as_an_error() {
+    let scratch = Scratch::new();
+    let server = Server::with_info(
+        outcome_info(),
+        vec![reply(
+            422,
+            receipt(json!({
+                "update_status": "failed",
+                "failure_id": "fail-9",
+                "failure_message": "quota <b>exceeded</b>",
+                "closed_at": "2026-11-13T10:00:02.000000Z",
+            })),
+        )],
+    );
+    let output = scratch.run(&server.url, &["workflow:update-outcome", "chk-42", "upd-1"]);
+    assert_eq!(output.status.code(), Some(2), "{output:?}");
+    assert!(output.stdout.is_empty(), "{output:?}");
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.starts_with("Update [upd-1] failed: quota <b>exceeded</b>\n"),
+        "{stderr}"
+    );
+    assert!(stderr.contains("final outcome"), "{stderr}");
+    assert!(!stderr.contains("retry"), "{stderr}");
+
+    let output = scratch.run(
+        &server.url,
+        &["workflow:update-outcome", "chk-42", "upd-1", "--json"],
+    );
+    assert_eq!(output.status.code(), Some(2), "{output:?}");
+    let error = stdout_json(&output);
+    assert_eq!(error["exit_code"], 2);
+    assert_eq!(error["status_code"], 422);
+    assert_eq!(error["command"], "workflow:update-outcome");
+    assert_eq!(error["namespace"], "orders");
+    assert_eq!(error["workflow_id"], "chk-42");
+    assert_eq!(error["update_id"], "upd-1");
+    assert_eq!(error["update_status"], "failed");
+    assert_eq!(error["failure_id"], "fail-9");
+    assert_eq!(error["failure_message"], "quota <b>exceeded</b>");
+    assert_eq!(error["recommendations"][0]["id"], "update.failed");
+    assert_eq!(server.lines(), [OUTCOME_READ, OUTCOME_READ]);
+}
+
+#[test]
+fn update_outcome_not_found_exits_5_and_does_not_claim_the_update_never_existed() {
+    let scratch = Scratch::new();
+    let server = Server::with_info(
+        outcome_info(),
+        vec![reply(
+            404,
+            json!({
+                "message": "Update [upd-1] is not retained for workflow [chk-42].",
+                "reason": "update_not_found",
+                "workflow_id": "chk-42",
+                "update_id": "upd-1",
+            }),
+        )],
+    );
+    let output = scratch.run(&server.url, &["workflow:update-outcome", "chk-42", "upd-1"]);
+    assert_eq!(output.status.code(), Some(5), "{output:?}");
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.starts_with(
+            "Update [upd-1] is not retained for workflow [chk-42] in namespace [orders]."
+        ),
+        "{stderr}"
+    );
+    assert!(
+        stderr.contains("does not prove the update was never admitted"),
+        "{stderr}"
+    );
+    assert!(stderr.contains("Reason: update_not_found"), "{stderr}");
+
+    let output = scratch.run(
+        &server.url,
+        &["workflow:update-outcome", "chk-42", "upd-1", "--json"],
+    );
+    assert_eq!(output.status.code(), Some(5), "{output:?}");
+    let error = stdout_json(&output);
+    assert_eq!(error["exit_code"], 5);
+    assert_eq!(error["status_code"], 404);
+    assert_eq!(error["reason"], "update_not_found");
+    assert_eq!(error["update_id"], "upd-1");
+    assert_eq!(error["recommendations"][0]["id"], "resource.not_found");
+    assert_eq!(server.lines(), [OUTCOME_READ, OUTCOME_READ]);
+}
+
+#[test]
+fn update_outcome_is_refused_before_any_request_without_the_capability() {
+    let scratch = Scratch::new();
+    let mut not_advertised = php_info();
+    not_advertised["capabilities"] = json!({"update_outcome_reads": false});
+    for info in [php_info(), not_advertised] {
+        let server = Server::with_info(info.clone(), vec![ok(receipt(json!({})))]);
+        let output = scratch.run(
+            &server.url,
+            &[
+                "workflow:update-outcome",
+                "chk-42",
+                "upd-1",
+                "--wait=completed",
+            ],
+        );
+        assert_eq!(output.status.code(), Some(8), "{output:?}");
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(
+            stderr.contains("does not advertise capabilities.update_outcome_reads"),
+            "{stderr}"
+        );
+        assert!(
+            stderr.contains("dw never sends the update again in place of a read"),
+            "{stderr}"
+        );
+
+        let output = scratch.run(
+            &server.url,
+            &["workflow:update-outcome", "chk-42", "upd-1", "--json"],
+        );
+        assert_eq!(output.status.code(), Some(8), "{output:?}");
+        let error = stdout_json(&output);
+        assert_eq!(error["exit_code"], 8);
+        assert_eq!(
+            error["compatibility"]["detail"],
+            "server did not advertise capabilities.update_outcome_reads."
+        );
+        assert!(
+            server.lines().is_empty(),
+            "no read and no update: {:?}",
+            server.lines()
+        );
+    }
+}
+
+#[test]
+fn update_outcome_refuses_bad_wait_options_and_a_mismatched_receipt() {
+    let scratch = Scratch::new();
+    let server = Server::with_info(outcome_info(), vec![ok(receipt(json!({})))]);
+    for args in [
+        vec!["workflow:update-outcome", "chk-42", "upd-1", "--wait=later"],
+        vec![
+            "workflow:update-outcome",
+            "chk-42",
+            "upd-1",
+            "--wait-timeout=5",
+        ],
+        vec![
+            "workflow:update-outcome",
+            "chk-42",
+            "upd-1",
+            "--wait=completed",
+            "--wait-timeout=0",
+        ],
+        vec![
+            "workflow:update-outcome",
+            "chk-42",
+            "upd-1",
+            "--wait=completed",
+            "--wait-timeout=1.5",
+        ],
+    ] {
+        let output = scratch.run(&server.url, &args);
+        assert_eq!(output.status.code(), Some(2), "{args:?}: {output:?}");
+    }
+    assert!(server.lines().is_empty(), "{:?}", server.lines());
+
+    let output = scratch.run(&server.url, &["workflow:update-outcome", "chk-42", "upd-2"]);
+    assert_eq!(output.status.code(), Some(1), "{output:?}");
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.contains("does not match the requested update"),
+        "{stderr}"
+    );
+    assert!(!String::from_utf8(output.stdout).unwrap().contains("upd-1"));
+}
+
+#[test]
+fn update_points_an_unfinished_update_at_update_outcome_only_when_the_server_can_read_it() {
+    let scratch = Scratch::new();
+    let accepted = receipt(json!({
+        "wait_for": "completed",
+        "wait_timed_out": true,
+        "wait_timeout_seconds": 10,
+    }));
+    let args = [
+        "workflow:update",
+        "chk-42",
+        "quota.adjust",
+        "--wait=completed",
+        "--request-id=quota-1",
+    ];
+    let server = Server::with_info(outcome_info(), vec![reply(202, accepted.clone())]);
+    let output = scratch.run(&server.url, &args);
+    assert_eq!(output.status.code(), Some(0), "{output:?}");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(
+        stdout.contains("accepted but not finished (the completion wait ran out)"),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("dw workflow:update-outcome chk-42 upd-1 --wait=completed"),
+        "{stdout}"
+    );
+
+    let server = Server::with_info(php_info(), vec![reply(202, accepted)]);
+    let output = scratch.run(&server.url, &args);
+    assert_eq!(output.status.code(), Some(0), "{output:?}");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(!stdout.contains("workflow:update-outcome"), "{stdout}");
 }

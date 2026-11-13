@@ -72,6 +72,7 @@ fn handler(name: &str) -> Option<Handler> {
         "workflow:start" => Handler::Server(workflow_message::start),
         "workflow:signal" => Handler::Server(workflow_message::signal),
         "workflow:update" => Handler::Server(workflow_message::update),
+        "workflow:update-outcome" => Handler::Server(workflow_message::update_outcome),
         "workflow:cancel" => Handler::Server(workflow_control::cancel),
         "workflow:terminate" => Handler::Server(workflow_control::terminate),
         "workflow:archive" => Handler::Server(workflow_control::archive),
@@ -149,6 +150,7 @@ const NAMESPACE_SCOPED: &[&str] = &[
     "workflow:start",
     "workflow:signal",
     "workflow:update",
+    "workflow:update-outcome",
     "workflow:cancel",
     "workflow:terminate",
     "workflow:archive",
@@ -467,6 +469,7 @@ fn argument_context(input: &Input) -> Vec<(&'static str, String)> {
         ("signal-name", "signal_name"),
         ("query-name", "query_name"),
         ("update-name", "update_name"),
+        ("update-id", "update_id"),
     ]
     .into_iter()
     .filter_map(|(argument, field)| input.arg(argument).map(|value| (field, value)))

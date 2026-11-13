@@ -14,8 +14,11 @@ import time
 import urllib.error
 import urllib.request
 
+if __name__ == "__main__" and "BOOTSTRAP_HELD_IMPLEMENTATION" not in globals():
+    raise SystemExit("Use run_cli_216.py to verify the implementation before execution")
+
 SOURCE = Path(__file__).resolve().parent
-BOUNDARY_SHA = 'd377e9191ebf79dc990db159629c303c10531a2f27d3ae20933fabc87e3b3525'
+BOUNDARY_SHA = '49f44b870296b27955f116295f4e177a1fd285cc976809c13e5f57dc3cb1ebbf'
 # Bootstrap the local reviewed boundary module from the same bytes that are
 # checked. Subsequent inputs use its held descriptors and sealed memory files.
 _boundary_path = SOURCE / 'boundaries.py'
@@ -48,7 +51,11 @@ def held(path, digest, maximum=16 * 1024 * 1024):
     HELD.append(value)
     return value
 
-ENTRY_INPUT = held(Path(__file__).absolute(), None, 131072)
+if "BOOTSTRAP_HELD_IMPLEMENTATION" in globals():
+    ENTRY_INPUT = BOOTSTRAP_HELD_IMPLEMENTATION
+    HELD.extend([BOOTSTRAP_HELD_BOUNDARY, ENTRY_INPUT])
+else:
+    ENTRY_INPUT = held(Path(__file__).absolute(), None, 131072)
 PROXY_INPUT = held(PROXY_SOURCE, PROXY_SHA256)
 shared_proxy = PROXY_INPUT.module('cli216_shared_proxy')
 CommittedResponseLoss = shared_proxy.CommittedResponseLoss
@@ -72,6 +79,10 @@ ENV = {'PATH': str(ROOT / 'bin') + ':/usr/bin:/bin', 'HOME': str(ROOT / 'home'),
        'DURABLE_WORKFLOW_AUTH_TOKEN': TOKEN}
 for directory in ('data', 'home', 'config', 'tmp', 'docker-empty'):
     boundary.private_directory(ROOT / directory)
+WORKSPACE = boundary.Workspace(ROOT)
+ENV.update({'PATH': WORKSPACE.child_anchor('bin') + ':/usr/bin:/bin',
+            'HOME': WORKSPACE.child_anchor('home'), 'DW_CONFIG_HOME': WORKSPACE.child_anchor('config'),
+            'TMPDIR': WORKSPACE.child_anchor('tmp')})
 HTTP = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
 
@@ -84,13 +95,14 @@ def require(condition, label, detail=None):
 
 
 def docker(*args):
-    p = subprocess.run(['docker', '--config', str(ROOT / 'docker-empty'), *args], capture_output=True, text=True, timeout=50, env={'PATH': os.defpath, 'HOME': str(ROOT / 'home')})
+    p = subprocess.run(['docker', '--config', '/proc/self/fd/' + str(WORKSPACE.children['docker-empty'].fd), *args], capture_output=True, text=True, timeout=50, env={'PATH': os.defpath, 'HOME': WORKSPACE.child_anchor('home')}, pass_fds=WORKSPACE.inherited())
     if p.returncode:
         raise RuntimeError('docker operation failed: ' + p.stderr.replace(TOKEN, '[redacted]')[:2000])
     return p.stdout.strip()
 
 
 def request(method, path, body=None, namespace='default'):
+    WORKSPACE.recheck()
     headers = {'Authorization': 'Bearer ' + TOKEN, 'X-Namespace': namespace, 'Content-Type': 'application/json'}
     worker = path.startswith('/api/worker/')
     headers['X-Durable-Workflow-Protocol-Version' if worker else 'X-Durable-Workflow-Control-Plane-Version'] = '1.20' if worker else '2'
@@ -101,13 +113,17 @@ def request(method, path, body=None, namespace='default'):
             return response.status, json.load(response)
     except urllib.error.HTTPError as e:
         return e.code, json.load(e)
+    finally:
+        WORKSPACE.recheck()
 
 
 def cli(*args, namespace='default', success=True):
+    WORKSPACE.recheck()
     CLI_INPUT.recheck()
     p = subprocess.run(['dw', *args, '--server=' + PROXY.url, '--namespace=' + namespace, '--json'],
-                       executable=CLI_INPUT.executable, env=ENV, capture_output=True, text=True, timeout=45, pass_fds=(CLI_INPUT.sealed_fd,))
+                       executable=CLI_INPUT.executable, env=ENV, capture_output=True, text=True, timeout=45, pass_fds=(CLI_INPUT.sealed_fd, *WORKSPACE.inherited()))
     CLI_INPUT.recheck()
+    WORKSPACE.recheck()
     try:
         body = json.loads(p.stdout)
     except ValueError:
@@ -184,8 +200,7 @@ def history(f):
 
 
 def snapshot():
-    from contextlib import closing
-    with closing(sqlite3.connect(DB.as_uri() + '?mode=ro', uri=True, timeout=2)) as db:
+    with WORKSPACE.connection() as db:
         return legacy_helper.snapshot(db)
 
 
@@ -258,7 +273,7 @@ def result_is_one(answer):
 
 
 def run_modern():
-    require(shutil.which('dw', path=ENV['PATH']) == str(ROOT / 'bin/dw'), 'ordinary scoped PATH selects installed release')
+    require(shutil.which('dw', path=ENV['PATH']) == WORKSPACE.child_anchor('bin') + '/dw', 'ordinary scoped PATH selects installed release')
     require(hashlib.sha256((ROOT / 'bin/dw').read_bytes()).hexdigest() == 'da366c79c90978a3c0a92d723c66a96a2d0963f9dccbd41c8207f2c41848f814', 'published CLI binary SHA matches approved release')
     status, info = request('GET', '/api/cluster/info')
     require(status == 200 and info['version'] == '3.9.2' and info['capabilities']['command_request_keys'] is True, 'published Server 3.9.2 advertises command_request_keys', info.get('version'))
@@ -332,7 +347,7 @@ def run_modern():
 def run_selected_and_restart():
     status, info = request('GET', '/api/cluster/info')
     require(status == 200 and info['version'] == '3.9.2', 'same published Server version after process restart')
-    previous = json.loads((ROOT / 'modern-admissions.json').read_text())
+    previous = json.loads(WORKSPACE.read('modern-admissions.json'))
     recovered = 0
     for record in previous:
         if not record['dropped']:
@@ -399,19 +414,18 @@ def run_typed():
 
 if __name__ == '__main__':
     outcome, error = 'runner-blocked', None
-    runtime = boundary.OwnedContainer(docker, NAME)
+    runtime = boundary.OwnedContainer(docker, NAME, WORKSPACE)
     try:
         observed = json.loads(docker('image', 'inspect', IMAGE, '--format', '{{json .}}'))
         require(observed['Architecture'] == 'amd64' and observed['Os'] == 'linux', 'observed native platform is linux/amd64')
         require(observed['Config']['Labels']['org.opencontainers.image.revision'] == '5614274d2629d03f92932a07dfee0fb10349ddd9', 'observed image source matches qualified producer')
         envfile = ROOT / 'runtime.env'
-        envfile.write_text('DW_AUTH_TOKEN=' + TOKEN + '\nDW_RUST_MAINTENANCE_LOOP=0\n')
-        envfile.chmod(0o600)
+        WORKSPACE.write('runtime.env', ('DW_AUTH_TOKEN=' + TOKEN + '\nDW_RUST_MAINTENANCE_LOOP=0\n').encode())
         runtime.run('--rm', '-d', '--name', NAME, '--platform=linux/amd64', '--init', '--cpus=1', '--memory=1g', '--pids-limit=256',
-               '--read-only', '--cap-drop=ALL', '--security-opt=no-new-privileges', '--env-file', str(envfile),
-               '--mount', 'type=bind,source=' + str(ROOT / 'data') + ',target=/app/database',
+               '--read-only', '--cap-drop=ALL', '--security-opt=no-new-privileges', '--env-file', '/proc/self/fd/' + str(WORKSPACE.files['runtime.env'].fd), '--entrypoint=/bin/sh',
+               *WORKSPACE.mount_arguments(),
                '--tmpfs', '/app/storage:rw,uid=1000,gid=1000,mode=750,size=64m',
-               '--tmpfs', '/tmp:rw,size=16m', '-p', '127.0.0.1::8080', IMAGE)
+               '--tmpfs', '/tmp:rw,size=16m', '-p', '127.0.0.1::8080', IMAGE, *WORKSPACE.native_arguments())
         binding = runtime.inspect()['NetworkSettings']['Ports']['8080/tcp'][0]
         BASE = 'http://127.0.0.1:' + binding['HostPort']
         for _ in range(100):
@@ -448,6 +462,7 @@ if __name__ == '__main__':
                 time.sleep(.1)
             if runtime.exists():
                 raise RuntimeError('created container removal did not complete')
+            WORKSPACE.recheck()
             for item in HELD:
                 item.recheck()
             cleanup = 'created container and anonymous volumes removed; held inputs unchanged'
@@ -455,15 +470,18 @@ if __name__ == '__main__':
             cleanup = 'cleanup or input identity requires investigation'
             outcome = 'runner-blocked'
             error = (type(failure).__name__ + ': ' + str(failure)).replace(TOKEN, '[redacted]')
-        (ROOT / 'runtime.env').unlink(missing_ok=True)
+        WORKSPACE.unlink('runtime.env')
         report = {'started_at': STARTED, 'finished_at': datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                  'outcome': outcome, 'created_container_ids': runtime.created_ids, 'checks': CHECKS, 'error': error, 'cleanup': cleanup,
-                  'runner_sha256': ENTRY_INPUT.digest,
+                  'outcome': outcome, 'workspace_identity': WORKSPACE.evidence(), 'created_container_ids': runtime.created_ids, 'checks': CHECKS, 'error': error, 'cleanup': cleanup,
+                  'runner_sha256': ENTRY_INPUT.digest, 'launcher_sha256': BOOTSTRAP_LAUNCHER_SHA256,
+                  'runner_source_commit': BOOTSTRAP_SOURCE_COMMIT,
                   'proxy_sha256': PROXY_INPUT.digest, 'server_index': IMAGE, 'server_source': '5614274d2629d03f92932a07dfee0fb10349ddd9', 'phase': os.environ.get('CLI_216_PHASE', 'modern')}
-        (ROOT / 'result.json').write_text(json.dumps(report, indent=2))
-        (ROOT / 'invocations.json').write_text(json.dumps(INVOCATIONS, indent=2).replace(TOKEN, '[redacted]'))
-        (ROOT / 'admissions.json').write_text(json.dumps(ADMISSIONS, indent=2))
+        WORKSPACE.write('result.json', json.dumps(report, indent=2).encode())
+        WORKSPACE.write('invocations.json', json.dumps(INVOCATIONS, indent=2).replace(TOKEN, '[redacted]').encode())
+        WORKSPACE.write('admissions.json', json.dumps(ADMISSIONS, indent=2).encode())
         if PROXY:
-            (ROOT / 'wire.json').write_text(json.dumps(PROXY.records, indent=2).replace(TOKEN, '[redacted]'))
+            WORKSPACE.write('wire.json', json.dumps(PROXY.records, indent=2).replace(TOKEN, '[redacted]').encode())
+        WORKSPACE.recheck()
         print(json.dumps(report), flush=True)
+        WORKSPACE.close()
     raise SystemExit(0 if outcome == 'pass' else 1)

@@ -73,7 +73,22 @@ The runner holds these exact bytes and compares the actual retained Avro result
 with this known fixture. It never executes an external codec program or accepts
 its self-reported decoded result.
 
-Run source with isolated host Python and the private directory in
+Obtain the outer bootstrap from the frozen reviewed Git commit, independently
+verify its SHA256 from the owning review receipt, then pass those literal bytes
+to isolated Python with `-c`. Do not execute any dispatcher or bootstrap by a
+host pathname. The bootstrap obtains the dispatcher from the same frozen Git
+object and checks its separately fixed SHA256 before compile/exec. Host-path
+substitution of the outer dispatcher cannot replace those Git bytes.
+
+```bash
+reviewed_source_commit=FULL_REVIEWED_COMMIT_FROM_THE_PR
+bootstrap="$(git --no-replace-objects show "$reviewed_source_commit:scripts/acceptance/command-keys/git_bootstrap.py")"$'\n'
+expected_bootstrap_sha256=4b34ceb7b8c1366bc46405310bc4779df6a3ee63eb274af41868265028a5bc12
+actual_bootstrap_sha256="$(printf '%s' "$bootstrap" | sha256sum | awk '{print $1}')"
+test "$actual_bootstrap_sha256" = "$expected_bootstrap_sha256"
+```
+
+Run from that repository with the private directory in
 `CLI_216_WORKDIR`. Provide a clean environment without cloud, GitHub, Composer
 or registry credentials. Runtime authentication is synthetic and private.
 
@@ -81,7 +96,7 @@ or registry credentials. Runtime authentication is synthetic and private.
 env -i PATH=/usr/bin:/bin \
   CLI_216_WORKDIR="$experiment" \
   CLI_216_PROXY_SOURCE="$experiment/committed_response_loss.py" \
-  timeout 180s python3 -I -B scripts/acceptance/command-keys/cli_216.py
+  timeout 180s python3 -I -B -c "$bootstrap" "$reviewed_source_commit"
 ```
 
 For the restart phase, preserve the first phase's `admissions.json` as
@@ -91,7 +106,7 @@ records separately too. `CLI_216_PHASE=fresh-selected` adds direct fresh
 explicit-run literal-key markers (the loss cells intentionally withhold those
 initial response bodies). `CLI_216_PHASE=typed` runs the separate typed-intent
 cases. Use a **new** private
-directory for `legacy_cli.py`, with the same staged inputs and environment.
+directory with `CLI_216_RUNNER=legacy`, with the same staged inputs and environment.
 The legacy adapter generates its own admissions and stopped-copy database.
 
 An outer experiment owner must also enforce the timeout and remove only the
@@ -121,3 +136,110 @@ replacement, a forged codec, sealed-content writes, foreign-name survival and
 schema-only mutations that the predecessor's row-only comparison accepted.
 Modern and legacy zero-write checks use the same bounded typed logical snapshot,
 including catalog SQL, columns, indexes, triggers, views and all table rows.
+
+## Physical 3.8 upgrade
+
+`run_cli_216.py` verifies and holds literal-hash modern, legacy or physical implementation bytes
+before executing any implementation code. Its reported runner digest comes
+from those checked bytes, with a post-cleanup identity recheck. Direct execution
+of the implementation refuses before effectful initialization. It consumes the
+producer-owned real 3.8 API seed after the
+[accepted handoff](https://github.com/durable-workflow/server/pull/1210#issuecomment-6860138558).
+It does not call the synthetic transform or seed a replacement baseline.
+The accepted fixture contract is Server commit
+`a09f156399416216d2f097c257a2164f83c7eda7`. The original seed actually executed
+commit `09a4ccda3da11853606af031a8970bbde4b2d6ec`, driver SHA256
+`01c0fa1251ac3c809723e58d71817881fe2c5c9498579bc4c2e6097324a3618b`.
+Keep these two provenance meanings distinct.
+
+Use another fresh private directory with the common staged inputs above and:
+
+| Input | Source/identity |
+| --- | --- |
+| `CLI_216_PHYSICAL_BASELINE` | Absolute original stopped-backup path supplied by its owner; SHA256 `7d1826f7681342bb3a5974509648e2e8d75e7a21d262f65f3ec1f58727ccbc0c` |
+| `CLI_216_PHYSICAL_PACKET` | Absolute original seed JSON path supplied by its owner; SHA256 `8c728ce827df3a11621dfb0e82cdd404bbab48784182a5e92c8d632d49047fc5` |
+| `physical-contract.json` | The legacy manifest at accepted Server `a09f1563`; SHA256 `ceb4695643e48c7bfe3f81eea380c6ab9aa0b973da830cb552d070344047319f` |
+| `0013_command_intents.sql` | `rust/migrations/sqlite/0013_command_intents.sql` at published Server source `5614274d2629d03f92932a07dfee0fb10349ddd9`; SHA256 `fc3ad1730682c09704027dcbabc17cd6ded9c642a3ff20d7988d5f4b4a5726fd` |
+
+The original backup and packet are held read-only and rechecked after use.
+Only a newly created owned copy is mounted into the published 3.9.2 image.
+The image runs its actual `schema-upgrade` command, requiring SQLite 12 → 13.
+The comparison preserves all old business rows and schema objects, allowing
+only tagged DDL plus explicitly validated schema-version/journal metadata.
+The intent table must be empty. The new journal checksum, description,
+version, success, timestamp interval and exact integer-zero execution time are checked.
+
+```bash
+env -i PATH=/usr/bin:/bin \
+  CLI_216_WORKDIR="$experiment" \
+  CLI_216_PROXY_SOURCE="$experiment/committed_response_loss.py" \
+  CLI_216_RUNNER=physical \
+  CLI_216_PHYSICAL_BASELINE="$original_backup" \
+  CLI_216_PHYSICAL_PACKET="$original_packet" \
+  timeout 180s python3 -I -B -c "$bootstrap" "$reviewed_source_commit"
+```
+
+Created names are `cli-216-392-upgrade` and `cli-216-392-physical`; cleanup
+authority remains their captured IDs. The upgrade container is retained until
+its actual exit/log result is read, then removed. The runtime exercises the
+installed CLI's original keyed-update readbacks and name/run fences for all
+three old-run states. Original NULL-key signals are checked only for preserved
+identity/history, never manufactured retained-key or intent equality.
+Full request-window snapshots must agree. A later post-stop maintenance
+snapshot is a different observation and must not be relabeled as that window.
+
+The comparison's offline controls require the staged helper and tagged SQL:
+
+```bash
+CLI_216_TEST_HELPER="$experiment/sqlite_legacy.py" \
+  CLI_216_TEST_DELTA="$experiment/0013_command_intents.sql" \
+  python3 -I -B scripts/acceptance/command-keys/test_physical_cli.py -v
+```
+
+These controls are not a physical upgrade result. Source review, current
+normal gates, fresh actual execution and cleanup still qualify that cell.
+
+The manual experiment holds owned mode-0700 root/data directories and a
+single-link mode-0600 database descriptor throughout each phase. SQLite opens
+through the held real disk-file descriptor, preserving normal WAL/SHM behavior
+without reopening the mutable database name.
+Docker acquires the guarded canonical data bind. A literal in-container shell
+preflight checks the actual mounted directory and database device/inode,
+UID/GID, mode and link count before executing the native binary. Host checks
+immediately before/after acquisition and inspection retain their held identities.
+The env-file and Docker config client use inherited `/proc/self/fd` descriptors;
+HOME/config/tmp/bin consumer directories are separately held and inherited too.
+Exact-ID cleanup uses that held Docker configuration even after a workspace
+pathname failure. This requires the local Linux Docker daemon.
+Identity checks immediately surround snapshots, container creation/inspection,
+API and installed CLI calls, cleanup, and report emission. Reports are written
+through held no-follow descriptors, then their path, parent, and contents are
+rechecked before printing a terminal result. A swap fails the run; exact-ID
+container cleanup remains available even after a workspace identity failure.
+
+The synthetic transform uses a separate stopped sibling copy, verifies its
+complete result against the accepted helper's fingerprints, and copies those
+bytes into the existing held runtime database inode. It does not rename a new
+file over the database that later containers exercise. The physical upgrade
+also mutates only that held copied database. Reports include root/data/database
+identities so the parent can compare them across modern process restarts.
+Offline workspace controls demonstrate predecessor pathname substitution and
+require refusal for root/data/database swaps before upgrade or runtime start,
+report path/parent swaps during emission, in-place report edits, symlinks and
+extra hard links. A positive WAL control preserves actual mutable SQLite use.
+
+Opt-in actual-container boundary controls (separate from installed qualification):
+
+```bash
+CLI_216_CONTAINER_CONTROLS=1 \
+  python3 -I -B scripts/acceptance/command-keys/test_workspace_container.py -v
+```
+
+These use five sequential `cli-152-boundary-*` containers with the same pinned
+native image, one CPU, 512 MiB, 128 PIDs, no network or ports. Directory/file
+substitution must exit 78 before native execution. The positive mount control
+executes the native `schema-check` command and expects its SQLite-unsupported
+diagnostic, proving the preflight reached the native binary without starting a
+runtime or upgrading a database. Env/config controls use the real Docker reader
+and retain exact-ID cleanup after substitution. Check host capacity first and
+set TMPDIR to owned disk-backed scratch. No image build or credentials are used.

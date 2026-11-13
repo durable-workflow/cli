@@ -699,8 +699,9 @@ SH);
         self::assertStringContainsString('normalize_mtimes', $buildScript);
         self::assertStringContainsString('SPC_DOWNLOAD_RETRY="${SPC_DOWNLOAD_RETRY:-5}"', $buildScript);
         self::assertStringContainsString('SPC_DOWNLOAD_OUTER_ATTEMPTS="${SPC_DOWNLOAD_OUTER_ATTEMPTS:-4}"', $buildScript);
-        self::assertStringContainsString('spc_download_with_retry', $buildScript);
-        self::assertStringContainsString('--prefer-pre-built --without-suggestions --retry="$SPC_DOWNLOAD_RETRY"', $buildScript);
+        self::assertStringContainsString('"$TOOLS_DIR/spc" run', $buildScript);
+        $spcRunner = self::readRepoFile('scripts/ci/spc-artifact.py');
+        self::assertStringContainsString('"--prefer-pre-built", "--without-suggestions", "--retry="', $spcRunner);
 
         self::assertStringContainsString('SOURCE_DATE_EPOCH', $generator);
     }

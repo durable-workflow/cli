@@ -45,17 +45,6 @@ ensure_tools() {
     bash "$ROOT/scripts/ci/ensure-box.sh" "$BOX_VERSION" "$TOOLS_DIR/box"
 }
 
-ensure_spc() {
-    local platform
-    platform="$(detect_platform)"
-    if [[ ! -x "$TOOLS_DIR/spc" ]]; then
-        echo ">> Downloading spc (static-php-cli) for ${platform}"
-        curl --proto '=https' --proto-redir '=https' -fsSL -o "$TOOLS_DIR/spc" \
-            "https://dl.static-php.dev/static-php-cli/spc-bin/nightly/spc-${platform}"
-        chmod +x "$TOOLS_DIR/spc"
-    fi
-}
-
 install_composer_deps() {
     echo ">> Installing production Composer dependencies"
     composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
@@ -98,29 +87,6 @@ normalize_mtimes() {
         touch -h -d "@$epoch" "$ROOT/src/GeneratedBuildInfo.php" 2>/dev/null || true
 }
 
-spc_download_with_retry() {
-    if [[ ! "$SPC_DOWNLOAD_OUTER_ATTEMPTS" =~ ^[0-9]+$ ]] || [[ "$SPC_DOWNLOAD_OUTER_ATTEMPTS" -lt 1 ]]; then
-        echo "SPC_DOWNLOAD_OUTER_ATTEMPTS must be a positive integer" >&2
-        exit 1
-    fi
-
-    local attempt delay
-    for ((attempt = 1; attempt <= SPC_DOWNLOAD_OUTER_ATTEMPTS; attempt++)); do
-        if ./spc download "$@"; then
-            return 0
-        fi
-
-        if [[ "$attempt" -lt "$SPC_DOWNLOAD_OUTER_ATTEMPTS" ]]; then
-            delay=$((attempt * 30))
-            echo ">> spc dependency download attempt ${attempt}/${SPC_DOWNLOAD_OUTER_ATTEMPTS} failed; retrying in ${delay}s" >&2
-            sleep "$delay"
-        fi
-    done
-
-    echo "spc dependency download failed after ${SPC_DOWNLOAD_OUTER_ATTEMPTS} attempts" >&2
-    return 1
-}
-
 build_phar() {
     ensure_tools
     ensure_source_date_epoch
@@ -134,23 +100,21 @@ build_phar() {
 }
 
 build_binary() {
-    build_phar
-    ensure_spc
-    local php_version="${PHP_VERSION:-8.4}"
-    local platform
+    local platform php_version out_name
     platform="$(detect_platform)"
-    local out_name="dw-${platform}"
-
-    pushd "$TOOLS_DIR" >/dev/null
-    echo ">> Downloading PHP ${php_version} source + extension deps"
-    spc_download_with_retry --with-php="$php_version" --for-extensions="$SPC_EXTENSIONS" \
-        --prefer-pre-built --without-suggestions --retry="$SPC_DOWNLOAD_RETRY"
-    echo ">> Compiling phpmicro with required extensions"
-    ./spc build "$SPC_EXTENSIONS" --build-micro
-    echo ">> Embedding PHAR into micro SAPI"
-    ./spc micro:combine "$PHAR_OUT" --output="$BUILD_DIR/$out_name"
-    popd >/dev/null
-
+    if [[ "$platform" = macos-* ]]; then
+        echo 'Secure legacy macOS SPC execution is unavailable; use the supported native Rust CLI or a qualified Linux legacy build.' >&2
+        return 1
+    fi
+    # Refuse unsupported kernel execution before building any PHAR or fetching
+    # SPC. Acquisition remains available for every pinned platform.
+    bash "$ROOT/scripts/ci/ensure-spc.sh" "$platform" "$TOOLS_DIR/spc" check
+    build_phar
+    php_version="${PHP_VERSION:-8.4}"
+    out_name="dw-${platform}"
+    bash "$ROOT/scripts/ci/ensure-spc.sh" "$platform" "$TOOLS_DIR/spc" run \
+        "$php_version" "$SPC_EXTENSIONS" "$SPC_DOWNLOAD_RETRY" "$SPC_DOWNLOAD_OUTER_ATTEMPTS" \
+        "$PHAR_OUT" "$BUILD_DIR/$out_name" "$TOOLS_DIR"
     chmod +x "$BUILD_DIR/$out_name"
     echo ">> Standalone binary: $BUILD_DIR/$out_name"
 }

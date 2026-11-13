@@ -1,9 +1,13 @@
 """Offline checks for the physical-upgrade comparison's narrow exceptions."""
 import datetime
+import hashlib
 import importlib.util
 import os
 from pathlib import Path
 import sqlite3
+import subprocess
+import sys
+import tempfile
 import unittest
 
 SOURCE = Path(__file__).resolve().parent
@@ -16,8 +20,9 @@ def local_module(name, filename):
     return value
 
 
-physical = local_module("physical_comparison", "physical_cli.py")
+physical = local_module("physical_comparison", "physical_impl.py")
 boundary = local_module("physical_boundaries", "boundaries.py")
+bootstrap = local_module("physical_bootstrap", "physical_cli.py")
 
 
 class UpgradeComparisonTests(unittest.TestCase):
@@ -85,6 +90,47 @@ class UpgradeComparisonTests(unittest.TestCase):
 
     def test_unbounded_execution_time_is_refused(self):
         self.refuses("UPDATE _sqlx_migrations SET execution_time=999999999999999")
+
+
+class PreCaptureTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name).resolve()
+        self.boundary_input = boundary.HeldInput(SOURCE / "boundaries.py", bootstrap.BOUNDARY_SHA)
+        self.addCleanup(self.boundary_input.close)
+
+    def test_loaded_predecessor_can_relabel_while_candidate_refuses_before_execution(self):
+        source = self.root / "implementation.py"
+        marker = self.root / "effect"
+        original = ("captured = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()\n"
+                    "Path(" + repr(str(marker)) + ").touch()\n").encode()
+        source.write_bytes(original)
+        loaded = compile(original, str(source), "exec")
+        source.rename(self.root / "original")
+        source.write_bytes(b"replacement = True\n")
+        scope = {"__file__": str(source), "hashlib": hashlib, "Path": Path}
+        exec(loaded, scope)
+        self.assertEqual(scope["captured"], hashlib.sha256(source.read_bytes()).hexdigest())
+        self.assertNotEqual(scope["captured"], hashlib.sha256(original).hexdigest())
+        self.assertTrue(marker.exists())
+        marker.unlink()
+        with self.assertRaises(ValueError):
+            bootstrap.run_implementation(source, hashlib.sha256(original).hexdigest(), boundary, self.boundary_input)
+        self.assertFalse(marker.exists())
+
+    def test_direct_implementation_refuses_before_effectful_initialization(self):
+        result = subprocess.run([sys.executable, "-I", "-B", str(SOURCE / "physical_impl.py")],
+                                env={"PATH": os.defpath}, capture_output=True, text=True, timeout=5)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Use physical_cli.py", result.stderr)
+
+    def test_literal_bound_implementation_executes_checked_bytes(self):
+        source = self.root / "implementation.py"
+        data = b"value = 'reviewed'\n"
+        source.write_bytes(data)
+        result = bootstrap.run_implementation(source, hashlib.sha256(data).hexdigest(), boundary, self.boundary_input)
+        self.assertEqual(result["value"], "reviewed")
 
 
 if __name__ == "__main__":

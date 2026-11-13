@@ -124,7 +124,11 @@ including catalog SQL, columns, indexes, triggers, views and all table rows.
 
 ## Physical 3.8 upgrade
 
-`physical_cli.py` consumes the producer-owned real 3.8 API seed after the
+`physical_cli.py` verifies and holds the literal-hash `physical_impl.py` bytes
+before executing any implementation code. Its reported runner digest comes
+from those checked bytes, with a post-cleanup identity recheck. Direct execution
+of the implementation refuses before effectful initialization. It consumes the
+producer-owned real 3.8 API seed after the
 [accepted handoff](https://github.com/durable-workflow/server/pull/1210#issuecomment-6860138558).
 It does not call the synthetic transform or seed a replacement baseline.
 The accepted fixture contract is Server commit

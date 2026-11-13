@@ -1,4 +1,4 @@
-"""Verify the physical experiment implementation before executing its bytes."""
+"""Verify the selected command-key implementation before executing its bytes."""
 import hashlib
 import os
 from pathlib import Path
@@ -7,7 +7,11 @@ import types
 
 SOURCE = Path(__file__).resolve().parent
 BOUNDARY_SHA = "d377e9191ebf79dc990db159629c303c10531a2f27d3ae20933fabc87e3b3525"
-IMPLEMENTATION_SHA = "808cff32ead554ecefc931ead0797097312fec3a5155e49bfdeeffc218016f96"
+IMPLEMENTATIONS = {
+    'modern': ('cli_216.py', 'e26565125bb122e6d84cd6a6e230c7d47a56ca043eda7bffa7025b9c19fdbbbe'),
+    'legacy': ('legacy_cli.py', '0f0ceb09676d38109bbd57ed9c4d22e0c448a78c65999fe82a5feb3b3ce1062b'),
+    'physical': ('physical_impl.py', '81ff88b11a7c402d2206c2856b08080eb149528b31cd0f616ccd676e459fcd3f'),
+}
 
 
 def load_boundary():
@@ -52,5 +56,9 @@ def run_implementation(path, digest, boundary, boundary_input):
 
 
 if __name__ == "__main__":
+    choice = os.environ.get("CLI_216_RUNNER", "modern")
+    if choice not in IMPLEMENTATIONS:
+        raise SystemExit("CLI_216_RUNNER must be modern, legacy or physical")
+    filename, expected = IMPLEMENTATIONS[choice]
     trusted_boundary, held_boundary = load_boundary()
-    run_implementation(SOURCE / "physical_impl.py", IMPLEMENTATION_SHA, trusted_boundary, held_boundary)
+    run_implementation(SOURCE / filename, expected, trusted_boundary, held_boundary)

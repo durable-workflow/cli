@@ -81,7 +81,7 @@ or registry credentials. Runtime authentication is synthetic and private.
 env -i PATH=/usr/bin:/bin \
   CLI_216_WORKDIR="$experiment" \
   CLI_216_PROXY_SOURCE="$experiment/committed_response_loss.py" \
-  timeout 180s python3 -I -B scripts/acceptance/command-keys/cli_216.py
+  timeout 180s python3 -I -B scripts/acceptance/command-keys/run_cli_216.py
 ```
 
 For the restart phase, preserve the first phase's `admissions.json` as
@@ -91,7 +91,7 @@ records separately too. `CLI_216_PHASE=fresh-selected` adds direct fresh
 explicit-run literal-key markers (the loss cells intentionally withhold those
 initial response bodies). `CLI_216_PHASE=typed` runs the separate typed-intent
 cases. Use a **new** private
-directory for `legacy_cli.py`, with the same staged inputs and environment.
+directory with `CLI_216_RUNNER=legacy`, with the same staged inputs and environment.
 The legacy adapter generates its own admissions and stopped-copy database.
 
 An outer experiment owner must also enforce the timeout and remove only the
@@ -124,7 +124,7 @@ including catalog SQL, columns, indexes, triggers, views and all table rows.
 
 ## Physical 3.8 upgrade
 
-`physical_cli.py` verifies and holds the literal-hash `physical_impl.py` bytes
+`run_cli_216.py` verifies and holds literal-hash modern, legacy or physical implementation bytes
 before executing any implementation code. Its reported runner digest comes
 from those checked bytes, with a post-cleanup identity recheck. Direct execution
 of the implementation refuses before effectful initialization. It consumes the
@@ -152,15 +152,16 @@ The image runs its actual `schema-upgrade` command, requiring SQLite 12 → 13.
 The comparison preserves all old business rows and schema objects, allowing
 only tagged DDL plus explicitly validated schema-version/journal metadata.
 The intent table must be empty. The new journal checksum, description,
-version, success, timestamp interval and execution-time bound are checked.
+version, success, timestamp interval and exact integer-zero execution time are checked.
 
 ```bash
 env -i PATH=/usr/bin:/bin \
   CLI_216_WORKDIR="$experiment" \
   CLI_216_PROXY_SOURCE="$experiment/committed_response_loss.py" \
+  CLI_216_RUNNER=physical \
   CLI_216_PHYSICAL_BASELINE="$original_backup" \
   CLI_216_PHYSICAL_PACKET="$original_packet" \
-  timeout 180s python3 -I -B scripts/acceptance/command-keys/physical_cli.py
+  timeout 180s python3 -I -B scripts/acceptance/command-keys/run_cli_216.py
 ```
 
 Created names are `cli-216-392-upgrade` and `cli-216-392-physical`; cleanup

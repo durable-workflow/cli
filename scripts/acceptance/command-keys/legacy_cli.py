@@ -13,6 +13,9 @@ import sqlite3
 import threading
 import time
 
+if __name__ == "__main__" and "BOOTSTRAP_HELD_IMPLEMENTATION" not in globals():
+    raise SystemExit("Use run_cli_216.py to verify the implementation before execution")
+
 SOURCE = Path(__file__).resolve().parent
 ROOT = Path(os.environ["CLI_216_WORKDIR"])
 
@@ -39,9 +42,13 @@ def bound_driver():
         os.close(descriptor)
 
 
-BASE_SHA = "c6b7897a6b5c5208a236d296438fc56fa97d4b15ef28329ac719fade852dc562"
+BASE_SHA = "e26565125bb122e6d84cd6a6e230c7d47a56ca043eda7bffa7025b9c19fdbbbe"
 d = bound_driver()
-ENTRY_INPUT = d.held(Path(__file__).absolute(), None, 131072)
+if "BOOTSTRAP_HELD_IMPLEMENTATION" in globals():
+    ENTRY_INPUT = BOOTSTRAP_HELD_IMPLEMENTATION
+    d.HELD.extend([BOOTSTRAP_HELD_BOUNDARY, ENTRY_INPUT])
+else:
+    ENTRY_INPUT = d.held(Path(__file__).absolute(), None, 131072)
 legacy = d.legacy_helper
 d.NAME = "cli-216-392-legacy"
 runtime = d.boundary.OwnedContainer(d.docker, d.NAME)

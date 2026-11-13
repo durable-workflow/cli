@@ -13,7 +13,7 @@ import time
 import types
 
 SOURCE = Path(__file__).resolve().parent
-LEGACY_SHA = "b6d2bee1b689745b626ce2d7b754f0179bdb1d22e53ef33dd1501e6dec520c76"
+LEGACY_SHA = "0f0ceb09676d38109bbd57ed9c4d22e0c448a78c65999fe82a5feb3b3ce1062b"
 BASELINE_SHA = "7d1826f7681342bb3a5974509648e2e8d75e7a21d262f65f3ec1f58727ccbc0c"
 PACKET_SHA = "8c728ce827df3a11621dfb0e82cdd404bbab48784182a5e92c8d632d49047fc5"
 CONTRACT_SHA = "ceb4695643e48c7bfe3f81eea380c6ab9aa0b973da830cb552d070344047319f"
@@ -66,7 +66,7 @@ def compare_upgrade(before, after, delta, started, ended, helper):
         raise ValueError("baseline migration journal shape differs")
     if (row[0] != ["integer", 13] or row[1] != ["text", old[0][1][1] + " and keyed command intents"]
             or row[3] != ["integer", 1] or row[4] != ["blob", JOURNAL_CHECKSUM]
-            or row[5][0] != "integer" or not 0 <= row[5][1] <= 120_000_000_000
+            or row[5] != ["integer", 0]
             or row[2][0] != "text"):
         raise ValueError("migration journal content differs from tagged schema 13")
     installed = datetime.datetime.fromisoformat(row[2][1]).replace(tzinfo=datetime.timezone.utc)
@@ -109,7 +109,7 @@ def physical_cases(packet, common):
 
 if __name__ == "__main__":
     if "BOOTSTRAP_HELD_IMPLEMENTATION" not in globals() or "BOOTSTRAP_HELD_BOUNDARY" not in globals():
-        raise SystemExit("Use physical_cli.py to verify the implementation before execution")
+        raise SystemExit("Use run_cli_216.py to verify the implementation before execution")
     common = load_legacy()
     d = common.d
     entry = BOOTSTRAP_HELD_IMPLEMENTATION

@@ -22,7 +22,7 @@ def local_module(name, filename):
 
 physical = local_module("physical_comparison", "physical_impl.py")
 boundary = local_module("physical_boundaries", "boundaries.py")
-bootstrap = local_module("physical_bootstrap", "physical_cli.py")
+bootstrap = local_module("physical_bootstrap", "run_cli_216.py")
 
 
 class UpgradeComparisonTests(unittest.TestCase):
@@ -49,7 +49,7 @@ class UpgradeComparisonTests(unittest.TestCase):
         self.started = datetime.datetime.now(datetime.timezone.utc)
         self.db.executescript(self.delta.decode())
         self.db.execute("UPDATE _sqlx_migrations SET version=13,description='baseline and keyed command intents',"
-                        "installed_on=?,checksum=?", (self.started.strftime("%Y-%m-%d %H:%M:%S"), bytes.fromhex(physical.JOURNAL_CHECKSUM)))
+                        "installed_on=?,checksum=?,execution_time=0", (self.started.strftime("%Y-%m-%d %H:%M:%S"), bytes.fromhex(physical.JOURNAL_CHECKSUM)))
         self.ended = datetime.datetime.now(datetime.timezone.utc)
 
     def compare(self):
@@ -88,6 +88,9 @@ class UpgradeComparisonTests(unittest.TestCase):
     def test_old_journal_timestamp_is_refused(self):
         self.refuses("UPDATE _sqlx_migrations SET installed_on='2020-01-01 00:00:00'")
 
+    def test_nonzero_execution_time_is_refused(self):
+        self.refuses("UPDATE _sqlx_migrations SET execution_time=1")
+
     def test_unbounded_execution_time_is_refused(self):
         self.refuses("UPDATE _sqlx_migrations SET execution_time=999999999999999")
 
@@ -123,7 +126,24 @@ class PreCaptureTests(unittest.TestCase):
         result = subprocess.run([sys.executable, "-I", "-B", str(SOURCE / "physical_impl.py")],
                                 env={"PATH": os.defpath}, capture_output=True, text=True, timeout=5)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("Use physical_cli.py", result.stderr)
+        self.assertIn("Use run_cli_216.py", result.stderr)
+
+    def test_direct_common_entrypoints_refuse_before_initialization(self):
+        for filename in ("cli_216.py", "legacy_cli.py"):
+            with self.subTest(filename=filename):
+                result = subprocess.run([sys.executable, "-I", "-B", str(SOURCE / filename)],
+                                        env={"PATH": os.defpath}, capture_output=True, text=True, timeout=5)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("Use run_cli_216.py", result.stderr)
+
+    def test_unknown_loader_choice_refuses(self):
+        for choice in ("unknown", "../physical_impl.py"):
+            with self.subTest(choice=choice):
+                result = subprocess.run([sys.executable, "-I", "-B", str(SOURCE / "run_cli_216.py")],
+                                        env={"PATH": os.defpath, "CLI_216_RUNNER": choice},
+                                        capture_output=True, text=True, timeout=5)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("CLI_216_RUNNER must be", result.stderr)
 
     def test_literal_bound_implementation_executes_checked_bytes(self):
         source = self.root / "implementation.py"

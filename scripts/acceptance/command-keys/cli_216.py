@@ -14,6 +14,9 @@ import time
 import urllib.error
 import urllib.request
 
+if __name__ == "__main__" and "BOOTSTRAP_HELD_IMPLEMENTATION" not in globals():
+    raise SystemExit("Use run_cli_216.py to verify the implementation before execution")
+
 SOURCE = Path(__file__).resolve().parent
 BOUNDARY_SHA = 'd377e9191ebf79dc990db159629c303c10531a2f27d3ae20933fabc87e3b3525'
 # Bootstrap the local reviewed boundary module from the same bytes that are
@@ -48,7 +51,11 @@ def held(path, digest, maximum=16 * 1024 * 1024):
     HELD.append(value)
     return value
 
-ENTRY_INPUT = held(Path(__file__).absolute(), None, 131072)
+if "BOOTSTRAP_HELD_IMPLEMENTATION" in globals():
+    ENTRY_INPUT = BOOTSTRAP_HELD_IMPLEMENTATION
+    HELD.extend([BOOTSTRAP_HELD_BOUNDARY, ENTRY_INPUT])
+else:
+    ENTRY_INPUT = held(Path(__file__).absolute(), None, 131072)
 PROXY_INPUT = held(PROXY_SOURCE, PROXY_SHA256)
 shared_proxy = PROXY_INPUT.module('cli216_shared_proxy')
 CommittedResponseLoss = shared_proxy.CommittedResponseLoss

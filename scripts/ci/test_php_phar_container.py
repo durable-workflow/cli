@@ -20,6 +20,7 @@ def fixture(parent, predecessor=False):
     (root/'src/GeneratedBuildInfo.php').touch()
     (root/'docker/php-ci/phar.ini').write_bytes((ROOT/'docker/php-ci/phar.ini').read_bytes())
     (state/'artifacts/box.phar').write_text('synthetic immutable artifact')
+    (state/'artifacts/box.phar').chmod(0o400)
     launcher = root/'scripts/ci/run-php-phar-container.sh'
     source = LAUNCHER.read_text()
     if predecessor:
@@ -83,10 +84,25 @@ class PharLauncherTests(unittest.TestCase):
         def linked(root, _state, _environment):
             (root/'build').rmdir()
             (root/'build').symlink_to(root/'scripts')
-        for mutation in (image, linked):
+        def generated_link(root, _state, _environment):
+            generated = root/'src/GeneratedBuildInfo.php'
+            generated.unlink()
+            generated.symlink_to(root/'scripts/ci/run-php-phar-container.sh')
+        def generated_hardlink(root, _state, _environment):
+            generated = root/'src/GeneratedBuildInfo.php'
+            generated.unlink()
+            os.link(root/'scripts/ci/run-php-phar-container.sh', generated)
+        for mutation in (image, linked, generated_link, generated_hardlink):
             result, _, _ = self.invoke(mutate=mutation)
             self.assertNotEqual(0, result.returncode)
             self.assertEqual('', result.stdout)
+
+    def test_linked_box_artifact_refuses_before_docker(self):
+        def hardlinked(root, state, _environment):
+            os.link(state/'artifacts/box.phar', root/'vendor/alias')
+        result, _, _ = self.invoke('box', mutate=hardlinked)
+        self.assertNotEqual(0, result.returncode)
+        self.assertEqual('', result.stdout)
 
 
 @unittest.skipUnless(os.environ.get('CLI_PHP_CI_TEST_IMAGE'), 'requires inspected PHP image')
@@ -110,6 +126,7 @@ if ($attack === 'launcher') {
     $changed = @unlink($wrapper) && @file_put_contents($wrapper, $payload) !== false;
     if ($changed) { chmod($wrapper, 0755); }
 } else {
+    @chmod($state.'/artifacts/box.phar', 0600);
     $changed = @file_put_contents($state.'/artifacts/box.phar', 'replaced') !== false;
 }
 $writable = true;

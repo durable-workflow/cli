@@ -13,7 +13,9 @@ GITHUB_ENV="$metadata/environment" GITHUB_PATH="$metadata/path" \
 bindings="$(python3 -I -S -B - "$metadata/environment" "$metadata/path" "$root" <<'PY'
 from pathlib import Path
 import re,sys
-values = dict(line.split('=', 1) for line in Path(sys.argv[1]).read_text().splitlines())
+lines = Path(sys.argv[1]).read_text().splitlines()
+assert len(lines) == 6
+values = dict(line.split('=', 1) for line in lines)
 assert set(values) == {'CLI_PHP_CI_IMAGE','CLI_PHP_CI_ROOT','CLI_PHP_CI_STATE','COMPOSER_HOME','COMPOSER_CACHE_DIR','TMPDIR'}
 assert values['CLI_PHP_CI_ROOT'] == sys.argv[3]
 assert re.fullmatch(r'sha256:[0-9a-f]{64}', values['CLI_PHP_CI_IMAGE'])

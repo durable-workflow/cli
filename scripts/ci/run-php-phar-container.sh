@@ -79,6 +79,11 @@ for argument in "$@"; do
     arguments+=("$argument")
 done
 if [[ "$command" = box ]]; then
+    artifact="$state/artifacts/box.phar"
+    [[ -f "$artifact" && ! -L "$artifact" && -O "$artifact" \
+        && -n "$(find "$artifact" -prune -type f -links 1 -perm 0400)" ]] || {
+        echo 'Box must be a single-link owned read-only artifact.' >&2; exit 1;
+    }
     exec docker run "${options[@]}" "$image" php "$root/scripts/ci/exec-box.php" "$state/artifacts/box.phar" "${arguments[@]}"
 fi
 exec docker run "${options[@]}" "$image" "$command" "${arguments[@]}"

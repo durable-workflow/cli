@@ -500,18 +500,9 @@ jobs:
     env:
       LEGACY_VERSION: 2.3.5
       LEGACY_PHAR_SHA256: 67538671d44709312dd0ce77ec890094daf5c70d1e15eaa777c22231627d05a5
+      # Pinned official PHP index, including native amd64 and arm64 images.
+      LEGACY_PHP_IMAGE: php:8.4.27-cli-bookworm@sha256:b3e907a1108629c562c4bb313ce3449e34d49991f6bb2487913f6146f47200fe
     steps:
-      - name: Disable APT download retries (CVE-2026-109518)
-        if: runner.os == 'Linux'
-        run: echo 'Acquire::Retries "0";' | sudo tee /etc/apt/apt.conf.d/99-no-retries >/dev/null
-      - name: Set up PHP for the PHAR install
-        if: matrix.install == 'phar' && runner.os == 'Linux'
-        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240  # v2
-        with:
-          php-version: '8.4'
-          tools: none
-          coverage: none
-
       # setup-php could not install PHP on macos-15 for 2.5.0-rc.3 (twice,
       # ~29 minutes each), so macOS takes PHP 8.4 from Homebrew core, as
       # release.yml's macOS qualification does.
@@ -541,6 +532,25 @@ jobs:
           base="https://github.com/${GITHUB_REPOSITORY}/releases/download"
           work="$(mktemp -d)"
           export HOME="$work" DW_CONFIG_HOME="$work/config"
+          if [ "$INSTALL" = "phar" ] && [ "$RUNNER_OS" = "Linux" ]; then
+            case "$ASSET" in
+              dw-linux-x86_64) php_platform=linux/amd64 ;;
+              dw-linux-aarch64) php_platform=linux/arm64 ;;
+              *) echo "::error::No PHP platform for $ASSET"; exit 1 ;;
+            esac
+            # Mount only the downloaded test files. No checkout, token or
+            # host configuration is exposed to the PHP process (#297).
+            php() {
+              docker run --rm --name cli-legacy-phar-upgrade --init \
+                --platform "$php_platform" --cpus=2 --memory=512m --pids-limit=128 \
+                --read-only --tmpfs /tmp:rw,size=64m --cap-drop=ALL \
+                --security-opt=no-new-privileges --user "$(id -u):$(id -g)" \
+                --mount "type=bind,src=$work,dst=$work" \
+                --env "HOME=$work" --env "DW_CONFIG_HOME=$work/config" \
+                "$LEGACY_PHP_IMAGE" php "$@"
+            }
+            php -r 'printf("Legacy PHAR toolchain: PHP %s, %s\n", PHP_VERSION, php_uname("m"));'
+          fi
           curl --proto '=https' --tlsv1.2 -fsSL --retry 3 --retry-all-errors -o "$work/SHA256SUMS" "$base/$RELEASE_TAG/SHA256SUMS"
           expected="$(awk -v a="$ASSET" '$2 == a {print $1}' "$work/SHA256SUMS")"
           [ -n "$expected" ] || { echo "::error::$ASSET missing from $RELEASE_TAG SHA256SUMS"; exit 1; }

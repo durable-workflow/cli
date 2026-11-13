@@ -65,7 +65,7 @@ ALLOWED_ACTIONS = {
         "bundle": {"actions/download-artifact", "actions/upload-artifact"},
         "publish": {"actions/checkout", "actions/download-artifact", "actions/attest-build-provenance"},
         "verify-release": {"actions/checkout"},
-        "upgrade-from-2x": {"shivammathur/setup-php"},
+        "upgrade-from-2x": set(),
     },
     "build": {
         "build": {
@@ -167,6 +167,13 @@ class ReleaseRustWorkflowTest(unittest.TestCase):
                 self.assertEqual(expected, job["permissions"], name)
             if name != "publish":
                 self.assertNotIn("environment", job, name)
+
+    def test_legacy_php_container_is_bound_to_an_exact_official_image(self):
+        image = self.jobs["upgrade-from-2x"]["env"]["LEGACY_PHP_IMAGE"]
+        self.assertRegex(image, r"^php:[0-9]+\.[0-9]+\.[0-9]+-cli-bookworm@sha256:[0-9a-f]{64}$")
+        run = "\n".join(step.get("run", "") for step in self.steps("upgrade-from-2x"))
+        self.assertIn('"$LEGACY_PHP_IMAGE" php "$@"', run)
+        self.assertNotIn("sudo", run)
 
     def test_no_secrets_anywhere(self):
         for path in (RUST, BUILD, DRY_RUN):

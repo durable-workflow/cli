@@ -501,6 +501,9 @@ jobs:
       LEGACY_VERSION: 2.3.5
       LEGACY_PHAR_SHA256: 67538671d44709312dd0ce77ec890094daf5c70d1e15eaa777c22231627d05a5
     steps:
+      - name: Disable APT download retries (CVE-2026-109518)
+        if: runner.os == 'Linux'
+        run: echo 'Acquire::Retries "0";' | sudo tee /etc/apt/apt.conf.d/99-no-retries >/dev/null
       - name: Set up PHP for the PHAR install
         if: matrix.install == 'phar' && runner.os == 'Linux'
         uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240  # v2

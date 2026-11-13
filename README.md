@@ -138,11 +138,22 @@ make phar
 Run `make help` for the complete local development surface.
 
 The PHP maintenance standalone builder acquires SPC through the fixed upstream
-release identities in [ensure-spc.sh](scripts/ci/ensure-spc.sh). It verifies both
-the compressed archive and extracted binary, and rechecks existing caches before
-use. Unknown platforms and altered caches fail before SPC executes. This binds
-the SPC component only; PHP, downloaded libraries, build caches and each host
-platform still require their applicable toolchain qualification.
+release identities in [spc-artifact.py](scripts/ci/spc-artifact.py). It verifies
+the compressed archive and extracted binary for all four recorded platforms,
+and publishes caches atomically without replacing an existing file. Linux
+execution requires Python 3, sealed memory descriptors and bubblewrap at
+`/usr/bin/bwrap` with working unprivileged user namespaces. One sealed copy
+supplies every download, build and combine call through a private read-only
+mount, including the embedded PHP loader's self-reads. These controls run in
+the existing Python parity test lane. The namespace helper must be owned by
+root without setuid, setgid or file capabilities. The SPC process receives
+only `PATH`, `HOME`, `TMPDIR`, `SOURCE_DATE_EPOCH` and fixed `LC_ALL=C`.
+
+The legacy macOS standalone builder refuses execution. Use the supported native
+Rust CLI or a qualified Linux legacy build. Native Rust CLI macOS releases are
+unaffected. This binds the SPC component only. PHP, downloaded libraries, build
+caches and each host platform still require their applicable toolchain
+qualification.
 
 Standalone release builds use the reviewed [dependency source policy](scripts/ci/standalone-dependencies.json).
 The workflow verifies the OpenSSL archive before compilation and checks the

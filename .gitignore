@@ -6,3 +6,5 @@
 /build
 *.phar
 /src/GeneratedBuildInfo.php
+.claude/settings.local.json
+**/.claude/settings.local.json

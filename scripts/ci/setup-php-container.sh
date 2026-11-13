@@ -38,11 +38,16 @@ docker run --rm --init --name "cli-php-ci-probe-${minor}-${GITHUB_RUN_ID:-local}
 printf 'php_ci_image=%s\n' "$runtime_id"
 
 state="$(mktemp -d "${RUNNER_TEMP:?RUNNER_TEMP is required}/cli-php-ci.XXXXXX")"
-mkdir -p "$state/bin" "$state/home" "$state/tmp" "$state/composer-home/cache"
+mkdir -p "$root/vendor" "$state/bin" "$state/home" "$state/tmp" "$state/composer-home/cache"
+[[ ! -L "$root/vendor" && ! -L "$root/.phpunit.result.cache" ]]
+[[ -e "$root/.phpunit.result.cache" ]] || touch "$root/.phpunit.result.cache"
+touch "$state/phpunit-result.cache"
 ln -sf "$root/scripts/ci/run-php-container.sh" "$state/bin/php"
 ln -sf "$root/scripts/ci/run-php-container.sh" "$state/bin/composer"
 CLI_PHP_CI_TEST_IMAGE="$runtime_id" CLI_PHP_CI_ROOT="$root" CLI_PHP_CI_STATE="$state" \
     python3 -I -S -B "$root/scripts/ci/test-php-container-tls.py" -v
+CLI_PHP_CI_TEST_IMAGE="$runtime_id" CLI_PHP_CI_STATE="$state" \
+    python3 -I -S -B "$root/scripts/ci/test-php-container-boundary.py" -v
 {
     echo "CLI_PHP_CI_IMAGE=$runtime_id"
     echo "CLI_PHP_CI_ROOT=$root"

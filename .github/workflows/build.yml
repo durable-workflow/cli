@@ -46,6 +46,7 @@ jobs:
 
   test:
     name: Test (PHP ${{ matrix.php }})
+    needs: [action-policy]
     if: ${{ github.server_url == 'https://github.com' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15

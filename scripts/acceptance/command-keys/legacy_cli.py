@@ -39,8 +39,9 @@ def bound_driver():
         os.close(descriptor)
 
 
-BASE_SHA = "0f2afebcfeea0a728a203a59025bf0a94669581ccd0d84bf3f53abc2d971c653"
+BASE_SHA = "c6b7897a6b5c5208a236d296438fc56fa97d4b15ef28329ac719fade852dc562"
 d = bound_driver()
+ENTRY_INPUT = d.held(Path(__file__).absolute(), None, 131072)
 legacy = d.legacy_helper
 d.NAME = "cli-216-392-legacy"
 runtime = d.boundary.OwnedContainer(d.docker, d.NAME)
@@ -259,9 +260,9 @@ if __name__ == "__main__":
         report = {"cell": "synthetic-legacy-shape", "outcome": outcome, "created_container_ids": runtime.created_ids, "error": error,
                   "cleanup_error": cleanup_error, "phase": phase, "checks": len(d.CHECKS), "started_at": started,
                   "finished_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                  "driver_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-                  "base_driver_sha256": hashlib.sha256((SOURCE / "cli_216.py").read_bytes()).hexdigest(),
-                  "helper_sha256": hashlib.sha256((ROOT / "sqlite_legacy.py").read_bytes()).hexdigest(),
+                  "driver_sha256": ENTRY_INPUT.digest,
+                  "base_driver_sha256": d.ENTRY_INPUT.digest,
+                  "helper_sha256": d.HELPER_INPUT.digest,
                   "manifest_sha256": legacy.MANIFEST_SHA256, "server_index": d.IMAGE,
                   "transform": transform, "windows": windows,
                   "cleanup": "created container/volumes/env removed; held inputs unchanged" if absent and cleanup_error is None else "cleanup/input identity failed"}

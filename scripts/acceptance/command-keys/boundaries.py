@@ -25,9 +25,12 @@ class HeldInput:
                     or not 0 < value.st_size <= maximum):
                 raise ValueError("input must be an owned single-link non-writable-by-others regular file")
             self.data = os.pread(self.fd, maximum + 1, 0)
-            if len(self.data) != value.st_size or hashlib.sha256(self.data).hexdigest() != expected:
+            actual = hashlib.sha256(self.data).hexdigest()
+            if len(self.data) != value.st_size or (expected is not None and actual != expected):
                 raise ValueError("input content identity differs")
-            self.digest = expected
+            # None is used only to capture an already-running entrypoint.
+            # Every external executable/module/fixture has a literal digest.
+            self.digest = actual
             self.recheck()
             self.sealed_fd = os.memfd_create("cli-216-input", os.MFD_CLOEXEC | os.MFD_ALLOW_SEALING)
             with os.fdopen(os.dup(self.sealed_fd), "wb") as output:

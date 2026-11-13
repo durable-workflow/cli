@@ -15,7 +15,7 @@ import urllib.error
 import urllib.request
 
 SOURCE = Path(__file__).resolve().parent
-BOUNDARY_SHA = '664b0765774063c50bb82162be70fa4f91ca35abc3305a38498364cbdd51b3d8'
+BOUNDARY_SHA = 'd377e9191ebf79dc990db159629c303c10531a2f27d3ae20933fabc87e3b3525'
 # Bootstrap the local reviewed boundary module from the same bytes that are
 # checked. Subsequent inputs use its held descriptors and sealed memory files.
 _boundary_path = SOURCE / 'boundaries.py'
@@ -48,6 +48,7 @@ def held(path, digest, maximum=16 * 1024 * 1024):
     HELD.append(value)
     return value
 
+ENTRY_INPUT = held(Path(__file__).absolute(), None, 131072)
 PROXY_INPUT = held(PROXY_SOURCE, PROXY_SHA256)
 shared_proxy = PROXY_INPUT.module('cli216_shared_proxy')
 CommittedResponseLoss = shared_proxy.CommittedResponseLoss
@@ -457,7 +458,7 @@ if __name__ == '__main__':
         (ROOT / 'runtime.env').unlink(missing_ok=True)
         report = {'started_at': STARTED, 'finished_at': datetime.datetime.now(datetime.timezone.utc).isoformat(),
                   'outcome': outcome, 'created_container_ids': runtime.created_ids, 'checks': CHECKS, 'error': error, 'cleanup': cleanup,
-                  'runner_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+                  'runner_sha256': ENTRY_INPUT.digest,
                   'proxy_sha256': PROXY_INPUT.digest, 'server_index': IMAGE, 'server_source': '5614274d2629d03f92932a07dfee0fb10349ddd9', 'phase': os.environ.get('CLI_216_PHASE', 'modern')}
         (ROOT / 'result.json').write_text(json.dumps(report, indent=2))
         (ROOT / 'invocations.json').write_text(json.dumps(INVOCATIONS, indent=2).replace(TOKEN, '[redacted]'))

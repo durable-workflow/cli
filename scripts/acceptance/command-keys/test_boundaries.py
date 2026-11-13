@@ -57,6 +57,19 @@ class InputTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             held.recheck()
 
+    def test_entrypoint_replacement_cannot_relabel_terminal_digest(self):
+        path = self.file(b"reviewed entrypoint")
+        captured = boundary.HeldInput(path, None)
+        self.addCleanup(captured.close)
+        expected = hashlib.sha256(path.read_bytes()).hexdigest()
+        path.rename(self.root / "loaded")
+        self.file(b"replacement source")
+        # The predecessor's terminal pathname hash relabeled the run.
+        self.assertNotEqual(hashlib.sha256(path.read_bytes()).hexdigest(), expected)
+        self.assertEqual(captured.digest, expected)
+        with self.assertRaises(ValueError):
+            captured.recheck()
+
     def test_inplace_change_refused(self):
         path = self.file()
         held = self.hold(path)

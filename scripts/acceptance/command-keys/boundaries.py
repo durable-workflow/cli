@@ -238,14 +238,13 @@ class Workspace:
         @contextmanager
         def opened():
             self.recheck()
-            # The directory descriptor preserves SQLite's WAL/SHM sibling
-            # semantics. Check SQLite's opened main file against our held DB.
-            uri = "file:" + self.data.anchor + "/database.sqlite?mode=" + ("ro" if readonly else "rw")
+            # The real disk descriptor binds SQLite's opened main inode.
+            # PRAGMA database_list followed by stat would reopen a name and
+            # could accept swap-away/open-substitute/swap-back. SQLite retains
+            # normal disk-backed WAL/SHM behavior through this descriptor.
+            uri = "file:" + self.database.anchor + "?mode=" + ("ro" if readonly else "rw")
             db = sqlite3.connect(uri, uri=True, timeout=2)
             try:
-                named = db.execute("PRAGMA database_list").fetchone()[2]
-                if HeldDirectory.key(os.stat(named)) != self.database.identity:
-                    raise ValueError("SQLite opened a different database")
                 self.recheck()
                 yield db
             finally:

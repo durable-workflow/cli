@@ -18,7 +18,7 @@ if __name__ == "__main__" and "BOOTSTRAP_HELD_IMPLEMENTATION" not in globals():
     raise SystemExit("Use run_cli_216.py to verify the implementation before execution")
 
 SOURCE = Path(__file__).resolve().parent
-BOUNDARY_SHA = '5de532a128931b56bd7ca2232d60e07a2fa65d550cfbf56d9cd78d16ed3a5095'
+BOUNDARY_SHA = '49f44b870296b27955f116295f4e177a1fd285cc976809c13e5f57dc3cb1ebbf'
 # Bootstrap the local reviewed boundary module from the same bytes that are
 # checked. Subsequent inputs use its held descriptors and sealed memory files.
 _boundary_path = SOURCE / 'boundaries.py'

@@ -9,11 +9,11 @@ if __name__ == "__main__" and "BOOTSTRAP_LAUNCHER_SHA256" not in globals():
     raise SystemExit("Use the reviewed literal -c Git bootstrap before the dispatcher")
 
 SOURCE = Path(__file__).resolve().parent
-BOUNDARY_SHA = "5de532a128931b56bd7ca2232d60e07a2fa65d550cfbf56d9cd78d16ed3a5095"
+BOUNDARY_SHA = "49f44b870296b27955f116295f4e177a1fd285cc976809c13e5f57dc3cb1ebbf"
 IMPLEMENTATIONS = {
-    'modern': ('cli_216.py', 'f8a51ec2119cd24acf6b861b0a3c09e5ab7f651539136db506d6d8ef4b8e448b'),
-    'legacy': ('legacy_cli.py', 'cb3afd7348d1e556e57e820897ab5ca46fbaf944dcc02a5b04758a19065ed5cc'),
-    'physical': ('physical_impl.py', 'b3e42c81cc8855e11aad1eba68ef5651cd81460c65fd97b2708f5b08f576b8ca'),
+    'modern': ('cli_216.py', '507ff78a1a25bca43f4b5ce84abd395d59d24641bbac6db8c6ee86a665113417'),
+    'legacy': ('legacy_cli.py', 'cc4018a807ff01e557676fa7ff4cb73f30872b004d04b42338fe96f65e18aec2'),
+    'physical': ('physical_impl.py', '640a3a8b9e3c802e965971ca1e8980200493513a81249a9265817b9a9bce3ba4'),
 }
 
 

@@ -383,9 +383,7 @@ class WorkspaceTests(unittest.TestCase):
             with closing(sqlite3.connect(Path(held.executable).as_uri() + "?mode=ro&immutable=1", uri=True)) as db:
                 db.execute("SELECT * FROM transformed").fetchall()
         held.recheck()
-        with closing(sqlite3.connect("file:" + self.workspace.data.anchor + "/transformed.sqlite?mode=ro&immutable=1", uri=True)) as db:
-            opened = db.execute("PRAGMA database_list").fetchone()[2]
-            self.assertEqual(boundary.HeldInput._identity(os.stat(opened)), held.identity)
+        with closing(sqlite3.connect("file:/proc/self/fd/" + str(held.fd) + "?mode=ro&immutable=1", uri=True)) as db:
             self.assertEqual(db.execute("SELECT * FROM transformed").fetchall(), [(7,)])
         held.recheck()
         path.rename(path.with_name("original-transformed.sqlite"))
@@ -393,6 +391,35 @@ class WorkspaceTests(unittest.TestCase):
         path.chmod(0o600)
         with self.assertRaises(ValueError):
             held.recheck()
+
+    def test_sqlite_swap_open_swap_back_fools_path_stat_but_not_held_fd(self):
+        connect = sqlite3.connect
+        def raced(*arguments, **keywords):
+            original = self.database.with_name("opened-original.sqlite")
+            self.database.rename(original)
+            self.database.write_bytes(original.read_bytes())
+            self.database.chmod(0o600)
+            with closing(connect(self.database)) as replacement:
+                replacement.execute("UPDATE fixture SET value=99")
+                replacement.commit()
+            try:
+                opened = connect(*arguments, **keywords)
+            finally:
+                self.database.unlink()
+                original.rename(self.database)
+            # The predecessor's post-open name points back at the original,
+            # even if the returned connection already opened the substitute.
+            if "/database.sqlite?" in str(arguments[0]):
+                named = opened.execute("PRAGMA database_list").fetchone()[2]
+                self.assertEqual(boundary.HeldDirectory.key(os.stat(named)), self.workspace.database.identity)
+            self.workspace.recheck()
+            return opened
+        with patch.object(sqlite3, "connect", raced):
+            with closing(sqlite3.connect("file:" + self.workspace.data.anchor + "/database.sqlite?mode=ro", uri=True)) as old:
+                self.assertEqual(old.execute("SELECT * FROM fixture").fetchall(), [(99,)])
+            with self.workspace.connection() as current:
+                self.assertEqual(current.execute("SELECT * FROM fixture").fetchall(), [(1,)])
+        self.workspace.recheck()
 
     def test_mutable_database_keeps_inode_and_wal_semantics(self):
         identity = self.workspace.database.identity

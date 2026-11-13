@@ -42,7 +42,7 @@ def bound_driver():
         os.close(descriptor)
 
 
-BASE_SHA = "f8a51ec2119cd24acf6b861b0a3c09e5ab7f651539136db506d6d8ef4b8e448b"
+BASE_SHA = "507ff78a1a25bca43f4b5ce84abd395d59d24641bbac6db8c6ee86a665113417"
 d = bound_driver()
 if "BOOTSTRAP_HELD_IMPLEMENTATION" in globals():
     ENTRY_INPUT = BOOTSTRAP_HELD_IMPLEMENTATION
@@ -251,15 +251,11 @@ if __name__ == "__main__":
         copied_input = d.held(transformed, None, 64 * 1024 * 1024)
         d.WORKSPACE.recheck()
         seed_input.recheck()
-        # SQLite cannot open this sealed memfd as a database. Use its held
-        # disk sibling through the held data directory, check the actual
-        # opened main-file identity, then compare against the helper's full
-        # logical result before writing the already-captured bytes to DB.
+        # A real disk descriptor works with SQLite and binds the main inode;
+        # the sealed executable memfd does not. A post-open pathname stat
+        # cannot establish the connection's identity after a swap-back.
         copied_input.recheck()
-        with closing(sqlite3.connect("file:" + d.WORKSPACE.data.anchor + "/transformed.sqlite?mode=ro&immutable=1", uri=True)) as db:
-            opened = db.execute("PRAGMA database_list").fetchone()[2]
-            if d.boundary.HeldInput._identity(os.stat(opened)) != copied_input.identity:
-                raise ValueError("SQLite opened a different transformed copy")
+        with closing(sqlite3.connect("file:/proc/self/fd/" + str(copied_input.fd) + "?mode=ro&immutable=1", uri=True)) as db:
             transformed_snapshot = legacy.snapshot(db)
         copied_input.recheck()
         if (transform["before_sha256"] != legacy.fingerprint(before)

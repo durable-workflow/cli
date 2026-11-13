@@ -83,7 +83,7 @@ substitution of the outer dispatcher cannot replace those Git bytes.
 ```bash
 reviewed_source_commit=FULL_REVIEWED_COMMIT_FROM_THE_PR
 bootstrap="$(git --no-replace-objects show "$reviewed_source_commit:scripts/acceptance/command-keys/git_bootstrap.py")"$'\n'
-expected_bootstrap_sha256=80d8c383351eb18cd110da078029ad5aaa8b1b3518e63bf62b74304aec62a124
+expected_bootstrap_sha256=4b34ceb7b8c1366bc46405310bc4779df6a3ee63eb274af41868265028a5bc12
 actual_bootstrap_sha256="$(printf '%s' "$bootstrap" | sha256sum | awk '{print $1}')"
 test "$actual_bootstrap_sha256" = "$expected_bootstrap_sha256"
 ```
@@ -201,7 +201,8 @@ normal gates, fresh actual execution and cleanup still qualify that cell.
 
 The manual experiment holds owned mode-0700 root/data directories and a
 single-link mode-0600 database descriptor throughout each phase. SQLite opens
-through the held directory so WAL/SHM siblings keep their normal semantics.
+through the held real disk-file descriptor, preserving normal WAL/SHM behavior
+without reopening the mutable database name.
 Docker acquires the guarded canonical data bind. A literal in-container shell
 preflight checks the actual mounted directory and database device/inode,
 UID/GID, mode and link count before executing the native binary. Host checks

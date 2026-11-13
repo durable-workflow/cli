@@ -15896,6 +15896,188 @@
      }
     }
    }
+  },
+  {
+   "name": "workflow:update-outcome",
+   "description": "Read an update's outcome later by its update ID",
+   "synopsis": "workflow:update-outcome [-s|--server [SERVER]] [--namespace [NAMESPACE]] [--token [TOKEN]] [--tls-verify TLS-VERIFY] [--env ENV] [--output OUTPUT] [--wait [WAIT]] [--wait-timeout WAIT-TIMEOUT] [--json] [--] <workflow-id> <update-id>",
+   "aliases": [],
+   "hidden": false,
+   "help": "Read the outcome of an update sent earlier, by its update ID, without sending\nthe update again. The answer is the update's receipt:\n\n  - accepted: admitted and not finished yet. This is a pending update, never\n    a null result; run the command again with <comment>--wait=completed</comment> to wait.\n  - completed: the handler returned. Its result envelope may encode null.\n  - failed: the handler failed. dw prints the failure message and exits 2.\n  - rejected: the Server's original rejection, with its exit code.\n\n<comment>--wait=accepted</comment> (the default) answers at once. <comment>--wait=completed</comment> waits\nfor the outcome, up to <comment>--wait-timeout</comment> seconds or the Server's update wait\ndefault, and still answers accepted if the update has not finished by then.\n\nAn update ID the Server does not retain for the workflow exits 5\n(update_not_found). That does not prove the update was never admitted: a\nretained update is pruned with its run. The update follows its workflow\nacross continue-as-new, so the Run ID shown is the run that owns it now.\n\nNeeds a Server that advertises the update_outcome_reads capability (native\nServer 3.6.0 or later). dw reads cluster info first and refuses with exit 8,\nwithout sending any request, when it is missing. dw never sends the update\nagain in place of a read.\n\n<comment>Examples:</comment>\n\n  <info>dw workflow:update-outcome chk-42 01JUPDATE00000000000000000</info>\n  <info>dw workflow:update-outcome chk-42 01JUPDATE00000000000000000 --wait=completed --wait-timeout=30</info>\n  <info>dw workflow:update-outcome chk-42 01JUPDATE00000000000000000 --json | jq '.update_status'</info>",
+   "definition": {
+    "arguments": {
+     "workflow-id": {
+      "name": "workflow-id",
+      "is_required": true,
+      "is_array": false,
+      "description": "Workflow ID",
+      "default": null
+     },
+     "update-id": {
+      "name": "update-id",
+      "is_required": true,
+      "is_array": false,
+      "description": "Update ID, as workflow:update reported it",
+      "default": null
+     }
+    },
+    "options": {
+     "server": {
+      "name": "--server",
+      "shortcut": "-s",
+      "accept_value": true,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Server URL",
+      "default": null
+     },
+     "namespace": {
+      "name": "--namespace",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Target namespace",
+      "default": null
+     },
+     "token": {
+      "name": "--token",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Auth token",
+      "default": null
+     },
+     "tls-verify": {
+      "name": "--tls-verify",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": true,
+      "is_multiple": false,
+      "description": "Verify TLS certificates (true/false). Defaults to $DURABLE_WORKFLOW_TLS_VERIFY, then the selected profile, then true.",
+      "default": null
+     },
+     "env": {
+      "name": "--env",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": true,
+      "is_multiple": false,
+      "description": "Named dw environment to use (overrides $DW_ENV and any env set via `dw env:use`). Hard-fails when the profile does not exist.",
+      "default": null
+     },
+     "output": {
+      "name": "--output",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": true,
+      "is_multiple": false,
+      "description": "Output format: table (human-readable), json (single JSON document), jsonl (one JSON object per line, for list commands)",
+      "default": "table"
+     },
+     "wait": {
+      "name": "--wait",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Answer at once (accepted) or wait for the outcome (completed)",
+      "default": "accepted"
+     },
+     "wait-timeout": {
+      "name": "--wait-timeout",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": true,
+      "is_multiple": false,
+      "description": "With --wait=completed, the longest the Server waits, in seconds (default: the Server's update wait default)",
+      "default": null
+     },
+     "json": {
+      "name": "--json",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Output the command response as JSON (alias for --output=json)",
+      "default": false
+     },
+     "help": {
+      "name": "--help",
+      "shortcut": "-h",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Display help for the given command. When no command is given display help for the <info>list</info> command",
+      "default": false
+     },
+     "silent": {
+      "name": "--silent",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Do not output any message",
+      "default": false
+     },
+     "quiet": {
+      "name": "--quiet",
+      "shortcut": "-q",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Only errors are displayed. All other output is suppressed",
+      "default": false
+     },
+     "verbose": {
+      "name": "--verbose",
+      "shortcut": "-v|-vv|-vvv",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug",
+      "default": false
+     },
+     "version": {
+      "name": "--version",
+      "shortcut": "-V",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Display this application version",
+      "default": false
+     },
+     "ansi": {
+      "name": "--ansi",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Force (or disable --no-ansi) ANSI output",
+      "default": null
+     },
+     "no-ansi": {
+      "name": "--no-ansi",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Negate the \"--ansi\" option",
+      "default": null
+     },
+     "no-interaction": {
+      "name": "--no-interaction",
+      "shortcut": "-n",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Do not ask any interactive question",
+      "default": false
+     }
+    }
+   },
+   "rust_only": true
   }
  ]
 }

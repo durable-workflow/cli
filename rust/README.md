@@ -44,6 +44,7 @@ command is ported.
 | `--tls-verify=false` against HTTPS: no certificate or hostname checks, as in 2.x, plus a stderr warning on every such command (also with `--json` and `-q`) | Ported, intentional addition |
 | `batch:cancel`, `batch:signal`, `batch:update`, `batch:show`, `batch:resume`: resumable bulk operations with a private manifest and an optional `--deadline` ([runbook](../docs/batch-operations.md), cli#60). `parity/live_batch.py` runs them against the published Servers in CI | Rust-only, new |
 | `task-queue:pause-activities`, `task-queue:resume-activities`, `task-queue:activity-dispatch`: pause, resume and read activity dispatch on one task queue (Server #577), one request each after checking cluster info for `capabilities.task_queue_activity_dispatch_pause`; `task-queue:describe` and `task-queue:list` show the state when the Server reports it | Rust-only, new |
+| `workflow:update-outcome`: read an update's outcome later by its update ID (Server #1131, durable-workflow/.github#212), one GET after checking cluster info for `capabilities.update_outcome_reads`; pending, completed (including a null result), failed (exit 2), rejected and `update_not_found` (exit 5) are reported distinctly, and the update is never sent again. `workflow:update` points an unfinished update at it when the Server advertises the capability | Rust-only, new |
 
 Server calls go through the published `durable-workflow` crate, pinned to
 the latest qualified release.
@@ -189,8 +190,9 @@ option definitions and help text), generated from the pinned reference by
 read it, so they match 2.x even for commands not ported yet. The harness
 also checks `--help` for every catalog command.
 
-Commands with no 2.x equivalent (the `batch:*` commands, cli#60, and the
-task queue activity dispatch commands, Server #577) are added from
+Commands with no 2.x equivalent (the `batch:*` commands, cli#60, the task
+queue activity dispatch commands, Server #577, and `workflow:update-outcome`,
+Server #1131) are added from
 `parity/catalog-additions.json` and marked `rust_only`. The harness
 announces them, does not compare their `--help`, and removes only them from
 the candidate's listings and completions before comparing, so the rest of

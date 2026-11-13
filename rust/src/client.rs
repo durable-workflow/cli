@@ -125,9 +125,24 @@ impl Context {
         query: &[(String, String)],
         path: &str,
     ) -> Result<Value, CliError> {
+        self.workflow_get_with_timeout(segments, query, path, None)
+    }
+
+    /// `workflow_get` whose `timeout` replaces the SDK default for this
+    /// request only, for reads the Server may hold open.
+    pub fn workflow_get_with_timeout(
+        &self,
+        segments: &[&str],
+        query: &[(String, String)],
+        path: &str,
+        timeout: Option<Duration>,
+    ) -> Result<Value, CliError> {
         let mut request = RawRequest::get(segments.iter().copied());
         for (name, value) in query {
             request = request.query(name, value);
+        }
+        if let Some(timeout) = timeout {
+            request = request.timeout(timeout);
         }
         self.workflow_read(request, path)
     }

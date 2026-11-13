@@ -329,7 +329,230 @@ pub fn update(context: &Context, input: &Input) -> Result<i32, CliError> {
     optional_line(&result, "Update Status", "update_status");
     optional_line(&result, "Wait For", "wait_for");
     receipt_lines(&result);
+    // Only a Server with the read route (native, Server #1131) gets the
+    // hint, so 2.x output is unchanged elsewhere.
+    if crate::compat::advertises_capability(&info, UPDATE_OUTCOME_READS)
+        && result.get("update_status").and_then(Value::as_str) == Some("accepted")
+        && nonempty_scalar(result.get("update_id"))
+    {
+        let timed_out = result.get("wait_timed_out") == Some(&Value::Bool(true));
+        formatter::writeln_out("");
+        formatter::writeln_out(&format!(
+            "The update is accepted but not finished{}. Read its outcome later without sending it again:",
+            if timed_out {
+                " (the completion wait ran out)"
+            } else {
+                ""
+            }
+        ));
+        formatter::writeln_out(&format!(
+            "  <info>dw workflow:update-outcome {} {} --wait=completed</info>",
+            formatter::display_text(workflow_id),
+            field(&result, "update_id")
+        ));
+    }
     Ok(0)
+}
+
+/// Cluster info capability for reading an update's outcome later by its id
+/// (Server #1131, durable-workflow/.github#212). Published PHP Server 2.x
+/// has no such route.
+const UPDATE_OUTCOME_READS: &str = "update_outcome_reads";
+
+const UPDATE_OUTCOME_UNSUPPORTED: &str = "Reading an update's outcome later needs a native Durable Workflow Server 3.6.0 or later; published PHP Server 2.x has no such route. dw never sends the update again in place of a read.";
+
+const UPDATE_OUTCOME_NEXT_STEP: &str = "Connect to a Server that advertises this capability, or inspect the update in the workflow history (dw workflow:history). Do not send the update again to learn its outcome.";
+
+/// Added to `--wait-timeout` so the Server answers before the request
+/// times out; the SDK default stays the floor.
+const UPDATE_READ_TIMEOUT_GRACE: u64 = 10;
+const UPDATE_READ_TIMEOUT_FLOOR: u64 = 60;
+
+/// `workflow:update-outcome`: one read of an update's receipt by its id. It
+/// admits nothing, and nothing here ever submits the update.
+pub fn update_outcome(context: &Context, input: &Input) -> Result<i32, CliError> {
+    let workflow_id = input.arg("workflow-id").unwrap_or_default();
+    let update_id = input.arg("update-id").unwrap_or_default();
+    let info = context.preflight(false)?;
+    crate::compat::require_capability(
+        &info,
+        crate::build_info::version(),
+        UPDATE_OUTCOME_READS,
+        UPDATE_OUTCOME_UNSUPPORTED,
+        UPDATE_OUTCOME_NEXT_STEP,
+    )
+    .map_err(CliError::Compatibility)?;
+    let wait_for = optional_string(input, "wait").unwrap_or("accepted");
+    RequestContract::from_cluster_info(&info)
+        .map_err(CliError::Invalid)?
+        .assert_canonical_value("update", "wait_for", Some(wait_for), Some("--wait"))
+        .map_err(CliError::Invalid)?;
+    if !matches!(wait_for, "accepted" | "completed") {
+        return Err(CliError::Invalid(format!(
+            "--wait must be accepted or completed; got [{wait_for}]."
+        )));
+    }
+    let wait_timeout = match input.opt("wait-timeout").flatten().map(php::trim) {
+        None => None,
+        Some(value) => match value.parse::<u64>() {
+            Ok(seconds) if seconds > 0 && php::ctype_digit(value) => Some(seconds),
+            _ => {
+                return Err(CliError::Invalid(format!(
+                    "--wait-timeout must be a whole number of seconds, at least 1; got [{value}]."
+                )))
+            }
+        },
+    };
+    if wait_timeout.is_some() && wait_for != "completed" {
+        return Err(CliError::Invalid(
+            "--wait-timeout applies only with --wait=completed.".into(),
+        ));
+    }
+    let mut query = vec![("wait_for".to_string(), wait_for.to_string())];
+    if let Some(seconds) = wait_timeout {
+        query.push(("wait_timeout_seconds".into(), seconds.to_string()));
+    }
+    let timeout = wait_timeout.map(|seconds| {
+        Duration::from_secs(
+            seconds
+                .saturating_add(UPDATE_READ_TIMEOUT_GRACE)
+                .max(UPDATE_READ_TIMEOUT_FLOOR),
+        )
+    });
+    let path = format!("/workflows/{workflow_id}/updates/{update_id}");
+    let namespace = &context.connection.namespace;
+    let result = context
+        .workflow_get_with_timeout(
+            &["workflows", workflow_id, "updates", update_id],
+            &query,
+            &path,
+            timeout,
+        )
+        .map_err(|error| update_outcome_error(error, workflow_id, update_id, namespace))?;
+    // Bind the receipt to the update asked for before printing any of it.
+    let reported = |key: &str| result.get(key).and_then(Value::as_str);
+    if reported("update_id") != Some(update_id)
+        || reported("workflow_id").is_some_and(|reported| reported != workflow_id)
+    {
+        return Err(CliError::Failure(format!(
+            "Server error: update read response for [{path}] does not match the requested update."
+        )));
+    }
+    let result = with_namespace(result, namespace, None);
+    if context.mode.machine_readable() {
+        output::print_json(&result);
+        return Ok(0);
+    }
+    let status = reported_text(&result, "update_status");
+    formatter::writeln_out(&match status.as_deref() {
+        Some("completed") => "<info>Update completed</info>".to_string(),
+        Some("accepted") => "<comment>Update accepted, not finished yet</comment>".to_string(),
+        Some(other) => format!("Update {}", formatter::display_text(other)),
+        None => "Update receipt".to_string(),
+    });
+    formatter::writeln_out(&format!("  Workflow ID: {}", field(&result, "workflow_id")));
+    namespace_line(&result);
+    optional_line(&result, "Update", "update_name");
+    formatter::writeln_out(&format!("  Update ID: {}", field(&result, "update_id")));
+    optional_line(&result, "Run ID", "run_id");
+    optional_line(&result, "Update Status", "update_status");
+    optional_line(&result, "Command ID", "command_id");
+    optional_line(&result, "Accepted At", "accepted_at");
+    optional_line(&result, "Applied At", "applied_at");
+    optional_line(&result, "Closed At", "closed_at");
+    match status.as_deref() {
+        Some("completed") => {
+            formatter::writeln_out("  Result Envelope:");
+            // Pretty JSON keeps its line breaks; only console markup is
+            // escaped. An encoded null is still a result.
+            for line in
+                php::json_encode_pretty(result.get("result_envelope").unwrap_or(&Value::Null))
+                    .lines()
+            {
+                formatter::writeln_out(&format!("    {}", formatter::escape(line)));
+            }
+        }
+        Some("accepted") => {
+            formatter::writeln_out("");
+            if result.get("wait_timed_out") == Some(&Value::Bool(true)) {
+                let waited = reported_text(&result, "wait_timeout_seconds")
+                    .map(|seconds| format!(" after {} seconds", formatter::display_text(&seconds)))
+                    .unwrap_or_default();
+                formatter::writeln_out(&format!(
+                    "The completion wait ended{waited} before the update finished."
+                ));
+            }
+            formatter::writeln_out(
+                "The update is still pending: it has no result yet, which is not a null result.",
+            );
+            formatter::writeln_out(&format!(
+                "To wait for its outcome: <info>dw workflow:update-outcome {} {} --wait=completed</info>",
+                formatter::display_text(workflow_id),
+                field(&result, "update_id")
+            ));
+        }
+        _ => {}
+    }
+    Ok(0)
+}
+
+/// A non-empty trimmed scalar field as text.
+fn reported_text(result: &Value, key: &str) -> Option<String> {
+    result
+        .get(key)
+        .filter(|value| nonempty_scalar(Some(value)))
+        .map(|value| php::trim(&php::to_string(Some(value))).to_owned())
+}
+
+/// The Server's answer for an update that did not complete, said plainly.
+/// The status, exit code and body stay the Server's, so the JSON error
+/// envelope keeps every receipt field.
+fn update_outcome_error(
+    error: CliError,
+    workflow_id: &str,
+    update_id: &str,
+    namespace: &str,
+) -> CliError {
+    let CliError::Http {
+        status,
+        message,
+        body,
+    } = error
+    else {
+        return error;
+    };
+    let text = |key: &str| {
+        body.as_ref()
+            .and_then(|body| reported_text(&Value::Object(body.clone()), key))
+    };
+    let update_status = text("update_status");
+    let message = if status == 404 && text("reason").as_deref() == Some("update_not_found") {
+        format!(
+            "Update [{update_id}] is not retained for workflow [{workflow_id}] in namespace [{namespace}]. This does not prove the update was never admitted: a retained update is pruned with its run. Check the workflow ID, update ID and namespace."
+        )
+    } else if update_status.as_deref() == Some("failed") {
+        format!(
+            "Update [{update_id}] failed: {}",
+            text("failure_message").unwrap_or_else(|| "the Server sent no failure message.".into())
+        )
+    } else if update_status.as_deref() == Some("rejected")
+        || text("command_status").as_deref() == Some("rejected")
+    {
+        format!(
+            "Update [{update_id}] was rejected: {}",
+            text("rejection_reason")
+                .or_else(|| text("reason"))
+                .or_else(|| text("message"))
+                .unwrap_or_else(|| "the Server sent no reason.".into())
+        )
+    } else {
+        message
+    };
+    CliError::Http {
+        status,
+        message,
+        body,
+    }
 }
 
 /// The request as PHP holds it: an empty JSON object is an empty array.

@@ -500,6 +500,10 @@ dw workflow:query counter-1 current-at --input='["not-an-int"]' --output=json
 dw workflow:update order-123 approve --input='{"approver":"admin"}'
 dw workflow:update order-123 approve --input='{"approver":"admin"}' --wait=completed --request-id=approve-order-123-2026-10-20
 
+# Read an update's outcome later by its update ID (native Server 3.6.0+)
+dw workflow:update-outcome order-123 01JUPDATE00000000000000000
+dw workflow:update-outcome order-123 01JUPDATE00000000000000000 --wait=completed --wait-timeout=30
+
 # Send an integration event through a bounded bridge adapter
 dw bridge:webhook stripe --action=start_workflow --idempotency-key=stripe-event-1001 --target='{"workflow_type":"orders.fulfillment","task_queue":"external-workflows","business_key":"order-1001"}' --input='{"order_id":"order-1001"}'
 dw bridge:webhook pagerduty --action=signal_workflow --idempotency-key=pd-event-3003 --target='{"workflow_id":"wf-remediation-42","signal_name":"incident_escalated"}' --input='{"severity":"critical"}' --json
@@ -540,6 +544,37 @@ and `reason: request_id_conflict`; the response identifies the retained
 command and conflict parts. Legacy receipts with unverified intent never
 authorize a new command. Deduplicated admission does not make external effects
 exactly once.
+
+`workflow:update-outcome` reads an update that was sent earlier by its update
+ID, with one `GET /api/workflows/{workflow_id}/updates/{update_id}`, and never
+sends the update again. Use it when `workflow:update` returned before the
+update finished (`update_status: accepted`, for example after the
+`--wait=completed` wait ran out). The answer is the update's receipt, with the
+same statuses as `workflow:update`:
+
+| Server answer | Human output | Exit |
+|---|---|---|
+| 202, `update_status: accepted` | "Update accepted, not finished yet": pending, never a null result, with a hint to run again with `--wait=completed` | 0 |
+| 200, `update_status: completed` | "Update completed" and the `result_envelope`, which may encode null | 0 |
+| 422, `update_status: failed` | "Update [id] failed: ..." with the Server's `failure_message` | 2 |
+| a rejected update | its original rejection status and reason | by status |
+| 404, `reason: update_not_found` | not retained for that workflow in that namespace; this does not prove the update was never admitted, because a retained update is pruned with its run | 5 |
+
+`--wait=accepted` (the default) answers at once. `--wait=completed` waits for
+the outcome, up to `--wait-timeout` seconds or the Server's update wait default,
+and still answers accepted if the update has not finished by then. `--json`
+returns the Server receipt with `namespace` added; errors use the usual error
+envelope, which keeps the receipt fields (`update_status`, `failure_id`,
+`failure_message`, `reason`) and the full `server_response`. The update follows
+its workflow across continue-as-new, so `run_id` names the run that owns it now.
+
+The command needs a Server that advertises
+`capabilities.update_outcome_reads` (native Server 3.6.0 or later). On any other
+Server, including published PHP Server 2.x, `dw` refuses with exit 8 before
+sending any request. On such a Server, inspect the workflow history instead; do
+not send the update again to learn its outcome. When the Server advertises the
+capability, `workflow:update` prints the matching `workflow:update-outcome`
+command after an accepted but unfinished update.
 
 Batch cancellation with `--all-matching` cancels the exact run each listed
 workflow had when it was selected. If that run has continued as new, been

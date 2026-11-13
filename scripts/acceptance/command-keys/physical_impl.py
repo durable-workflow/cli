@@ -13,7 +13,7 @@ import time
 import types
 
 SOURCE = Path(__file__).resolve().parent
-LEGACY_SHA = "7324676373db9d44c63423fc50cb995a9040a791fa16a26a04690f00d5b0259e"
+LEGACY_SHA = "c2d19bd944bfb1cca7d370de923be2ccbd788f51b7ed4131622de691d58a08eb"
 BASELINE_SHA = "7d1826f7681342bb3a5974509648e2e8d75e7a21d262f65f3ec1f58727ccbc0c"
 PACKET_SHA = "8c728ce827df3a11621dfb0e82cdd404bbab48784182a5e92c8d632d49047fc5"
 CONTRACT_SHA = "ceb4695643e48c7bfe3f81eea380c6ab9aa0b973da830cb552d070344047319f"
@@ -145,9 +145,9 @@ if __name__ == "__main__":
         upgrade_started = datetime.datetime.now(datetime.timezone.utc)
         upgrade.run("-d", "--name", upgrade.name, "--platform=linux/amd64", "--init", "--cpus=1", "--memory=1g",
                     "--pids-limit=256", "--network=none", "--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges",
-                    "--env", "DB_CONNECTION=sqlite", "--env", "DB_DATABASE=/app/database/database.sqlite",
+                    "--entrypoint=/bin/sh", "--env", "DB_CONNECTION=sqlite", "--env", "DB_DATABASE=/app/database/database.sqlite",
                     *d.WORKSPACE.mount_arguments(),
-                    "--tmpfs", "/tmp:rw,size=16m", d.IMAGE, "schema-upgrade")
+                    "--tmpfs", "/tmp:rw,size=16m", d.IMAGE, *d.WORKSPACE.native_arguments("schema-upgrade"))
         upgrade.inspect()
         d.require(d.docker("wait", upgrade.id) == "0", "tagged image schema-upgrade exits zero")
         state = upgrade.inspect()["State"]
@@ -192,7 +192,8 @@ if __name__ == "__main__":
         d.WORKSPACE.unlink("runtime.env")
         report = {"cell": "physical-3.8-upgrade", "outcome": outcome, "workspace_identity": d.WORKSPACE.evidence(), "error": error, "cleanup_error": cleanup_error,
                   "phase": phase, "started_at": started.isoformat(), "finished_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                  "checks": len(d.CHECKS), "driver_sha256": entry.digest,
+                  "checks": len(d.CHECKS), "driver_sha256": entry.digest, "launcher_sha256": BOOTSTRAP_LAUNCHER_SHA256,
+                  "runner_source_commit": BOOTSTRAP_SOURCE_COMMIT,
                   "accepted_contract_source": "a09f156399416216d2f097c257a2164f83c7eda7",
                   "actual_seed_source": "09a4ccda3da11853606af031a8970bbde4b2d6ec",
                   "actual_seed_driver_sha256": "01c0fa1251ac3c809723e58d71817881fe2c5c9498579bc4c2e6097324a3618b",

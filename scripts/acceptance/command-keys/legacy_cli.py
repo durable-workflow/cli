@@ -42,7 +42,7 @@ def bound_driver():
         os.close(descriptor)
 
 
-BASE_SHA = "cd8638f7594b8fd72ac0e72dd44d38f6be27167430518b4bebd6c5c244c7c0cd"
+BASE_SHA = "f8a51ec2119cd24acf6b861b0a3c09e5ab7f651539136db506d6d8ef4b8e448b"
 d = bound_driver()
 if "BOOTSTRAP_HELD_IMPLEMENTATION" in globals():
     ENTRY_INPUT = BOOTSTRAP_HELD_IMPLEMENTATION
@@ -67,10 +67,10 @@ def start():
     d.WORKSPACE.write("runtime.env", ("DW_AUTH_TOKEN=" + d.TOKEN + "\nDW_RUST_MAINTENANCE_LOOP=0\n").encode())
     runtime.run("--rm", "-d", "--name", d.NAME, "--platform=linux/amd64", "--init",
              "--cpus=1", "--memory=1g", "--pids-limit=256", "--read-only", "--cap-drop=ALL",
-             "--security-opt=no-new-privileges", "--env-file", str(envfile),
+             "--security-opt=no-new-privileges", "--env-file", "/proc/self/fd/" + str(d.WORKSPACE.files["runtime.env"].fd), "--entrypoint=/bin/sh",
              *d.WORKSPACE.mount_arguments(),
              "--tmpfs", "/app/storage:rw,uid=1000,gid=1000,mode=750,size=64m",
-             "--tmpfs", "/tmp:rw,size=16m", "-p", "127.0.0.1::8080", d.IMAGE)
+             "--tmpfs", "/tmp:rw,size=16m", "-p", "127.0.0.1::8080", d.IMAGE, *d.WORKSPACE.native_arguments())
     binding = runtime.inspect()["NetworkSettings"]["Ports"]["8080/tcp"][0]
     d.BASE = "http://127.0.0.1:" + binding["HostPort"]
     for _ in range(100):
@@ -292,7 +292,8 @@ if __name__ == "__main__":
         report = {"cell": "synthetic-legacy-shape", "outcome": outcome, "workspace_identity": d.WORKSPACE.evidence(), "created_container_ids": runtime.created_ids, "error": error,
                   "cleanup_error": cleanup_error, "phase": phase, "checks": len(d.CHECKS), "started_at": started,
                   "finished_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                  "driver_sha256": ENTRY_INPUT.digest,
+                  "driver_sha256": ENTRY_INPUT.digest, "launcher_sha256": BOOTSTRAP_LAUNCHER_SHA256,
+                  "runner_source_commit": BOOTSTRAP_SOURCE_COMMIT,
                   "base_driver_sha256": d.ENTRY_INPUT.digest,
                   "helper_sha256": d.HELPER_INPUT.digest,
                   "manifest_sha256": legacy.MANIFEST_SHA256, "server_index": d.IMAGE,

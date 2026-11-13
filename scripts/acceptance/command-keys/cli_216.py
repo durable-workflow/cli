@@ -18,7 +18,7 @@ if __name__ == "__main__" and "BOOTSTRAP_HELD_IMPLEMENTATION" not in globals():
     raise SystemExit("Use run_cli_216.py to verify the implementation before execution")
 
 SOURCE = Path(__file__).resolve().parent
-BOUNDARY_SHA = '8e1374d497741cf1668c43bd884af69f72282448bc7151d00f6ff4718c4546b8'
+BOUNDARY_SHA = '5de532a128931b56bd7ca2232d60e07a2fa65d550cfbf56d9cd78d16ed3a5095'
 # Bootstrap the local reviewed boundary module from the same bytes that are
 # checked. Subsequent inputs use its held descriptors and sealed memory files.
 _boundary_path = SOURCE / 'boundaries.py'
@@ -80,6 +80,9 @@ ENV = {'PATH': str(ROOT / 'bin') + ':/usr/bin:/bin', 'HOME': str(ROOT / 'home'),
 for directory in ('data', 'home', 'config', 'tmp', 'docker-empty'):
     boundary.private_directory(ROOT / directory)
 WORKSPACE = boundary.Workspace(ROOT)
+ENV.update({'PATH': WORKSPACE.child_anchor('bin') + ':/usr/bin:/bin',
+            'HOME': WORKSPACE.child_anchor('home'), 'DW_CONFIG_HOME': WORKSPACE.child_anchor('config'),
+            'TMPDIR': WORKSPACE.child_anchor('tmp')})
 HTTP = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
 
@@ -92,7 +95,7 @@ def require(condition, label, detail=None):
 
 
 def docker(*args):
-    p = subprocess.run(['docker', '--config', str(ROOT / 'docker-empty'), *args], capture_output=True, text=True, timeout=50, env={'PATH': os.defpath, 'HOME': str(ROOT / 'home')})
+    p = subprocess.run(['docker', '--config', '/proc/self/fd/' + str(WORKSPACE.children['docker-empty'].fd), *args], capture_output=True, text=True, timeout=50, env={'PATH': os.defpath, 'HOME': WORKSPACE.child_anchor('home')}, pass_fds=WORKSPACE.inherited())
     if p.returncode:
         raise RuntimeError('docker operation failed: ' + p.stderr.replace(TOKEN, '[redacted]')[:2000])
     return p.stdout.strip()
@@ -118,7 +121,7 @@ def cli(*args, namespace='default', success=True):
     WORKSPACE.recheck()
     CLI_INPUT.recheck()
     p = subprocess.run(['dw', *args, '--server=' + PROXY.url, '--namespace=' + namespace, '--json'],
-                       executable=CLI_INPUT.executable, env=ENV, capture_output=True, text=True, timeout=45, pass_fds=(CLI_INPUT.sealed_fd,))
+                       executable=CLI_INPUT.executable, env=ENV, capture_output=True, text=True, timeout=45, pass_fds=(CLI_INPUT.sealed_fd, *WORKSPACE.inherited()))
     CLI_INPUT.recheck()
     WORKSPACE.recheck()
     try:
@@ -270,7 +273,7 @@ def result_is_one(answer):
 
 
 def run_modern():
-    require(shutil.which('dw', path=ENV['PATH']) == str(ROOT / 'bin/dw'), 'ordinary scoped PATH selects installed release')
+    require(shutil.which('dw', path=ENV['PATH']) == WORKSPACE.child_anchor('bin') + '/dw', 'ordinary scoped PATH selects installed release')
     require(hashlib.sha256((ROOT / 'bin/dw').read_bytes()).hexdigest() == 'da366c79c90978a3c0a92d723c66a96a2d0963f9dccbd41c8207f2c41848f814', 'published CLI binary SHA matches approved release')
     status, info = request('GET', '/api/cluster/info')
     require(status == 200 and info['version'] == '3.9.2' and info['capabilities']['command_request_keys'] is True, 'published Server 3.9.2 advertises command_request_keys', info.get('version'))
@@ -344,7 +347,7 @@ def run_modern():
 def run_selected_and_restart():
     status, info = request('GET', '/api/cluster/info')
     require(status == 200 and info['version'] == '3.9.2', 'same published Server version after process restart')
-    previous = json.loads((ROOT / 'modern-admissions.json').read_text())
+    previous = json.loads(WORKSPACE.read('modern-admissions.json'))
     recovered = 0
     for record in previous:
         if not record['dropped']:
@@ -419,10 +422,10 @@ if __name__ == '__main__':
         envfile = ROOT / 'runtime.env'
         WORKSPACE.write('runtime.env', ('DW_AUTH_TOKEN=' + TOKEN + '\nDW_RUST_MAINTENANCE_LOOP=0\n').encode())
         runtime.run('--rm', '-d', '--name', NAME, '--platform=linux/amd64', '--init', '--cpus=1', '--memory=1g', '--pids-limit=256',
-               '--read-only', '--cap-drop=ALL', '--security-opt=no-new-privileges', '--env-file', str(envfile),
+               '--read-only', '--cap-drop=ALL', '--security-opt=no-new-privileges', '--env-file', '/proc/self/fd/' + str(WORKSPACE.files['runtime.env'].fd), '--entrypoint=/bin/sh',
                *WORKSPACE.mount_arguments(),
                '--tmpfs', '/app/storage:rw,uid=1000,gid=1000,mode=750,size=64m',
-               '--tmpfs', '/tmp:rw,size=16m', '-p', '127.0.0.1::8080', IMAGE)
+               '--tmpfs', '/tmp:rw,size=16m', '-p', '127.0.0.1::8080', IMAGE, *WORKSPACE.native_arguments())
         binding = runtime.inspect()['NetworkSettings']['Ports']['8080/tcp'][0]
         BASE = 'http://127.0.0.1:' + binding['HostPort']
         for _ in range(100):
@@ -470,7 +473,8 @@ if __name__ == '__main__':
         WORKSPACE.unlink('runtime.env')
         report = {'started_at': STARTED, 'finished_at': datetime.datetime.now(datetime.timezone.utc).isoformat(),
                   'outcome': outcome, 'workspace_identity': WORKSPACE.evidence(), 'created_container_ids': runtime.created_ids, 'checks': CHECKS, 'error': error, 'cleanup': cleanup,
-                  'runner_sha256': ENTRY_INPUT.digest,
+                  'runner_sha256': ENTRY_INPUT.digest, 'launcher_sha256': BOOTSTRAP_LAUNCHER_SHA256,
+                  'runner_source_commit': BOOTSTRAP_SOURCE_COMMIT,
                   'proxy_sha256': PROXY_INPUT.digest, 'server_index': IMAGE, 'server_source': '5614274d2629d03f92932a07dfee0fb10349ddd9', 'phase': os.environ.get('CLI_216_PHASE', 'modern')}
         WORKSPACE.write('result.json', json.dumps(report, indent=2).encode())
         WORKSPACE.write('invocations.json', json.dumps(INVOCATIONS, indent=2).replace(TOKEN, '[redacted]').encode())

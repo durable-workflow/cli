@@ -87,6 +87,18 @@ def private_directory(path):
     return path
 
 
+# Adapted from sdk-python 377a3eee workspace_guards.py. The qualified
+# image checks the actual acquired bind before executing its native binary.
+NATIVE_PREFLIGHT = """set -eu
+test -d "$1" && test ! -L "$1" || exit 78
+test -f "$1/$2" && test ! -L "$1/$2" || exit 78
+test "$(stat -c '%d:%i:%u:%g:%a:%h' -- "$1")" = "$3" || exit 78
+test "$(stat -c '%d:%i:%u:%g:%a:%h' -- "$1/$2")" = "$4" || exit 78
+shift 4
+exec /usr/local/bin/durable-workflow-server "$@"
+"""
+
+
 class HeldDirectory:
     """Keep an owned directory inode, including its no-follow parent binding."""
     def __init__(self, path, parent=None):
@@ -187,9 +199,13 @@ class HeldWritableFile:
 class Workspace:
     """Bind comparison, Docker data, and terminal evidence to held objects."""
     def __init__(self, root):
+        for name in ("home", "config", "tmp", "docker-empty", "bin"):
+            private_directory(Path(root) / name)
         self.root = HeldDirectory(root)
         self.data = HeldDirectory(Path(root) / "data", self.root)
         self.files = {}
+        self.children = {name: HeldDirectory(Path(root) / name, self.root)
+                         for name in ("home", "config", "tmp", "docker-empty", "bin")}
         try:
             # The first phase creates the file; later phases hold the existing
             # inode. Server mutates it across restarts and schema upgrades.
@@ -205,6 +221,8 @@ class Workspace:
         self.root.recheck()
         self.data.recheck()
         self.database.recheck()
+        for value in self.children.values():
+            value.recheck()
         for value in self.files.values():
             value.recheck()
 
@@ -237,21 +255,40 @@ class Workspace:
 
     def mount_arguments(self):
         self.recheck()
-        # Docker resolves these local /proc descriptors while the parent holds
-        # them open. Both directory and main-file mounts keep the exact inode,
-        # even if a same-UID process renames a workspace pathname transiently.
-        return ("--mount", "type=bind,source=" + self.data.anchor + ",target=/app/database",
-                "--mount", "type=bind,source=" + self.database.anchor + ",target=/app/database/database.sqlite")
+        return ("--mount", "type=bind,source=" + str(self.data.path) + ",target=/app/database")
+
+    def native_arguments(self, *arguments):
+        self.recheck()
+        def identity(descriptor):
+            value = os.fstat(descriptor)
+            return f"{value.st_dev}:{value.st_ino}:{value.st_uid}:{value.st_gid}:{stat.S_IMODE(value.st_mode):o}:{value.st_nlink}"
+        return ("-c", NATIVE_PREFLIGHT, "checked-native", "/app/database", "database.sqlite",
+                identity(self.data.fd), identity(self.database.fd), *arguments)
 
     def inspect_mounts(self, value):
         self.recheck()
-        expected = {"/app/database": self.data.anchor, "/app/database/database.sqlite": self.database.anchor}
-        for destination, source in expected.items():
-            matches = [item for item in value["Mounts"] if item["Destination"] == destination]
-            if (len(matches) != 1 or matches[0]["Type"] != "bind" or matches[0]["Source"] != source
-                    or matches[0]["RW"] is not True):
-                raise ValueError("Docker did not bind the held workspace objects")
+        matches = [item for item in value["Mounts"] if item["Destination"] == "/app/database"]
+        if (len(matches) != 1 or matches[0]["Type"] != "bind" or matches[0]["Source"] != str(self.data.path)
+                or matches[0]["RW"] is not True):
+            raise ValueError("Docker did not acquire the guarded canonical data bind")
         self.recheck()
+
+    def child_anchor(self, name):
+        return self.children[name].anchor
+
+    def inherited(self):
+        return tuple(item.fd for item in [*self.children.values(), *self.files.values()])
+
+    def read(self, name):
+        self.recheck()
+        if name not in self.files:
+            self.files[name] = HeldWritableFile(self.root, name, maximum=32 * 1024 * 1024)
+        item = self.files[name]
+        item.recheck()
+        data = os.pread(item.fd, item.maximum + 1, 0)
+        item.digest = hashlib.sha256(data).hexdigest()
+        self.recheck()
+        return data
 
     def write(self, name, data):
         self.recheck()
@@ -262,19 +299,23 @@ class Workspace:
         self.recheck()
 
     def unlink(self, name):
-        self.recheck()
+        # Unlink only the captured entry through its held parent; root-path
+        # refusal must not prevent credential cleanup or touch a replacement.
         item = self.files.get(name)
         if item is not None:
-            item.recheck()
+            value = os.stat(item.name, dir_fd=item.parent.fd, follow_symlinks=False)
+            if HeldDirectory.key(value) != item.identity or HeldDirectory.key(os.fstat(item.fd)) != item.identity:
+                raise ValueError("cleanup entry was replaced; preserving it")
             os.unlink(name, dir_fd=self.root.fd)
             item.close()
             del self.files[name]
-        self.recheck()
 
     def close(self):
         for value in self.files.values():
             value.close()
         self.database.close()
+        for value in self.children.values():
+            value.close()
         self.data.close()
         self.root.close()
 

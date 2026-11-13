@@ -381,16 +381,41 @@ class WorkspaceTests(unittest.TestCase):
         self.workspace.recheck()
         self.assertEqual(self.workspace.database.identity, identity)
 
-    def test_docker_mounts_are_exact_held_directory_and_file_descriptors(self):
+    def test_canonical_docker_mount_requires_literal_native_identity_preflight(self):
         arguments = self.workspace.mount_arguments()
-        mounts = [{"Destination": target, "Source": source, "Type": "bind", "RW": True}
-                  for target, source in (("/app/database", self.workspace.data.anchor),
-                                         ("/app/database/database.sqlite", self.workspace.database.anchor))]
-        self.assertIn("source=" + self.workspace.database.anchor, arguments[-1])
+        mounts = [{"Destination": "/app/database", "Source": str(self.root / "data"), "Type": "bind", "RW": True}]
+        self.assertEqual(arguments, ("--mount", "type=bind,source=" + str(self.root / "data") + ",target=/app/database"))
+        native = self.workspace.native_arguments("schema-check")
+        self.assertEqual(native[1], boundary.NATIVE_PREFLIGHT)
+        self.assertEqual(native[-1], "schema-check")
+        self.assertEqual(native[-2], ":".join(str(value) for value in [self.database.stat().st_dev,
+                         self.database.stat().st_ino, os.getuid(), os.getgid(), 600, 1]))
         self.workspace.inspect_mounts({"Mounts": mounts})
-        mounts[1]["Source"] = str(self.database)
+        mounts[0]["Source"] = str(self.root)
         with self.assertRaises(ValueError):
             self.workspace.inspect_mounts({"Mounts": mounts})
+
+    def test_consumer_state_directory_swaps_are_refused(self):
+        for name in ("home", "config", "tmp", "docker-empty", "bin"):
+            with self.subTest(name=name):
+                path = self.root / name
+                path.rename(self.root / (name + "-held"))
+                path.mkdir(mode=0o700)
+                with self.assertRaises(ValueError):
+                    self.workspace.recheck()
+                path.rmdir()
+                (self.root / (name + "-held")).rename(path)
+        self.workspace.recheck()
+
+    def test_env_cleanup_uses_held_parent_after_root_rename(self):
+        self.workspace.write("runtime.env", b"SYNTHETIC=value")
+        original = self.root.with_name("held-root")
+        self.root.rename(original)
+        self.root.mkdir(mode=0o700)
+        (self.root / "runtime.env").write_bytes(b"foreign")
+        self.workspace.unlink("runtime.env")
+        self.assertFalse((original / "runtime.env").exists())
+        self.assertEqual((self.root / "runtime.env").read_bytes(), b"foreign")
 
     def test_failed_workspace_check_does_not_block_exact_id_cleanup(self):
         docker = FakeDocker()

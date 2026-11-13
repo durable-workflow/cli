@@ -5,12 +5,15 @@ from pathlib import Path
 import stat
 import types
 
+if __name__ == "__main__" and "BOOTSTRAP_LAUNCHER_SHA256" not in globals():
+    raise SystemExit("Use the reviewed literal -c Git bootstrap before the dispatcher")
+
 SOURCE = Path(__file__).resolve().parent
-BOUNDARY_SHA = "8e1374d497741cf1668c43bd884af69f72282448bc7151d00f6ff4718c4546b8"
+BOUNDARY_SHA = "5de532a128931b56bd7ca2232d60e07a2fa65d550cfbf56d9cd78d16ed3a5095"
 IMPLEMENTATIONS = {
-    'modern': ('cli_216.py', 'cd8638f7594b8fd72ac0e72dd44d38f6be27167430518b4bebd6c5c244c7c0cd'),
-    'legacy': ('legacy_cli.py', '7324676373db9d44c63423fc50cb995a9040a791fa16a26a04690f00d5b0259e'),
-    'physical': ('physical_impl.py', 'f1babc7103039e18e3d88a9d780926e5b73a0447ba17b56173d9dffd06c1c353'),
+    'modern': ('cli_216.py', 'f8a51ec2119cd24acf6b861b0a3c09e5ab7f651539136db506d6d8ef4b8e448b'),
+    'legacy': ('legacy_cli.py', 'c2d19bd944bfb1cca7d370de923be2ccbd788f51b7ed4131622de691d58a08eb'),
+    'physical': ('physical_impl.py', '446676dbfb755cc2f3aebeffdcf56977d3d064e2796bf4f86379bda0cf341ddc'),
 }
 
 
@@ -41,7 +44,9 @@ def run_implementation(path, digest, boundary, boundary_input):
     try:
         scope = {"__name__": "__main__", "__file__": str(implementation.path),
                  "BOOTSTRAP_HELD_IMPLEMENTATION": implementation,
-                 "BOOTSTRAP_HELD_BOUNDARY": boundary_input}
+                 "BOOTSTRAP_HELD_BOUNDARY": boundary_input,
+                 "BOOTSTRAP_LAUNCHER_SHA256": globals().get("BOOTSTRAP_LAUNCHER_SHA256"),
+                 "BOOTSTRAP_SOURCE_COMMIT": globals().get("BOOTSTRAP_SOURCE_COMMIT")}
         # The literal digest and held bytes precede every implementation
         # effect, including imports and source-provenance capture.
         exec(compile(implementation.data, str(implementation.path), "exec"), scope)

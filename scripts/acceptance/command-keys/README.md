@@ -73,7 +73,22 @@ The runner holds these exact bytes and compares the actual retained Avro result
 with this known fixture. It never executes an external codec program or accepts
 its self-reported decoded result.
 
-Run source with isolated host Python and the private directory in
+Obtain the outer bootstrap from the frozen reviewed Git commit, independently
+verify its SHA256 from the owning review receipt, then pass those literal bytes
+to isolated Python with `-c`. Do not execute any dispatcher or bootstrap by a
+host pathname. The bootstrap obtains the dispatcher from the same frozen Git
+object and checks its separately fixed SHA256 before compile/exec. Host-path
+substitution of the outer dispatcher cannot replace those Git bytes.
+
+```bash
+reviewed_source_commit=FULL_REVIEWED_COMMIT_FROM_THE_PR
+bootstrap="$(git --no-replace-objects show "$reviewed_source_commit:scripts/acceptance/command-keys/git_bootstrap.py")"$'\n'
+expected_bootstrap_sha256=368d78748c12bb51b60a01336702f942a9fe11f9dff918edacdb710a8950ed44
+actual_bootstrap_sha256="$(printf '%s' "$bootstrap" | sha256sum | awk '{print $1}')"
+test "$actual_bootstrap_sha256" = "$expected_bootstrap_sha256"
+```
+
+Run from that repository with the private directory in
 `CLI_216_WORKDIR`. Provide a clean environment without cloud, GitHub, Composer
 or registry credentials. Runtime authentication is synthetic and private.
 
@@ -81,7 +96,7 @@ or registry credentials. Runtime authentication is synthetic and private.
 env -i PATH=/usr/bin:/bin \
   CLI_216_WORKDIR="$experiment" \
   CLI_216_PROXY_SOURCE="$experiment/committed_response_loss.py" \
-  timeout 180s python3 -I -B scripts/acceptance/command-keys/run_cli_216.py
+  timeout 180s python3 -I -B -c "$bootstrap" "$reviewed_source_commit"
 ```
 
 For the restart phase, preserve the first phase's `admissions.json` as
@@ -161,7 +176,7 @@ env -i PATH=/usr/bin:/bin \
   CLI_216_RUNNER=physical \
   CLI_216_PHYSICAL_BASELINE="$original_backup" \
   CLI_216_PHYSICAL_PACKET="$original_packet" \
-  timeout 180s python3 -I -B scripts/acceptance/command-keys/run_cli_216.py
+  timeout 180s python3 -I -B -c "$bootstrap" "$reviewed_source_commit"
 ```
 
 Created names are `cli-216-392-upgrade` and `cli-216-392-physical`; cleanup
@@ -187,9 +202,14 @@ normal gates, fresh actual execution and cleanup still qualify that cell.
 The manual experiment holds owned mode-0700 root/data directories and a
 single-link mode-0600 database descriptor throughout each phase. SQLite opens
 through the held directory so WAL/SHM siblings keep their normal semantics.
-Docker binds both the held directory and the held main database file via local
-`/proc/<runner-pid>/fd` paths; the inspected mounts must match both descriptors.
-This requires the local Linux Docker daemon, not a remote Docker context.
+Docker acquires the guarded canonical data bind. A literal in-container shell
+preflight checks the actual mounted directory and database device/inode,
+UID/GID, mode and link count before executing the native binary. Host checks
+immediately before/after acquisition and inspection retain their held identities.
+The env-file and Docker config client use inherited `/proc/self/fd` descriptors;
+HOME/config/tmp/bin consumer directories are separately held and inherited too.
+Exact-ID cleanup uses that held Docker configuration even after a workspace
+pathname failure. This requires the local Linux Docker daemon.
 Identity checks immediately surround snapshots, container creation/inspection,
 API and installed CLI calls, cleanup, and report emission. Reports are written
 through held no-follow descriptors, then their path, parent, and contents are
@@ -206,3 +226,19 @@ Offline workspace controls demonstrate predecessor pathname substitution and
 require refusal for root/data/database swaps before upgrade or runtime start,
 report path/parent swaps during emission, in-place report edits, symlinks and
 extra hard links. A positive WAL control preserves actual mutable SQLite use.
+
+Opt-in actual-container boundary controls (separate from installed qualification):
+
+```bash
+CLI_216_CONTAINER_CONTROLS=1 \
+  python3 -I -B scripts/acceptance/command-keys/test_workspace_container.py -v
+```
+
+These use five sequential `cli-152-boundary-*` containers with the same pinned
+native image, one CPU, 512 MiB, 128 PIDs, no network or ports. Directory/file
+substitution must exit 78 before native execution. The positive mount control
+executes the native `schema-check` command and expects its SQLite-unsupported
+diagnostic, proving the preflight reached the native binary without starting a
+runtime or upgrading a database. Env/config controls use the real Docker reader
+and retain exact-ID cleanup after substitution. Check host capacity first and
+set TMPDIR to owned disk-backed scratch. No image build or credentials are used.

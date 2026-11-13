@@ -5,10 +5,12 @@ import importlib.util
 import os
 from pathlib import Path
 import sqlite3
+import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
+import unittest.mock
 
 SOURCE = Path(__file__).resolve().parent
 
@@ -139,11 +141,42 @@ class PreCaptureTests(unittest.TestCase):
     def test_unknown_loader_choice_refuses(self):
         for choice in ("unknown", "../physical_impl.py"):
             with self.subTest(choice=choice):
-                result = subprocess.run([sys.executable, "-I", "-B", str(SOURCE / "run_cli_216.py")],
-                                        env={"PATH": os.defpath, "CLI_216_RUNNER": choice},
-                                        capture_output=True, text=True, timeout=5)
-                self.assertNotEqual(result.returncode, 0)
-                self.assertIn("CLI_216_RUNNER must be", result.stderr)
+                scope = {"__name__": "__main__", "__file__": str(SOURCE / "run_cli_216.py"),
+                         "BOOTSTRAP_LAUNCHER_SHA256": "trusted-test"}
+                with unittest.mock.patch.dict(os.environ, {"CLI_216_RUNNER": choice}):
+                    with self.assertRaisesRegex(SystemExit, "CLI_216_RUNNER must be"):
+                        exec(compile((SOURCE / "run_cli_216.py").read_bytes(), scope["__file__"], "exec"), scope)
+
+    def test_direct_outer_dispatcher_refuses_pathname_authority(self):
+        result = subprocess.run([sys.executable, "-I", "-B", str(SOURCE / "run_cli_216.py")],
+                                env={"PATH": os.defpath}, capture_output=True, text=True, timeout=5)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("literal -c Git bootstrap", result.stderr)
+
+    def test_frozen_git_bootstrap_ignores_preopen_outer_path_substitution(self):
+        root = self.root / "repo"
+        root.mkdir()
+        folder = root / "scripts/acceptance/command-keys"
+        folder.mkdir(parents=True)
+        launcher = folder / "run_cli_216.py"
+        launcher.write_bytes((SOURCE / "run_cli_216.py").read_bytes())
+        env = {"PATH": os.defpath, "HOME": str(self.root), "GIT_CONFIG_NOSYSTEM": "1"}
+        def git(*args):
+            return subprocess.check_output(["git", "-C", str(root), *args], env=env, stderr=subprocess.DEVNULL)
+        git("init"); git("add", ".")
+        git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "Frozen dispatcher")
+        commit = git("rev-parse", "HEAD").decode().strip()
+        marker = self.root / "substitute-executed"
+        launcher.write_text("from pathlib import Path\nPath(" + repr(str(marker)) + ").touch()\n")
+        subprocess.run([sys.executable, "-I", "-B", str(launcher)], env=env, check=True)
+        self.assertTrue(marker.exists())
+        marker.unlink()
+        code = (SOURCE / "git_bootstrap.py").read_text()
+        result = subprocess.run([sys.executable, "-I", "-B", "-c", code, commit], cwd=root,
+                                env={**env, "CLI_216_RUNNER": "unknown"}, capture_output=True, text=True, timeout=10)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("CLI_216_RUNNER must be", result.stderr)
+        self.assertFalse(marker.exists())
 
     def test_literal_bound_implementation_executes_checked_bytes(self):
         source = self.root / "implementation.py"

@@ -17,8 +17,19 @@ PY
 echo '2a36a2417e8947357ea6f6cbc2f6c53a834f3c069f8013a34d6d861b7123d576  '"$root/.central-apt-source/docker/apt/require-fixed-bookworm-apt.sh" | sha256sum --check --strict
 
 runtime="cli-php-ci:${minor}-${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-1}"
-docker build --file "$root/docker/php-ci/Dockerfile" --build-arg "PHP_IMAGE=$image" --tag "$runtime" "$root"
+base="$runtime-base"
+docker build --file "$root/docker/php-ci/Dockerfile" --build-arg "PHP_IMAGE=$image" --tag "$base" "$root"
+base_id="$(docker image inspect "$base" --format '{{.Id}}')"
+docker build --file "$root/docker/php-ci/cli.Dockerfile" --build-arg "PHP_RUNTIME_IMAGE=$base" --tag "$runtime" "$root"
+[[ "$(docker image inspect "$base" --format '{{.Id}}')" = "$base_id" ]]
 runtime_id="$(docker image inspect "$runtime" --format '{{.Id}}')"
+docker image inspect "$base_id" "$runtime_id" | python3 -c '
+import json,sys
+base,runtime=json.load(sys.stdin)
+layers=base["RootFS"]["Layers"]
+assert runtime["RootFS"]["Layers"][:len(layers)] == layers, "CLI overlay must extend the inspected shared base"
+print("php_ci_base="+base["Id"])
+'
 docker run --rm --init --name "cli-php-ci-probe-${minor}-${GITHUB_RUN_ID:-local}" \
     --cpus 1 --memory 512m --pids-limit 64 --network none \
     --user "$(id -u):$(id -g)" --cap-drop ALL --security-opt no-new-privileges \

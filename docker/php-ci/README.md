@@ -6,6 +6,8 @@ byte-for-byte from SDK PHP source
 from the accepted Sample App container pattern. Keep these common build inputs
 aligned before starting another base build. CLI owns its minor selection,
 runtime probe, restricted launcher environment and actual test results.
+`cli.Dockerfile` extends that base with the pinned Node binary and procps,
+which the existing release-contract and installer-shell fixtures require.
 
 `scripts/ci/php-container-images.json` selects immutable official PHP images
 for 8.2, 8.4 and 8.5. Composer is pinned to the reviewed 2.10.3 image index.

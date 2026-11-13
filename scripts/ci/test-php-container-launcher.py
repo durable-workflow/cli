@@ -56,10 +56,24 @@ class PhpContainerSetupIsolationTest(unittest.TestCase):
 
 
 class PhpContainerLauncherTest(unittest.TestCase):
-    def invoke(self, command='php', arguments=(), **overrides):
+    def invoke(self, command='php', arguments=(), symlink_data=None, **overrides):
         with tempfile.TemporaryDirectory() as directory:
             state = Path(directory)
+            root = state / 'source'
+            (root / 'vendor').mkdir(parents=True)
+            (root / '.phpunit.result.cache').touch()
+            (state / 'phpunit-result.cache').touch()
+            subprocess.run(['git', 'init', '--quiet', str(root)], check=True)
             (state / 'bin').mkdir()
+            for name in ['home', 'tmp', 'composer-home']:
+                (state / name).mkdir()
+            if symlink_data:
+                selected = root / 'vendor' if symlink_data == 'vendor' else state / symlink_data
+                if selected.is_dir():
+                    selected.rmdir()
+                else:
+                    selected.unlink()
+                selected.symlink_to(root)
             (state / 'bin' / command).symlink_to(LAUNCHER)
             docker = state / 'bin/docker'
             docker.write_text('#!/usr/bin/env python3\nimport json,sys\nprint(json.dumps(sys.argv[1:]))\n')
@@ -68,7 +82,7 @@ class PhpContainerLauncherTest(unittest.TestCase):
             bundle.write_text('synthetic mount only')
             environment = {
                 'PATH': str(state / 'bin') + os.pathsep + os.defpath,
-                'CLI_PHP_CI_ROOT': str(ROOT),
+                'CLI_PHP_CI_ROOT': str(root),
                 'CLI_PHP_CI_STATE': str(state),
                 'CLI_PHP_CI_IMAGE': 'sha256:' + 'f' * 64,
                 'SSL_CERT_FILE': str(bundle),
@@ -85,10 +99,10 @@ class PhpContainerLauncherTest(unittest.TestCase):
             arguments = [str(state / 'bin/composer') if x == '{composer}' else x for x in arguments]
             result = subprocess.run([str(state / 'bin' / command), *arguments], cwd=ROOT,
                                     env=environment, capture_output=True, text=True)
-            return result, str(bundle), str(state)
+            return result, str(bundle), str(state), str(root)
 
     def test_credentials_and_php_overrides_do_not_enter_runtime(self):
-        result, bundle, state = self.invoke(arguments=('-r', 'echo PHP_VERSION;'))
+        result, bundle, state, root = self.invoke(arguments=('-r', 'echo PHP_VERSION;'))
         self.assertEqual(0, result.returncode, result.stderr)
         invocation = json.loads(result.stdout)
         passed = [invocation[i + 1] for i, part in enumerate(invocation[:-1]) if part == '--env']
@@ -99,13 +113,18 @@ class PhpContainerLauncherTest(unittest.TestCase):
         self.assertIn('HOME=' + state + '/home', passed)
         mounts = [invocation[i + 1] for i, part in enumerate(invocation[:-1]) if part == '--mount']
         self.assertEqual(1, mounts.count(f'type=bind,source={bundle},target={bundle},readonly'))
+        self.assertIn(f'type=bind,source={root},target={root},readonly', mounts)
+        self.assertIn(f'type=bind,source={state},target={state},readonly', mounts)
+        self.assertIn(f'type=bind,source={root}/vendor,target={root}/vendor', mounts)
+        for directory in ['home', 'tmp', 'composer-home']:
+            self.assertIn(f'type=bind,source={state}/{directory},target={state}/{directory}', mounts)
         self.assertFalse(any('docker.sock' in mount for mount in mounts))
         self.assertIn('--cap-drop', invocation)
         self.assertIn('no-new-privileges', invocation)
         self.assertEqual(['php', '-r', 'echo PHP_VERSION;'], invocation[-3:])
 
     def test_composer_verifier_reads_container_phar(self):
-        result, _, _ = self.invoke(arguments=('/guard/verify.php', '{composer}', str(ROOT)),
+        result, _, _, _ = self.invoke(arguments=('/guard/verify.php', '{composer}', str(ROOT)),
                                     GITHUB_ACTION_PATH='/guard')
         self.assertEqual(0, result.returncode, result.stderr)
         invocation = json.loads(result.stdout)
@@ -113,12 +132,19 @@ class PhpContainerLauncherTest(unittest.TestCase):
         self.assertIn('type=bind,source=/guard,target=/guard,readonly', invocation)
 
     def test_composer_uses_container_executable(self):
-        result, _, _ = self.invoke(command='composer', arguments=('test',))
+        result, _, _, _ = self.invoke(command='composer', arguments=('test',))
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual(['composer', 'test'], json.loads(result.stdout)[-2:])
 
+    def test_symlinked_writable_mounts_refuse_before_docker(self):
+        for selected in ['vendor', 'home', 'tmp', 'composer-home', 'phpunit-result.cache']:
+            with self.subTest(selected=selected):
+                result, _, _, _ = self.invoke(symlink_data=selected)
+                self.assertNotEqual(0, result.returncode)
+                self.assertEqual('', result.stdout)
+
     def test_mutable_image_refuses_before_docker(self):
-        result, _, _ = self.invoke(CLI_PHP_CI_IMAGE='cli-php-ci:mutable')
+        result, _, _, _ = self.invoke(CLI_PHP_CI_IMAGE='cli-php-ci:mutable')
         self.assertNotEqual(0, result.returncode)
         self.assertIn('inspected immutable image config ID', result.stderr)
         self.assertEqual('', result.stdout)

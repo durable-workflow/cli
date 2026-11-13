@@ -23,3 +23,12 @@ launchers. Those launchers forward the selected CA files as read-only mounts
 and keep unrelated host credentials outside the runtime. The caller's normal
 Composer verifier still checks the actual container PHAR before dependency
 requests and again before project scripts.
+
+The repository and launcher state are mounted read-only. Separate writable
+mounts contain `vendor`, PHPUnit's result-cache data, the private home,
+Composer state and temporary files. The launcher refuses symlinked writable
+mount roots. Application code cannot replace a host wrapper or its source
+through those mounts. A disposable-source control attempts direct launcher
+writes, wrapper unlink/replacement and rename, then invokes the next host PHP
+entry. The container test cells depend on the accepted central policy before
+executing a changed runtime source.

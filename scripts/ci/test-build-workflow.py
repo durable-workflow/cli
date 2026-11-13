@@ -26,6 +26,9 @@ class BuildWorkflowTest(unittest.TestCase):
         versions.append(setup['with']['php-version'])
         self.assertCountEqual(['8.2', '8.3', '8.4', '8.5'], versions)
 
+    def test_container_cells_require_accepted_policy_before_execution(self):
+        self.assertIn('action-policy', self.jobs['test']['needs'])
+
     def test_required_gate_includes_every_job(self):
         self.assertEqual(set(self.jobs) - {'target-branch-qualification'}, set(self.gate['needs']))
         guarded = set()

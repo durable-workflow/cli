@@ -24,7 +24,6 @@ SPC_DOWNLOAD_RETRY="${SPC_DOWNLOAD_RETRY:-5}"
 SPC_DOWNLOAD_OUTER_ATTEMPTS="${SPC_DOWNLOAD_OUTER_ATTEMPTS:-4}"
 
 BOX_VERSION="${BOX_VERSION:-4.6.6}"
-BOX_URL="https://github.com/box-project/box/releases/download/${BOX_VERSION}/box.phar"
 
 detect_platform() {
     local os arch
@@ -43,11 +42,7 @@ detect_platform() {
 
 ensure_tools() {
     mkdir -p "$TOOLS_DIR"
-    if [[ ! -x "$TOOLS_DIR/box" ]]; then
-        echo ">> Downloading Box ${BOX_VERSION}"
-        curl --proto '=https' --proto-redir '=https' -fsSL -o "$TOOLS_DIR/box" "$BOX_URL"
-        chmod +x "$TOOLS_DIR/box"
-    fi
+    bash "$ROOT/scripts/ci/ensure-box.sh" "$BOX_VERSION" "$TOOLS_DIR/box"
 }
 
 ensure_spc() {

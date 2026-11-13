@@ -325,6 +325,13 @@ is platform-specific work and is not required for the PHAR-level proof.
 - Box reads `SOURCE_DATE_EPOCH` directly when stamping the gzip layer,
   so both the entry table and the compression frame are deterministic.
 
+The build script binds Box 4.6.6 to its reviewed release-asset size and
+SHA256 before using either a downloaded or cached copy. Acquisition follows
+only HTTPS redirects within the GitHub release-asset host set. An unknown
+`BOX_VERSION` or changed cache fails the build; updating the tool requires
+reviewing its new artifact identity. This check does not replace qualification
+of the PHP runtime used to execute Box.
+
 ### How to verify locally
 
 ```bash

@@ -88,6 +88,8 @@ jobs:
           node --check scripts/ci/verify-standalone-dependencies.js
           node --check scripts/ci/rust-dependency-inventory.js
           php -l scripts/ci/probe-standalone-runtime.php
+          php -l scripts/ci/probe-php-test-runtime.php
+          bash -n scripts/ci/run-php-container.sh
           bash -n scripts/ci/verify-release-tag-source.sh
           bash -n scripts/ci/establish-native-prerequisites.sh
           bash -n scripts/ci/reconcile-release-metadata.sh
@@ -101,6 +103,7 @@ jobs:
           python scripts/ci/test-release-rust-workflow.py
           python scripts/ci/test-apt-no-retries.py
           python scripts/ci/test-build-workflow.py
+          python scripts/ci/test-php-container-launcher.py
           node --test scripts/ci/test-rust-dependency-inventory.js
           python scripts/ci/test-native-prerequisites.py
           node --test scripts/ci/test-release-workflow-metadata.js
@@ -180,6 +183,8 @@ jobs:
           node --check scripts/ci/verify-standalone-dependencies.js
           node --check scripts/ci/rust-dependency-inventory.js
           php -l scripts/ci/probe-standalone-runtime.php
+          php -l scripts/ci/probe-php-test-runtime.php
+          bash -n scripts/ci/run-php-container.sh
           bash -n scripts/ci/verify-release-tag-source.sh
           bash -n scripts/ci/establish-native-prerequisites.sh
           bash -n scripts/ci/reconcile-release-metadata.sh
@@ -193,6 +198,7 @@ jobs:
           python scripts/ci/test-release-rust-workflow.py
           python scripts/ci/test-apt-no-retries.py
           python scripts/ci/test-build-workflow.py
+          python scripts/ci/test-php-container-launcher.py
           node --test scripts/ci/test-rust-dependency-inventory.js
           python scripts/ci/test-native-prerequisites.py
           node --test scripts/ci/test-release-workflow-metadata.js

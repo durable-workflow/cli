@@ -12,7 +12,7 @@ commit = sys.argv.pop(1)
 if not re.fullmatch(r"[0-9a-f]{40}", commit, re.ASCII):
     raise ValueError("bootstrap requires one reviewed full Git commit")
 relative = "scripts/acceptance/command-keys/run_cli_216.py"
-expected = "5762dd388597e1a5fcb7e088a6abb54aee8ad6976a240aebd88be1f615314150"
+expected = "443fb73678de46ae6d52e2b388f23d1e6b0adf5aa2bc3fc85720c427718c9c7a"
 data = subprocess.check_output(["/usr/bin/git", "--no-replace-objects", "show", commit + ":" + relative],
                                env={"PATH": os.defpath}, timeout=10)
 if hashlib.sha256(data).hexdigest() != expected:

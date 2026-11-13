@@ -251,8 +251,17 @@ if __name__ == "__main__":
         copied_input = d.held(transformed, None, 64 * 1024 * 1024)
         d.WORKSPACE.recheck()
         seed_input.recheck()
-        with closing(sqlite3.connect(Path(copied_input.executable).as_uri() + "?mode=ro&immutable=1", uri=True)) as db:
+        # SQLite cannot open this sealed memfd as a database. Use its held
+        # disk sibling through the held data directory, check the actual
+        # opened main-file identity, then compare against the helper's full
+        # logical result before writing the already-captured bytes to DB.
+        copied_input.recheck()
+        with closing(sqlite3.connect("file:" + d.WORKSPACE.data.anchor + "/transformed.sqlite?mode=ro&immutable=1", uri=True)) as db:
+            opened = db.execute("PRAGMA database_list").fetchone()[2]
+            if d.boundary.HeldInput._identity(os.stat(opened)) != copied_input.identity:
+                raise ValueError("SQLite opened a different transformed copy")
             transformed_snapshot = legacy.snapshot(db)
+        copied_input.recheck()
         if (transform["before_sha256"] != legacy.fingerprint(before)
                 or transform["after_sha256"] != legacy.fingerprint(transformed_snapshot)):
             raise ValueError("held transform source/result differs")

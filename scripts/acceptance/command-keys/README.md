@@ -83,7 +83,7 @@ substitution of the outer dispatcher cannot replace those Git bytes.
 ```bash
 reviewed_source_commit=FULL_REVIEWED_COMMIT_FROM_THE_PR
 bootstrap="$(git --no-replace-objects show "$reviewed_source_commit:scripts/acceptance/command-keys/git_bootstrap.py")"$'\n'
-expected_bootstrap_sha256=368d78748c12bb51b60a01336702f942a9fe11f9dff918edacdb710a8950ed44
+expected_bootstrap_sha256=80d8c383351eb18cd110da078029ad5aaa8b1b3518e63bf62b74304aec62a124
 actual_bootstrap_sha256="$(printf '%s' "$bootstrap" | sha256sum | awk '{print $1}')"
 test "$actual_bootstrap_sha256" = "$expected_bootstrap_sha256"
 ```

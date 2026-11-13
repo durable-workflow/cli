@@ -370,6 +370,30 @@ class WorkspaceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.workspace.recheck()
 
+    def test_transformed_copy_sqlite_read_uses_held_disk_identity_not_memfd(self):
+        path = self.root / "data/transformed.sqlite"
+        with closing(sqlite3.connect(path)) as db:
+            db.execute("CREATE TABLE transformed(value INTEGER)")
+            db.execute("INSERT INTO transformed VALUES (7)")
+            db.commit()
+        path.chmod(0o600)
+        held = boundary.HeldInput(path, hashlib.sha256(path.read_bytes()).hexdigest())
+        self.addCleanup(held.close)
+        with self.assertRaises(sqlite3.OperationalError):
+            with closing(sqlite3.connect(Path(held.executable).as_uri() + "?mode=ro&immutable=1", uri=True)) as db:
+                db.execute("SELECT * FROM transformed").fetchall()
+        held.recheck()
+        with closing(sqlite3.connect("file:" + self.workspace.data.anchor + "/transformed.sqlite?mode=ro&immutable=1", uri=True)) as db:
+            opened = db.execute("PRAGMA database_list").fetchone()[2]
+            self.assertEqual(boundary.HeldInput._identity(os.stat(opened)), held.identity)
+            self.assertEqual(db.execute("SELECT * FROM transformed").fetchall(), [(7,)])
+        held.recheck()
+        path.rename(path.with_name("original-transformed.sqlite"))
+        path.write_bytes(held.data)
+        path.chmod(0o600)
+        with self.assertRaises(ValueError):
+            held.recheck()
+
     def test_mutable_database_keeps_inode_and_wal_semantics(self):
         identity = self.workspace.database.identity
         with self.workspace.connection(readonly=False) as db:

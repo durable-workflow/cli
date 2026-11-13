@@ -12,8 +12,8 @@ SOURCE = Path(__file__).resolve().parent
 BOUNDARY_SHA = "5de532a128931b56bd7ca2232d60e07a2fa65d550cfbf56d9cd78d16ed3a5095"
 IMPLEMENTATIONS = {
     'modern': ('cli_216.py', 'f8a51ec2119cd24acf6b861b0a3c09e5ab7f651539136db506d6d8ef4b8e448b'),
-    'legacy': ('legacy_cli.py', 'c2d19bd944bfb1cca7d370de923be2ccbd788f51b7ed4131622de691d58a08eb'),
-    'physical': ('physical_impl.py', '446676dbfb755cc2f3aebeffdcf56977d3d064e2796bf4f86379bda0cf341ddc'),
+    'legacy': ('legacy_cli.py', 'cb3afd7348d1e556e57e820897ab5ca46fbaf944dcc02a5b04758a19065ed5cc'),
+    'physical': ('physical_impl.py', 'b3e42c81cc8855e11aad1eba68ef5651cd81460c65fd97b2708f5b08f576b8ca'),
 }
 
 

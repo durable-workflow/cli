@@ -5,12 +5,54 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 
 
 ROOT = Path(__file__).resolve().parents[2]
 LAUNCHER = ROOT / 'scripts/ci/run-php-container.sh'
+SETUP = ROOT / 'scripts/ci/setup-php-container.sh'
+
+
+class PhpContainerSetupIsolationTest(unittest.TestCase):
+    def test_workspace_python_imports_do_not_run_before_apt_source_guard(self):
+        for origin in ['working-directory', 'PYTHONPATH']:
+            with self.subTest(origin=origin), tempfile.TemporaryDirectory() as directory:
+                temporary = Path(directory)
+                project = temporary / 'project'
+                scripts = project / 'scripts/ci'
+                scripts.mkdir(parents=True)
+                setup = scripts / SETUP.name
+                setup.write_bytes(SETUP.read_bytes())
+                (scripts / 'php-container-images.json').write_bytes(
+                    (ROOT / 'scripts/ci/php-container-images.json').read_bytes())
+                marker = temporary / 'workspace-imported'
+                poison = project if origin == 'working-directory' else temporary / 'python-path'
+                poison.mkdir(exist_ok=True)
+                (poison / 'json.py').write_text(
+                    'from pathlib import Path\n'
+                    f'Path({str(marker)!r}).write_text("executed")\n'
+                    'raise RuntimeError("Workspace Python import executed")\n')
+                binaries = temporary / 'bin'
+                binaries.mkdir()
+                (binaries / 'python3').symlink_to(sys.executable)
+                docker = binaries / 'docker'
+                docker.write_text('#!/bin/sh\nexit 99\n')
+                docker.chmod(0o755)
+                environment = {'PATH': str(binaries) + os.pathsep + os.defpath}
+                if origin == 'PYTHONPATH':
+                    environment['PYTHONPATH'] = str(poison)
+                positive = subprocess.run([sys.executable, '-c', 'import json'], cwd=project,
+                                          env=environment, capture_output=True)
+                self.assertNotEqual(0, positive.returncode)
+                self.assertTrue(marker.exists(), 'The unisolated positive control must execute the marker')
+                marker.unlink()
+
+                result = subprocess.run(['bash', str(setup), '8.2'], cwd=project,
+                                        env=environment, capture_output=True)
+                self.assertEqual(1, result.returncode, 'The missing APT source must stop setup before Docker')
+                self.assertFalse(marker.exists(), 'The real setup must not execute workspace/PYTHONPATH code')
 
 
 class PhpContainerLauncherTest(unittest.TestCase):

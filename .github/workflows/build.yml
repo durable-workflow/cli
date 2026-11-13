@@ -102,7 +102,7 @@ jobs:
           python scripts/ci/test-release-rust-workflow.py
           python scripts/ci/test-apt-no-retries.py
           python scripts/ci/test-build-workflow.py
-          python scripts/ci/test-php-container-launcher.py
+          python -I -S -B scripts/ci/test-php-container-launcher.py
           node --test scripts/ci/test-rust-dependency-inventory.js
           python scripts/ci/test-native-prerequisites.py
           node --test scripts/ci/test-release-workflow-metadata.js
@@ -196,7 +196,7 @@ jobs:
           python scripts/ci/test-release-rust-workflow.py
           python scripts/ci/test-apt-no-retries.py
           python scripts/ci/test-build-workflow.py
-          python scripts/ci/test-php-container-launcher.py
+          python -I -S -B scripts/ci/test-php-container-launcher.py
           node --test scripts/ci/test-rust-dependency-inventory.js
           python scripts/ci/test-native-prerequisites.py
           node --test scripts/ci/test-release-workflow-metadata.js

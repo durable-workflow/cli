@@ -4,7 +4,7 @@ umask 077
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 minor="${1:?Usage: setup-php-container.sh 8.2|8.4|8.5}"
-image="$(python3 - "$root/scripts/ci/php-container-images.json" "$minor" <<'PY'
+image="$(python3 -I -S -B - "$root/scripts/ci/php-container-images.json" "$minor" <<'PY'
 import json,re,sys
 images=json.load(open(sys.argv[1]))
 image=images[sys.argv[2]]
@@ -23,7 +23,7 @@ base_id="$(docker image inspect "$base" --format '{{.Id}}')"
 docker build --file "$root/docker/php-ci/cli.Dockerfile" --build-arg "PHP_RUNTIME_IMAGE=$base" --tag "$runtime" "$root"
 [[ "$(docker image inspect "$base" --format '{{.Id}}')" = "$base_id" ]]
 runtime_id="$(docker image inspect "$runtime" --format '{{.Id}}')"
-docker image inspect "$base_id" "$runtime_id" | python3 -c '
+docker image inspect "$base_id" "$runtime_id" | python3 -I -S -B -c '
 import json,sys
 base,runtime=json.load(sys.stdin)
 layers=base["RootFS"]["Layers"]
@@ -42,7 +42,7 @@ mkdir -p "$state/bin" "$state/home" "$state/tmp" "$state/composer-home/cache"
 ln -sf "$root/scripts/ci/run-php-container.sh" "$state/bin/php"
 ln -sf "$root/scripts/ci/run-php-container.sh" "$state/bin/composer"
 CLI_PHP_CI_TEST_IMAGE="$runtime_id" CLI_PHP_CI_ROOT="$root" CLI_PHP_CI_STATE="$state" \
-    python3 "$root/scripts/ci/test-php-container-tls.py" -v
+    python3 -I -S -B "$root/scripts/ci/test-php-container-tls.py" -v
 {
     echo "CLI_PHP_CI_IMAGE=$runtime_id"
     echo "CLI_PHP_CI_ROOT=$root"

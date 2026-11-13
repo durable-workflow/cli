@@ -52,6 +52,7 @@ while IFS= read -r variable; do
         DURABLE_WORKFLOW_CLI_SMOKE_WORKER_TOKEN|\
         DW_CI_CA_SHA256|GITHUB_ACTIONS|CI|TMPDIR|TZ)
             options+=(--env "$variable") ;;
+        *) ;; # Host credentials and unrelated configuration stay outside.
     esac
 done < <(compgen -e)
 

@@ -13,7 +13,7 @@ import time
 import types
 
 SOURCE = Path(__file__).resolve().parent
-LEGACY_SHA = "0f0ceb09676d38109bbd57ed9c4d22e0c448a78c65999fe82a5feb3b3ce1062b"
+LEGACY_SHA = "7324676373db9d44c63423fc50cb995a9040a791fa16a26a04690f00d5b0259e"
 BASELINE_SHA = "7d1826f7681342bb3a5974509648e2e8d75e7a21d262f65f3ec1f58727ccbc0c"
 PACKET_SHA = "8c728ce827df3a11621dfb0e82cdd404bbab48784182a5e92c8d632d49047fc5"
 CONTRACT_SHA = "ceb4695643e48c7bfe3f81eea380c6ab9aa0b973da830cb552d070344047319f"
@@ -125,8 +125,8 @@ if __name__ == "__main__":
     if packet["expected_external_baseline"] != contract["physical_upgrade"]["baseline"] or len(packet["cases"]) != 6:
         raise ValueError("physical baseline/case identities differ")
     d.NAME = "cli-216-392-physical"
-    common.runtime = d.boundary.OwnedContainer(d.docker, d.NAME)
-    upgrade = d.boundary.OwnedContainer(d.docker, "cli-216-392-upgrade")
+    common.runtime = d.boundary.OwnedContainer(d.docker, d.NAME, d.WORKSPACE)
+    upgrade = d.boundary.OwnedContainer(d.docker, "cli-216-392-upgrade", d.WORKSPACE)
     outcome, error, phase = "runner-blocked", None, "preflight"
     started = datetime.datetime.now(datetime.timezone.utc)
     before, after = None, None
@@ -135,16 +135,18 @@ if __name__ == "__main__":
         d.require(observed["Architecture"] == "amd64" and observed["Os"] == "linux" and
                   observed["Config"]["Labels"]["org.opencontainers.image.revision"] ==
                   "5614274d2629d03f92932a07dfee0fb10349ddd9", "physical candidate published platform/source identity")
-        descriptor = os.open(d.DB, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
-        with os.fdopen(descriptor, "wb") as copied:
-            copied.write(baseline.data)
+        d.WORKSPACE.recheck()
+        if os.fstat(d.WORKSPACE.database.fd).st_size != 0:
+            raise ValueError("physical upgrade needs a newly created empty DB inode")
+        d.WORKSPACE.database.write(baseline.data)
+        d.WORKSPACE.recheck()
         before = common.full_snapshot()
         phase = "explicit physical schema upgrade"
         upgrade_started = datetime.datetime.now(datetime.timezone.utc)
         upgrade.run("-d", "--name", upgrade.name, "--platform=linux/amd64", "--init", "--cpus=1", "--memory=1g",
                     "--pids-limit=256", "--network=none", "--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges",
                     "--env", "DB_CONNECTION=sqlite", "--env", "DB_DATABASE=/app/database/database.sqlite",
-                    "--mount", "type=bind,source=" + str(d.ROOT / "data") + ",target=/app/database",
+                    *d.WORKSPACE.mount_arguments(),
                     "--tmpfs", "/tmp:rw,size=16m", d.IMAGE, "schema-upgrade")
         upgrade.inspect()
         d.require(d.docker("wait", upgrade.id) == "0", "tagged image schema-upgrade exits zero")
@@ -181,13 +183,14 @@ if __name__ == "__main__":
                     time.sleep(.1)
                 if owned.exists():
                     raise RuntimeError("created physical container removal did not finish")
+            d.WORKSPACE.recheck()
             for item in d.HELD:
                 item.recheck()
         except Exception as failure:
             outcome = "runner-blocked"
             cleanup_error = (type(failure).__name__ + ": " + str(failure)).replace(d.TOKEN, "[redacted]")
-        (d.ROOT / "runtime.env").unlink(missing_ok=True)
-        report = {"cell": "physical-3.8-upgrade", "outcome": outcome, "error": error, "cleanup_error": cleanup_error,
+        d.WORKSPACE.unlink("runtime.env")
+        report = {"cell": "physical-3.8-upgrade", "outcome": outcome, "workspace_identity": d.WORKSPACE.evidence(), "error": error, "cleanup_error": cleanup_error,
                   "phase": phase, "started_at": started.isoformat(), "finished_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
                   "checks": len(d.CHECKS), "driver_sha256": entry.digest,
                   "accepted_contract_source": "a09f156399416216d2f097c257a2164f83c7eda7",
@@ -199,6 +202,8 @@ if __name__ == "__main__":
                   "request_windows": common.windows, "server_index": d.IMAGE,
                   "created_container_ids": upgrade.created_ids + common.runtime.created_ids,
                   "cleanup": "created IDs/volumes/env removed; original held inputs unchanged" if cleanup_error is None else "requires investigation"}
-        (d.ROOT / "physical-result.json").write_text(json.dumps(report, indent=2))
+        d.WORKSPACE.write("physical-result.json", json.dumps(report, indent=2).encode())
+        d.WORKSPACE.recheck()
         print(json.dumps(report), flush=True)
+        d.WORKSPACE.close()
     raise SystemExit(0 if outcome == "pass" else 1)

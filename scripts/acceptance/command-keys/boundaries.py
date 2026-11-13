@@ -87,12 +87,207 @@ def private_directory(path):
     return path
 
 
+class HeldDirectory:
+    """Keep an owned directory inode, including its no-follow parent binding."""
+    def __init__(self, path, parent=None):
+        self.path, self.parent = Path(path), parent
+        if not self.path.is_absolute() or self.path.resolve() != self.path:
+            raise ValueError("directory must be canonical without symlinks")
+        if parent is not None:
+            parent.recheck()
+            if self.path.parent != parent.path:
+                raise ValueError("held directory must be a direct child")
+        self.fd = os.open(self.path if parent is None else self.path.name,
+                          os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC,
+                          dir_fd=None if parent is None else parent.fd)
+        self.identity = self.key(os.fstat(self.fd))
+        try:
+            self.recheck()
+        except BaseException:
+            self.close()
+            raise
+
+    @staticmethod
+    def key(value):
+        return (value.st_dev, value.st_ino, value.st_mode, value.st_uid, value.st_gid, value.st_nlink)
+
+    def recheck(self):
+        if self.parent is not None:
+            self.parent.recheck()
+        value = os.fstat(self.fd)
+        named = os.stat(self.path if self.parent is None else self.path.name,
+                        dir_fd=None if self.parent is None else self.parent.fd, follow_symlinks=False)
+        if (not stat.S_ISDIR(value.st_mode) or value.st_uid != os.getuid()
+                or stat.S_IMODE(value.st_mode) != 0o700 or value.st_nlink < 2
+                or self.key(value) != self.identity or self.key(named) != self.identity
+                or self.path.resolve() != self.path or self.key(self.path.lstat()) != self.identity):
+            raise ValueError("held directory identity changed")
+
+    @property
+    def anchor(self):
+        return "/proc/" + str(os.getpid()) + "/fd/" + str(self.fd)
+
+    def close(self):
+        os.close(self.fd)
+
+
+class HeldWritableFile:
+    """Mutable SQLite data or a frozen report, always tied to one parent/inode."""
+    def __init__(self, parent, name, *, create=False, maximum=64 * 1024 * 1024):
+        if Path(name).name != name or name in (".", ".."):
+            raise ValueError("held file requires one filename")
+        self.parent, self.name, self.maximum, self.digest = parent, name, maximum, None
+        parent.recheck()
+        flags = os.O_RDWR | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC
+        if create:
+            flags |= os.O_CREAT | os.O_EXCL
+        self.fd = os.open(name, flags, 0o600, dir_fd=parent.fd)
+        self.identity = HeldDirectory.key(os.fstat(self.fd))
+        try:
+            self.recheck()
+        except BaseException:
+            self.close()
+            raise
+
+    def recheck(self):
+        self.parent.recheck()
+        value = os.fstat(self.fd)
+        named = os.stat(self.name, dir_fd=self.parent.fd, follow_symlinks=False)
+        if (not stat.S_ISREG(value.st_mode) or value.st_uid != os.getuid() or value.st_nlink != 1
+                or stat.S_IMODE(value.st_mode) != 0o600 or not 0 <= value.st_size <= self.maximum
+                or HeldDirectory.key(value) != self.identity or HeldDirectory.key(named) != self.identity):
+            raise ValueError("held writable file identity changed")
+        if self.digest is not None and hashlib.sha256(os.pread(self.fd, self.maximum + 1, 0)).hexdigest() != self.digest:
+            raise ValueError("held report content changed")
+
+    @property
+    def anchor(self):
+        return "/proc/" + str(os.getpid()) + "/fd/" + str(self.fd)
+
+    def write(self, data, *, freeze=False):
+        self.recheck()
+        if len(data) > self.maximum:
+            raise ValueError("held file byte bound exceeded")
+        self.digest = None
+        os.ftruncate(self.fd, 0)
+        offset = 0
+        while offset < len(data):
+            count = os.pwrite(self.fd, data[offset:], offset)
+            if count <= 0:
+                raise OSError("held file write made no progress")
+            offset += count
+        os.fsync(self.fd)
+        self.digest = hashlib.sha256(data).hexdigest() if freeze else None
+        self.recheck()
+
+    def close(self):
+        os.close(self.fd)
+
+
+class Workspace:
+    """Bind comparison, Docker data, and terminal evidence to held objects."""
+    def __init__(self, root):
+        self.root = HeldDirectory(root)
+        self.data = HeldDirectory(Path(root) / "data", self.root)
+        self.files = {}
+        try:
+            # The first phase creates the file; later phases hold the existing
+            # inode. Server mutates it across restarts and schema upgrades.
+            exists = os.path.lexists(Path(root) / "data/database.sqlite")
+            self.database = HeldWritableFile(self.data, "database.sqlite", create=not exists)
+            self.recheck()
+        except BaseException:
+            self.data.close()
+            self.root.close()
+            raise
+
+    def recheck(self):
+        self.root.recheck()
+        self.data.recheck()
+        self.database.recheck()
+        for value in self.files.values():
+            value.recheck()
+
+    def evidence(self):
+        self.recheck()
+        return {"root": list(self.root.identity), "data": list(self.data.identity),
+                "database": list(self.database.identity)}
+
+    def connection(self, *, readonly=True):
+        from contextlib import contextmanager
+        import sqlite3
+
+        @contextmanager
+        def opened():
+            self.recheck()
+            # The directory descriptor preserves SQLite's WAL/SHM sibling
+            # semantics. Check SQLite's opened main file against our held DB.
+            uri = "file:" + self.data.anchor + "/database.sqlite?mode=" + ("ro" if readonly else "rw")
+            db = sqlite3.connect(uri, uri=True, timeout=2)
+            try:
+                named = db.execute("PRAGMA database_list").fetchone()[2]
+                if HeldDirectory.key(os.stat(named)) != self.database.identity:
+                    raise ValueError("SQLite opened a different database")
+                self.recheck()
+                yield db
+            finally:
+                db.close()
+                self.recheck()
+        return opened()
+
+    def mount_arguments(self):
+        self.recheck()
+        # Docker resolves these local /proc descriptors while the parent holds
+        # them open. Both directory and main-file mounts keep the exact inode,
+        # even if a same-UID process renames a workspace pathname transiently.
+        return ("--mount", "type=bind,source=" + self.data.anchor + ",target=/app/database",
+                "--mount", "type=bind,source=" + self.database.anchor + ",target=/app/database/database.sqlite")
+
+    def inspect_mounts(self, value):
+        self.recheck()
+        expected = {"/app/database": self.data.anchor, "/app/database/database.sqlite": self.database.anchor}
+        for destination, source in expected.items():
+            matches = [item for item in value["Mounts"] if item["Destination"] == destination]
+            if (len(matches) != 1 or matches[0]["Type"] != "bind" or matches[0]["Source"] != source
+                    or matches[0]["RW"] is not True):
+                raise ValueError("Docker did not bind the held workspace objects")
+        self.recheck()
+
+    def write(self, name, data):
+        self.recheck()
+        if name not in self.files:
+            exists = os.path.lexists(self.root.path / name)
+            self.files[name] = HeldWritableFile(self.root, name, create=not exists, maximum=32 * 1024 * 1024)
+        self.files[name].write(data, freeze=True)
+        self.recheck()
+
+    def unlink(self, name):
+        self.recheck()
+        item = self.files.get(name)
+        if item is not None:
+            item.recheck()
+            os.unlink(name, dir_fd=self.root.fd)
+            item.close()
+            del self.files[name]
+        self.recheck()
+
+    def close(self):
+        for value in self.files.values():
+            value.close()
+        self.database.close()
+        self.data.close()
+        self.root.close()
+
+
 class OwnedContainer:
-    def __init__(self, docker, name):
+    def __init__(self, docker, name, workspace=None):
         self.docker, self.name, self.id = docker, name, None
+        self.workspace = workspace
         self.created_ids = []
 
     def run(self, *arguments):
+        if self.workspace is not None:
+            self.workspace.recheck()
         if self.exists() or self.docker("ps", "-aq", "--filter", "name=^" + self.name + "$"):
             raise ValueError("container name already exists; no cleanup authority acquired")
         created = self.docker("run", *arguments)
@@ -105,19 +300,26 @@ class OwnedContainer:
     def exists(self):
         return self.id is not None and self.docker("ps", "-aq", "--no-trunc", "--filter", "id=" + self.id) == self.id
 
-    def inspect(self):
+    def inspect(self, *, check_workspace=True):
+        if check_workspace and self.workspace is not None:
+            self.workspace.recheck()
         if not self.exists():
             raise ValueError("created container no longer exists")
         value = json.loads(self.docker("inspect", self.id, "--format", "{{json .}}"))
         if value["Id"] != self.id or value["Name"] != "/" + self.name:
             raise ValueError("created container ID/name changed")
+        if check_workspace and self.workspace is not None:
+            self.workspace.inspect_mounts(value)
         return value
 
     def stop(self):
         self.inspect()
         self.docker("stop", "--time=10", self.id)
+        if self.workspace is not None:
+            self.workspace.recheck()
 
     def remove(self):
         if self.exists():
-            self.inspect()
+            # A failed workspace check must not prevent exact-ID cleanup.
+            self.inspect(check_workspace=False)
             self.docker("rm", "-fv", self.id)

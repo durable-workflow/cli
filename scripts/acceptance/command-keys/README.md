@@ -183,3 +183,26 @@ CLI_216_TEST_HELPER="$experiment/sqlite_legacy.py" \
 
 These controls are not a physical upgrade result. Source review, current
 normal gates, fresh actual execution and cleanup still qualify that cell.
+
+The manual experiment holds owned mode-0700 root/data directories and a
+single-link mode-0600 database descriptor throughout each phase. SQLite opens
+through the held directory so WAL/SHM siblings keep their normal semantics.
+Docker binds both the held directory and the held main database file via local
+`/proc/<runner-pid>/fd` paths; the inspected mounts must match both descriptors.
+This requires the local Linux Docker daemon, not a remote Docker context.
+Identity checks immediately surround snapshots, container creation/inspection,
+API and installed CLI calls, cleanup, and report emission. Reports are written
+through held no-follow descriptors, then their path, parent, and contents are
+rechecked before printing a terminal result. A swap fails the run; exact-ID
+container cleanup remains available even after a workspace identity failure.
+
+The synthetic transform uses a separate stopped sibling copy, verifies its
+complete result against the accepted helper's fingerprints, and copies those
+bytes into the existing held runtime database inode. It does not rename a new
+file over the database that later containers exercise. The physical upgrade
+also mutates only that held copied database. Reports include root/data/database
+identities so the parent can compare them across modern process restarts.
+Offline workspace controls demonstrate predecessor pathname substitution and
+require refusal for root/data/database swaps before upgrade or runtime start,
+report path/parent swaps during emission, in-place report edits, symlinks and
+extra hard links. A positive WAL control preserves actual mutable SQLite use.

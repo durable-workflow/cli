@@ -6,11 +6,11 @@ import stat
 import types
 
 SOURCE = Path(__file__).resolve().parent
-BOUNDARY_SHA = "d377e9191ebf79dc990db159629c303c10531a2f27d3ae20933fabc87e3b3525"
+BOUNDARY_SHA = "8e1374d497741cf1668c43bd884af69f72282448bc7151d00f6ff4718c4546b8"
 IMPLEMENTATIONS = {
-    'modern': ('cli_216.py', 'e26565125bb122e6d84cd6a6e230c7d47a56ca043eda7bffa7025b9c19fdbbbe'),
-    'legacy': ('legacy_cli.py', '0f0ceb09676d38109bbd57ed9c4d22e0c448a78c65999fe82a5feb3b3ce1062b'),
-    'physical': ('physical_impl.py', '81ff88b11a7c402d2206c2856b08080eb149528b31cd0f616ccd676e459fcd3f'),
+    'modern': ('cli_216.py', 'cd8638f7594b8fd72ac0e72dd44d38f6be27167430518b4bebd6c5c244c7c0cd'),
+    'legacy': ('legacy_cli.py', '7324676373db9d44c63423fc50cb995a9040a791fa16a26a04690f00d5b0259e'),
+    'physical': ('physical_impl.py', 'f1babc7103039e18e3d88a9d780926e5b73a0447ba17b56173d9dffd06c1c353'),
 }
 
 

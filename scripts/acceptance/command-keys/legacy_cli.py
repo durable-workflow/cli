@@ -42,7 +42,7 @@ def bound_driver():
         os.close(descriptor)
 
 
-BASE_SHA = "e26565125bb122e6d84cd6a6e230c7d47a56ca043eda7bffa7025b9c19fdbbbe"
+BASE_SHA = "cd8638f7594b8fd72ac0e72dd44d38f6be27167430518b4bebd6c5c244c7c0cd"
 d = bound_driver()
 if "BOOTSTRAP_HELD_IMPLEMENTATION" in globals():
     ENTRY_INPUT = BOOTSTRAP_HELD_IMPLEMENTATION
@@ -51,25 +51,24 @@ else:
     ENTRY_INPUT = d.held(Path(__file__).absolute(), None, 131072)
 legacy = d.legacy_helper
 d.NAME = "cli-216-392-legacy"
-runtime = d.boundary.OwnedContainer(d.docker, d.NAME)
+runtime = d.boundary.OwnedContainer(d.docker, d.NAME, d.WORKSPACE)
 manifest = legacy.manifest()
 cases, selections, windows = [], [], []
 started = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
 
 def full_snapshot():
-    with closing(sqlite3.connect(d.DB.as_uri() + "?mode=ro", uri=True, timeout=2)) as db:
+    with d.WORKSPACE.connection() as db:
         return legacy.snapshot(db)
 
 
 def start():
     envfile = ROOT / "runtime.env"
-    envfile.write_text("DW_AUTH_TOKEN=" + d.TOKEN + "\nDW_RUST_MAINTENANCE_LOOP=0\n")
-    envfile.chmod(0o600)
+    d.WORKSPACE.write("runtime.env", ("DW_AUTH_TOKEN=" + d.TOKEN + "\nDW_RUST_MAINTENANCE_LOOP=0\n").encode())
     runtime.run("--rm", "-d", "--name", d.NAME, "--platform=linux/amd64", "--init",
              "--cpus=1", "--memory=1g", "--pids-limit=256", "--read-only", "--cap-drop=ALL",
              "--security-opt=no-new-privileges", "--env-file", str(envfile),
-             "--mount", "type=bind,source=" + str(ROOT / "data") + ",target=/app/database",
+             *d.WORKSPACE.mount_arguments(),
              "--tmpfs", "/app/storage:rw,uid=1000,gid=1000,mode=750,size=64m",
              "--tmpfs", "/tmp:rw,size=16m", "-p", "127.0.0.1::8080", d.IMAGE)
     binding = runtime.inspect()["NetworkSettings"]["Ports"]["8080/tcp"][0]
@@ -230,11 +229,36 @@ if __name__ == "__main__":
         phase = "offline accepted transform"
         # This is a current-producer fixture. Checkpoint only after observed
         # process absence, then freeze the helper's untouched source inode.
-        with closing(sqlite3.connect(d.DB, timeout=2)) as db:
+        with d.WORKSPACE.connection(readonly=False) as db:
             db.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()
+        # Preserve the held runtime DB inode. Transform a distinct stopped
+        # sibling copy, verify its complete result, then copy through the held
+        # DB descriptor before starting the next runtime on that same inode.
+        d.WORKSPACE.recheck()
         original = d.DB.with_name("seed.sqlite")
-        d.DB.rename(original)
-        transform = legacy.transform_copy(original, d.DB, selections, stopped=True)
+        descriptor = os.open(original.name, os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                             0o600, dir_fd=d.WORKSPACE.data.fd)
+        try:
+            with os.fdopen(os.dup(descriptor), "wb") as copied:
+                copied.write(os.pread(d.WORKSPACE.database.fd, 64 * 1024 * 1024 + 1, 0))
+        finally:
+            os.close(descriptor)
+        seed_input = d.held(original, None, 64 * 1024 * 1024)
+        d.WORKSPACE.recheck()
+        transformed = d.DB.with_name("transformed.sqlite")
+        before = full_snapshot()
+        transform = legacy.transform_copy(original, transformed, selections, stopped=True)
+        copied_input = d.held(transformed, None, 64 * 1024 * 1024)
+        d.WORKSPACE.recheck()
+        seed_input.recheck()
+        with closing(sqlite3.connect(Path(copied_input.executable).as_uri() + "?mode=ro&immutable=1", uri=True)) as db:
+            transformed_snapshot = legacy.snapshot(db)
+        if (transform["before_sha256"] != legacy.fingerprint(before)
+                or transform["after_sha256"] != legacy.fingerprint(transformed_snapshot)):
+            raise ValueError("held transform source/result differs")
+        d.WORKSPACE.database.write(copied_input.data)
+        if full_snapshot() != transformed_snapshot:
+            raise ValueError("held runtime DB differs from accepted transformed copy")
         d.require(transform["transformed"] == 12, "exact twelve approved legacy transforms; all other schema/rows preserved")
         start()
         phase = "installed legacy readback"
@@ -257,14 +281,15 @@ if __name__ == "__main__":
                 time.sleep(.1)
             if runtime.exists():
                 raise RuntimeError("created container removal did not complete")
+            d.WORKSPACE.recheck()
             for item in d.HELD:
                 item.recheck()
         except Exception as failure:
             cleanup_error = (type(failure).__name__ + ": " + str(failure)).replace(d.TOKEN, "[redacted]")
             outcome = "runner-blocked"
-        (ROOT / "runtime.env").unlink(missing_ok=True)
+        d.WORKSPACE.unlink("runtime.env")
         absent = not runtime.exists()
-        report = {"cell": "synthetic-legacy-shape", "outcome": outcome, "created_container_ids": runtime.created_ids, "error": error,
+        report = {"cell": "synthetic-legacy-shape", "outcome": outcome, "workspace_identity": d.WORKSPACE.evidence(), "created_container_ids": runtime.created_ids, "error": error,
                   "cleanup_error": cleanup_error, "phase": phase, "checks": len(d.CHECKS), "started_at": started,
                   "finished_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
                   "driver_sha256": ENTRY_INPUT.digest,
@@ -273,7 +298,9 @@ if __name__ == "__main__":
                   "manifest_sha256": legacy.MANIFEST_SHA256, "server_index": d.IMAGE,
                   "transform": transform, "windows": windows,
                   "cleanup": "created container/volumes/env removed; held inputs unchanged" if absent and cleanup_error is None else "cleanup/input identity failed"}
-        (ROOT / "legacy-result.json").write_text(json.dumps(report, indent=2))
-        (ROOT / "legacy-wire.json").write_text(json.dumps({"seed": seed_wire, "readback": wire}, indent=2))
+        d.WORKSPACE.write("legacy-result.json", json.dumps(report, indent=2).encode())
+        d.WORKSPACE.write("legacy-wire.json", json.dumps({"seed": seed_wire, "readback": wire}, indent=2).encode())
+        d.WORKSPACE.recheck()
         print(json.dumps(report), flush=True)
+        d.WORKSPACE.close()
     raise SystemExit(0 if outcome == "pass" and absent else 1)

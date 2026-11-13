@@ -223,7 +223,13 @@ class SnapshotTests(unittest.TestCase):
         database = Path(temporary.name).resolve() / "snapshot.sqlite"
         tree = ast.parse((SOURCE / "cli_216.py").read_text())
         function = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "snapshot")
-        scope = {"DB": database, "sqlite3": sqlite3, "legacy_helper": helper}
+        data = database.parent / "data"
+        data.mkdir(mode=0o700)
+        database = data / "database.sqlite"
+        database.parent.parent.chmod(0o700)
+        workspace = boundary.Workspace(database.parent.parent)
+        self.addCleanup(workspace.close)
+        scope = {"WORKSPACE": workspace, "legacy_helper": helper}
         exec(compile(ast.Module(body=[function], type_ignores=[]), "snapshot-check", "exec"), scope)
         with closing(sqlite3.connect(database)) as db:
             db.execute("CREATE TABLE fixture(value INTEGER)")
@@ -245,6 +251,155 @@ class SnapshotTests(unittest.TestCase):
                 db.commit()
                 self.assertEqual(old, predecessor())
                 self.assertNotEqual(current, scope["snapshot"]())
+
+
+class WorkspaceTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.parent = Path(self.temporary.name).resolve()
+        self.root = self.parent / "work"
+        self.root.mkdir(mode=0o700)
+        (self.root / "data").mkdir(mode=0o700)
+        self.workspace = boundary.Workspace(self.root)
+        self.addCleanup(self.workspace.close)
+        self.database = self.root / "data/database.sqlite"
+        with self.workspace.connection(readonly=False) as db:
+            db.execute("CREATE TABLE fixture(value INTEGER)")
+            db.execute("INSERT INTO fixture VALUES (1)")
+            db.commit()
+
+    def replace(self, target):
+        path = {"root": self.root, "data": self.root / "data", "database": self.database}[target]
+        renamed = path.with_name(path.name + "-original")
+        path.rename(renamed)
+        if target == "database":
+            path.write_bytes(renamed.read_bytes())
+            path.chmod(0o600)
+        else:
+            import shutil
+            shutil.copytree(renamed, path)
+        # The predecessor could reopen the new pathname and observe the same
+        # schema/rows, even though Docker would exercise a different object.
+        with closing(sqlite3.connect(self.database)) as db:
+            self.assertEqual(db.execute("SELECT * FROM fixture").fetchall(), [(1,)])
+
+    def test_parent_or_db_swap_after_copy_refuses_before_upgrade(self):
+        # Each subcase needs an independent held workspace.
+        for target in ("root", "data", "database"):
+            with self.subTest(target=target):
+                if target != "root":
+                    self.setUp()
+                self.workspace.database.recheck()
+                self.replace(target)
+                docker = FakeDocker()
+                owned = boundary.OwnedContainer(docker, "cli-test", self.workspace)
+                with self.assertRaises(ValueError):
+                    owned.run("--name", "cli-test")
+                self.assertFalse(docker.calls)
+
+    def test_parent_or_db_swap_after_comparison_refuses_runtime_start(self):
+        for target in ("data", "database"):
+            with self.subTest(target=target):
+                if target == "database":
+                    self.setUp()
+                with self.workspace.connection() as db:
+                    self.assertEqual(db.execute("SELECT * FROM fixture").fetchall(), [(1,)])
+                self.replace(target)
+                with self.assertRaises(ValueError):
+                    self.workspace.mount_arguments()
+                with self.assertRaises(ValueError):
+                    with self.workspace.connection():
+                        self.fail("replaced database was opened")
+
+    def test_root_swap_refuses_report_emission(self):
+        self.replace("root")
+        with self.assertRaises(ValueError):
+            self.workspace.write("physical-result.json", b'{"outcome":"pass"}')
+        self.assertFalse((self.root / "physical-result.json").exists())
+
+    def test_report_replacement_is_refused_before_and_during_write(self):
+        self.workspace.write("physical-result.json", b"original")
+        path = self.root / "physical-result.json"
+        path.rename(self.root / "original-report")
+        path.write_bytes(b"replacement")
+        path.chmod(0o600)
+        with self.assertRaises(ValueError):
+            self.workspace.write("physical-result.json", b"pass")
+        self.assertEqual(path.read_bytes(), b"replacement")
+
+    def test_report_path_swap_during_emission_cannot_publish_pass(self):
+        original = os.pwrite
+        path = self.root / "physical-result.json"
+        def swapped(fd, data, offset):
+            result = original(fd, data, offset)
+            path.rename(self.root / "held-report")
+            path.write_bytes(b"forged")
+            path.chmod(0o600)
+            return result
+        with patch.object(boundary.os, "pwrite", swapped):
+            with self.assertRaises(ValueError):
+                self.workspace.write("physical-result.json", b'{"outcome":"pass"}')
+        self.assertEqual(path.read_bytes(), b"forged")
+
+    def test_report_parent_swap_during_emission_is_refused(self):
+        original = os.pwrite
+        def swapped(fd, data, offset):
+            result = original(fd, data, offset)
+            self.replace("root")
+            return result
+        with patch.object(boundary.os, "pwrite", swapped):
+            with self.assertRaises(ValueError):
+                self.workspace.write("physical-result.json", b'{"outcome":"pass"}')
+
+    def test_report_in_place_edit_is_refused(self):
+        self.workspace.write("physical-result.json", b"reviewed")
+        (self.root / "physical-result.json").write_bytes(b"tampered")
+        with self.assertRaises(ValueError):
+            self.workspace.recheck()
+
+    def test_db_symlink_and_extra_link_are_refused(self):
+        original = self.database.with_name("original.sqlite")
+        self.database.rename(original)
+        self.database.symlink_to(original)
+        with self.assertRaises(ValueError):
+            self.workspace.recheck()
+        self.database.unlink()
+        original.rename(self.database)
+        os.link(self.database, self.database.with_name("second.sqlite"))
+        with self.assertRaises(ValueError):
+            self.workspace.recheck()
+
+    def test_mutable_database_keeps_inode_and_wal_semantics(self):
+        identity = self.workspace.database.identity
+        with self.workspace.connection(readonly=False) as db:
+            db.execute("PRAGMA journal_mode=WAL")
+            db.execute("INSERT INTO fixture VALUES (2)")
+            db.commit()
+            with self.workspace.connection() as reader:
+                self.assertEqual(reader.execute("SELECT * FROM fixture").fetchall(), [(1,), (2,)])
+        self.workspace.recheck()
+        self.assertEqual(self.workspace.database.identity, identity)
+
+    def test_docker_mounts_are_exact_held_directory_and_file_descriptors(self):
+        arguments = self.workspace.mount_arguments()
+        mounts = [{"Destination": target, "Source": source, "Type": "bind", "RW": True}
+                  for target, source in (("/app/database", self.workspace.data.anchor),
+                                         ("/app/database/database.sqlite", self.workspace.database.anchor))]
+        self.assertIn("source=" + self.workspace.database.anchor, arguments[-1])
+        self.workspace.inspect_mounts({"Mounts": mounts})
+        mounts[1]["Source"] = str(self.database)
+        with self.assertRaises(ValueError):
+            self.workspace.inspect_mounts({"Mounts": mounts})
+
+    def test_failed_workspace_check_does_not_block_exact_id_cleanup(self):
+        docker = FakeDocker()
+        owned = boundary.OwnedContainer(docker, "cli-test")
+        owned.run("--name", "cli-test")
+        owned.workspace = self.workspace
+        self.replace("data")
+        owned.remove()
+        self.assertIn(("rm", "-fv", "a" * 64), docker.calls)
 
 
 if __name__ == "__main__":

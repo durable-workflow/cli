@@ -13,26 +13,51 @@ import threading
 import time
 import urllib.error
 import urllib.request
-import importlib.util
 
-PROXY_SOURCE = Path(os.environ['CLI_216_PROXY_SOURCE']).resolve()
+SOURCE = Path(__file__).resolve().parent
+BOUNDARY_SHA = '664b0765774063c50bb82162be70fa4f91ca35abc3305a38498364cbdd51b3d8'
+# Bootstrap the local reviewed boundary module from the same bytes that are
+# checked. Subsequent inputs use its held descriptors and sealed memory files.
+_boundary_path = SOURCE / 'boundaries.py'
+_boundary_fd = os.open(_boundary_path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+try:
+    import stat
+    import types
+    _identity = os.fstat(_boundary_fd)
+    if (not stat.S_ISREG(_identity.st_mode) or _identity.st_uid != os.getuid()
+            or _identity.st_nlink != 1 or _identity.st_mode & 0o022 or _identity.st_size > 65536):
+        raise ValueError('boundary module owner/type/mode differs')
+    _boundary_bytes = os.pread(_boundary_fd, 65537, 0)
+    if hashlib.sha256(_boundary_bytes).hexdigest() != BOUNDARY_SHA:
+        raise ValueError('boundary module source differs')
+    boundary = types.ModuleType('cli216_boundaries')
+    boundary.__file__ = str(_boundary_path)
+    exec(compile(_boundary_bytes, str(_boundary_path), 'exec'), boundary.__dict__)
+    if boundary.HeldInput._identity(_boundary_path.lstat()) != boundary.HeldInput._identity(_identity):
+        raise ValueError('boundary module changed while importing held bytes')
+finally:
+    os.close(_boundary_fd)
+
+ROOT = boundary.private_directory(Path(os.environ['CLI_216_WORKDIR']))
+PROXY_SOURCE = Path(os.environ['CLI_216_PROXY_SOURCE'])
 PROXY_SHA256 = 'bd1e8ccbbf76f63fc2eafa278a023eb181d405b68d9c30016392e395a1eff725'
-if hashlib.sha256(PROXY_SOURCE.read_bytes()).hexdigest() != PROXY_SHA256:
-    raise SystemExit('Shared proxy bytes do not match the independently reviewed fixture')
-spec = importlib.util.spec_from_file_location('cli216_shared_proxy', PROXY_SOURCE)
-shared_proxy = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(shared_proxy)
-CommittedResponseLoss = shared_proxy.CommittedResponseLoss
+HELD = [boundary.HeldInput(_boundary_path, BOUNDARY_SHA)]
 
-ROOT = Path(os.environ['CLI_216_WORKDIR'])
-if not ROOT.is_absolute() or ROOT.resolve() != ROOT or ROOT.is_symlink():
-    raise SystemExit('Require an absolute canonical private experiment directory')
-owned = ROOT.stat()
-if owned.st_uid != os.getuid() or owned.st_mode & 0o777 != 0o700:
-    raise SystemExit('Experiment directory must be owned by this user and mode 0700')
-CODEC_PYTHON = Path(os.environ['CLI_216_CODEC_PYTHON'])
-if not CODEC_PYTHON.is_absolute():
-    raise SystemExit('Provide the verified installed codec Python as an absolute path')
+def held(path, digest, maximum=16 * 1024 * 1024):
+    value = boundary.HeldInput(path, digest, maximum=maximum)
+    HELD.append(value)
+    return value
+
+PROXY_INPUT = held(PROXY_SOURCE, PROXY_SHA256)
+shared_proxy = PROXY_INPUT.module('cli216_shared_proxy')
+CommittedResponseLoss = shared_proxy.CommittedResponseLoss
+HELPER_INPUT = held(ROOT / 'sqlite_legacy.py', '6fc6054ce087c136a86d7b6b222daeefaa87c58fa0b613b155a5df39e6a26fad')
+legacy_helper = HELPER_INPUT.module('cli216_snapshot_helper')
+MANIFEST_INPUT = held(ROOT / 'command-key-legacy-v1-vectors.json', 'da1990000c611d7377690c7526487d6415fa4f9cb42d299f59585a7c2eebf769')
+legacy_helper.MANIFEST = Path(MANIFEST_INPUT.executable)
+ENVELOPE_INPUT = held(ROOT / 'worker-envelopes.json', '68dac0826e251d0450d458224fa3d4d8714aba8e432df7e241909b8c4b877767')
+ENVELOPES = json.loads(ENVELOPE_INPUT.data)
+CLI_INPUT = held(ROOT / 'bin/dw', 'da366c79c90978a3c0a92d723c66a96a2d0963f9dccbd41c8207f2c41848f814', 32 * 1024 * 1024)
 IMAGE = 'ghcr.io/durable-workflow/server@sha256:8ffcdb2a36af3129a1987849aafe8715fe0d3bf9a9648467f0b5cb8eeef43ba9'
 NAME = 'cli-216-392-modern'
 TOKEN = secrets.token_hex(32)
@@ -45,8 +70,9 @@ ENV = {'PATH': str(ROOT / 'bin') + ':/usr/bin:/bin', 'HOME': str(ROOT / 'home'),
        'DW_CONFIG_HOME': str(ROOT / 'config'), 'TMPDIR': str(ROOT / 'tmp'),
        'DURABLE_WORKFLOW_AUTH_TOKEN': TOKEN}
 for directory in ('data', 'home', 'config', 'tmp', 'docker-empty'):
-    (ROOT / directory).mkdir(exist_ok=True)
-(ROOT / 'data').chmod(0o700)
+    boundary.private_directory(ROOT / directory)
+HTTP = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
 
 
 def require(condition, label, detail=None):
@@ -70,15 +96,17 @@ def request(method, path, body=None, namespace='default'):
     r = urllib.request.Request(BASE + path, method=method, headers=headers,
                                data=None if body is None else json.dumps(body).encode())
     try:
-        with urllib.request.urlopen(r, timeout=15) as response:
+        with HTTP.open(r, timeout=15) as response:
             return response.status, json.load(response)
     except urllib.error.HTTPError as e:
         return e.code, json.load(e)
 
 
 def cli(*args, namespace='default', success=True):
+    CLI_INPUT.recheck()
     p = subprocess.run(['dw', *args, '--server=' + PROXY.url, '--namespace=' + namespace, '--json'],
-                       env=ENV, capture_output=True, text=True, timeout=45)
+                       executable=CLI_INPUT.executable, env=ENV, capture_output=True, text=True, timeout=45, pass_fds=(CLI_INPUT.sealed_fd,))
+    CLI_INPUT.recheck()
     try:
         body = json.loads(p.stdout)
     except ValueError:
@@ -124,11 +152,11 @@ def finish(f, task, commands):
     return body
 
 
-def fixture(kind, tag, namespace='default', workflow=None):
+def fixture(kind, tag, namespace='default', workflow=None, parameter_type='int'):
     wf = workflow or 'cli216-' + tag + '-' + secrets.token_hex(4)
     f = {'workflow': wf, 'worker': wf + '-w', 'queue': wf + '-q', 'type': wf + '-t', 'namespace': namespace}
-    param = {'name': 'value', 'type': 'int', 'required': True, 'variadic': False,
-             'default_available': False, 'allows_null': False}
+    param = {'name': 'value', 'type': parameter_type, 'required': True, 'variadic': False,
+             'default_available': False, 'allows_null': parameter_type == 'mixed'}
     contracts = {'signals': ['finish'], 'signal_contracts': [{'name': 'finish', 'parameters': [param]}],
                  'updates': ['set'], 'update_validators': [], 'update_contracts': [{'name': 'set', 'parameters': [param]}]}
     status, body = request('POST', '/api/worker/register', {
@@ -141,7 +169,7 @@ def fixture(kind, tag, namespace='default', workflow=None):
         raise AssertionError(('register', status, body))
     started = cli('workflow:start', '--workflow-id=' + wf, '--type=' + f['type'], '--task-queue=' + f['queue'], '--input=[]', namespace=namespace)
     f['run'] = started['run_id']
-    f['empty_envelope'] = json.loads((ROOT / 'worker-envelopes.json').read_text())['empty']
+    f['empty_envelope'] = ENVELOPES['empty']
     if kind == 'update':
         finish(f, poll(f), [{'type': 'open_signal_wait', 'signal_name': 'finish'}])
     return f
@@ -155,22 +183,17 @@ def history(f):
 
 
 def snapshot():
-    with sqlite3.connect('file:' + str(DB) + '?mode=ro', uri=True) as db:
-        tables = [r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")]
-        data = {}
-        for table in tables:
-            quoted = '"' + table.replace('"', '""') + '"'
-            rows = db.execute('SELECT * FROM ' + quoted).fetchall()
-            data[table] = {'count': len(rows), 'sha256': hashlib.sha256(repr(sorted(rows, key=repr)).encode()).hexdigest()}
-        return data
+    from contextlib import closing
+    with closing(sqlite3.connect(DB.as_uri() + '?mode=ro', uri=True, timeout=2)) as db:
+        return legacy_helper.snapshot(db)
 
 
-def original(kind, f, key=None, lost=False, run=None):
+def original(kind, f, key=None, lost=False, run=None, value=1):
     path = path_for(kind, f, run=run)
     before = len(PROXY.records)
     if lost:
         PROXY.arm('POST', path)
-    answer = message(kind, f['workflow'], key, run=run, namespace=f['namespace'], success=not lost)
+    answer = message(kind, f['workflow'], key, value=value, run=run, namespace=f['namespace'], success=not lost)
     sent = [r for r in PROXY.records[before:] if r['method'] == 'POST' and r['path'] == path]
     require(len(sent) == 1, kind + ': exactly one admission POST; no implicit resend')
     wire = sent[0]
@@ -185,7 +208,7 @@ def original(kind, f, key=None, lost=False, run=None):
                 kind + ': complete upstream receipt dropped before downstream status')
         admitted = snapshot()
         recovery_start = len(PROXY.records)
-        receipt = message(kind, f['workflow'], chosen, run=run, namespace=f['namespace'])
+        receipt = message(kind, f['workflow'], chosen, value=value, run=run, namespace=f['namespace'])
         recovered = [r for r in PROXY.records[recovery_start:] if r['method'] == 'POST' and r['path'] == path]
         require(len(recovered) == 1, kind + ': one explicit recovery POST')
         require(recovered[0]['request_body_sha256'] == wire['request_body_sha256'],
@@ -227,15 +250,10 @@ def conflict(kind, f, record, part, **options):
     require(snapshot() == before, kind + ': conflict changes no database row')
 
 
-def decoded_result(answer):
-    envelope = answer.get('result_envelope')
-    p = subprocess.run([str(CODEC_PYTHON), '-I', '-B', '-c',
-        'import json,sys; from durable_workflow import serializer; print(json.dumps(serializer.decode_envelope(json.load(sys.stdin))))'],
-        input=json.dumps(envelope), capture_output=True, text=True, timeout=10,
-        env={'PATH': '/usr/bin:/bin', 'HOME': str(ROOT / 'home'), 'TMPDIR': str(ROOT / 'tmp')})
-    if p.returncode:
-        raise AssertionError('official Avro fixture decode failed')
-    return json.loads(p.stdout)
+def result_is_one(answer):
+    # Compare the actual retained Avro result with the held official-codec
+    # fixture. No external interpreter can self-certify a decoded value.
+    return answer.get('result_envelope') == ENVELOPES['one']
 
 
 def run_modern():
@@ -277,7 +295,7 @@ def run_modern():
             record = original(kind, f, key=kind + '-' + terminal, lost=True)
             commands = []
             if kind == 'update':
-                commands.append({'type': 'complete_update', 'update_id': record['receipt']['update_id'], 'result': json.loads((ROOT / 'worker-envelopes.json').read_text())['one']})
+                commands.append({'type': 'complete_update', 'update_id': record['receipt']['update_id'], 'result': ENVELOPES['one']})
             commands.append({'type': terminal, 'result': f['empty_envelope']})
             terminal_event = 'WorkflowCompleted' if terminal == 'complete_workflow' else 'WorkflowContinuedAsNew'
             for _ in range(10):
@@ -287,7 +305,7 @@ def run_modern():
             require(any(e['event_type'] == terminal_event for e in history(f)), kind + ': terminal transition recorded before retry')
             answer = retained(kind, f, record)
             if kind == 'update':
-                require(answer.get('update_status') == 'completed' and decoded_result(answer) == 1, 'update: original completed typed result survives ' + terminal, answer)
+                require(answer.get('update_status') == 'completed' and result_is_one(answer), 'update: original completed typed result survives ' + terminal, answer)
             require(any(e['event_type'] == ('WorkflowCompleted' if terminal == 'complete_workflow' else 'WorkflowContinuedAsNew') for e in history(f)), kind + ': original history proves ' + terminal)
             conflict(kind, f, record, 'arguments', value=2)
             conflict(kind, f, record, 'target', run='00000000000000000000000000')
@@ -332,7 +350,7 @@ def run_selected_and_restart():
             commands = []
             if kind == 'update':
                 commands.append({'type': 'complete_update', 'update_id': record['receipt']['update_id'],
-                                 'result': json.loads((ROOT / 'worker-envelopes.json').read_text())['one']})
+                                 'result': ENVELOPES['one']})
             commands.append({'type': terminal, 'result': f['empty_envelope']})
             terminal_event = 'WorkflowCompleted' if terminal == 'complete_workflow' else 'WorkflowContinuedAsNew'
             for _ in range(10):
@@ -342,7 +360,7 @@ def run_selected_and_restart():
             require(any(e['event_type'] == terminal_event for e in history(f)), kind + ': selected-run terminal transition recorded')
             answer = retained(kind, f, record, run=f['run'])
             if kind == 'update':
-                require(answer.get('update_status') == 'completed' and decoded_result(answer) == 1,
+                require(answer.get('update_status') == 'completed' and result_is_one(answer),
                         'selected update: original typed result survives ' + terminal)
             conflict(kind, f, record, 'target')
             conflict(kind, f, record, 'target', run='00000000000000000000000000')
@@ -356,8 +374,31 @@ def run_fresh_selected():
         retained(kind, f, record, run=f['run'])
 
 
+def run_typed():
+    vectors = [
+        ('int64', 9223372036854775806, '9223372036854775806'),
+        ('null', None, False),
+        ('unicode', 'é🙂', 'e\u0301🙂'),
+        ('map', {'b': 2, 'a': [None, 'é', 9007199254740993]},
+                {'b': '2', 'a': [None, 'é', 9007199254740993]}),
+        ('integer-float', 1, 1.0),
+        ('signed-zero', 0.0, -0.0),
+    ]
+    for kind in ('signal', 'update'):
+        f = fixture(kind, 'typed-' + kind, parameter_type='mixed')
+        for label, value, other in vectors:
+            record = original(kind, f, key='typed-' + label, value=value, lost=True)
+            equal = {'a': value['a'], 'b': value['b']} if label == 'map' else value
+            retained(kind, f, record, value=equal)
+            conflict(kind, f, record, 'arguments', value=other)
+        event = 'SignalReceived' if kind == 'signal' else 'UpdateAccepted'
+        require(sum(row['event_type'] == event for row in history(f)) == len(vectors),
+                kind + ': typed recovery/conflict admits one event per original key')
+
+
 if __name__ == '__main__':
     outcome, error = 'runner-blocked', None
+    runtime = boundary.OwnedContainer(docker, NAME)
     try:
         observed = json.loads(docker('image', 'inspect', IMAGE, '--format', '{{json .}}'))
         require(observed['Architecture'] == 'amd64' and observed['Os'] == 'linux', 'observed native platform is linux/amd64')
@@ -365,12 +406,12 @@ if __name__ == '__main__':
         envfile = ROOT / 'runtime.env'
         envfile.write_text('DW_AUTH_TOKEN=' + TOKEN + '\nDW_RUST_MAINTENANCE_LOOP=0\n')
         envfile.chmod(0o600)
-        docker('run', '--rm', '-d', '--name', NAME, '--platform=linux/amd64', '--init', '--cpus=1', '--memory=1g', '--pids-limit=256',
+        runtime.run('--rm', '-d', '--name', NAME, '--platform=linux/amd64', '--init', '--cpus=1', '--memory=1g', '--pids-limit=256',
                '--read-only', '--cap-drop=ALL', '--security-opt=no-new-privileges', '--env-file', str(envfile),
                '--mount', 'type=bind,source=' + str(ROOT / 'data') + ',target=/app/database',
                '--tmpfs', '/app/storage:rw,uid=1000,gid=1000,mode=750,size=64m',
                '--tmpfs', '/tmp:rw,size=16m', '-p', '127.0.0.1::8080', IMAGE)
-        binding = json.loads(docker('inspect', NAME, '--format', '{{json .NetworkSettings.Ports}}'))['8080/tcp'][0]
+        binding = runtime.inspect()['NetworkSettings']['Ports']['8080/tcp'][0]
         BASE = 'http://127.0.0.1:' + binding['HostPort']
         for _ in range(100):
             try:
@@ -384,6 +425,8 @@ if __name__ == '__main__':
         threading.Thread(target=PROXY.serve_forever, daemon=True).start()
         if os.environ.get('CLI_216_PHASE') == 'selected-restart':
             run_selected_and_restart()
+        elif os.environ.get('CLI_216_PHASE') == 'typed':
+            run_typed()
         elif os.environ.get('CLI_216_PHASE') == 'fresh-selected':
             run_fresh_selected()
         else:
@@ -397,15 +440,25 @@ if __name__ == '__main__':
             PROXY.shutdown()
             PROXY.server_close()
         try:
-            docker('rm', '-fv', NAME)
-            cleanup = 'container and anonymous volumes removed'
-        except Exception:
-            cleanup = 'container removal needs investigation'
+            runtime.remove()
+            for _ in range(50):
+                if not runtime.exists():
+                    break
+                time.sleep(.1)
+            if runtime.exists():
+                raise RuntimeError('created container removal did not complete')
+            for item in HELD:
+                item.recheck()
+            cleanup = 'created container and anonymous volumes removed; held inputs unchanged'
+        except Exception as failure:
+            cleanup = 'cleanup or input identity requires investigation'
+            outcome = 'runner-blocked'
+            error = (type(failure).__name__ + ': ' + str(failure)).replace(TOKEN, '[redacted]')
         (ROOT / 'runtime.env').unlink(missing_ok=True)
         report = {'started_at': STARTED, 'finished_at': datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                  'outcome': outcome, 'checks': CHECKS, 'error': error, 'cleanup': cleanup,
+                  'outcome': outcome, 'created_container_ids': runtime.created_ids, 'checks': CHECKS, 'error': error, 'cleanup': cleanup,
                   'runner_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-                  'proxy_sha256': hashlib.sha256(PROXY_SOURCE.read_bytes()).hexdigest(), 'server_index': IMAGE, 'server_source': '5614274d2629d03f92932a07dfee0fb10349ddd9', 'phase': os.environ.get('CLI_216_PHASE', 'modern')}
+                  'proxy_sha256': PROXY_INPUT.digest, 'server_index': IMAGE, 'server_source': '5614274d2629d03f92932a07dfee0fb10349ddd9', 'phase': os.environ.get('CLI_216_PHASE', 'modern')}
         (ROOT / 'result.json').write_text(json.dumps(report, indent=2))
         (ROOT / 'invocations.json').write_text(json.dumps(INVOCATIONS, indent=2).replace(TOKEN, '[redacted]'))
         (ROOT / 'admissions.json').write_text(json.dumps(ADMISSIONS, indent=2))

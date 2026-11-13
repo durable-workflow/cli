@@ -3,7 +3,9 @@ import concurrent.futures
 from contextlib import closing
 import datetime
 import hashlib
-import importlib.util
+import stat
+import types
+import sys
 import json
 import os
 from pathlib import Path
@@ -15,19 +17,33 @@ SOURCE = Path(__file__).resolve().parent
 ROOT = Path(os.environ["CLI_216_WORKDIR"])
 
 
-def bound_module(name, filename, expected):
-    path = SOURCE / filename if filename == "cli_216.py" else ROOT / filename
-    if hashlib.sha256(path.read_bytes()).hexdigest() != expected:
-        raise ValueError("fixture source identity differs: " + filename)
-    spec = importlib.util.spec_from_file_location(name, path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+def bound_driver():
+    path = SOURCE / "cli_216.py"
+    descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    try:
+        observed = os.fstat(descriptor)
+        if (not stat.S_ISREG(observed.st_mode) or observed.st_uid != os.getuid()
+                or observed.st_nlink != 1 or observed.st_mode & 0o022 or observed.st_size > 131072):
+            raise ValueError("base driver owner/type/mode differs")
+        data = os.pread(descriptor, 131073, 0)
+        if hashlib.sha256(data).hexdigest() != BASE_SHA:
+            raise ValueError("base driver source identity differs")
+        module = types.ModuleType("cli216_owner")
+        module.__file__ = str(path)
+        exec(compile(data, str(path), "exec"), module.__dict__)
+        item = module.held(path, BASE_SHA)
+        if item.identity != item._identity(observed):
+            raise ValueError("base driver changed during held import")
+        return module
+    finally:
+        os.close(descriptor)
 
 
-d = bound_module("cli216_owner", "cli_216.py", "d3833b37e96dab863c8652bfe65c09ca5f632dcdee985637b443c4f66a56898e")
-legacy = bound_module("cli216_legacy", "sqlite_legacy.py", "6fc6054ce087c136a86d7b6b222daeefaa87c58fa0b613b155a5df39e6a26fad")
+BASE_SHA = "0f2afebcfeea0a728a203a59025bf0a94669581ccd0d84bf3f53abc2d971c653"
+d = bound_driver()
+legacy = d.legacy_helper
 d.NAME = "cli-216-392-legacy"
+runtime = d.boundary.OwnedContainer(d.docker, d.NAME)
 manifest = legacy.manifest()
 cases, selections, windows = [], [], []
 started = datetime.datetime.now(datetime.timezone.utc).isoformat()
@@ -42,13 +58,13 @@ def start():
     envfile = ROOT / "runtime.env"
     envfile.write_text("DW_AUTH_TOKEN=" + d.TOKEN + "\nDW_RUST_MAINTENANCE_LOOP=0\n")
     envfile.chmod(0o600)
-    d.docker("run", "--rm", "-d", "--name", d.NAME, "--platform=linux/amd64", "--init",
+    runtime.run("--rm", "-d", "--name", d.NAME, "--platform=linux/amd64", "--init",
              "--cpus=1", "--memory=1g", "--pids-limit=256", "--read-only", "--cap-drop=ALL",
              "--security-opt=no-new-privileges", "--env-file", str(envfile),
              "--mount", "type=bind,source=" + str(ROOT / "data") + ",target=/app/database",
              "--tmpfs", "/app/storage:rw,uid=1000,gid=1000,mode=750,size=64m",
              "--tmpfs", "/tmp:rw,size=16m", "-p", "127.0.0.1::8080", d.IMAGE)
-    binding = json.loads(d.docker("inspect", d.NAME, "--format", "{{json .NetworkSettings.Ports}}"))["8080/tcp"][0]
+    binding = runtime.inspect()["NetworkSettings"]["Ports"]["8080/tcp"][0]
     d.BASE = "http://127.0.0.1:" + binding["HostPort"]
     for _ in range(100):
         try:
@@ -71,9 +87,9 @@ def stop():
         d.PROXY.shutdown()
         d.PROXY.server_close()
         d.PROXY = None
-    d.docker("stop", "--time=10", d.NAME)
+    runtime.stop()
     for _ in range(50):
-        if not d.docker("ps", "-aq", "--filter", "name=^" + d.NAME + "$"):
+        if not runtime.exists():
             break
         time.sleep(.1)
     else:
@@ -224,27 +240,31 @@ if __name__ == "__main__":
         if d.PROXY:
             d.PROXY.shutdown()
             d.PROXY.server_close()
-        names = d.docker("ps", "-aq", "--filter", "name=^" + d.NAME + "$")
-        if names:
-            try:
-                d.docker("rm", "-fv", d.NAME)
-            except RuntimeError:
-                pass
+        cleanup_error = None
+        try:
+            runtime.remove()
             for _ in range(50):
-                if not d.docker("ps", "-aq", "--filter", "name=^" + d.NAME + "$"):
+                if not runtime.exists():
                     break
                 time.sleep(.1)
+            if runtime.exists():
+                raise RuntimeError("created container removal did not complete")
+            for item in d.HELD:
+                item.recheck()
+        except Exception as failure:
+            cleanup_error = (type(failure).__name__ + ": " + str(failure)).replace(d.TOKEN, "[redacted]")
+            outcome = "runner-blocked"
         (ROOT / "runtime.env").unlink(missing_ok=True)
-        absent = not d.docker("ps", "-aq", "--filter", "name=^" + d.NAME + "$")
-        report = {"cell": "synthetic-legacy-shape", "outcome": outcome, "error": error,
-                  "phase": phase, "checks": len(d.CHECKS), "started_at": started,
+        absent = not runtime.exists()
+        report = {"cell": "synthetic-legacy-shape", "outcome": outcome, "created_container_ids": runtime.created_ids, "error": error,
+                  "cleanup_error": cleanup_error, "phase": phase, "checks": len(d.CHECKS), "started_at": started,
                   "finished_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
                   "driver_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
                   "base_driver_sha256": hashlib.sha256((SOURCE / "cli_216.py").read_bytes()).hexdigest(),
                   "helper_sha256": hashlib.sha256((ROOT / "sqlite_legacy.py").read_bytes()).hexdigest(),
                   "manifest_sha256": legacy.MANIFEST_SHA256, "server_index": d.IMAGE,
                   "transform": transform, "windows": windows,
-                  "cleanup": "exact container/volumes/env removed" if absent else "container cleanup failed"}
+                  "cleanup": "created container/volumes/env removed; held inputs unchanged" if absent and cleanup_error is None else "cleanup/input identity failed"}
         (ROOT / "legacy-result.json").write_text(json.dumps(report, indent=2))
         (ROOT / "legacy-wire.json").write_text(json.dumps({"seed": seed_wire, "readback": wire}, indent=2))
         print(json.dumps(report), flush=True)

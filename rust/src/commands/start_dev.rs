@@ -10,7 +10,6 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 const DEVELOPMENT_TOKEN: &str = "dev-token";
-const SERVER_SOURCE: &str = "b6e04ce7e679464e91f6ceae83310d3bb3204092";
 const SHUTDOWN_GRACE: Duration = Duration::from_secs(5);
 
 struct Settings {
@@ -165,9 +164,7 @@ async fn serve(settings: Settings) -> Result<i32, CliError> {
         "Data: {}",
         formatter::display_text(&settings.directory.to_string_lossy())
     ));
-    formatter::writeln_out(&format!(
-        "Embedded native source: {SERVER_SOURCE} (development build)"
-    ));
+    formatter::writeln_out("Built-in native runtime (development build).");
     if settings.token == DEVELOPMENT_TOKEN {
         formatter::writeln_out("Development token: dev-token");
         formatter::writeln_out(&format!("Connect in another terminal: dw env:set local --server=http://{address} --token=dev-token --make-default"));

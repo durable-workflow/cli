@@ -248,6 +248,13 @@ fn restart_preserves_workflow_data_and_releases_the_directory_lock() {
         ],
     );
     let before = project.client(&first, &["workflow:describe", "keep-me"]);
+    assert_eq!(before["workflow_id"], "keep-me");
+    for name in ["run_id", "workflow_type", "status"] {
+        assert!(
+            before[name].as_str().is_some_and(|value| !value.is_empty()),
+            "missing {name}"
+        );
+    }
     first.stop();
     let mut second = DevServer::start(&project, &args);
     let after = project.client(&second, &["workflow:describe", "keep-me"]);

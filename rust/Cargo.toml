@@ -17,9 +17,9 @@ path = "src/main.rs"
 # dependency patches on this exact source revision as well.
 durable-workflow-server = { git = "https://github.com/durable-workflow/server", rev = "b6e04ce7e679464e91f6ceae83310d3bb3204092" }
 axum = { version = "=0.8.9", default-features = false, features = ["http1", "tokio"] }
-# Pinned to the latest qualified published SDK release. Move only after
-# sdk-rust's published-package acceptance.
-durable-workflow = "=4.12.0"
+# Composition candidate for sdk-rust#279. Replace with the qualified package
+# before this development-runtime change can be released.
+durable-workflow = { git = "https://github.com/durable-workflow/sdk-rust", rev = "ff75c2a59029cc5c6ab510ca5af2e3acc06ae7b4", default-features = false }
 serde = "1"
 sha2 = "0.10"
 # Random generated request IDs, as 2.x random_bytes(); already in the release

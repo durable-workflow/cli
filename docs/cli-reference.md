@@ -459,8 +459,8 @@ dw doctor
 ```
 
 Existing native `DW_*` payload, query and storage limits also apply. The runtime
-reports itself as a development build; its exact embedded source is printed
-at startup. It is not the separately qualified published Server image.
+reports itself as a development build. Its source is pinned in the CLI
+dependency lock. It is not the separately qualified published Server image.
 Ctrl+C and SIGTERM shut down HTTP and native maintenance and preserve the data.
 No background dependency services are launched or left running.
 

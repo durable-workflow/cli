@@ -77,15 +77,50 @@ def readiness(port, expected_status=200):
 
 
 def cli(binary, root, environment, port, arguments):
+    target = [] if port is None else [f'--server=http://127.0.0.1:{port}',
+                                     '--token=dev-token']
     result = subprocess.run(
-        [str(binary), *arguments, f'--server=http://127.0.0.1:{port}',
-         '--token=dev-token', '--output=json'],
+        [str(binary), *arguments, *target, '--output=json'],
         cwd=root, env=environment, stdin=subprocess.DEVNULL,
         capture_output=True, text=True, timeout=15, check=False,
     )
     if result.returncode:
         raise RuntimeError('CLI request failed: '+result.stdout+result.stderr)
     return json.loads(result.stdout)
+
+
+def profile(binary, root, environment, port):
+    saved = cli(binary, root, environment, None, ['env:set', 'local',
+        f'--server=http://127.0.0.1:{port}', '--token=dev-token', '--make-default'])
+    if saved.get('name') != 'local' or saved.get('current') is not True:
+        raise RuntimeError('local profile was not selected')
+    diagnostic = cli(binary, root, environment, None, ['doctor'])
+    connection = diagnostic.get('connection', {})
+    if (diagnostic.get('server', {}).get('reachable') is not True
+            or connection.get('profile', {}).get('name') != 'local'
+            or connection.get('server') != f'http://127.0.0.1:{port}'):
+        raise RuntimeError('doctor did not reach the Server through the saved profile')
+
+
+def read_workflow(binary, root, environment, run_id=None):
+    listing = cli(binary, root, environment, None, ['workflow:list'])
+    if not any(row.get('workflow_id') == 'cli-asset-smoke'
+               for row in listing.get('workflows', [])):
+        raise RuntimeError('new workflow was not listed through the profile')
+    workflow = cli(binary, root, environment, None,
+                   ['workflow:describe', 'cli-asset-smoke'])
+    if workflow.get('workflow_id') != 'cli-asset-smoke':
+        raise RuntimeError('new workflow was not visible')
+    for name in ['run_id', 'workflow_type', 'status']:
+        if not isinstance(workflow.get(name), str) or not workflow[name]:
+            raise RuntimeError('missing workflow identity/state: '+name)
+    if run_id is not None and workflow['run_id'] != run_id:
+        raise RuntimeError('workflow run changed over restart')
+    history = cli(binary, root, environment, None,
+                  ['workflow:history', 'cli-asset-smoke', workflow['run_id']])
+    if not isinstance(history.get('events'), list) or not history['events']:
+        raise RuntimeError('workflow history was not visible through the profile')
+    return workflow, history['events']
 
 
 def private_state_refusals(binary, root, environment):
@@ -161,25 +196,22 @@ def main():
                         pass
                     else:
                         raise RuntimeError('a held development directory could be replaced')
-            cli(binary, root, environment, port, ['workflow:start', '--type=cli.asset-smoke',
+            profile(binary, root, environment, port)
+            cli(binary, root, environment, None, ['workflow:start', '--type=cli.asset-smoke',
                 '--workflow-id=cli-asset-smoke', '--input={}'])
-            before = cli(binary, root, environment, port, ['workflow:describe', 'cli-asset-smoke'])
-            if before.get('workflow_id') != 'cli-asset-smoke':
-                raise RuntimeError('new workflow was not visible')
-            for name in ['run_id', 'workflow_type', 'status']:
-                if not isinstance(before.get(name), str) or not before[name]:
-                    raise RuntimeError('missing workflow identity/state: '+name)
+            before, history_before = read_workflow(binary, root, environment)
         finally:
             stop(process, reader)
         process, reader, port = start(binary, root, environment)
         try:
             readiness(port)
-            after = cli(binary, root, environment, port, ['workflow:describe', 'cli-asset-smoke'])
+            profile(binary, root, environment, port)
+            after, history_after = read_workflow(binary, root, environment, before['run_id'])
             for name in ['workflow_id', 'run_id', 'workflow_type', 'status']:
                 if before.get(name) != after.get(name):
                     raise RuntimeError('workflow identity/state changed over restart: '+name)
-            if 'cli-asset-smoke' not in json.dumps(after):
-                raise RuntimeError('workflow did not survive restart')
+            if history_before != history_after:
+                raise RuntimeError('workflow history changed over restart')
         finally:
             stop(process, reader)
         observation = root/'observation.json'
@@ -195,7 +227,7 @@ def main():
         finally:
             stop(process, reader)
         private_state_refusals(binary, root, environment)
-    print('Built-in native Server: empty PATH, readiness, workflow admission, restart and platform admission PASS')
+    print('Built-in native Server: empty PATH, profile, doctor, start/list/describe/history, restart and platform admission PASS')
 
 
 if __name__ == '__main__':

@@ -21,7 +21,7 @@ command is ported.
 | `env:list`, `env:set`, `env:use`, `env:show`, `env:delete` | Ported |
 | `server:health`, `server:info` (and `cluster:info`) | Ported |
 | Compatibility preflight, session and `--version` warnings, exit 8 refusals | Ported |
-| `server:start-dev`: local Laravel launch, Compose prerequisites and Unix signal cleanup | Ported |
+| `server:start-dev`: built-in native Server, SQLite, private persistent data and shutdown | No external runtime or separate Server installation |
 | `runtime:check`: native build identity and compilation target | Ported, intentional output/help difference |
 | `doctor`: redacted connection sources, server metadata, warnings and next steps | Ported |
 | `workflow:list`: one namespace/page, filters, Server envelopes, JSON and JSONL | Ported |
@@ -46,8 +46,9 @@ command is ported.
 | `task-queue:pause-activities`, `task-queue:resume-activities`, `task-queue:activity-dispatch`: pause, resume and read activity dispatch on one task queue (Server #577), one request each after checking cluster info for `capabilities.task_queue_activity_dispatch_pause`; `task-queue:describe` and `task-queue:list` show the state when the Server reports it | Rust-only, new |
 | `workflow:update-outcome`: read an update's outcome later by its update ID (Server #1131, durable-workflow/.github#212), one GET after checking cluster info for `capabilities.update_outcome_reads`; pending, completed (including a null result), failed (exit 2), rejected and `update_not_found` (exit 5) are reported distinctly, and the update is never sent again. `workflow:update` points an unfinished update at it when the Server advertises the capability | Rust-only, new |
 
-Server calls go through the published `durable-workflow` crate, pinned to
-the latest qualified release.
+Server calls go through the `durable-workflow` crate. The unreleased native
+development Server also links the Server library; exact dependency revisions
+are recorded in `Cargo.toml` and `Cargo.lock`.
 
 `workflow:list-runs` sends its workflow ID as one percent-encoded SDK path
 segment. IDs containing slashes, query delimiters or fragments stay within

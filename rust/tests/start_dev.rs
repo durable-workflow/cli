@@ -336,6 +336,119 @@ fn custom_token_is_enforced_and_is_not_printed() {
 }
 
 #[cfg(unix)]
+fn private_directory(path: &std::path::Path) {
+    use std::os::unix::fs::DirBuilderExt;
+    fs::DirBuilder::new()
+        .mode(0o700)
+        .recursive(true)
+        .create(path)
+        .unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn shared_or_linked_data_directory_refuses_without_changing_its_target() {
+    use std::os::unix::fs::{symlink, PermissionsExt};
+    for linked in [false, true] {
+        let project = Project::new();
+        let target = project.0.join("target");
+        private_directory(&target);
+        let selected = if linked {
+            let selected = project.0.join("linked");
+            symlink(&target, &selected).unwrap();
+            selected
+        } else {
+            fs::set_permissions(&target, fs::Permissions::from_mode(0o777)).unwrap();
+            target.clone()
+        };
+        let output = project.run(&[
+            "server:start-dev",
+            "--port=0",
+            "--data-dir",
+            selected.to_str().unwrap(),
+        ]);
+        assert_eq!(output.status.code(), Some(1));
+        assert_eq!(fs::read_dir(&target).unwrap().count(), 0);
+        assert!(!String::from_utf8_lossy(&output.stdout).contains("listening on"));
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn linked_shared_and_special_state_refuses_before_sqlite_can_write() {
+    use std::os::unix::ffi::OsStrExt;
+    use std::os::unix::fs::{symlink, PermissionsExt};
+    for name in [
+        "server.lock",
+        "database.sqlite",
+        "database.sqlite-wal",
+        "database.sqlite-shm",
+    ] {
+        for kind in ["symlink", "hardlink", "directory", "fifo", "shared"] {
+            let project = Project::new();
+            let data = project.0.join("data");
+            private_directory(&data);
+            let target = project.0.join("outside.sqlite");
+            fs::write(&target, b"").unwrap();
+            fs::set_permissions(&target, fs::Permissions::from_mode(0o600)).unwrap();
+            let entry = data.join(name);
+            match kind {
+                "symlink" => symlink(&target, &entry).unwrap(),
+                "hardlink" => fs::hard_link(&target, &entry).unwrap(),
+                "directory" => private_directory(&entry),
+                "fifo" => {
+                    let path = std::ffi::CString::new(entry.as_os_str().as_bytes()).unwrap();
+                    assert_eq!(unsafe { libc::mkfifo(path.as_ptr(), 0o600) }, 0);
+                }
+                "shared" => {
+                    fs::write(&entry, b"").unwrap();
+                    fs::set_permissions(&entry, fs::Permissions::from_mode(0o666)).unwrap();
+                }
+                _ => unreachable!(),
+            }
+            let output = project.run(&[
+                "server:start-dev",
+                "--port=0",
+                "--data-dir",
+                data.to_str().unwrap(),
+            ]);
+            assert_eq!(
+                output.status.code(),
+                Some(1),
+                "{name}/{kind}: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            assert!(
+                fs::read(&target).unwrap().is_empty(),
+                "outside DB changed for {name}/{kind}"
+            );
+            assert!(!String::from_utf8_lossy(&output.stdout).contains("listening on"));
+        }
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn relative_payload_state_cannot_hide_a_link() {
+    use std::os::unix::fs::symlink;
+    let project = Project::new();
+    let data = project.0.join("data");
+    private_directory(&data.join("storage/app"));
+    let outside = project.0.join("outside");
+    private_directory(&outside);
+    symlink(&outside, data.join("storage/app/external-payloads")).unwrap();
+    let output = project.run(&[
+        "server:start-dev",
+        "--port=0",
+        "--data-dir",
+        data.to_str().unwrap(),
+    ]);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(!data.join("database.sqlite").exists());
+    assert_eq!(fs::read_dir(&outside).unwrap().count(), 0);
+}
+
+#[cfg(unix)]
 #[test]
 fn sigint_closes_http_and_allows_immediate_restart() {
     let project = Project::new();

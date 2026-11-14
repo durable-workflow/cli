@@ -1,10 +1,10 @@
 //! Self-contained native Server for local development.
 
+use super::start_dev_data::Data;
 use crate::cli::Input;
 use crate::error::CliError;
 use crate::{config, formatter};
 use durable_workflow_server::runtime::{router, Runtime};
-use std::fs::{File, OpenOptions};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
 use std::time::Duration;
@@ -66,48 +66,19 @@ impl Settings {
             token,
         })
     }
+}
 
-    fn prepare_directory(&mut self) -> Result<File, CliError> {
-        let mut builder = std::fs::DirBuilder::new();
-        builder.recursive(true);
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::DirBuilderExt;
-            builder.mode(0o700);
-        }
-        builder.create(&self.directory).map_err(|error| {
-            CliError::Failure(format!("Cannot create development data directory: {error}"))
-        })?;
-        self.directory = self.directory.canonicalize().map_err(|error| {
-            CliError::Failure(format!(
-                "Cannot resolve development data directory: {error}"
-            ))
-        })?;
-        let mut options = OpenOptions::new();
-        options.create(true).truncate(false).read(true).write(true);
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::OpenOptionsExt;
-            options.mode(0o600);
-        }
-        let lock = options
-            .open(self.directory.join("server.lock"))
-            .map_err(|error| {
-                CliError::Failure(format!("Cannot open development data lock: {error}"))
-            })?;
-        lock.try_lock().map_err(|_| CliError::Failure("The development data directory is already in use, or cannot be locked. Stop its Server or select another --data-dir.".into()))?;
-        Ok(lock)
-    }
+fn data_error(error: std::io::Error) -> CliError {
+    CliError::Failure(format!("Cannot use development data safely: {error}"))
 }
 
 pub fn run(input: &Input) -> Result<i32, CliError> {
     let mut settings = Settings::parse(input)?;
-    let _lock = settings.prepare_directory()?;
+    let data = Data::open(&settings.directory).map_err(data_error)?;
+    settings.directory = data.path().to_owned();
     // Keep SQLite and native's relative payload storage inside the selected
     // data directory. A relative DB filename also works with Windows drives.
-    std::env::set_current_dir(&settings.directory).map_err(|error| {
-        CliError::Failure(format!("Cannot use development data directory: {error}"))
-    })?;
+    data.enter().map_err(data_error)?;
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(2)
         .enable_all()
@@ -115,7 +86,7 @@ pub fn run(input: &Input) -> Result<i32, CliError> {
         .map_err(|error| {
             CliError::Failure(format!("Cannot start the development runtime: {error}"))
         })?;
-    runtime.block_on(serve(settings))
+    runtime.block_on(serve(settings, data))
 }
 
 async fn stopped() -> i32 {
@@ -136,7 +107,7 @@ async fn stopped() -> i32 {
     }
 }
 
-async fn serve(settings: Settings) -> Result<i32, CliError> {
+async fn serve(settings: Settings, mut data: Data) -> Result<i32, CliError> {
     let shutdown = stopped();
     tokio::pin!(shutdown);
     // Reserve the address before opening/migrating the database. A busy port
@@ -152,10 +123,15 @@ async fn serve(settings: Settings) -> Result<i32, CliError> {
     let address = listener
         .local_addr()
         .map_err(|error| CliError::Failure(error.to_string()))?;
+    data.prepare_database().map_err(data_error)?;
     let runtime = tokio::select! {
         result = Runtime::open("database.sqlite", settings.token.clone()) => result.map_err(|error| CliError::Failure(format!("Cannot open development database: {error}")))?,
         code = &mut shutdown => return Ok(code),
     };
+    if let Err(error) = data.verify() {
+        runtime.close().await;
+        return Err(data_error(error));
+    }
     runtime.set_maintenance_repair(true);
     formatter::writeln_out(&format!(
         "<info>Durable Workflow development Server listening on http://{address}</info>"
@@ -189,5 +165,6 @@ async fn serve(settings: Settings) -> Result<i32, CliError> {
         }
     };
     runtime.close().await;
+    data.verify().map_err(data_error)?;
     outcome
 }

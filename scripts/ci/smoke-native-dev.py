@@ -1,5 +1,6 @@
 """Exercise the development runtime in a staged standalone dw executable."""
 import argparse
+import hashlib
 import http.client
 import json
 import os
@@ -87,6 +88,54 @@ def cli(binary, root, environment, port, arguments):
     return json.loads(result.stdout)
 
 
+def private_state_refusals(binary, root, environment):
+    # Seed each case through the real command first. A refusal caused merely by
+    # an incorrectly prepared ACL/directory would not test the malicious entry.
+    cases = [('directory', 'symlink')]
+    cases += [(name, kind) for name in ['server.lock', 'database.sqlite',
+                                      'database.sqlite-wal', 'database.sqlite-shm']
+              for kind in ['symlink', 'hardlink']]
+    if os.name == 'posix':
+        cases += [('directory', 'shared'), ('database.sqlite', 'shared')]
+    for index, (name, kind) in enumerate(cases):
+        case = root/f'refusal-{index}'
+        case.mkdir()
+        process, reader, _ = start(binary, case, environment)
+        stop(process, reader)
+        data = case/'data'
+        outside = case/'outside'
+        if name == 'directory':
+            if kind == 'symlink':
+                data.rename(outside)
+                data.symlink_to(outside, target_is_directory=True)
+                witness = outside/'database.sqlite'
+            else:
+                data.chmod(0o777)
+                witness = data/'database.sqlite'
+        else:
+            entry = data/name
+            entry.unlink(missing_ok=True)
+            outside.write_bytes(b'')
+            outside.chmod(0o600)
+            if kind == 'symlink':
+                entry.symlink_to(outside)
+            elif kind == 'hardlink':
+                os.link(outside, entry)
+            else:
+                entry.write_bytes(b'')
+                entry.chmod(0o666)
+            witness = outside
+        before = hashlib.sha256(witness.read_bytes()).hexdigest()
+        result = subprocess.run([str(binary), 'server:start-dev', '--port=0',
+                                 '--data-dir', str(data)], cwd=case, env=environment,
+                                stdin=subprocess.DEVNULL, capture_output=True,
+                                text=True, timeout=10, check=False)
+        if result.returncode != 1 or 'listening on' in result.stdout:
+            raise RuntimeError(f'unsafe data entry was not refused: {name}/{kind}')
+        if hashlib.sha256(witness.read_bytes()).hexdigest() != before:
+            raise RuntimeError(f'unsafe data entry modified its target: {name}/{kind}')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--binary', type=Path, required=True)
@@ -102,6 +151,16 @@ def main():
         process, reader, port = start(binary, root, environment)
         try:
             readiness(port)
+            if os.name == 'nt':
+                # The held directory handles must deny rename, including the
+                # parent used by SQLite after the initial path checks.
+                for path in [root/'data', root]:
+                    try:
+                        path.rename(path.with_name(path.name+'-replaced'))
+                    except OSError:
+                        pass
+                    else:
+                        raise RuntimeError('a held development directory could be replaced')
             cli(binary, root, environment, port, ['workflow:start', '--type=cli.asset-smoke',
                 '--workflow-id=cli-asset-smoke', '--input={}'])
             before = cli(binary, root, environment, port, ['workflow:describe', 'cli-asset-smoke'])
@@ -135,6 +194,7 @@ def main():
             readiness(port, 200 if os.name == 'posix' else 503)
         finally:
             stop(process, reader)
+        private_state_refusals(binary, root, environment)
     print('Built-in native Server: empty PATH, readiness, workflow admission, restart and platform admission PASS')
 
 

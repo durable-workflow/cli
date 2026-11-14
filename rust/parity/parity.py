@@ -323,14 +323,30 @@ def compare(reference, candidate, case):
     return differences
 
 
-def normalize_catalog_metadata(value, case, side, updates=None):
+def normalize_catalog_metadata(value, case, side, updates=None, completion_descriptions=None):
     """Reconcile exact reviewed help fields on descriptor surfaces only."""
     argv = case.get("argv", [])
-    if argv and argv[0] not in {"list", "help"} and not any(flag in argv for flag in ["--help", "-h"]):
+    completion = argv[:1] == ["_complete"]
+    if argv and not completion and argv[0] not in {"list", "help"} and not any(flag in argv for flag in ["--help", "-h"]):
         return value
     if updates is None:
         with open(os.path.join(CRATE, "parity", "catalog-updates.json"), encoding="utf-8") as handle:
             updates = json.load(handle)
+    if completion:
+        if not isinstance(value, str):
+            return value
+        if completion_descriptions is None:
+            with open(os.path.join(CRATE, "src", "completion.json"), encoding="utf-8") as handle:
+                completion_descriptions = {entry["value"]: entry["description"]
+                                           for entry in json.load(handle)["application"]}
+        for command, fields in updates.items():
+            update = fields.get("description")
+            if not update or completion_descriptions.get(command) != update["candidate"]:
+                continue
+            row = command + "\t" + update[side]
+            value = re.sub(r"(?m)^" + re.escape(row) + r"$",
+                           lambda match: f"<reviewed-completion:{command}>", value)
+        return value
 
     def visit(item):
         if isinstance(item, list):
@@ -581,7 +597,7 @@ def run_all(candidate_binary, servers, verbose, server_only=False, skip_referenc
     # The native start-dev command now runs a real embedded Server. PHP's
     # fake-Artisan launch cases are retained as historical reference data;
     # Rust's HTTP/data/restart/shutdown contract is in tests/start_dev.rs.
-    legacy_dev = [case for case in cases if case.get("argv", [None])[0] == "server:start-dev"]
+    legacy_dev = [case for case in cases if case.get("argv", [])[:1] == ["server:start-dev"]]
     if legacy_dev:
         print(f"Skipping {len(legacy_dev)} legacy PHP start-dev launcher cases; "
               "the embedded native Server is exercised by cargo test --test start_dev (cli#160).")

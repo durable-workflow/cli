@@ -166,6 +166,26 @@ class CatalogMetadataParityTest(unittest.TestCase):
         self.assertEqual(self.normalize("target:command\nbefore help\n", "reference"),
                          self.normalize("target:command\nafter help\n", "candidate"))
 
+    def test_completion_reconciles_only_the_exact_reviewed_description_row(self):
+        case = {"argv": ["_complete", "-sfish"]}
+        def normalize(value, side, descriptions=None):
+            return parity.normalize_catalog_metadata(
+                value, case, side, self.updates,
+                {"target:command": "after"} if descriptions is None else descriptions)
+        reference = "target:command\tbefore\nother:command\tkept\n"
+        candidate = "target:command\tafter\nother:command\tkept\n"
+        expected = normalize(reference, "reference")
+        self.assertEqual(expected, normalize(candidate, "candidate"))
+        for altered in [candidate.replace("after", "unexpected"),
+                        candidate.replace("kept", "changed"),
+                        candidate.replace("target:command", "unknown:command"),
+                        candidate.replace("\tafter", " after"),
+                        candidate.replace("\tafter", "\tafter extra")]:
+            self.assertNotEqual(expected, normalize(altered, "candidate"))
+        # A catalog change does not update an unchanged completion table.
+        self.assertEqual(reference, normalize(reference, "reference", {"target:command": "before"}))
+        self.assertEqual({"result": "after"}, normalize({"result": "after"}, "candidate"))
+
 
 class PhpMainReferenceTest(unittest.TestCase):
     def setUp(self):

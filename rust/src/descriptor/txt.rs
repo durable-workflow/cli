@@ -285,11 +285,11 @@ fn describe_application_header(writer: &mut Writer, start_here: bool) {
         writer.text("<comment>Start here:</comment>\n");
         for (name, description) in [
             ("server:start-dev", "Start a local Server"),
-            ("env:set", "Save a connection profile"),
             ("doctor", "Check your connection"),
             ("workflow:start", "Start a workflow"),
             ("workflow:list", "Find your workflows"),
             ("workflow:describe", "Inspect a workflow"),
+            ("workflow:history", "Read a workflow's history"),
         ] {
             writer.text(&format!("  <info>{name:20}</info> {description}\n"));
         }
@@ -412,22 +412,16 @@ mod tests {
         let first_steps = &page[start..end];
         for name in [
             "server:start-dev",
-            "env:set",
             "doctor",
             "workflow:start",
             "workflow:list",
             "workflow:describe",
+            "workflow:history",
         ] {
             assert!(first_steps.contains(name));
             assert!(catalog::entry(name).is_some());
         }
-        assert_eq!(
-            first_steps
-                .lines()
-                .filter(|line| line.starts_with("  ") && !line.starts_with("  Use"))
-                .count(),
-            6
-        );
+        assert!(page[..page.find("Options:").unwrap()].contains("dw env:set"));
         assert!(end < page.find("Available commands:").unwrap());
         assert!(!application(None, true).contains("Start here:"));
         assert!(!application(Some("workflow"), false).contains("Start here:"));

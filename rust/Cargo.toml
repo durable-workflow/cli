@@ -15,7 +15,7 @@ path = "src/main.rs"
 [dependencies]
 # Native development Server, built into every standalone dw binary. Keep its
 # dependency patches on this exact source revision as well.
-durable-workflow-server = { git = "https://github.com/durable-workflow/server", rev = "63cea4854ec6ebe56ab1603b014e246b907aedc0" }
+durable-workflow-server = { git = "https://github.com/durable-workflow/server", rev = "3d90086f73533ac4437735bae6b9d0446558577c" }
 axum = { version = "=0.8.9", default-features = false, features = ["http1", "tokio"] }
 # Composition candidate for sdk-rust#279. Replace with the qualified package
 # before this development-runtime change can be released.
@@ -56,9 +56,9 @@ strip = "symbols"
 # Cargo only applies patches from the top-level manifest. These are the
 # reviewed Server dependency sources, including its Avro and SQL adapters.
 [patch.crates-io]
-apache-avro = { git = "https://github.com/durable-workflow/server", rev = "63cea4854ec6ebe56ab1603b014e246b907aedc0" }
-sqlx-mysql = { git = "https://github.com/durable-workflow/server", rev = "63cea4854ec6ebe56ab1603b014e246b907aedc0" }
-sqlx-postgres = { git = "https://github.com/durable-workflow/server", rev = "63cea4854ec6ebe56ab1603b014e246b907aedc0" }
+apache-avro = { git = "https://github.com/durable-workflow/server", rev = "3d90086f73533ac4437735bae6b9d0446558577c" }
+sqlx-mysql = { git = "https://github.com/durable-workflow/server", rev = "3d90086f73533ac4437735bae6b9d0446558577c" }
+sqlx-postgres = { git = "https://github.com/durable-workflow/server", rev = "3d90086f73533ac4437735bae6b9d0446558577c" }
 
 [profile.dev]
 debug = 0

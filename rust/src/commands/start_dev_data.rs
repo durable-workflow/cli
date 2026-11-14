@@ -155,11 +155,22 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    #[ignore = "requires a disposable root-owned test process"]
     fn foreign_owned_private_directory_is_refused_before_any_state_write() {
         use std::os::unix::ffi::OsStrExt;
         use std::os::unix::fs::PermissionsExt;
-        assert_eq!(unsafe { libc::geteuid() }, 0);
+        if unsafe { libc::geteuid() } != 0 {
+            // Ordinary CI checks refusal without touching the system-owned
+            // directory. A disposable root runner exercises the causal 0700
+            // foreign-owner fixture below, even with DAC bypass available.
+            use std::os::unix::fs::MetadataExt;
+            let path = ["/root", "/var/root"]
+                .into_iter()
+                .map(Path::new)
+                .find(|path| fs::metadata(path).is_ok_and(|metadata| metadata.uid() == 0))
+                .expect("a system-owned directory for the refusal control");
+            assert!(Data::open(path).is_err());
+            return;
+        }
         let root = Scratch::new();
         let directory = root.0.join("foreign");
         fs::create_dir(&directory).unwrap();

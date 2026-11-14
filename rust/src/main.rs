@@ -37,8 +37,8 @@ enum Handler {
 fn handler(name: &str) -> Option<Handler> {
     use commands::{
         activity_task, batch, completion, debug, doctor, env, namespace, runtime, schedule, schema,
-        search_attribute, server, start_dev, system, task_queue, upgrade, worker, workflow,
-        workflow_control, workflow_message, workflow_run,
+        search_attribute, server, start_dev, system, task_queue, upgrade, version_usage, worker,
+        workflow, workflow_control, workflow_message, workflow_run,
     };
     Some(match name {
         "completion" => Handler::Local(completion::completion),
@@ -53,6 +53,7 @@ fn handler(name: &str) -> Option<Handler> {
         "server:health" => Handler::Server(server::health),
         "server:info" => Handler::Server(server::info),
         "workflow:list" => Handler::Server(workflow::list),
+        "workflow:version-usage" => Handler::Server(version_usage::run),
         "batch:cancel" => Handler::Server(batch::cancel),
         "batch:signal" => Handler::Server(batch::signal),
         "batch:update" => Handler::Server(batch::update),
@@ -141,6 +142,7 @@ fn handler(name: &str) -> Option<Handler> {
 /// Commands whose errors carry the resolved namespace.
 const NAMESPACE_SCOPED: &[&str] = &[
     "workflow:list",
+    "workflow:version-usage",
     "workflow:list-runs",
     "workflow:describe",
     "workflow:show-run",
@@ -225,6 +227,7 @@ const GROUPED_ALIASES: &[(&[&str], GroupVerbs)] = &[
         &["workflow", "workflows"],
         &[
             ("list", "workflow:list"),
+            ("version-usage", "workflow:version-usage"),
             ("migrate-v1", "workflow:migrate-v1"),
         ],
     ),
@@ -728,8 +731,12 @@ fn run(raw: Vec<String>) -> i32 {
     let result = match handler {
         Handler::Local(run) => run(&input),
         Handler::Server(run) => client::Context::new(&input).and_then(|context| {
-            // doctor and server:start-dev opt out of the session warning in 2.x.
-            if !matches!(command.as_str(), "doctor" | "server:start-dev") {
+            // Version usage validates before its own strict preflight. The two
+            // original commands opt out of the session warning in 2.x.
+            if !matches!(
+                command.as_str(),
+                "doctor" | "server:start-dev" | "workflow:version-usage"
+            ) {
                 context.warn_if_incompatible(
                     client::uses_worker_protocol(&command),
                     NAMESPACE_SCOPED.contains(&command.as_str())

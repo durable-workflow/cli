@@ -110,6 +110,10 @@
    "description": "Project a Waterline v1 workflow into standalone read-only visibility"
   },
   {
+   "value": "workflow:version-usage",
+   "description": "Show live legacy, current and unknown version usage across open runs"
+  },
+  {
    "value": "service-call:describe",
    "description": "Inspect a durable Nexus service call and its original target"
   },
@@ -1351,6 +1355,20 @@
   },
   "workflow-task:poll": {
    "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "workflow:version-usage": {
+   "options": {
+    "state": [
+     "legacy",
+     "current",
+     "unknown"
+    ],
     "output": [
      "table",
      "json",

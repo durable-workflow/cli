@@ -174,15 +174,18 @@ fn describe_definition(writer: &mut Writer, options: &[&OptionView], arguments: 
         writer.text("\n");
     }
     if !options.is_empty() {
-        writer.text("<comment>Options:</comment>");
-        // Options with a multi-letter shortcut (-v|vv|vvv) come last.
-        let (later, first): (Vec<&&OptionView>, Vec<&&OptionView>) = options
-            .iter()
-            .partition(|option| option.shortcut.chars().count() > 1);
-        for option in first.into_iter().chain(later) {
-            writer.text("\n");
-            describe_option(writer, option, total_width);
-        }
+        describe_options(writer, options, total_width, "Options");
+    }
+}
+
+fn describe_options(writer: &mut Writer, options: &[&OptionView], total_width: usize, title: &str) {
+    writer.text(&format!("<comment>{title}:</comment>"));
+    let (later, first): (Vec<&&OptionView>, Vec<&&OptionView>) = options
+        .iter()
+        .partition(|option| option.shortcut.chars().count() > 1);
+    for option in first.into_iter().chain(later) {
+        writer.text("\n");
+        describe_option(writer, option, total_width);
     }
 }
 
@@ -203,10 +206,47 @@ pub fn command(view: &CommandView, raw: bool) -> String {
         writer.text(&format!("  {}", formatter::escape(&usage)));
     }
     writer.text("\n");
+    let starting_workflow = view.entry.name == "workflow:start" && !raw;
+    if starting_workflow {
+        writer.text("\n<comment>Quick start:</comment>\n");
+        writer.text("  <info>dw workflow:start --type=orders.Checkout</info>\n");
+        writer.text("  Use a workflow type registered by your application's Worker.\n");
+        writer.text("  Add <info>--wait</info> to wait for completion. Use <info>--output=json</info> for JSON.\n");
+    }
     if !view.options.is_empty() || !view.arguments.is_empty() {
         writer.text("\n");
-        let options: Vec<&OptionView> = view.options.iter().collect();
-        describe_definition(&mut writer, &options, &view.arguments);
+        if starting_workflow {
+            let names = [
+                "type",
+                "input",
+                "workflow-id",
+                "task-queue",
+                "wait",
+                "output",
+                "env",
+                "help",
+            ];
+            let common: Vec<_> = names
+                .iter()
+                .filter_map(|name| view.options.iter().find(|option| option.name == *name))
+                .collect();
+            let advanced: Vec<_> = view
+                .options
+                .iter()
+                .filter(|option| !names.contains(&option.name.as_str()))
+                .collect();
+            describe_definition(&mut writer, &common, &view.arguments);
+            writer.text("\n\n");
+            let width = advanced
+                .iter()
+                .map(|option| option_width(option))
+                .max()
+                .unwrap_or(0);
+            describe_options(&mut writer, &advanced, width, "Advanced options");
+        } else {
+            let options: Vec<&OptionView> = view.options.iter().collect();
+            describe_definition(&mut writer, &options, &view.arguments);
+        }
         writer.text("\n");
     }
     if !view.help.is_empty() && view.help != *description {
@@ -237,10 +277,26 @@ fn application_options() -> Vec<OptionView> {
 }
 
 /// The `-h`/`--help` … `--verbose` block every listing starts with.
-fn describe_application_header(writer: &mut Writer) {
+fn describe_application_header(writer: &mut Writer, start_here: bool) {
     writer.text(&format!("{}\n\n", long_version()));
     writer.text("<comment>Usage:</comment>\n");
     writer.text("  command [options] [arguments]\n\n");
+    if start_here {
+        writer.text("<comment>Start here:</comment>\n");
+        for (name, description) in [
+            ("server:start-dev", "Start a local Server"),
+            ("env:set", "Save a connection profile"),
+            ("doctor", "Check your connection"),
+            ("workflow:start", "Start a workflow"),
+            ("workflow:list", "Find your workflows"),
+            ("workflow:describe", "Inspect a workflow"),
+        ] {
+            writer.text(&format!("  <info>{name:20}</info> {description}\n"));
+        }
+        writer.text("\n  Use <info>dw help workflow:start</info> for options and examples.\n\n");
+        writer.text("  Run <info>dw doctor</info> to inspect the target Server.\n");
+        writer.text("  Save a profile with <info>dw env:set</info>; the default target is localhost:8080.\n\n");
+    }
     let options = application_options();
     let refs: Vec<&OptionView> = options.iter().collect();
     describe_definition(writer, &refs, &[]);
@@ -252,7 +308,7 @@ fn describe_application_header(writer: &mut Writer) {
 /// `list` namespace.
 pub fn application_header() -> String {
     let mut writer = Writer::new(false);
-    describe_application_header(&mut writer);
+    describe_application_header(&mut writer, false);
     writer.out
 }
 
@@ -276,7 +332,7 @@ pub fn application(described: Option<&str>, raw: bool) -> String {
         return writer.out;
     }
 
-    describe_application_header(&mut writer);
+    describe_application_header(&mut writer, described.is_none());
     // When describing one namespace, its aliases are listed too.
     let listed: Vec<&str> = match &resolved {
         Some(_) => view
@@ -349,6 +405,36 @@ mod tests {
     }
 
     #[test]
+    fn default_human_listing_has_a_short_starting_path_before_all_commands() {
+        let page = plain(&application(None, false));
+        let start = page.find("Start here:").unwrap();
+        let end = start + page[start..].find("\n\n").unwrap();
+        let first_steps = &page[start..end];
+        for name in [
+            "server:start-dev",
+            "env:set",
+            "doctor",
+            "workflow:start",
+            "workflow:list",
+            "workflow:describe",
+        ] {
+            assert!(first_steps.contains(name));
+            assert!(catalog::entry(name).is_some());
+        }
+        assert_eq!(
+            first_steps
+                .lines()
+                .filter(|line| line.starts_with("  ") && !line.starts_with("  Use"))
+                .count(),
+            6
+        );
+        assert!(end < page.find("Available commands:").unwrap());
+        assert!(!application(None, true).contains("Start here:"));
+        assert!(!application(Some("workflow"), false).contains("Start here:"));
+        assert!(!application_header().contains("Start here:"));
+    }
+
+    #[test]
     fn env_use_help_matches_2x() {
         let page = plain(&command(
             &CommandView::new(catalog::entry("env:use").unwrap()),
@@ -365,6 +451,28 @@ mod tests {
         );
         assert!(page.contains("\n  -v|vv|vvv, --verbose  Increase the verbosity"));
         assert!(page.ends_with("    dw env:use prod --json\n"));
+    }
+
+    #[test]
+    fn workflow_start_help_begins_with_an_example_and_separates_advanced_options() {
+        let view = CommandView::new(catalog::entry("workflow:start").unwrap());
+        let page = plain(&command(&view, false));
+        let common = page.find("Options:").unwrap();
+        let advanced = page.find("Advanced options:").unwrap();
+        assert!(page.find("dw workflow:start --type=").unwrap() < common);
+        assert!(common < page.find("--type=TYPE").unwrap());
+        assert!(page.find("--output=OUTPUT").unwrap() < advanced);
+        for option in [
+            "--priority",
+            "--fairness-key",
+            "--duplicate-policy",
+            "--json",
+        ] {
+            assert!(page.find(option).unwrap() > advanced);
+        }
+        let raw = plain(&command(&view, true));
+        assert!(!raw.contains("Advanced options:"));
+        assert!(!raw.contains("Quick start:"));
     }
 
     #[test]

@@ -556,6 +556,11 @@ def help_cases():
                 "fields": ["stdout_text"],
                 "reason": "The help accurately describes one Server response page and an unconsumed cursor (cli#113).",
             }}
+        if case["argv"][0] == "workflow:start":
+            case["expected_difference"] = {"*": {
+                "fields": ["stdout_text"],
+                "reason": "Human workflow:start help puts its first example and common controls before advanced options (cli#159).",
+            }}
         if case["argv"][0] == "workflow:signal":
             # --request-id is PHP main's (cli#61); published 2.3.5 lacks it.
             case["reference"] = "php-main"

@@ -543,14 +543,30 @@
    "name": "unknown command in a known namespace",
    "argv": [
     "env:nope"
-   ]
+   ],
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "stderr"
+     ],
+     "reason": "Qualified command typos prioritize the nearest name in the requested namespace (cli#159)."
+    }
+   }
   },
   {
    "name": "typo with several suggestions",
    "argv": [
     "env:lst",
     "-n"
-   ]
+   ],
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "stderr"
+     ],
+     "reason": "Qualified command typos prioritize the nearest name in the requested namespace (cli#159)."
+    }
+   }
   },
   {
    "name": "typo with one suggestion, no interaction",
@@ -617,11 +633,27 @@
    "name": "list",
    "argv": [
     "list"
-   ]
+   ],
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "stdout_text"
+     ],
+     "reason": "Human command discovery begins with six common commands and connection guidance (cli#159)."
+    }
+   }
   },
   {
    "name": "no arguments lists commands",
-   "argv": []
+   "argv": [],
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "stdout_text"
+     ],
+     "reason": "Human command discovery begins with six common commands and connection guidance (cli#159)."
+    }
+   }
   },
   {
    "name": "list one namespace",
@@ -670,7 +702,15 @@
    },
    "argv": [
     "env:nope"
-   ]
+   ],
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "stderr"
+     ],
+     "reason": "Qualified command typos prioritize the nearest name in the requested namespace (cli#159)."
+    }
+   }
   },
   {
    "name": "server:info json",
@@ -899,7 +939,15 @@
    "argv": [
     "workflow:start",
     "--help"
-   ]
+   ],
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "stdout_text"
+     ],
+     "reason": "Human workflow:start help puts its first example and common controls before advanced options (cli#159)."
+    }
+   }
   },
   {
    "name": "help for a command with array options",
@@ -947,7 +995,15 @@
    "argv": [
     "help",
     "env:lst"
-   ]
+   ],
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "stderr"
+     ],
+     "reason": "Qualified command typos prioritize the nearest name in the requested namespace (cli#159)."
+    }
+   }
   },
   {
    "name": "help without a command",
@@ -1215,7 +1271,15 @@
    "argv": [
     "list",
     "--ansi"
-   ]
+   ],
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "stdout_text"
+     ],
+     "reason": "Human command discovery begins with six common commands and connection guidance (cli#159)."
+    }
+   }
   },
   {
    "name": "ansi version",
@@ -1294,7 +1358,15 @@
    "argv": [
     "list",
     "--no-ansi"
-   ]
+   ],
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "stdout_text"
+     ],
+     "reason": "Human command discovery begins with six common commands and connection guidance (cli#159)."
+    }
+   }
   },
   {
    "name": "quiet command",
@@ -22765,6 +22837,21 @@
     "--json"
    ],
    "server": true
+  },
+  {
+   "name": "workflow typo prioritizes its own list command",
+   "argv": [
+    "workflow:lst",
+    "-n"
+   ],
+   "expected_difference": {
+    "*": {
+     "fields": [
+      "stderr"
+     ],
+     "reason": "workflow:lst suggests workflow:list first while preserving the lookup failure and noninteractive behavior (cli#159)."
+    }
+   }
   }
  ]
 }

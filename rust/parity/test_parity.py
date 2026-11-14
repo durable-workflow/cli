@@ -167,6 +167,21 @@ class CatalogMetadataParityTest(unittest.TestCase):
                          self.normalize("target:command\nafter help\n", "candidate"))
 
 
+class HumanHelpDifferenceScopeTest(unittest.TestCase):
+    def test_display_changes_cannot_hide_exit_json_or_config_regressions(self):
+        with open(parity.CASES, encoding="utf-8") as handle:
+            cases = json.load(handle)["cases"] + parity.help_cases()
+        for case in cases:
+            expected = case.get("expected_difference", {}).get("*", {})
+            if "cli#159" not in expected.get("reason", ""):
+                continue
+            fields = expected["fields"]
+            self.assertIn(fields, [["stdout_text"], ["stderr"]])
+            self.assertIsNotNone(parity.intentional_reason(case, fields))
+            for extra in ["exit_code", "stdout_json", "config", "stderr_category"]:
+                self.assertIsNone(parity.intentional_reason(case, [*fields, extra]))
+
+
 class PhpMainReferenceTest(unittest.TestCase):
     def setUp(self):
         self.directories = list(parity.BIN_DIRECTORIES)

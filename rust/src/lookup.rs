@@ -1,6 +1,7 @@
 //! Command lookup with the 2.x (Symfony Console) rules: exact names and
 //! aliases, unambiguous abbreviations per `:` segment (`env:li`, `e:l`),
-//! and the same "not defined", "ambiguous" and "Did you mean" messages.
+//! and the same error categories. Typo suggestions put nearby commands in
+//! the requested namespace first.
 
 use crate::catalog;
 use std::cmp::Ordering;
@@ -251,10 +252,24 @@ pub fn find(name: &str, terminal_width: usize) -> Result<String, LookupError> {
         if let Some(position) = name.rfind(':') {
             find_namespace(&name[..position])?;
         }
-        let visible: Vec<String> = alternatives(name, &all)
+        let mut visible: Vec<String> = alternatives(name, &all)
             .into_iter()
             .filter(|candidate| !canonical(candidate).hidden)
             .collect();
+        // A typo within a known namespace should offer its nearest command
+        // first. Alphabetical sorting buries workflow:list below unrelated
+        // commands that happen to share its final segment.
+        if let Some((namespace, _)) = name.rsplit_once(':') {
+            visible.sort_by(|left, right| {
+                let same_namespace = |candidate: &str| {
+                    candidate.rsplit_once(':').map(|(prefix, _)| prefix) == Some(namespace)
+                };
+                same_namespace(right)
+                    .cmp(&same_namespace(left))
+                    .then_with(|| levenshtein(name, left).cmp(&levenshtein(name, right)))
+                    .then_with(|| natural_case_cmp(left, right))
+            });
+        }
         let message = format!(
             "Command \"{name}\" is not defined.{}",
             did_you_mean(&visible)
@@ -355,10 +370,34 @@ mod tests {
                 alternatives: vec!["env:list".into()],
             }
         );
-        assert!(find("env:lst", 80)
-            .unwrap_err()
-            .message()
-            .starts_with("Command \"env:lst\" is not defined.\n\nDid you mean one of these?\n    activities:list\n    activity:list\n"));
+        assert!(find("env:lst", 80).unwrap_err().message().starts_with(
+            "Command \"env:lst\" is not defined.\n\nDid you mean one of these?\n    env:list\n"
+        ));
+    }
+
+    #[test]
+    fn command_typos_prioritize_the_requested_namespace_and_nearest_name() {
+        for (typo, wanted) in [
+            ("workflow:lst", "workflow:list"),
+            ("env:lst", "env:list"),
+            ("activity:lst", "activity:list"),
+        ] {
+            let LookupError::NotFound { alternatives, .. } = find(typo, 80).unwrap_err() else {
+                panic!("expected command suggestions for {typo}");
+            };
+            assert_eq!(alternatives.first().map(String::as_str), Some(wanted));
+            assert!(alternatives.iter().all(|name| !canonical(name).hidden));
+        }
+        // Suggesting a command must never silently dispatch it.
+        assert_eq!(find("e:li", 80).unwrap(), "env:list");
+        assert_eq!(find("workflows:list", 80).unwrap(), "workflow:list");
+        let LookupError::NotFound { alternatives, .. } = find("sch", 80).unwrap_err() else {
+            panic!("expected the existing namespace suggestions");
+        };
+        assert_eq!(
+            alternatives.first().map(String::as_str),
+            Some("schedule:backfill")
+        );
     }
 
     #[test]

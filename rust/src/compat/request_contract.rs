@@ -112,8 +112,7 @@ fn rejected_alias<'a>(aliases: Option<&'a Value>, value: &str) -> Option<&'a str
                 .filter(|item| !item.is_empty())?;
             Some((php::trim(key), item))
         })
-        .filter(|(key, _)| *key == value)
-        .next_back()
+        .rfind(|(key, _)| *key == value)
         .map(|(_, item)| item)
 }
 

@@ -95,10 +95,10 @@ jobs:
         with:
           clients: pip,python,cargo,curl,git
 
-      - name: Install Rust 1.86
+      - name: Install Rust 1.99
         uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4  # stable
         with:
-          toolchain: 1.86.0
+          toolchain: 1.99.0
           targets: ${{ matrix.target }}
 
       - name: Install the musl C toolchain
@@ -128,12 +128,14 @@ jobs:
           export DW_CLI_BUILD_DATE SOURCE_DATE_EPOCH="$epoch"
           # Keep runner paths out of the binary.
           registry="${CARGO_HOME:-$HOME/.cargo}/registry/src"
+          git_sources="${CARGO_HOME:-$HOME/.cargo}/git/checkouts"
           workspace="$GITHUB_WORKSPACE"
           if [ "$RUNNER_OS" = "Windows" ]; then
             registry="$(cygpath -w "$registry")"
+            git_sources="$(cygpath -w "$git_sources")"
             workspace="$(cygpath -w "$workspace")"
           fi
-          flags="--remap-path-prefix=$registry=/cargo/registry/src --remap-path-prefix=$workspace=/build"
+          flags="--remap-path-prefix=$registry=/cargo/registry/src --remap-path-prefix=$git_sources=/cargo/git/checkouts --remap-path-prefix=$workspace=/build"
           if [ "$RUNNER_OS" = "Windows" ]; then
             flags="$flags -C target-feature=+crt-static"
           fi
@@ -195,6 +197,11 @@ jobs:
             echo "::error::$ASSET embeds a runner path"
             exit 1
           fi
+
+      - name: Exercise the built-in native development Server
+        env:
+          ASSET: ${{ matrix.asset }}
+        run: python3 -I -S scripts/ci/smoke-native-dev.py --binary "dist/$ASSET"
 
       - name: Write the dependency inventory
         env:

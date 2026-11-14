@@ -430,29 +430,39 @@ dw server:info
 dw doctor
 dw doctor --env=prod --output=json
 
-# Serve an existing, configured Laravel project (requires PHP on PATH)
+# Start the built-in native development Server
 dw server:start-dev
-dw server:start-dev --port=9090 --db=sqlite
+dw server:start-dev --port=9090 --data-dir=./workflow-data
 ```
 
-`server:start-dev` runs `php artisan serve` in the current directory and defaults
-to `127.0.0.1`. Use `--host=0.0.0.0` explicitly to bind to all interfaces. Install
-the project's dependencies, configure its database and run migrations first.
-The native CLI still requires a separate PHP executable for this command.
-The selected `--db` value is passed as `DB_CONNECTION`. Clear Laravel's cached
-configuration when changing drivers.
-Restart the command after editing `.env`. Artisan's automatic environment reload
-is disabled so the selected database driver stays applied to HTTP requests.
+`server:start-dev` runs the native Server and bundled SQLite compiled into
+`dw`. No PHP, Docker, Redis, separate Server installation or runtime download
+is needed. It works from an empty directory, creates the schema and default
+namespace, and runs its own timers and maintenance. Application SDK workers
+run separately.
 
-MySQL and PostgreSQL modes require Docker Compose services named `mysql` or
-`pgsql`, respectively, and `redis` in that project. A failed dependency launch
-stops startup. Compose services remain running when the HTTP process ends.
-Run queue workers and the scheduler separately as your application requires.
+The default address is `127.0.0.1:8080`. Only loopback binds are accepted.
+`--host=localhost` and `--host=::1` are supported. `--port=0` chooses an available
+port and prints the selected URL. The bundled database driver is `sqlite`.
 
-POSIX native binaries forward SIGINT and SIGTERM to the active HTTP or Compose
-process and wait up to five seconds before stopping it. Source and PHAR installs
-use this forwarding when their PHP runtime provides `pcntl` and `posix`. Windows uses its
-console interruption behavior. Existing Compose services remain caller-owned.
+Data persists in `dev-server` beside the CLI's config file. `--data-dir` selects
+another directory. Only one development Server can use a directory at a time.
+The development runtime refuses incompatible existing database ownership.
+It does not take over or upgrade an unrelated PHP database.
+
+The default development bearer token is `dev-token`. Pass `--token` to use a
+custom token, which is not printed. Connect from another terminal:
+
+```bash
+dw env:set local --server=http://127.0.0.1:8080 --token=dev-token --make-default
+dw doctor
+```
+
+Existing native `DW_*` payload, query and storage limits also apply. The runtime
+reports itself as a development build; its exact embedded source is printed
+at startup. It is not the separately qualified published Server image.
+Ctrl+C and SIGTERM shut down HTTP and native maintenance and preserve the data.
+No background dependency services are launched or left running.
 
 For a standalone Server using published images, follow the
 [service quickstart](https://durable-workflow.com/docs/quickstart/).

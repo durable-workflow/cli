@@ -578,6 +578,14 @@ def invocation_path(binary, role):
 def run_all(candidate_binary, servers, verbose, server_only=False, skip_references=()):
     with open(CASES, encoding="utf-8") as handle:
         cases = json.load(handle)["cases"] + help_cases()
+    # The native start-dev command now runs a real embedded Server. PHP's
+    # fake-Artisan launch cases are retained as historical reference data;
+    # Rust's HTTP/data/restart/shutdown contract is in tests/start_dev.rs.
+    legacy_dev = [case for case in cases if case.get("argv", [None])[0] == "server:start-dev"]
+    if legacy_dev:
+        print(f"Skipping {len(legacy_dev)} legacy PHP start-dev launcher cases; "
+              "the embedded native Server is exercised by cargo test --test start_dev (cli#160).")
+        cases = [case for case in cases if case not in legacy_dev]
     if server_only:
         cases = [case for case in cases if case.get("server")]
     skipped = [case for case in cases if case.get("reference") in skip_references]

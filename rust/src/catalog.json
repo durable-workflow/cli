@@ -781,7 +781,7 @@
    "synopsis": "upgrade [--tag TAG] [--dry-run] [--force] [--output OUTPUT]",
    "aliases": [],
    "hidden": false,
-   "help": "Replace the currently running `dw` binary with a newer release from\n`durable-workflow/cli` on GitHub. The command verifies the downloaded\nasset against `SHA256SUMS` before replacing the binary, and only\nrewrites standalone release installs \u2014 Composer, Homebrew, and PHAR\ninstalls are refused with a pointer at the right managing tool.\n\n<comment>Examples:</comment>\n\n  <info>dw upgrade</info>\n  <info>dw upgrade --tag=\\<release-tag\\></info>\n  <info>dw upgrade --dry-run</info>\n  <info>dw upgrade --output=json</info>",
+   "help": "Replace the currently running `dw` binary with a newer release from\n`durable-workflow/cli` on GitHub. The command verifies the downloaded\nasset against `SHA256SUMS` before replacing the binary, and only\nrewrites standalone release installs — Composer, Homebrew, and PHAR\ninstalls are refused with a pointer at the right managing tool.\n\n<comment>Examples:</comment>\n\n  <info>dw upgrade</info>\n  <info>dw upgrade --tag=\\<release-tag\\></info>\n  <info>dw upgrade --dry-run</info>\n  <info>dw upgrade --output=json</info>",
    "definition": {
     "arguments": [],
     "options": {
@@ -1083,7 +1083,7 @@
    "synopsis": "activity:complete [-s|--server [SERVER]] [--namespace [NAMESPACE]] [--token [TOKEN]] [--tls-verify TLS-VERIFY] [--env ENV] [--output OUTPUT] [--lease-owner [LEASE-OWNER]] [--json] [-i|--input [INPUT]] [--input-file [INPUT-FILE]] [--input-encoding [INPUT-ENCODING]] [--] <task-id> <attempt-id>",
    "aliases": [],
    "hidden": false,
-   "help": "Complete an activity from outside the worker process. Supply the leased\n<comment>activity_attempt_id</comment> so the server can validate ownership\nand enforce the at-most-one terminal outcome per attempt. If the attempt\nhas already settled (for example, a redelivery recorded completion\nfirst), the server returns <comment>recorded=false</comment> with a reason\ncode \u2014 that is the redelivery path, not a failure.\n\n<comment>Examples:</comment>\n\n  <info>dw activity:complete act-123 att-456 --input='{\"ok\":true}'</info>\n  <info>dw activity:complete act-123 att-456 --input-file=result.json --json</info>",
+   "help": "Complete an activity from outside the worker process. Supply the leased\n<comment>activity_attempt_id</comment> so the server can validate ownership\nand enforce the at-most-one terminal outcome per attempt. If the attempt\nhas already settled (for example, a redelivery recorded completion\nfirst), the server returns <comment>recorded=false</comment> with a reason\ncode — that is the redelivery path, not a failure.\n\n<comment>Examples:</comment>\n\n  <info>dw activity:complete act-123 att-456 --input='{\"ok\":true}'</info>\n  <info>dw activity:complete act-123 att-456 --input-file=result.json --json</info>",
    "definition": {
     "arguments": {
      "task-id": {
@@ -1440,7 +1440,7 @@
    "synopsis": "activity:fail [-s|--server [SERVER]] [--namespace [NAMESPACE]] [--token [TOKEN]] [--tls-verify TLS-VERIFY] [--env ENV] [--output OUTPUT] [--lease-owner [LEASE-OWNER]] [-m|--message MESSAGE] [-t|--type [TYPE]] [--failure-kind FAILURE-KIND] [--retryable] [--non-retryable] [--timeout-type TIMEOUT-TYPE] [--cancelled] [--malformed-output] [--json] [--] <task-id> <attempt-id>",
    "aliases": [],
    "hidden": false,
-   "help": "Fail an activity from outside the worker process. Activity attempts are\nat-least-once; each retry runs as a fresh attempt with a new\n<comment>activity_attempt_id</comment> while the\n<comment>activity_execution_id</comment> stays stable across the retry\nchain. <comment>--non-retryable</comment> tells the server to skip the\nretry policy and surface the failure to the workflow immediately. If the\nnamed <comment>activity_attempt_id</comment> has already settled, the\nserver returns <comment>recorded=false</comment> with a reason \u2014 that is\nredelivery, not a failure to fail.\n\n<comment>Examples:</comment>\n\n  <info>dw activity:fail act-123 att-456 -m \"upstream returned 500\"</info>\n  <info>dw activity:fail act-123 att-456 -m \"bad input\" -t ValidationError --non-retryable</info>",
+   "help": "Fail an activity from outside the worker process. Activity attempts are\nat-least-once; each retry runs as a fresh attempt with a new\n<comment>activity_attempt_id</comment> while the\n<comment>activity_execution_id</comment> stays stable across the retry\nchain. <comment>--non-retryable</comment> tells the server to skip the\nretry policy and surface the failure to the workflow immediately. If the\nnamed <comment>activity_attempt_id</comment> has already settled, the\nserver returns <comment>recorded=false</comment> with a reason — that is\nredelivery, not a failure to fail.\n\n<comment>Examples:</comment>\n\n  <info>dw activity:fail act-123 att-456 -m \"upstream returned 500\"</info>\n  <info>dw activity:fail act-123 att-456 -m \"bad input\" -t ValidationError --non-retryable</info>",
    "definition": {
     "arguments": {
      "task-id": {
@@ -3127,7 +3127,7 @@
    "synopsis": "env:delete [--output OUTPUT] [--json] [--] <name>",
    "aliases": [],
    "hidden": false,
-   "help": "Delete a named dw environment profile from the config file.\n\nIf the deleted profile is the current default (set via\n<info>dw env:use</info>), the default is cleared \u2014 the next command\nwithout <info>--env</info> and without <info>DW_ENV</info> will fall\nback to environment variables and the built-in defaults.\n\n<comment>Examples:</comment>\n\n  <info>dw env:delete staging</info>",
+   "help": "Delete a named dw environment profile from the config file.\n\nIf the deleted profile is the current default (set via\n<info>dw env:use</info>), the default is cleared — the next command\nwithout <info>--env</info> and without <info>DW_ENV</info> will fall\nback to environment variables and the built-in defaults.\n\n<comment>Examples:</comment>\n\n  <info>dw env:delete staging</info>",
    "definition": {
     "arguments": {
      "name": {
@@ -3644,7 +3644,7 @@
    "synopsis": "env:use [--output OUTPUT] [--json] [--] <name>",
    "aliases": [],
    "hidden": false,
-   "help": "Persist <info>name</info> as the default dw environment profile.\n\nSubsequent commands use this profile unless the caller passes an\nexplicit <info>--env</info> or sets the <info>DW_ENV</info> environment\nvariable. Unknown profile names are rejected \u2014 use\n<info>dw env:list</info> to see the available profiles.\n\n<comment>Examples:</comment>\n\n  <info>dw env:use dev</info>\n  <info>dw env:use prod --json</info>",
+   "help": "Persist <info>name</info> as the default dw environment profile.\n\nSubsequent commands use this profile unless the caller passes an\nexplicit <info>--env</info> or sets the <info>DW_ENV</info> environment\nvariable. Unknown profile names are rejected — use\n<info>dw env:list</info> to see the available profiles.\n\n<comment>Examples:</comment>\n\n  <info>dw env:use dev</info>\n  <info>dw env:use prod --json</info>",
    "definition": {
     "arguments": {
      "name": {
@@ -3755,7 +3755,7 @@
    "synopsis": "namespace:create [-s|--server [SERVER]] [--namespace [NAMESPACE]] [--token [TOKEN]] [--tls-verify TLS-VERIFY] [--env ENV] [--output OUTPUT] [-d|--description [DESCRIPTION]] [-r|--retention [RETENTION]] [--json] [--] <name>",
    "aliases": [],
    "hidden": false,
-   "help": "Create a logical namespace for workflow executions. Namespaces\npartition the visibility surface \u2014 workflows in different namespaces\nnever appear in each other's lists.\n\n<comment>Examples:</comment>\n\n  <info>dw namespace:create billing</info>\n  <info>dw namespace:create billing --description=\"prod invoicing\" --retention=90</info>",
+   "help": "Create a logical namespace for workflow executions. Namespaces\npartition the visibility surface — workflows in different namespaces\nnever appear in each other's lists.\n\n<comment>Examples:</comment>\n\n  <info>dw namespace:create billing</info>\n  <info>dw namespace:create billing --description=\"prod invoicing\" --retention=90</info>",
    "definition": {
     "arguments": {
      "name": {
@@ -4085,7 +4085,7 @@
    "synopsis": "namespace:describe [-s|--server [SERVER]] [--namespace [NAMESPACE]] [--token [TOKEN]] [--tls-verify TLS-VERIFY] [--env ENV] [--output OUTPUT] [--json] [--] <name>",
    "aliases": [],
    "hidden": false,
-   "help": "Show configuration for a namespace \u2014 retention period, status, and\naudit timestamps.\n\n<comment>Examples:</comment>\n\n  <info>dw namespace:describe billing</info>\n  <info>dw namespace:describe billing --json | jq '.retention_days'</info>",
+   "help": "Show configuration for a namespace — retention period, status, and\naudit timestamps.\n\n<comment>Examples:</comment>\n\n  <info>dw namespace:describe billing</info>\n  <info>dw namespace:describe billing --json | jq '.retention_days'</info>",
    "definition": {
     "arguments": {
      "name": {
@@ -5629,7 +5629,7 @@
    "synopsis": "schedule:create [-s|--server [SERVER]] [--namespace [NAMESPACE]] [--token [TOKEN]] [--tls-verify TLS-VERIFY] [--env ENV] [--output OUTPUT] [--schedule-id [SCHEDULE-ID]] [-t|--workflow-type WORKFLOW-TYPE] [-c|--cron [CRON]] [--interval [INTERVAL]] [--task-queue [TASK-QUEUE]] [--timezone [TIMEZONE]] [--execution-timeout EXECUTION-TIMEOUT] [--run-timeout RUN-TIMEOUT] [--overlap-policy [OVERLAP-POLICY]] [--jitter JITTER] [--max-runs MAX-RUNS] [--paused] [--note [NOTE]] [--json] [-i|--input [INPUT]] [--input-file [INPUT-FILE]] [--input-encoding [INPUT-ENCODING]]",
    "aliases": [],
    "hidden": false,
-   "help": "Create a schedule that periodically starts a workflow. Provide either\na cron expression or an ISO 8601 interval (<comment>PT1H</comment>,\n<comment>PT30M</comment>, \u2026). Overlap policy controls what happens when\nthe next fire time arrives while the previous run is still executing.\n\n<comment>Examples:</comment>\n\n  # Cron-based daily schedule\n  <info>dw schedules create --schedule-id=daily-report --workflow-type=reports.Daily --cron=\"0 6 * * *\"</info>\n\n  # Interval every 15 minutes\n  <info>dw schedules create --schedule-id=poller --workflow-type=sync.Poll --interval=PT15M</info>\n\n  # Create paused with a one-time cap\n  <info>dw schedules create --schedule-id=one-shot --workflow-type=migrate.Once --cron=\"0 0 1 * *\" --max-runs=1 --paused</info>",
+   "help": "Create a schedule that periodically starts a workflow. Provide either\na cron expression or an ISO 8601 interval (<comment>PT1H</comment>,\n<comment>PT30M</comment>, …). Overlap policy controls what happens when\nthe next fire time arrives while the previous run is still executing.\n\n<comment>Examples:</comment>\n\n  # Cron-based daily schedule\n  <info>dw schedules create --schedule-id=daily-report --workflow-type=reports.Daily --cron=\"0 6 * * *\"</info>\n\n  # Interval every 15 minutes\n  <info>dw schedules create --schedule-id=poller --workflow-type=sync.Poll --interval=PT15M</info>\n\n  # Create paused with a one-time cap\n  <info>dw schedules create --schedule-id=one-shot --workflow-type=migrate.Once --cron=\"0 0 1 * *\" --max-runs=1 --paused</info>",
    "definition": {
     "arguments": [],
     "options": {
@@ -5921,7 +5921,7 @@
    "synopsis": "schedule:delete [-s|--server [SERVER]] [--namespace [NAMESPACE]] [--token [TOKEN]] [--tls-verify TLS-VERIFY] [--env ENV] [--output OUTPUT] [--json] [--] <schedule-id>",
    "aliases": [],
    "hidden": false,
-   "help": "Delete a schedule. In-flight runs it has already spawned keep running\n\u2014 only future fires are cancelled.\n\n<comment>Examples:</comment>\n\n  <info>dw schedules delete daily-report</info>\n  <info>dw schedules delete daily-report --json</info>",
+   "help": "Delete a schedule. In-flight runs it has already spawned keep running\n— only future fires are cancelled.\n\n<comment>Examples:</comment>\n\n  <info>dw schedules delete daily-report</info>\n  <info>dw schedules delete daily-report --json</info>",
    "definition": {
     "arguments": {
      "schedule-id": {
@@ -7104,7 +7104,7 @@
    "synopsis": "schedule:update [-s|--server [SERVER]] [--namespace [NAMESPACE]] [--token [TOKEN]] [--tls-verify TLS-VERIFY] [--env ENV] [--output OUTPUT] [-c|--cron [CRON]] [--interval [INTERVAL]] [-t|--workflow-type [WORKFLOW-TYPE]] [--task-queue [TASK-QUEUE]] [--execution-timeout EXECUTION-TIMEOUT] [--run-timeout RUN-TIMEOUT] [--overlap-policy [OVERLAP-POLICY]] [--jitter JITTER] [--max-runs MAX-RUNS] [--note [NOTE]] [--json] [-i|--input [INPUT]] [--input-file [INPUT-FILE]] [--input-encoding [INPUT-ENCODING]] [--] <schedule-id>",
    "aliases": [],
    "hidden": false,
-   "help": "Change a schedule in place. Pass only the fields you want to update \u2014\neverything else is left alone. At least one field is required.\n\n<comment>Examples:</comment>\n\n  <info>dw schedules update daily-report --cron=\"0 5 * * *\"</info>\n  <info>dw schedules update daily-report --overlap-policy=skip --jitter=60</info>\n  <info>dw schedules update daily-report --max-runs=100</info>",
+   "help": "Change a schedule in place. Pass only the fields you want to update —\neverything else is left alone. At least one field is required.\n\n<comment>Examples:</comment>\n\n  <info>dw schedules update daily-report --cron=\"0 5 * * *\"</info>\n  <info>dw schedules update daily-report --overlap-policy=skip --jitter=60</info>\n  <info>dw schedules update daily-report --max-runs=100</info>",
    "definition": {
     "arguments": {
      "schedule-id": {
@@ -7974,7 +7974,7 @@
     "search-attributes:list"
    ],
    "hidden": false,
-   "help": "List every search attribute \u2014 system-defined attributes shipped by the\nserver and any custom attributes registered for this namespace. When\n<comment>--namespace</comment> is omitted, the command queries the\nresolved default namespace only; it never enumerates all namespaces.\n\n<comment>Examples:</comment>\n\n  <info>dw search-attributes list</info>\n  <info>dw search-attribute:list</info>\n  <info>dw search-attribute:list --namespace=orders</info>\n  <info>dw search-attributes list --output=json | jq '.custom_attributes'</info>\n  <info>dw search-attribute:list --output=json | jq '.custom_attributes'</info>",
+   "help": "List every search attribute — system-defined attributes shipped by the\nserver and any custom attributes registered for this namespace. When\n<comment>--namespace</comment> is omitted, the command queries the\nresolved default namespace only; it never enumerates all namespaces.\n\n<comment>Examples:</comment>\n\n  <info>dw search-attributes list</info>\n  <info>dw search-attribute:list</info>\n  <info>dw search-attribute:list --namespace=orders</info>\n  <info>dw search-attributes list --output=json | jq '.custom_attributes'</info>\n  <info>dw search-attribute:list --output=json | jq '.custom_attributes'</info>",
    "definition": {
     "arguments": [],
     "options": {
@@ -8398,11 +8398,11 @@
   },
   {
    "name": "server:start-dev",
-   "description": "Serve an existing Laravel project for local development",
-   "synopsis": "server:start-dev [-p|--port [PORT]] [--host [HOST]] [--db [DB]]",
+   "description": "Start the built-in native development Server",
+   "synopsis": "server:start-dev [-p|--port [PORT]] [--host [HOST]] [--db [DB]] [--data-dir DATA-DIR] [--token TOKEN]",
    "aliases": [],
    "hidden": false,
-   "help": "Run this command from an installed, configured Laravel project's directory.\nAn external PHP executable is required, even when using the native dw binary.\nThis launches Artisan's HTTP server. Configure the database and run migrations\nfirst, and run the project's queue worker and scheduler separately when needed.\nRestart this command after editing the project's .env configuration.\n\nSQLite is the default database driver. For <comment>mysql</comment> or\n<comment>pgsql</comment>, your project's Docker Compose configuration must\ndefine that service and <comment>redis</comment>. Dependencies are left running\nwhen the HTTP process stops. The bind address defaults to loopback.\n\nFor a standalone Durable Workflow Server, follow the Docker-backed quickstart:\nhttps://durable-workflow.com/docs/quickstart/\n\n<comment>Examples:</comment>\n\n  <info>dw server:start-dev</info>\n  <info>dw server:start-dev --port=9000</info>\n  <info>dw server:start-dev --db=mysql</info>",
+   "help": "Start a local Durable Workflow Server using the native runtime and SQLite\ncompiled into dw. Run it from any directory. No PHP, Docker, Redis, separate\nServer installation or runtime download is needed. The runtime creates its\nschema and default namespace and runs its own timers and maintenance.\n\nThe address defaults to 127.0.0.1:8080 and only loopback binds are accepted.\nUse --port=0 to choose an available port. Data persists under dw's config\nfolder in dev-server, or the directory selected with --data-dir. Only one\nServer may use a data directory at a time. Ctrl+C closes the runtime and keeps\nthe data. SDK workers still run your application code separately.\n\nThe local development token is dev-token. Set --token to choose another.\nExisting native DW_* payload, query and storage limits also apply. This is\na CLI-linked development build, with its embedded source shown at startup.\n\n<comment>Examples:</comment>\n\n  <info>dw server:start-dev</info>\n  <info>dw server:start-dev --port=9000 --data-dir=./workflow-data</info>\n\n  # In another terminal, connect the CLI to the local Server\n  <info>dw env:set local --server=http://127.0.0.1:8080 --token=dev-token --make-default</info>\n  <info>dw doctor</info>",
    "definition": {
     "arguments": [],
     "options": {
@@ -8412,7 +8412,7 @@
       "accept_value": true,
       "is_value_required": false,
       "is_multiple": false,
-      "description": "Server port",
+      "description": "Server port (0 chooses an available port)",
       "default": "8080"
      },
      "host": {
@@ -8421,7 +8421,7 @@
       "accept_value": true,
       "is_value_required": false,
       "is_multiple": false,
-      "description": "Bind address (IP address or localhost)",
+      "description": "Loopback bind address (127.0.0.1, ::1 or localhost)",
       "default": "127.0.0.1"
      },
      "db": {
@@ -8430,7 +8430,7 @@
       "accept_value": true,
       "is_value_required": false,
       "is_multiple": false,
-      "description": "Database driver (sqlite, mysql, pgsql)",
+      "description": "Bundled database driver (sqlite)",
       "default": "sqlite"
      },
      "help": {
@@ -8504,6 +8504,24 @@
       "is_multiple": false,
       "description": "Do not ask any interactive question",
       "default": false
+     },
+     "data-dir": {
+      "name": "--data-dir",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": true,
+      "is_multiple": false,
+      "description": "Directory for persistent local development data",
+      "default": null
+     },
+     "token": {
+      "name": "--token",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": true,
+      "is_multiple": false,
+      "description": "Development bearer token (defaults to dev-token)",
+      "default": null
      }
     }
    }
@@ -11896,7 +11914,7 @@
    "synopsis": "worker:register [-s|--server [SERVER]] [--namespace [NAMESPACE]] [--token [TOKEN]] [--tls-verify TLS-VERIFY] [--env ENV] [--output OUTPUT] [--task-queue TASK-QUEUE] [--runtime RUNTIME] [--sdk-version [SDK-VERSION]] [--build-id [BUILD-ID]] [--workflow-type [WORKFLOW-TYPE]] [--activity-type [ACTIVITY-TYPE]] [--max-workflow-tasks [MAX-WORKFLOW-TASKS]] [--max-activity-tasks [MAX-ACTIVITY-TASKS]] [--json] [--] [<worker-id>]",
    "aliases": [],
    "hidden": false,
-   "help": "Register a worker identity for direct worker-protocol diagnostics. Real SDK\nworkers register automatically; this command is useful when smoke-testing\ntask routing, leases, and workflow-task completion from the CLI.\n\nThe <comment>--build-id</comment> option names the compatibility marker this\ndiagnostic worker advertises as part of its supported set. Markers are\nopaque strings; the engine performs exact-string equality and the\nworkers-only <comment>*</comment> wildcard only, so a diagnostic worker\nregistered without <comment>--build-id</comment> sees only runs that were\nstamped with no required marker. Reserve the wildcard for single-build\nfleets and test harnesses \u2014 runs themselves are never stamped with\n<comment>*</comment>.\n\n<comment>Examples:</comment>\n\n  <info>dw worker:register cli-worker --task-queue=orders --workflow-type=orders.Checkout</info>\n  <info>dw worker:register py-worker --runtime=python --activity-type=email.send --json</info>\n  <info>dw worker:register cli-2026-04-17 --task-queue=orders --build-id=build-2026-04-17</info>",
+   "help": "Register a worker identity for direct worker-protocol diagnostics. Real SDK\nworkers register automatically; this command is useful when smoke-testing\ntask routing, leases, and workflow-task completion from the CLI.\n\nThe <comment>--build-id</comment> option names the compatibility marker this\ndiagnostic worker advertises as part of its supported set. Markers are\nopaque strings; the engine performs exact-string equality and the\nworkers-only <comment>*</comment> wildcard only, so a diagnostic worker\nregistered without <comment>--build-id</comment> sees only runs that were\nstamped with no required marker. Reserve the wildcard for single-build\nfleets and test harnesses — runs themselves are never stamped with\n<comment>*</comment>.\n\n<comment>Examples:</comment>\n\n  <info>dw worker:register cli-worker --task-queue=orders --workflow-type=orders.Checkout</info>\n  <info>dw worker:register py-worker --runtime=python --activity-type=email.send --json</info>\n  <info>dw worker:register cli-2026-04-17 --task-queue=orders --build-id=build-2026-04-17</info>",
    "definition": {
     "arguments": {
      "worker-id": {
@@ -13913,7 +13931,7 @@
    "synopsis": "workflow:repair [-s|--server [SERVER]] [--namespace [NAMESPACE]] [--token [TOKEN]] [--tls-verify TLS-VERIFY] [--env ENV] [--output OUTPUT] [--json] [--] <workflow-id>",
    "aliases": [],
    "hidden": false,
-   "help": "Ask the server to re-enqueue the workflow's next task if it has stalled\nbehind a lost worker or expired lease. Repair is engine-level recovery:\nit routes to the same decision set, does not duplicate history, and the\nexactly-once-at-commit guarantee still holds for the typed history rows\nthe decision batch writes. Safe to call on a healthy workflow \u2014 the\nserver will no-op.\n\n<comment>Examples:</comment>\n\n  <info>dw workflow:repair chk-42</info>\n  <info>dw workflow:repair chk-42 --json</info>",
+   "help": "Ask the server to re-enqueue the workflow's next task if it has stalled\nbehind a lost worker or expired lease. Repair is engine-level recovery:\nit routes to the same decision set, does not duplicate history, and the\nexactly-once-at-commit guarantee still holds for the typed history rows\nthe decision batch writes. Safe to call on a healthy workflow — the\nserver will no-op.\n\n<comment>Examples:</comment>\n\n  <info>dw workflow:repair chk-42</info>\n  <info>dw workflow:repair chk-42 --json</info>",
    "definition": {
     "arguments": {
      "workflow-id": {
@@ -14612,7 +14630,7 @@
       "accept_value": true,
       "is_value_required": true,
       "is_multiple": false,
-      "description": "Relative weight (1..1000) for the fairness class \u2014 higher weights claim a proportionally larger share of dispatch slots",
+      "description": "Relative weight (1..1000) for the fairness class — higher weights claim a proportionally larger share of dispatch slots",
       "default": null
      },
      "wait": {
@@ -14741,7 +14759,7 @@
    "synopsis": "workflow:terminate [-s|--server [SERVER]] [--namespace [NAMESPACE]] [--token [TOKEN]] [--tls-verify TLS-VERIFY] [--env ENV] [--output OUTPUT] [--reason [REASON]] [--run-id [RUN-ID]] [--json] [--] <workflow-id>",
    "aliases": [],
    "hidden": false,
-   "help": "Force-stop a workflow. Unlike <comment>workflow:cancel</comment>,\ntermination does not give the workflow a chance to clean up \u2014 use it\nfor runaway or unreachable workflows.\n\n<comment>Examples:</comment>\n\n  <info>dw workflow:terminate chk-42 --reason=\"runaway loop\"</info>\n  <info>dw workflow:terminate chk-42 --run-id=01HZ...</info>",
+   "help": "Force-stop a workflow. Unlike <comment>workflow:cancel</comment>,\ntermination does not give the workflow a chance to clean up — use it\nfor runaway or unreachable workflows.\n\n<comment>Examples:</comment>\n\n  <info>dw workflow:terminate chk-42 --reason=\"runaway loop\"</info>\n  <info>dw workflow:terminate chk-42 --run-id=01HZ...</info>",
    "definition": {
     "arguments": {
      "workflow-id": {
@@ -15322,7 +15340,7 @@
    "synopsis": "workflow-task:fail [-s|--server [SERVER]] [--namespace [NAMESPACE]] [--token [TOKEN]] [--tls-verify TLS-VERIFY] [--env ENV] [--output OUTPUT] [--lease-owner LEASE-OWNER] [-m|--message MESSAGE] [-t|--type [TYPE]] [--stack-trace [STACK-TRACE]] [--json] [--] <task-id> <attempt>",
    "aliases": [],
    "hidden": false,
-   "help": "Report a worker-side failure for the named workflow-task attempt through\nthe worker protocol. Workflow tasks are replayed deterministically,\nnot retried against application logic, so this records that the worker\ncould not durably commit the decision \u2014 the engine replays the same\nhistory into a fresh task. It is distinct from completing a task with\na workflow-level fail_workflow command, which writes WorkflowFailed\ninto the run.\n\n<comment>Examples:</comment>\n\n  <info>dw workflow-task:fail task-123 1 --lease-owner=cli-worker --message=\"replay mismatch\"</info>\n  <info>dw workflow-task:fail task-123 1 --message=\"bad command\" --type=NonDeterminism --stack-trace=trace.txt --json</info>",
+   "help": "Report a worker-side failure for the named workflow-task attempt through\nthe worker protocol. Workflow tasks are replayed deterministically,\nnot retried against application logic, so this records that the worker\ncould not durably commit the decision — the engine replays the same\nhistory into a fresh task. It is distinct from completing a task with\na workflow-level fail_workflow command, which writes WorkflowFailed\ninto the run.\n\n<comment>Examples:</comment>\n\n  <info>dw workflow-task:fail task-123 1 --lease-owner=cli-worker --message=\"replay mismatch\"</info>\n  <info>dw workflow-task:fail task-123 1 --message=\"bad command\" --type=NonDeterminism --stack-trace=trace.txt --json</info>",
    "definition": {
     "arguments": {
      "task-id": {

@@ -1,376 +1,351 @@
-#![cfg(unix)]
-
+//! The built dw starts a real native Server without any external executables.
+use serde_json::Value;
 use std::fs;
-use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
-use std::os::unix::process::CommandExt;
+use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::process::{Child, Command, Output, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{mpsc, Arc, Mutex};
+use std::thread::JoinHandle;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-static PROJECT_SEQUENCE: AtomicU64 = AtomicU64::new(0);
-
 struct Project(PathBuf);
-
 impl Project {
     fn new() -> Self {
-        let nonce = SystemTime::now()
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let sequence = PROJECT_SEQUENCE.fetch_add(1, Ordering::Relaxed);
         let root = std::env::temp_dir().join(format!(
-            "dw-dev-test-{}-{nonce}-{sequence}",
-            std::process::id()
+            "dw-native-dev-{}-{now}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
         ));
-        fs::DirBuilder::new().mode(0o700).create(&root).unwrap();
-        fs::create_dir(root.join("bin")).unwrap();
-        fs::write(root.join("artisan"), "fixture project\n").unwrap();
+        fs::create_dir(&root).unwrap();
+        fs::create_dir(root.join("empty-bin")).unwrap();
         Self(root)
     }
-
-    fn tool(&self, name: &str, body: &str) {
-        let path = self.0.join("bin").join(name);
-        fs::write(&path, format!("#!/bin/sh\n{body}\n")).unwrap();
-        fs::set_permissions(path, fs::Permissions::from_mode(0o700)).unwrap();
-    }
-
-    fn php(&self) {
-        self.tool(
-            "php",
-            &format!(
-                "{}\n{}",
-                SIGNAL_FIXTURE,
-                r#"
-printf '%s\n' "$@" > launch.args
-printf '%s' "$DB_CONNECTION" > launch.db
-if [ -f compose.started ]; then printf yes > compose.before; fi
-printf '<info>child stdout λ</info>\n'
-printf 'child stderr\n' >&2
-exit "${DW_DEV_PHP_EXIT:-0}"
-"#
-            ),
-        );
-    }
-
-    fn docker(&self) {
-        self.tool(
-            "docker",
-            &format!(
-                "{}\n{}",
-                SIGNAL_FIXTURE,
-                r#"
-printf '%s\n' "$@" > compose.args
-printf started > compose.started
-exit "${DW_DEV_DOCKER_EXIT:-0}"
-"#
-            ),
-        );
-    }
-
-    fn command(&self, args: &[&str]) -> Command {
+    fn command(&self, arguments: &[&str]) -> Command {
         let mut command = Command::new(env!("CARGO_BIN_EXE_dw"));
         command
-            .arg("server:start-dev")
-            .args(args)
+            .args(arguments)
             .current_dir(&self.0)
             .env_clear()
             .env("HOME", &self.0)
-            .env("DW_ENV", "missing-dev-test-profile")
-            .env("PATH", self.0.join("bin"))
+            .env("DW_CONFIG_HOME", self.0.join("config"))
+            .env("PATH", self.0.join("empty-bin"))
             .stdin(Stdio::null());
-        // Keep these tests independent of the test runner's own terminal.
-        unsafe {
-            command.pre_exec(|| {
-                if libc::setsid() < 0 {
-                    Err(std::io::Error::last_os_error())
-                } else {
-                    Ok(())
-                }
-            });
+        #[cfg(windows)]
+        {
+            // Windows' network and SQLite libraries need the OS directory,
+            // independent of PATH and any developer tools.
+            if let Some(root) = std::env::var_os("SystemRoot") {
+                command.env("SystemRoot", root);
+            }
         }
         command
     }
-
-    fn run(&self, args: &[&str], env: &[(&str, &str)]) -> Output {
-        let mut command = self.command(args);
-        command.envs(env.iter().copied());
-        wait(
-            command
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped())
-                .spawn()
-                .unwrap(),
-            Duration::from_secs(8),
-        )
+    fn run(&self, args: &[&str]) -> Output {
+        let child = self
+            .command(args)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        wait(child, Duration::from_secs(10))
+    }
+    fn client(&self, server: &DevServer, command: &[&str]) -> Value {
+        let mut args = command.to_vec();
+        args.extend([
+            "--server",
+            &server.url,
+            "--token=dev-token",
+            "--output=json",
+        ]);
+        let output = self.run(&args);
+        assert!(
+            output.status.success(),
+            "{}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        serde_json::from_slice(&output.stdout).unwrap()
     }
 }
-
 impl Drop for Project {
     fn drop(&mut self) {
-        if let Ok(pid) = fs::read_to_string(self.0.join("child.pid")) {
-            if let Ok(pid) = pid.trim().parse::<i32>() {
-                // Only the fixture's still-existing session may be cleaned up.
-                let descendant = fs::read_to_string(self.0.join("descendant.pid"))
-                    .ok()
-                    .and_then(|pid| pid.trim().parse::<i32>().ok());
-                if unsafe { libc::getpgid(pid) } == pid
-                    || descendant.is_some_and(|child| unsafe { libc::getpgid(child) } == pid)
-                {
-                    unsafe {
-                        libc::kill(-pid, libc::SIGKILL);
-                    }
-                }
-            }
-        }
         let _ = fs::remove_dir_all(&self.0);
     }
 }
 
-const SIGNAL_FIXTURE: &str = r#"
-if [ -n "$DW_DEV_SIGNAL_MODE" ]; then
-    trap 'printf 2 > received.signal; exit 0' INT
-    trap 'printf 15 > received.signal; exit 0' TERM
-    if [ "$DW_DEV_SIGNAL_MODE" = ignore ]; then trap '' INT TERM; fi
-    printf '%s' "$$" > child.pid
-    while :; do /bin/sleep 1; done
-fi
-"#;
-
-fn wait(mut child: Child, timeout: Duration) -> Output {
-    let deadline = Instant::now() + timeout;
+fn wait(mut child: Child, duration: Duration) -> Output {
+    let deadline = Instant::now() + duration;
     while child.try_wait().unwrap().is_none() {
         if Instant::now() >= deadline {
             let _ = child.kill();
             let _ = child.wait();
-            panic!("development process exceeded its test deadline");
+            panic!("dw exceeded test deadline");
         }
         std::thread::sleep(Duration::from_millis(10));
     }
     child.wait_with_output().unwrap()
 }
-
-fn recorded_pid(project: &Project, filename: &str) -> Option<i32> {
-    fs::read_to_string(project.0.join(filename))
-        .ok()?
-        .trim()
-        .parse()
-        .ok()
+struct DevServer {
+    child: Child,
+    url: String,
+    text: Arc<Mutex<String>>,
+    reader: Option<JoinHandle<()>>,
+}
+impl DevServer {
+    fn start(project: &Project, extra: &[&str]) -> Self {
+        let mut args = vec!["server:start-dev", "--port=0"];
+        args.extend(extra);
+        let mut child = project
+            .command(&args)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit())
+            .spawn()
+            .unwrap();
+        let stdout = child.stdout.take().unwrap();
+        let (ready, receiver) = mpsc::channel();
+        let text = Arc::new(Mutex::new(String::new()));
+        let captured = text.clone();
+        let reader = std::thread::spawn(move || {
+            for line in BufReader::new(stdout).lines() {
+                let Ok(line) = line else { break };
+                if let Some((_, url)) = line.split_once("listening on ") {
+                    let _ = ready.send(url.to_owned());
+                }
+                captured.lock().unwrap().push_str(&line);
+                captured.lock().unwrap().push('\n');
+            }
+        });
+        let url = match receiver.recv_timeout(Duration::from_secs(15)) {
+            Ok(url) => url,
+            Err(error) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                let _ = reader.join();
+                panic!("native startup failed: {error}: {}", text.lock().unwrap());
+            }
+        };
+        Self {
+            child,
+            url,
+            text,
+            reader: Some(reader),
+        }
+    }
+    fn stop(&mut self) -> i32 {
+        #[cfg(unix)]
+        unsafe {
+            libc::kill(self.child.id() as i32, libc::SIGTERM);
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = self.child.kill();
+        }
+        let deadline = Instant::now() + Duration::from_secs(8);
+        let code = loop {
+            if let Some(status) = self.child.try_wait().unwrap() {
+                break status.code().unwrap_or(1);
+            }
+            if Instant::now() >= deadline {
+                let _ = self.child.kill();
+                let _ = self.child.wait();
+                panic!("native shutdown exceeded deadline");
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        };
+        if let Some(reader) = self.reader.take() {
+            reader.join().unwrap();
+        }
+        code
+    }
+    fn get(&self, path: &str, token: Option<&str>) -> (u16, Value) {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime.block_on(async {
+            let client = reqwest::Client::builder()
+                .no_proxy()
+                .timeout(Duration::from_secs(3))
+                .build()
+                .unwrap();
+            let mut request = client.get(format!("{}{path}", self.url));
+            if let Some(token) = token {
+                request = request.bearer_auth(token);
+            }
+            let response = request.send().await.unwrap();
+            let status = response.status().as_u16();
+            let body = response.json().await.unwrap();
+            (status, body)
+        })
+    }
+}
+impl Drop for DevServer {
+    fn drop(&mut self) {
+        if self.child.try_wait().ok().flatten().is_none() {
+            let _ = self.child.kill();
+            let _ = self.child.wait();
+        }
+        if let Some(reader) = self.reader.take() {
+            let _ = reader.join();
+        }
+    }
 }
 
 #[test]
-fn validation_precedes_every_child_launch() {
+fn starts_in_an_empty_directory_with_bundled_sqlite_and_real_cli_admission() {
     let project = Project::new();
-    project.php();
-    project.docker();
-    for args in [
-        vec!["--port=0"],
+    let mut server = DevServer::start(&project, &[]);
+    assert_eq!(server.get("/api/health", None).0, 200);
+    let (status, ready) = server.get("/api/ready", None);
+    assert_eq!(status, 200);
+    assert_eq!(ready["development"], true);
+    assert_eq!(server.get("/api/cluster/info", None).0, 401);
+    let cluster = project.client(&server, &["server:info"]);
+    assert!(cluster.get("capabilities").is_some());
+    let started = project.client(
+        &server,
+        &[
+            "workflow:start",
+            "--type=dev.example",
+            "--workflow-id=dev-first",
+            "--input={}",
+        ],
+    );
+    assert!(started.to_string().contains("dev-first"));
+    let listed = project.client(&server, &["workflow:list"]);
+    assert!(listed.to_string().contains("dev-first"));
+    let described = project.client(&server, &["workflow:describe", "dev-first"]);
+    assert!(described.to_string().contains("dev-first"));
+    assert!(project
+        .0
+        .join("config/dev-server/database.sqlite")
+        .is_file());
+    assert!(!project.0.join("artisan").exists());
+    let code = server.stop();
+    #[cfg(unix)]
+    assert_eq!(code, 143);
+}
+
+#[test]
+fn restart_preserves_workflow_data_and_releases_the_directory_lock() {
+    let project = Project::new();
+    let directory = project.0.join("data with spaces");
+    let args = ["--data-dir", directory.to_str().unwrap()];
+    let mut first = DevServer::start(&project, &args);
+    project.client(
+        &first,
+        &[
+            "workflow:start",
+            "--type=dev.example",
+            "--workflow-id=keep-me",
+            "--input=null",
+        ],
+    );
+    let before = project.client(&first, &["workflow:describe", "keep-me"]);
+    first.stop();
+    let mut second = DevServer::start(&project, &args);
+    let after = project.client(&second, &["workflow:describe", "keep-me"]);
+    for name in ["workflow_id", "run_id", "workflow_type", "status"] {
+        assert_eq!(before[name], after[name], "{name}");
+    }
+    assert!(after.to_string().contains("keep-me"));
+    second.stop();
+}
+
+#[test]
+fn same_data_directory_cannot_start_two_runtimes() {
+    let project = Project::new();
+    let mut first = DevServer::start(&project, &[]);
+    let output = project.run(&["server:start-dev", "--port=0"]);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("already in use"));
+    assert_eq!(first.get("/api/ready", None).0, 200);
+    first.stop();
+}
+
+#[test]
+fn busy_port_refuses_before_creating_a_database() {
+    let project = Project::new();
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = format!("--port={}", listener.local_addr().unwrap().port());
+    let output = project.run(&["server:start-dev", &port]);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(!project.0.join("config/dev-server/database.sqlite").exists());
+}
+
+#[test]
+fn invalid_arguments_do_not_create_runtime_data() {
+    let project = Project::new();
+    for flags in [
         vec!["--port=65536"],
         vec!["--port=-1"],
         vec!["--port=8080.5"],
         vec!["--port"],
-        vec!["--db=unknown"],
+        vec!["--db=mysql"],
+        vec!["--db=pgsql"],
         vec!["--db"],
-        vec!["--host=http://localhost"],
+        vec!["--host=0.0.0.0"],
+        vec!["--host=example.test"],
         vec!["--host"],
+        vec!["--token="],
+        vec!["--data-dir="],
     ] {
-        let output = project.run(&args, &[]);
-        assert_eq!(output.status.code(), Some(2));
-        assert!(output.stderr.is_empty());
-        assert!(!project.0.join("launch.args").exists());
-        assert!(!project.0.join("compose.args").exists());
+        let mut args = vec!["server:start-dev"];
+        args.extend(flags);
+        let output = project.run(&args);
+        assert_eq!(
+            output.status.code(),
+            Some(2),
+            "{args:?}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(!project.0.join("config/dev-server").exists());
     }
 }
 
 #[test]
-fn missing_prerequisites_refuse_without_launching_http() {
+fn custom_token_is_enforced_and_is_not_printed() {
     let project = Project::new();
-    let output = project.run(&[], &[]);
-    assert_eq!(output.status.code(), Some(1));
-    assert!(String::from_utf8_lossy(&output.stdout).contains("external PHP executable"));
-    project.php();
-    let output = project.run(&["--db=mysql"], &[]);
-    assert_eq!(output.status.code(), Some(1));
-    assert!(String::from_utf8_lossy(&output.stdout).contains("Docker Compose is required"));
-    fs::remove_file(project.0.join("artisan")).unwrap();
-    let output = project.run(&[], &[]);
-    assert_eq!(output.status.code(), Some(1));
-    assert!(String::from_utf8_lossy(&output.stdout).contains("No readable artisan file"));
-    assert!(!project.0.join("launch.args").exists());
-}
-
-#[test]
-fn sqlite_forwards_arguments_and_merges_formatted_stdout_and_stderr() {
-    for host in ["127.0.0.1", "localhost", "0.0.0.0", "::1"] {
-        let project = Project::new();
-        project.php();
-        let output = project.run(&["--port=09090", &format!("--host={host}")], &[]);
-        assert!(output.status.success());
-        assert!(output.stderr.is_empty());
-        assert_eq!(
-            fs::read_to_string(project.0.join("launch.args")).unwrap(),
-            format!("artisan\nserve\n--no-reload\n--port=09090\n--host={host}\n")
-        );
-        assert_eq!(
-            fs::read_to_string(project.0.join("launch.db")).unwrap(),
-            "sqlite"
-        );
-        assert!(String::from_utf8_lossy(&output.stdout).ends_with("child stdout λ\nchild stderr\n"));
-    }
-}
-
-#[test]
-fn compose_must_succeed_before_http_and_both_child_exit_codes_are_preserved() {
-    for db in ["mysql", "pgsql"] {
-        let project = Project::new();
-        project.php();
-        project.docker();
-        let output = project.run(&[&format!("--db={db}")], &[("DW_DEV_DOCKER_EXIT", "17")]);
-        assert_eq!(output.status.code(), Some(17));
-        assert!(!project.0.join("launch.args").exists());
-        assert!(!String::from_utf8_lossy(&output.stdout).contains("Starting Laravel HTTP server"));
-        let output = project.run(&[&format!("--db={db}")], &[("DW_DEV_PHP_EXIT", "42")]);
-        assert_eq!(output.status.code(), Some(42));
-        assert_eq!(
-            fs::read_to_string(project.0.join("compose.args")).unwrap(),
-            format!("compose\nup\n-d\n{db}\nredis\n")
-        );
-        assert_eq!(fs::read_to_string(project.0.join("launch.db")).unwrap(), db);
-        assert_eq!(
-            fs::read_to_string(project.0.join("compose.before")).unwrap(),
-            "yes"
-        );
-        assert!(String::from_utf8_lossy(&output.stdout).contains("Laravel HTTP process failed"));
-    }
-}
-
-#[test]
-fn quiet_suppresses_child_output_without_changing_its_exit_status() {
-    let project = Project::new();
-    project.php();
-    let output = project.run(&["-q"], &[("DW_DEV_PHP_EXIT", "42")]);
-    assert_eq!(output.status.code(), Some(42));
-    assert!(output.stdout.is_empty() && output.stderr.is_empty());
-}
-
-fn interrupt(db: &str, signal: i32, ignore: bool, second: bool) {
-    let project = Project::new();
-    project.php();
-    project.docker();
-    let mut command = project.command(&[&format!("--db={db}")]);
-    command.env("DW_DEV_SIGNAL_MODE", if ignore { "ignore" } else { "wait" });
-    let mut child = command
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .unwrap();
-    let start_deadline = Instant::now() + Duration::from_secs(5);
-    while recorded_pid(&project, "child.pid").is_none() {
-        assert!(
-            child.try_wait().unwrap().is_none(),
-            "CLI stopped before child startup"
-        );
-        if Instant::now() >= start_deadline {
-            let _ = child.kill();
-            let _ = child.wait();
-            panic!("fixture child did not start");
-        }
-        std::thread::sleep(Duration::from_millis(10));
-    }
-    let started = Instant::now();
-    assert_eq!(unsafe { libc::kill(child.id() as i32, signal) }, 0);
-    if second {
-        std::thread::sleep(Duration::from_secs(2));
-        assert_eq!(unsafe { libc::kill(child.id() as i32, libc::SIGTERM) }, 0);
-    }
-    let output = wait(child, Duration::from_secs(7));
-    assert_eq!(output.status.code(), Some(128 + signal));
-    let pid: i32 = fs::read_to_string(project.0.join("child.pid"))
+    let mut server = DevServer::start(&project, &["--token=synthetic-custom-token"]);
+    assert_eq!(server.get("/api/cluster/info", Some("dev-token")).0, 401);
+    assert_eq!(
+        server
+            .get("/api/cluster/info", Some("synthetic-custom-token"))
+            .0,
+        200
+    );
+    server.stop();
+    assert!(!server
+        .text
+        .lock()
         .unwrap()
-        .trim()
-        .parse()
-        .unwrap();
-    assert_ne!(
-        unsafe { libc::kill(pid, 0) },
-        0,
-        "managed child survived interruption"
-    );
-    if db == "mysql" {
-        assert!(!String::from_utf8_lossy(&output.stdout).contains("Starting Laravel HTTP server"));
-    }
-    if ignore {
-        assert!(!project.0.join("received.signal").exists());
-        assert!(started.elapsed() >= Duration::from_secs(5));
-        assert!(started.elapsed() < Duration::from_millis(6500));
-    } else {
-        assert_eq!(
-            fs::read_to_string(project.0.join("received.signal")).unwrap(),
-            signal.to_string()
-        );
-    }
+        .contains("synthetic-custom-token"));
 }
 
+#[cfg(unix)]
 #[test]
-fn sigint_and_sigterm_are_forwarded_during_compose_and_http() {
-    for db in ["sqlite", "mysql"] {
-        for signal in [libc::SIGINT, libc::SIGTERM] {
-            interrupt(db, signal, false, false);
-        }
-    }
-}
-
-#[test]
-fn an_ignored_signal_cannot_keep_children_alive_past_five_seconds() {
-    interrupt("sqlite", libc::SIGTERM, true, false);
-}
-
-#[test]
-fn a_second_interrupt_preserves_the_first_signal_and_cleanup_deadline() {
-    interrupt("sqlite", libc::SIGINT, true, true);
-}
-
-#[test]
-fn interruption_still_stops_descendants_while_the_output_pipe_drains() {
+fn sigint_closes_http_and_allows_immediate_restart() {
     let project = Project::new();
-    project.tool(
-        "php",
-        r#"
-printf '%s' "$$" > child.pid
-/bin/sh -c 'trap "exit 0" TERM; printf "%s" "$$" > descendant.pid; while :; do /bin/sleep 1; done' &
-exit 0
-"#,
-    );
-    let mut child = project
-        .command(&[])
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .unwrap();
-    let deadline = Instant::now() + Duration::from_secs(3);
-    while recorded_pid(&project, "descendant.pid").is_none() {
-        if Instant::now() >= deadline {
-            let _ = child.kill();
-            let _ = child.wait();
-            panic!("descendant did not start");
+    let mut server = DevServer::start(&project, &[]);
+    unsafe {
+        libc::kill(server.child.id() as i32, libc::SIGINT);
+    }
+    let deadline = Instant::now() + Duration::from_secs(8);
+    loop {
+        if let Some(status) = server.child.try_wait().unwrap() {
+            assert_eq!(status.code(), Some(130));
+            break;
         }
+        assert!(Instant::now() < deadline);
         std::thread::sleep(Duration::from_millis(10));
     }
-    assert!(child.try_wait().unwrap().is_none());
-    assert_eq!(unsafe { libc::kill(child.id() as i32, libc::SIGTERM) }, 0);
-    let output = wait(child, Duration::from_secs(7));
-    assert_eq!(output.status.code(), Some(143));
-    let pid: i32 = fs::read_to_string(project.0.join("descendant.pid"))
-        .unwrap()
-        .trim()
-        .parse()
-        .unwrap();
-    let deadline = Instant::now() + Duration::from_secs(1);
-    while unsafe { libc::kill(pid, 0) } == 0 && Instant::now() < deadline {
-        std::thread::sleep(Duration::from_millis(10));
-    }
-    assert_ne!(
-        unsafe { libc::kill(pid, 0) },
-        0,
-        "descendant survived interruption"
-    );
+    let mut restarted = DevServer::start(&project, &[]);
+    assert_eq!(restarted.get("/api/ready", None).0, 200);
+    restarted.stop();
 }

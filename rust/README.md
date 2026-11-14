@@ -110,7 +110,7 @@ compatibility check, without a request, as 2.x reports it.
 
 ## Build and test
 
-Requires Rust 1.86 or newer.
+Requires Rust 1.99 or newer, including the bundled native development Server.
 
 ```bash
 cargo test --locked

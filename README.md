@@ -43,6 +43,28 @@ See the [distribution guide](docs/distribution.md) for exact-version installs,
 direct downloads, checksum and attestation verification, Homebrew, and
 reproducible builds.
 
+## Start a local Server
+
+The native CLI includes a development Server and SQLite. Installing `dw` is
+all you need to start the runtime:
+
+```bash
+dw server:start-dev
+```
+
+It listens on `127.0.0.1:8080`, initializes the database and default namespace,
+and runs timers and maintenance. In another terminal, connect the CLI:
+
+```bash
+dw env:set local --server=http://127.0.0.1:8080 --token=dev-token --make-default
+dw doctor
+```
+
+Data persists in `dev-server` under the CLI config directory. Use
+`--data-dir=./workflow-data` to choose a directory or `--port=9000` to choose a
+port. Ctrl+C stops the runtime and preserves its data. Application workers
+still run your workflow and activity code through an SDK.
+
 ## Connect
 
 Named profiles keep a runtime URL, namespace, token source, TLS policy, and

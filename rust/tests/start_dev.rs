@@ -356,3 +356,64 @@ fn sigint_closes_http_and_allows_immediate_restart() {
     assert_eq!(restarted.get("/api/ready", None).0, 200);
     restarted.stop();
 }
+
+#[test]
+fn actual_sdk_worker_completes_a_workflow_after_a_durable_timer() {
+    use durable_workflow::{Client, Worker, WorkflowResultOptions};
+    let project = Project::new();
+    let mut server = DevServer::start(&project, &[]);
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    runtime.block_on(async {
+        let client = Client::builder(server.url.clone())
+            .token(Some("dev-token".into()))
+            .build()
+            .unwrap();
+        let mut worker = Worker::new(client.clone(), "cli-dev-test")
+            .worker_id("cli-dev-worker")
+            .poll_timeout(Duration::ZERO);
+        worker.register_typed_workflow("cli.dev.timer", |ctx, value: i64| async move {
+            ctx.sleep(Duration::from_secs(1)).await?;
+            Ok(value + 1)
+        });
+        worker.register().await.unwrap();
+        let handle = client
+            .start_workflow("cli.dev.timer", "cli-dev-test", "sdk-timer", 41)
+            .await
+            .unwrap();
+        tokio::time::timeout(Duration::from_secs(15), async {
+            loop {
+                worker.run_once().await.unwrap();
+                if handle.describe().await.unwrap().is_terminal() {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        })
+        .await
+        .expect("embedded runtime did not fire its timer and complete the workflow");
+        let result: i64 = handle
+            .result_typed(WorkflowResultOptions {
+                poll_interval: Duration::from_millis(20),
+                timeout: Duration::from_secs(2),
+            })
+            .await
+            .unwrap();
+        assert_eq!(result, 42);
+        worker.run_until(async {}).await.unwrap();
+    });
+    let description = project.client(&server, &["workflow:describe", "sdk-timer"]);
+    assert_eq!(description["status"], "completed");
+    let history = project.client(
+        &server,
+        &[
+            "workflow:history",
+            "sdk-timer",
+            description["run_id"].as_str().unwrap(),
+        ],
+    );
+    assert!(history.to_string().contains("TimerFired"));
+    server.stop();
+}

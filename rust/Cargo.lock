@@ -56,7 +56,7 @@ dependencies = [
 [[package]]
 name = "apache-avro"
 version = "0.22.0"
-source = "git+https://github.com/durable-workflow/server?rev=b6e04ce7e679464e91f6ceae83310d3bb3204092#b6e04ce7e679464e91f6ceae83310d3bb3204092"
+source = "git+https://github.com/durable-workflow/server?rev=63cea4854ec6ebe56ab1603b014e246b907aedc0#63cea4854ec6ebe56ab1603b014e246b907aedc0"
 dependencies = [
  "bigdecimal",
  "bon",
@@ -486,7 +486,7 @@ dependencies = [
 [[package]]
 name = "durable-workflow-server"
 version = "0.0.0"
-source = "git+https://github.com/durable-workflow/server?rev=b6e04ce7e679464e91f6ceae83310d3bb3204092#b6e04ce7e679464e91f6ceae83310d3bb3204092"
+source = "git+https://github.com/durable-workflow/server?rev=63cea4854ec6ebe56ab1603b014e246b907aedc0#63cea4854ec6ebe56ab1603b014e246b907aedc0"
 dependencies = [
  "apache-avro 0.22.0",
  "axum",
@@ -2014,7 +2014,7 @@ dependencies = [
 [[package]]
 name = "sqlx-mysql"
 version = "0.9.0"
-source = "git+https://github.com/durable-workflow/server?rev=b6e04ce7e679464e91f6ceae83310d3bb3204092#b6e04ce7e679464e91f6ceae83310d3bb3204092"
+source = "git+https://github.com/durable-workflow/server?rev=63cea4854ec6ebe56ab1603b014e246b907aedc0#63cea4854ec6ebe56ab1603b014e246b907aedc0"
 dependencies = [
  "bitflags",
  "byteorder",
@@ -2040,7 +2040,7 @@ dependencies = [
 [[package]]
 name = "sqlx-postgres"
 version = "0.9.0"
-source = "git+https://github.com/durable-workflow/server?rev=b6e04ce7e679464e91f6ceae83310d3bb3204092#b6e04ce7e679464e91f6ceae83310d3bb3204092"
+source = "git+https://github.com/durable-workflow/server?rev=63cea4854ec6ebe56ab1603b014e246b907aedc0#63cea4854ec6ebe56ab1603b014e246b907aedc0"
 dependencies = [
  "atoi",
  "base64 0.22.1",

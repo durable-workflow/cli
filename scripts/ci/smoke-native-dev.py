@@ -10,6 +10,7 @@ import signal
 import subprocess
 import tempfile
 import threading
+import time
 
 
 def start(binary, root, environment):
@@ -57,7 +58,7 @@ def stop(process, reader):
         raise RuntimeError(f'development Server shutdown returned {process.returncode}')
 
 
-def readiness(port):
+def readiness(port, expected_status=200):
     # Fixed numeric loopback destination. Proxy/environment settings and a
     # runtime-provided URL cannot redirect the acceptance requests elsewhere.
     connection = http.client.HTTPConnection('127.0.0.1', port, timeout=5)
@@ -65,8 +66,11 @@ def readiness(port):
         connection.request('GET', '/api/ready')
         response = connection.getresponse()
         body = response.read(65536)
-        if response.status != 200 or json.loads(body).get('development') is not True:
-            raise RuntimeError('embedded development Server is not ready')
+        document = json.loads(body)
+        if response.status != expected_status or document.get('development') is not True:
+            raise RuntimeError('unexpected development Server readiness')
+        if expected_status == 503 and b'storage_admission_unavailable' not in body:
+            raise RuntimeError('unsupported file admission did not fail closed')
     finally:
         connection.close()
 
@@ -119,7 +123,19 @@ def main():
                 raise RuntimeError('workflow did not survive restart')
         finally:
             stop(process, reader)
-    print('Built-in native Server: empty PATH, readiness, workflow admission and restart persistence PASS')
+        observation = root/'observation.json'
+        observation.write_text(json.dumps({'schema':'durable-workflow.storage-pressure.v1',
+            'source':'cli-asset-test', 'state':'normal', 'observed_at':int(time.time())}))
+        observation.chmod(0o600)
+        configured = {**environment, 'DW_STORAGE_ADMISSION_FILE':str(observation),
+                      'DW_STORAGE_ADMISSION_SOURCE':'cli-asset-test',
+                      'DW_STORAGE_ADMISSION_MAX_AGE_SECONDS':'300'}
+        process, reader, port = start(binary, root, configured)
+        try:
+            readiness(port, 200 if os.name == 'posix' else 503)
+        finally:
+            stop(process, reader)
+    print('Built-in native Server: empty PATH, readiness, workflow admission, restart and platform admission PASS')
 
 
 if __name__ == '__main__':

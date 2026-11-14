@@ -32,3 +32,13 @@ through those mounts. A disposable-source control attempts direct launcher
 writes, wrapper unlink/replacement and rename, then invokes the next host PHP
 entry. The container test cells depend on the accepted central policy before
 executing a changed runtime source.
+
+The Rust source-reference caller has a separate `reference.ini` profile with
+unlimited PHP memory, UTC, PHAR writes disabled and CLI OPcache disabled. Its
+launcher exposes only `rust/target/php-vectors.json` as writable under the Rust
+build tree. Compiled binaries, source and host controls stay read-only. Parity
+config directories live in private temporary data; only `DW_CONFIG_HOME` and
+build identity fields needed by the source reference cross that boundary.
+Run `prepare-php-reference-container.sh CONFIG_ID PRIVATE_STATE` to check an
+already-inspected image, or the setup script to build the pinned runtime. The
+proposed caller fixture preserves the original vector, Cargo and parity commands.

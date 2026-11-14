@@ -19,6 +19,18 @@ generated="$tree/src/GeneratedBuildInfo.php"
 [[ ! -L "$generated" ]]
 if [[ ! -e "$generated" ]]; then (set -o noclobber; : > "$generated"); fi
 [[ -f "$generated" && -O "$generated" && -n "$(find "$generated" -prune -type f -links 1)" ]]
+# Input mtimes alone do not pin the archive metadata under the container
+# runtime. Box supports one explicit timestamp for every PHAR entry.
+python3 -I -S -B - "$tree/box.json.dist" "$tree/box.json" "${SOURCE_DATE_EPOCH:?SOURCE_DATE_EPOCH is required}" <<'PYCONFIG'
+import json,os,re,sys
+configuration=json.load(open(sys.argv[1]))
+assert re.fullmatch(r'[0-9]{1,12}',sys.argv[3],flags=re.ASCII)
+configuration['timestamp']='@'+sys.argv[3]
+fd=os.open(sys.argv[2],os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o400)
+with os.fdopen(fd,'w') as output:
+    json.dump(configuration,output,indent=4)
+    output.write('\n')
+PYCONFIG
 # The existing launcher queries the Git directory. This empty metadata is not
 # a source revision and is excluded from the PHAR; build identity stays explicit.
 [[ ! -e "$tree/.git" && ! -L "$tree/.git" ]]

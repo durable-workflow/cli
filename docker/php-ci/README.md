@@ -50,3 +50,8 @@ tree at a time; PHP sees that tree read-only with only vendor, build and the
 generated build-info file writable. Other trees and the compared PHAR copy
 are not mounted. The original build script's mutable Box cache path is
 routed through the existing guard and read-only pinned Box artifact.
+
+The prepared caller is `scripts/ci/verify-php-reproducible-build.sh`; the
+ordinary local script is unchanged. Each host-prepared tree receives a
+read-only Box configuration with its timestamp set from `SOURCE_DATE_EPOCH`.
+This pins PHAR metadata as well as the original input-file normalization.

@@ -23,6 +23,7 @@ def fixture(parent, predecessor=False):
         (root/'scripts/ci'/name).chmod((ROOT/'scripts/ci'/name).stat().st_mode & 0o777)
     (root/'docker/php-ci/phar.ini').write_bytes((ROOT/'docker/php-ci/phar.ini').read_bytes())
     (root/'src/GeneratedBuildInfo.php').touch()
+    (root/'box.json.dist').write_bytes((ROOT/'box.json.dist').read_bytes())
     (root/'scripts/build.sh').write_text('synthetic archived control')
     subprocess.run(['git', 'init', '--quiet', str(root)], check=True)
     attempt = runner/'dw-cli-repro.fixture'
@@ -37,7 +38,7 @@ def fixture(parent, predecessor=False):
         (state/'profile'/name).symlink_to(root/'scripts/ci/run-php-phar-container.sh')
     environment = {'PATH':os.defpath, 'CLI_PHP_CI_ROOT':str(root), 'CLI_PHP_CI_STATE':str(state),
                    'CLI_PHP_CI_IMAGE':'sha256:'+'f'*64, 'CLI_PHP_CI_REPRO':'1', 'RUNNER_TEMP':str(runner),
-                   'TMPDIR':str(state/'tmp'), 'CLI_TEST_ATTEMPT':str(attempt)}
+                   'TMPDIR':str(state/'tmp'), 'CLI_TEST_ATTEMPT':str(attempt), 'SOURCE_DATE_EPOCH':'1234567890'}
     subprocess.run(['bash', str(root/'scripts/ci/prepare-php-repro-tree.sh'), str(tree)],
                    env=environment, check=True, capture_output=True, timeout=10)
     if predecessor:
@@ -98,6 +99,15 @@ class ReproLauncherTests(unittest.TestCase):
             result, _, _, _ = self.invoke(mutate=mutation)
             self.assertNotEqual(0, result.returncode)
             self.assertEqual('', result.stdout)
+
+    def test_prepared_box_config_pins_time_and_preserves_source_settings(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root,_state,tree,_env=fixture(Path(directory))
+            source=json.loads((root/'box.json.dist').read_text())
+            prepared=json.loads((tree/'box.json').read_text())
+            self.assertEqual('@1234567890',prepared.pop('timestamp'))
+            self.assertEqual(source,prepared)
+            self.assertEqual(0o400,(tree/'box.json').stat().st_mode & 0o777)
 
     def test_tree_preparation_refuses_linked_or_shared_runtime_storage(self):
         with tempfile.TemporaryDirectory() as directory:

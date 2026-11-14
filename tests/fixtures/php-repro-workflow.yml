@@ -32,4 +32,4 @@ jobs:
       - name: Verify actual Composer dependency trust
         uses: durable-workflow/.github/.github/actions/verify-composer-trust@75587fc33ff40c34f32ef777293dad56bb6f48c7  # clean-trust
       - name: Verify dw.phar reproduces bit-for-bit
-        run: scripts/verify-reproducible-build.sh
+        run: scripts/ci/verify-php-reproducible-build.sh

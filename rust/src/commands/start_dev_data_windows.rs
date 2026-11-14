@@ -52,7 +52,7 @@ impl Drop for Token {
 
 fn sid_text(sid: PSID) -> io::Result<String> {
     let mut text = null_mut();
-    if unsafe { ConvertSidToStringSidW(sid, &mut text) } == 0 {
+    if unsafe { ConvertSidToStringSidW(sid, &mut text) } == 0 || text.is_null() {
         return Err(io::Error::last_os_error());
     }
     let _allocation = Local(text.cast());
@@ -75,7 +75,7 @@ fn current_user() -> io::Result<String> {
     unsafe {
         GetTokenInformation(token.0, TokenUser, null_mut(), 0, &mut size);
     }
-    if size == 0 {
+    if (size as usize) < size_of::<TOKEN_USER>() {
         return Err(io::Error::last_os_error());
     }
     let mut buffer = vec![0_usize; (size as usize).div_ceil(size_of::<usize>())];
@@ -88,6 +88,8 @@ fn current_user() -> io::Result<String> {
             &mut size,
         )
     } == 0
+        || (size as usize) < size_of::<TOKEN_USER>()
+        || size as usize > buffer.len() * size_of::<usize>()
     {
         return Err(io::Error::last_os_error());
     }
@@ -191,13 +193,19 @@ fn private(file: &File, directory: bool) -> io::Result<()> {
     }
     for index in 0..unsafe { (*acl).AceCount } {
         let mut ace = null_mut();
-        if unsafe { GetAce(acl, u32::from(index), &mut ace) } == 0 {
+        if unsafe { GetAce(acl, u32::from(index), &mut ace) } == 0 || ace.is_null() {
             return Err(io::Error::last_os_error());
         }
         let header = unsafe { &*ace.cast::<ACE_HEADER>() };
+        if usize::from(header.AceSize) < size_of::<ACE_HEADER>() {
+            return Err(refused());
+        }
         match header.AceType {
             0 => {
                 // ACCESS_ALLOWED_ACE_TYPE
+                if usize::from(header.AceSize) < size_of::<ACCESS_ALLOWED_ACE>() {
+                    return Err(refused());
+                }
                 let allowed = unsafe { &*ace.cast::<ACCESS_ALLOWED_ACE>() };
                 let sid = sid_text((&allowed.SidStart as *const u32).cast_mut().cast())?;
                 if sid != user && sid != "S-1-5-18" && sid != "S-1-5-32-544" {

@@ -247,15 +247,76 @@ fn human_output_exposes_unknown_reasons_and_live_counts() {
 }
 
 #[test]
-fn filtered_empty_page_retains_unfiltered_unknown_counts() {
+fn later_filtered_empty_page_retains_unfiltered_unknown_counts() {
     let mut body = page();
     body["state"] = json!("legacy");
     body["runs"] = json!([]);
     body["returned_count"] = json!(0);
     let server = Server::new(info(), Reply::Json(200, body.clone()));
     let mut query = args();
-    query.extend(["--state=legacy", "--output=jsonl"]);
+    query.extend(["--state=legacy", "--cursor=after-legacy", "--output=jsonl"]);
     assert_eq!(success(&Scratch::new().run(&server, &query)), body);
+}
+
+#[test]
+fn first_filtered_empty_page_requires_zero_selected_count() {
+    let scratch = Scratch::new();
+    for legacy in [0, 1] {
+        let mut body = page();
+        body["state"] = json!("legacy");
+        body["runs"] = json!([]);
+        body["returned_count"] = json!(0);
+        body["counts"] = json!({"total":5, "legacy":legacy, "current":2-legacy, "unknown":3});
+        let server = Server::new(info(), Reply::Json(200, body.clone()));
+        let mut query = args();
+        query.extend(["--state=legacy", "--output=json"]);
+        let output = scratch.run(&server, &query);
+        if legacy == 0 {
+            assert_eq!(success(&output), body);
+        } else {
+            assert_failed(&output);
+        }
+    }
+}
+
+#[test]
+fn truncated_first_terminal_pages_cannot_report_success() {
+    let scratch = Scratch::new();
+    for mode in ["--output=json", "--output=jsonl"] {
+        let mut body = page();
+        body["runs"].as_array_mut().unwrap().pop();
+        body["returned_count"] = json!(4);
+        let server = Server::new(info(), Reply::Json(200, body.clone()));
+        let mut query = args();
+        query.push(mode);
+        assert_failed(&scratch.run(&server, &query));
+        // Later terminal pages cannot infer preceding cardinality from an
+        // opaque cursor. Keep that valid live-page behavior available.
+        query.push("--cursor=prior-opaque");
+        assert_eq!(success(&scratch.run(&server, &query)), body);
+    }
+}
+
+#[test]
+fn continuation_pages_must_fill_the_requested_limit() {
+    let scratch = Scratch::new();
+    for limit in [5, 50] {
+        let mut body = page();
+        body["counts"] = json!({"total":100,"legacy":1,"current":1,"unknown":98});
+        body["limit"] = json!(limit);
+        body["has_more"] = json!(true);
+        body["next_cursor"] = json!("next-opaque");
+        let server = Server::new(info(), Reply::Json(200, body.clone()));
+        let limit_arg = format!("--limit={limit}");
+        let mut query = args();
+        query.extend([&limit_arg, "--output=json"]);
+        let output = scratch.run(&server, &query);
+        if limit == 5 {
+            assert_eq!(success(&output), body);
+        } else {
+            assert_failed(&output);
+        }
+    }
 }
 
 #[test]

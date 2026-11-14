@@ -250,6 +250,18 @@ impl Page {
         {
             return Err(invalid_response("counts or page length"));
         }
+        let selected = query
+            .state
+            .map_or(page.counts.total, |state| page.counts.for_state(state));
+        if (query.cursor.is_none()
+            && !page.has_more
+            && u64::try_from(page.returned_count).ok() != Some(selected))
+            || (page.has_more && page.returned_count != usize::from(query.limit))
+        {
+            return Err(invalid_response(
+                "incomplete first page or continuation page",
+            ));
+        }
         let bound = page.through_run_id.as_deref();
         if bound == Some("")
             || (bound.is_none()

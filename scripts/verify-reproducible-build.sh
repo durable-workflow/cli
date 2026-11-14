@@ -17,7 +17,14 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-ATTEMPT_DIR="$(mktemp -d "${TMPDIR:-/tmp}/dw-cli-repro.XXXXXX")"
+if [[ -n "${CLI_PHP_CI_REPRO:-}" ]]; then
+    [[ "$CLI_PHP_CI_REPRO" = 1 && "${CLI_PHP_CI_ROOT:-}" = "$ROOT" ]] || exit 1
+    # Archive controls and the compared artifacts must stay outside PHP's
+    # writable temporary data. Each invocation mounts only its selected tree.
+    ATTEMPT_DIR="$(mktemp -d "${RUNNER_TEMP:?RUNNER_TEMP is required}/dw-cli-repro.XXXXXX")"
+else
+    ATTEMPT_DIR="$(mktemp -d "${TMPDIR:-/tmp}/dw-cli-repro.XXXXXX")"
+fi
 FIRST_TREE="$ATTEMPT_DIR/source.1"
 SECOND_TREE="$ATTEMPT_DIR/source.2"
 
@@ -81,6 +88,9 @@ create_source_tree() {
 
     mkdir -p "$tree"
     git -C "$ROOT" archive --format=tar "$SOURCE_COMMIT" | tar -xf - -C "$tree"
+    if [[ "${CLI_PHP_CI_REPRO:-}" = 1 ]]; then
+        bash "$ROOT/scripts/ci/prepare-php-repro-tree.sh" "$tree"
+    fi
 }
 
 build_attempt() {

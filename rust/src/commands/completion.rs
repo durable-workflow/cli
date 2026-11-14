@@ -678,7 +678,7 @@ fn run_complete(input: &Input) -> Result<i32, String> {
     if let Some(version) = version {
         if crate::compat::version::php_version_compare(version, COMPLETION_API_VERSION) < 0 {
             let message = format!("Completion script version is not supported (\"{version}\" given, \">={COMPLETION_API_VERSION}\" required).");
-            log(&[message.clone()])?;
+            log(std::slice::from_ref(&message))?;
             writeln_out(&format!("{message} Install the Symfony completion script again by using the \"completion\" command."));
             return Ok(126);
         }

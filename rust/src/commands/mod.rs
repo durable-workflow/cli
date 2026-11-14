@@ -14,6 +14,7 @@ pub mod schema;
 pub mod search_attribute;
 pub mod server;
 pub mod start_dev;
+mod start_dev_data;
 pub mod system;
 pub mod task_queue;
 pub mod upgrade;

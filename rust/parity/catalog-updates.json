@@ -417,5 +417,247 @@
    "reference": "Start a workflow by type. The server accepts JSON input, memo, and\nsearch attributes. With <comment>--wait</comment> the command blocks until\nthe workflow reaches a terminal state and exits with\n<comment>SUCCESS (0)</comment> on completion or <comment>FAILURE (1)</comment> on\nfailure / cancellation / termination.\n\nStart commands are deduped by <comment>workflow_command_id</comment>. If the\ncaller retries after a network error it must send the same command id so\nthe engine recognises the retry. The <comment>--duplicate-policy</comment>\noption controls what happens when a second start targets an existing\n<comment>workflow_instance_id</comment> (e.g. <comment>reject_duplicate</comment>\nreturns a duplicate outcome, <comment>return_existing_active</comment>\nreturns the existing active run's identity).\n\nThe new run is pinned to the starter process's compatibility marker\n(<comment>DW_V2_CURRENT_COMPATIBILITY</comment>) exactly once at start. Retry\nruns, continue-as-new runs, and child workflows inherit that marker so the\nrun stays inside one compatibility family for its whole lifecycle. Only\nworkers whose <comment>DW_V2_SUPPORTED_COMPATIBILITIES</comment> set includes\nthe run's marker (or the workers-only <comment>*</comment> wildcard) will\nclaim the run's tasks; any other worker rejects the claim at claim time\nwith <comment>compatibility_blocked</comment> or\n<comment>compatibility_unsupported</comment> and the task stays on the queue\nfor a compatible worker to pick up.\n\n<comment>Examples:</comment>\n\n  # Start with no input\n  <info>dw workflow:start --type=orders.Checkout</info>\n\n  # Start with JSON input and a custom workflow id\n  <info>dw workflow:start -t orders.Checkout -w chk-42 -i '{\"order_id\":42}'</info>\n\n  # Start, then wait for terminal state\n  <info>dw workflow:start -t orders.Checkout -i '{\"order_id\":42}' --wait</info>\n\n  # Start with search attributes for visibility filters\n  <info>dw workflow:start -t orders.Checkout --search-attr env=prod --search-attr tier=gold</info>",
    "candidate": "Start a workflow by type. The server accepts JSON input, memo, and\nsearch attributes. With <comment>--wait</comment> the command blocks until\nthe workflow reaches a terminal state and exits with\n<comment>SUCCESS (0)</comment> on completion or <comment>FAILURE (1)</comment> on\nfailure / cancellation / termination.\n\n<comment>Examples:</comment>\n\n  # Start with no input\n  <info>dw workflow:start --type=orders.Checkout</info>\n\n  # Start with JSON input and a custom workflow id\n  <info>dw workflow:start -t orders.Checkout -w chk-42 -i '{\"order_id\":42}'</info>\n\n  # Start, then wait for terminal state\n  <info>dw workflow:start -t orders.Checkout -i '{\"order_id\":42}' --wait</info>\n\n  # Start with search attributes for visibility filters\n  <info>dw workflow:start -t orders.Checkout --search-attr env=prod --search-attr tier=gold</info>\n\n  # Print the start response as JSON\n  <info>dw workflow:start --type=orders.Checkout --output=json</info>\n\nUse <comment>--output=json</comment> for JSON. <comment>--json</comment> is its alias.\n\n<comment>Advanced behavior:</comment>\n\nStart commands are deduped by <comment>workflow_command_id</comment>. If the\ncaller retries after a network error it must send the same command id so\nthe engine recognises the retry. The <comment>--duplicate-policy</comment>\noption controls what happens when a second start targets an existing\n<comment>workflow_instance_id</comment> (e.g. <comment>reject_duplicate</comment>\nreturns a duplicate outcome, <comment>return_existing_active</comment>\nreturns the existing active run's identity).\n\nThe new run is pinned to the starter process's compatibility marker\n(<comment>DW_V2_CURRENT_COMPATIBILITY</comment>) exactly once at start. Retry\nruns, continue-as-new runs, and child workflows inherit that marker so the\nrun stays inside one compatibility family for its whole lifecycle. Only\nworkers whose <comment>DW_V2_SUPPORTED_COMPATIBILITIES</comment> set includes\nthe run's marker (or the workers-only <comment>*</comment> wildcard) will\nclaim the run's tasks; any other worker rejects the claim at claim time\nwith <comment>compatibility_blocked</comment> or\n<comment>compatibility_unsupported</comment> and the task stays on the queue\nfor a compatible worker to pick up."
   }
+ },
+ "server:start-dev": {
+  "description": {
+   "reference": "Serve an existing Laravel project for local development",
+   "candidate": "Start the built-in native development Server"
+  },
+  "synopsis": {
+   "reference": "server:start-dev [-p|--port [PORT]] [--host [HOST]] [--db [DB]]",
+   "candidate": "server:start-dev [-p|--port [PORT]] [--host [HOST]] [--db [DB]] [--data-dir DATA-DIR] [--token TOKEN]"
+  },
+  "help": {
+   "reference": "Run this command from an installed, configured Laravel project's directory.\nAn external PHP executable is required, even when using the native dw binary.\nThis launches Artisan's HTTP server. Configure the database and run migrations\nfirst, and run the project's queue worker and scheduler separately when needed.\nRestart this command after editing the project's .env configuration.\n\nSQLite is the default database driver. For <comment>mysql</comment> or\n<comment>pgsql</comment>, your project's Docker Compose configuration must\ndefine that service and <comment>redis</comment>. Dependencies are left running\nwhen the HTTP process stops. The bind address defaults to loopback.\n\nFor a standalone Durable Workflow Server, follow the Docker-backed quickstart:\nhttps://durable-workflow.com/docs/quickstart/\n\n<comment>Examples:</comment>\n\n  <info>dw server:start-dev</info>\n  <info>dw server:start-dev --port=9000</info>\n  <info>dw server:start-dev --db=mysql</info>",
+   "candidate": "Start a local Durable Workflow Server using the native runtime and SQLite\ncompiled into dw. Run it from any directory. No PHP, Docker, Redis, separate\nServer installation or runtime download is needed. The runtime creates its\nschema and default namespace and runs its own timers and maintenance.\n\nThe address defaults to 127.0.0.1:8080 and only loopback binds are accepted.\nUse --port=0 to choose an available port. Data persists under dw's config\nfolder in dev-server, or the directory selected with --data-dir. Only one\nServer may use a data directory at a time. Ctrl+C closes the runtime and keeps\nthe data. SDK workers still run your application code separately.\n\nThe local development token is dev-token. Set --token to choose another.\nExisting native DW_* payload, query and storage limits also apply. This is\na CLI-linked development build. Its source is pinned in the CLI dependency lock.\n\n<comment>Examples:</comment>\n\n  <info>dw server:start-dev</info>\n  <info>dw server:start-dev --port=9000 --data-dir=./workflow-data</info>\n\n  # In another terminal, connect the CLI to the local Server\n  <info>dw env:set local --server=http://127.0.0.1:8080 --token=dev-token --make-default</info>\n  <info>dw doctor</info>"
+  },
+  "definition": {
+   "reference": {
+    "arguments": [],
+    "options": {
+     "port": {
+      "name": "--port",
+      "shortcut": "-p",
+      "accept_value": true,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Server port",
+      "default": "8080"
+     },
+     "host": {
+      "name": "--host",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Bind address (IP address or localhost)",
+      "default": "127.0.0.1"
+     },
+     "db": {
+      "name": "--db",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Database driver (sqlite, mysql, pgsql)",
+      "default": "sqlite"
+     },
+     "help": {
+      "name": "--help",
+      "shortcut": "-h",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Display help for the given command. When no command is given display help for the <info>list</info> command",
+      "default": false
+     },
+     "silent": {
+      "name": "--silent",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Do not output any message",
+      "default": false
+     },
+     "quiet": {
+      "name": "--quiet",
+      "shortcut": "-q",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Only errors are displayed. All other output is suppressed",
+      "default": false
+     },
+     "verbose": {
+      "name": "--verbose",
+      "shortcut": "-v|-vv|-vvv",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug",
+      "default": false
+     },
+     "version": {
+      "name": "--version",
+      "shortcut": "-V",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Display this application version",
+      "default": false
+     },
+     "ansi": {
+      "name": "--ansi",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Force (or disable --no-ansi) ANSI output",
+      "default": null
+     },
+     "no-ansi": {
+      "name": "--no-ansi",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Negate the \"--ansi\" option",
+      "default": null
+     },
+     "no-interaction": {
+      "name": "--no-interaction",
+      "shortcut": "-n",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Do not ask any interactive question",
+      "default": false
+     }
+    }
+   },
+   "candidate": {
+    "arguments": [],
+    "options": {
+     "port": {
+      "name": "--port",
+      "shortcut": "-p",
+      "accept_value": true,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Server port (0 chooses an available port)",
+      "default": "8080"
+     },
+     "host": {
+      "name": "--host",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Loopback bind address (127.0.0.1, ::1 or localhost)",
+      "default": "127.0.0.1"
+     },
+     "db": {
+      "name": "--db",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Bundled database driver (sqlite)",
+      "default": "sqlite"
+     },
+     "help": {
+      "name": "--help",
+      "shortcut": "-h",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Display help for the given command. When no command is given display help for the <info>list</info> command",
+      "default": false
+     },
+     "silent": {
+      "name": "--silent",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Do not output any message",
+      "default": false
+     },
+     "quiet": {
+      "name": "--quiet",
+      "shortcut": "-q",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Only errors are displayed. All other output is suppressed",
+      "default": false
+     },
+     "verbose": {
+      "name": "--verbose",
+      "shortcut": "-v|-vv|-vvv",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug",
+      "default": false
+     },
+     "version": {
+      "name": "--version",
+      "shortcut": "-V",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Display this application version",
+      "default": false
+     },
+     "ansi": {
+      "name": "--ansi",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Force (or disable --no-ansi) ANSI output",
+      "default": null
+     },
+     "no-ansi": {
+      "name": "--no-ansi",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Negate the \"--ansi\" option",
+      "default": null
+     },
+     "no-interaction": {
+      "name": "--no-interaction",
+      "shortcut": "-n",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Do not ask any interactive question",
+      "default": false
+     },
+     "data-dir": {
+      "name": "--data-dir",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": true,
+      "is_multiple": false,
+      "description": "Directory for persistent local development data",
+      "default": null
+     },
+     "token": {
+      "name": "--token",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": true,
+      "is_multiple": false,
+      "description": "Development bearer token (defaults to dev-token)",
+      "default": null
+     }
+    }
+   }
+  }
  }
 }

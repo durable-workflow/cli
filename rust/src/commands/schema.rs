@@ -138,7 +138,7 @@ pub fn list(_input: &Input) -> Result<i32, CliError> {
         .iter()
         .filter_map(|(name, entry)| entry.as_object().map(|entry| (name, entry)))
         .collect();
-    configs.sort_by(|(left, _), (right, _)| left.cmp(right));
+    configs.sort_by_key(|(left, _)| *left);
     rows.extend(configs.into_iter().map(|(name, entry)| {
         vec![
             "config".into(),

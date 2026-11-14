@@ -364,6 +364,10 @@
   {
    "value": "watch",
    "description": "Watch long-running resources and print state changes"
+  },
+  {
+   "value": "workflow:version-usage",
+   "description": "Show live legacy, current and unknown version usage across open runs"
   }
  ],
  "values": {
@@ -1351,6 +1355,20 @@
   },
   "workflow-task:poll": {
    "options": {
+    "output": [
+     "table",
+     "json",
+     "jsonl"
+    ]
+   }
+  },
+  "workflow:version-usage": {
+   "options": {
+    "state": [
+     "legacy",
+     "current",
+     "unknown"
+    ],
     "output": [
      "table",
      "json",

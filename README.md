@@ -97,6 +97,23 @@ dw workflow:history <workflow-id> <run-id>
 dw service-call:describe <endpoint> <service> <operation> <call-id> --json
 ```
 
+## Version branch usage
+
+Before retiring a version branch, inspect the open runs for its workflow type
+and change ID:
+
+```bash
+dw workflow:version-usage shipment carrier-api --min-version=2 --namespace=orders
+dw workflow:version-usage shipment carrier-api --min-version=2 --state=unknown --json
+```
+
+This requires a Server advertising `workflow_version_usage`. Counts include all
+legacy, current and unknown runs before filtering and paging. A missing marker
+or unavailable history stays unknown. The command reads one live page; pass its
+opaque `next_cursor` with the same query to continue. JSON and JSONL preserve the
+whole page, including counts. Drain or fence admissions and restart the query
+before making a branch-removal decision.
+
 ## Automation Contract
 
 All read and mutating commands support machine-readable output. Use

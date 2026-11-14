@@ -100,7 +100,7 @@ impl<'a> Query<'a> {
     }
 
     fn request(&self) -> RawRequest {
-        let mut request = RawRequest::get(["workflows", "version-usage"])
+        let mut request = RawRequest::get(["workflow-version-usage"])
             .query("workflow_type", self.workflow_type)
             .query("change_id", self.change_id)
             .query("min_version", self.minimum.to_string())

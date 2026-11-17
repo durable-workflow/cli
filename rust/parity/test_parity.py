@@ -166,6 +166,41 @@ class CatalogMetadataParityTest(unittest.TestCase):
         self.assertEqual(self.normalize("target:command\nbefore help\n", "reference"),
                          self.normalize("target:command\nafter help\n", "candidate"))
 
+    def test_completion_reconciles_only_the_exact_reviewed_description_row(self):
+        case = {"argv": ["_complete", "-sfish"]}
+        def normalize(value, side, descriptions=None):
+            return parity.normalize_catalog_metadata(
+                value, case, side, self.updates,
+                {"target:command": "after"} if descriptions is None else descriptions)
+        reference = "target:command\tbefore\nother:command\tkept\n"
+        candidate = "target:command\tafter\nother:command\tkept\n"
+        expected = normalize(reference, "reference")
+        self.assertEqual(expected, normalize(candidate, "candidate"))
+        for altered in [candidate.replace("after", "unexpected"),
+                        candidate.replace("kept", "changed"),
+                        candidate.replace("target:command", "unknown:command"),
+                        candidate.replace("\tafter", " after"),
+                        candidate.replace("\tafter", "\tafter extra")]:
+            self.assertNotEqual(expected, normalize(altered, "candidate"))
+        # A catalog change does not update an unchanged completion table.
+        self.assertEqual(reference, normalize(reference, "reference", {"target:command": "before"}))
+        self.assertEqual({"result": "after"}, normalize({"result": "after"}, "candidate"))
+
+
+class HumanHelpDifferenceScopeTest(unittest.TestCase):
+    def test_display_changes_cannot_hide_exit_json_or_config_regressions(self):
+        with open(parity.CASES, encoding="utf-8") as handle:
+            cases = json.load(handle)["cases"] + parity.help_cases()
+        for case in cases:
+            expected = case.get("expected_difference", {}).get("*", {})
+            if "cli#159" not in expected.get("reason", ""):
+                continue
+            fields = expected["fields"]
+            self.assertIn(fields, [["stdout_text"], ["stderr"]])
+            self.assertIsNotNone(parity.intentional_reason(case, fields))
+            for extra in ["exit_code", "stdout_json", "config", "stderr_category"]:
+                self.assertIsNone(parity.intentional_reason(case, [*fields, extra]))
+
 
 class PhpMainReferenceTest(unittest.TestCase):
     def setUp(self):

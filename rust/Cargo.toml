@@ -17,9 +17,9 @@ path = "src/main.rs"
 # dependency patches on this exact source revision as well.
 durable-workflow-server = { git = "https://github.com/durable-workflow/server", rev = "3d90086f73533ac4437735bae6b9d0446558577c" }
 axum = { version = "=0.8.9", default-features = false, features = ["http1", "tokio"] }
-# Composition candidate for sdk-rust#279. Replace with the qualified package
-# before this development-runtime change can be released.
-durable-workflow = { git = "https://github.com/durable-workflow/sdk-rust", rev = "ff75c2a59029cc5c6ab510ca5af2e3acc06ae7b4", default-features = false }
+# Published 4.18.0 carries sdk-rust#279: without its default msrv-1-86
+# feature the SDK composes with the native Server's newer Avro dependency.
+durable-workflow = { version = "=4.18.0", default-features = false }
 serde = "1"
 sha2 = "0.10"
 # Random generated request IDs, as 2.x random_bytes(); already in the release

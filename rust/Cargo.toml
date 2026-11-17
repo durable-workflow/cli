@@ -15,7 +15,7 @@ path = "src/main.rs"
 [dependencies]
 # Native development Server, built into every standalone dw binary. Keep its
 # dependency patches on this exact source revision as well.
-durable-workflow-server = { git = "https://github.com/durable-workflow/server", rev = "3d90086f73533ac4437735bae6b9d0446558577c" }
+durable-workflow-server = { git = "https://github.com/durable-workflow/server", rev = "da655a8500691d6ce8e018d1552801491a696135" }
 axum = { version = "=0.8.9", default-features = false, features = ["http1", "tokio"] }
 # Published 4.18.0 carries sdk-rust#279: without its default msrv-1-86
 # feature the SDK composes with the native Server's newer Avro dependency.
@@ -34,6 +34,9 @@ tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "net", "
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 
 [dev-dependencies]
+# Inflates the compressed development database fixtures; already in the
+# graph through the native Server.
+miniz_oxide = "0.9"
 # A self-signed HTTPS Server for the --tls-verify tests, on the ring provider
 # reqwest already uses.
 rcgen = { version = "0.13", default-features = false, features = ["ring", "pem"] }
@@ -56,9 +59,9 @@ strip = "symbols"
 # Cargo only applies patches from the top-level manifest. These are the
 # reviewed Server dependency sources, including its Avro and SQL adapters.
 [patch.crates-io]
-apache-avro = { git = "https://github.com/durable-workflow/server", rev = "3d90086f73533ac4437735bae6b9d0446558577c" }
-sqlx-mysql = { git = "https://github.com/durable-workflow/server", rev = "3d90086f73533ac4437735bae6b9d0446558577c" }
-sqlx-postgres = { git = "https://github.com/durable-workflow/server", rev = "3d90086f73533ac4437735bae6b9d0446558577c" }
+apache-avro = { git = "https://github.com/durable-workflow/server", rev = "da655a8500691d6ce8e018d1552801491a696135" }
+sqlx-mysql = { git = "https://github.com/durable-workflow/server", rev = "da655a8500691d6ce8e018d1552801491a696135" }
+sqlx-postgres = { git = "https://github.com/durable-workflow/server", rev = "da655a8500691d6ce8e018d1552801491a696135" }
 
 [profile.dev]
 debug = 0

@@ -4,12 +4,14 @@ use super::start_dev_data::Data;
 use crate::cli::Input;
 use crate::error::CliError;
 use crate::{config, formatter};
-use durable_workflow_server::runtime::{router, Runtime};
+use durable_workflow_server::runtime::{router, schema_upgrade, Runtime, RuntimeError};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
 use std::time::Duration;
 
 const DEVELOPMENT_TOKEN: &str = "dev-token";
+// Relative to the held data directory, which `Data::enter` made current.
+const DATABASE: &str = "database.sqlite";
 const SHUTDOWN_GRACE: Duration = Duration::from_secs(5);
 
 struct Settings {
@@ -107,6 +109,49 @@ async fn stopped() -> i32 {
     }
 }
 
+/// Open the development database. Native startup never upgrades a schema,
+/// but this Server holds its own data directory exclusively, so an earlier
+/// native schema found there is upgraded in place with the Server's own
+/// SQLite upgrade before the runtime opens it. A newer schema still refuses.
+async fn open(data: &Data, token: &str) -> Result<Runtime, CliError> {
+    match Runtime::open(DATABASE, token.to_owned()).await {
+        Err(RuntimeError::Refused {
+            reason: "native_schema_upgrade_required",
+            ..
+        }) => {}
+        result => return result.map_err(open_error),
+    }
+    data.verify().map_err(data_error)?;
+    let report = schema_upgrade::upgrade_sqlite(DATABASE)
+        .await
+        .map_err(|error| {
+            CliError::Failure(format!("Cannot upgrade the development database: {error}"))
+        })?;
+    data.verify().map_err(data_error)?;
+    if report["status"] == "upgraded" {
+        formatter::writeln_out(&format!(
+            "Upgraded the development database from schema {} to {}.",
+            report["from_schema_version"], report["schema_version"]
+        ));
+    }
+    Runtime::open(DATABASE, token.to_owned())
+        .await
+        .map_err(open_error)
+}
+
+fn open_error(error: RuntimeError) -> CliError {
+    match error {
+        RuntimeError::Refused {
+            reason: reason @ "native_schema_newer_than_binary",
+            ..
+        } => CliError::Failure(format!(
+            "Cannot open development database: it was written by a newer dw ({reason}). \
+             Start it with that newer dw, or move the data directory aside or choose another --data-dir to start fresh."
+        )),
+        error => CliError::Failure(format!("Cannot open development database: {error}")),
+    }
+}
+
 async fn serve(settings: Settings, mut data: Data) -> Result<i32, CliError> {
     let shutdown = stopped();
     tokio::pin!(shutdown);
@@ -125,7 +170,7 @@ async fn serve(settings: Settings, mut data: Data) -> Result<i32, CliError> {
         .map_err(|error| CliError::Failure(error.to_string()))?;
     data.prepare_database().map_err(data_error)?;
     let runtime = tokio::select! {
-        result = Runtime::open("database.sqlite", settings.token.clone()) => result.map_err(|error| CliError::Failure(format!("Cannot open development database: {error}")))?,
+        result = open(&data, &settings.token) => result?,
         code = &mut shutdown => return Ok(code),
     };
     if let Err(error) = data.verify() {

@@ -62,8 +62,11 @@ dw doctor
 
 Data persists in `dev-server` under the CLI config directory. Use
 `--data-dir=./workflow-data` to choose a directory or `--port=9000` to choose a
-port. Ctrl+C stops the runtime and preserves its data. Application workers
-still run your workflow and activity code through an SDK.
+port. Ctrl+C stops the runtime and preserves its data. When a newer `dw`
+finds data written by an earlier one, it upgrades that development database
+in place and prints the schema versions; an older `dw` refuses data written by
+a newer one. Application workers still run your workflow and activity code
+through an SDK.
 
 ## Connect
 

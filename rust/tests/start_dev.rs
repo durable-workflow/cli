@@ -207,7 +207,18 @@ fn starts_in_an_empty_directory_with_bundled_sqlite_and_real_cli_admission() {
     assert_eq!(ready["development"], true);
     assert_eq!(server.get("/api/cluster/info", None).0, 401);
     let cluster = project.client(&server, &["server:info"]);
-    assert!(cluster.get("capabilities").is_some());
+    assert_eq!(cluster["capabilities"]["workflow_version_usage"], true);
+    let usage = project.client(
+        &server,
+        &[
+            "workflow:version-usage",
+            "dev.example",
+            "change-a",
+            "--min-version=2",
+        ],
+    );
+    assert_eq!(usage["counts"]["total"], 0, "{usage}");
+    assert_eq!(usage["runs"], serde_json::json!([]), "{usage}");
     let started = project.client(
         &server,
         &[
@@ -263,6 +274,94 @@ fn restart_preserves_workflow_data_and_releases_the_directory_lock() {
     }
     assert!(after.to_string().contains("keep-me"));
     second.stop();
+}
+
+/// A development database written by the published CLI 2.9.0 binary (native
+/// schema 14): `dw server:start-dev --data-dir X --port 0`, then
+/// `dw workflow:start --type=dev.upgrade --workflow-id=before-upgrade
+/// --input='{"kept":true}'` and SIGTERM. Stored zlib-compressed.
+const CLI_2_9_0_DATABASE: &[u8] =
+    include_bytes!("fixtures/dev-server-cli-2.9.0-schema-14.sqlite.zlib");
+/// A native ownership marker at schema 99, newer than any binary knows.
+const NEWER_DATABASE: &[u8] = include_bytes!("fixtures/dev-server-schema-99.sqlite.zlib");
+
+/// Create a data directory with this dw, then replace its database contents
+/// in place, keeping the private file the Server created.
+fn data_directory_with(project: &Project, fixture: &[u8]) -> (PathBuf, Vec<u8>) {
+    let directory = project.0.join("data");
+    let mut server = DevServer::start(project, &["--data-dir", directory.to_str().unwrap()]);
+    server.stop();
+    let database = miniz_oxide::inflate::decompress_to_vec_zlib(fixture).unwrap();
+    fs::write(directory.join("database.sqlite"), &database).unwrap();
+    (directory, database)
+}
+
+#[test]
+fn development_database_from_cli_2_9_0_is_upgraded_in_place_with_its_data() {
+    let project = Project::new();
+    let (directory, _) = data_directory_with(&project, CLI_2_9_0_DATABASE);
+    let args = ["--data-dir", directory.to_str().unwrap()];
+    let mut upgraded = DevServer::start(&project, &args);
+    let described = project.client(&upgraded, &["workflow:describe", "before-upgrade"]);
+    assert_eq!(described["run_id"], "01M7NVAVQN0FTYF4ND5GSGAADA");
+    assert_eq!(described["workflow_type"], "dev.upgrade");
+    assert_eq!(described["status"], "pending");
+    assert_eq!(described["input"], serde_json::json!([true]));
+    let cluster = project.client(&upgraded, &["server:info"]);
+    assert_eq!(cluster["capabilities"]["workflow_version_usage"], true);
+    project.client(
+        &upgraded,
+        &[
+            "workflow:start",
+            "--type=dev.upgrade",
+            "--workflow-id=after-upgrade",
+            "--input=null",
+        ],
+    );
+    upgraded.stop();
+    let text = upgraded.text.lock().unwrap().clone();
+    assert_eq!(
+        text.matches("Upgraded the development database from schema 14 to 15.")
+            .count(),
+        1,
+        "{text}"
+    );
+    assert!(
+        text.find("Upgraded the development database").unwrap()
+            < text.find("listening on").unwrap()
+    );
+
+    let mut current = DevServer::start(&project, &args);
+    for id in ["before-upgrade", "after-upgrade"] {
+        let described = project.client(&current, &["workflow:describe", id]);
+        assert_eq!(described["workflow_id"], id);
+    }
+    current.stop();
+    assert!(!current.text.lock().unwrap().contains("Upgraded"));
+}
+
+#[test]
+fn newer_development_schema_refuses_without_changing_the_database() {
+    let project = Project::new();
+    let (directory, database) = data_directory_with(&project, NEWER_DATABASE);
+    let output = project.run(&[
+        "server:start-dev",
+        "--port=0",
+        "--data-dir",
+        directory.to_str().unwrap(),
+    ]);
+    assert_eq!(output.status.code(), Some(1));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("written by a newer dw"), "{stderr}");
+    assert!(
+        stderr.contains("native_schema_newer_than_binary"),
+        "{stderr}"
+    );
+    assert!(!String::from_utf8_lossy(&output.stdout).contains("listening on"));
+    assert_eq!(
+        fs::read(directory.join("database.sqlite")).unwrap(),
+        database
+    );
 }
 
 #[test]

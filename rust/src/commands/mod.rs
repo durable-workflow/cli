@@ -18,6 +18,7 @@ mod start_dev_data;
 pub mod system;
 pub mod task_queue;
 pub mod upgrade;
+pub mod version_usage;
 pub mod worker;
 pub mod workflow;
 pub mod workflow_control;

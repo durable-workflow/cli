@@ -27,7 +27,7 @@
   },
   {
    "value": "server:start-dev",
-   "description": "Serve an existing Laravel project for local development"
+   "description": "Start the built-in native development Server"
   },
   {
    "value": "doctor",
@@ -956,7 +956,10 @@
      "mysql",
      "pgsql"
     ]
-   }
+   },
+   "db": [
+    "sqlite"
+   ]
   },
   "service-call:describe": {
    "options": {

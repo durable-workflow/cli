@@ -457,8 +457,9 @@ checksum = "1aaf95b3e5c8f23aa320147307562d361db0ae0d51242340f558153b4eb2439b"
 
 [[package]]
 name = "durable-workflow"
-version = "4.17.0"
-source = "git+https://github.com/durable-workflow/sdk-rust?rev=ff75c2a59029cc5c6ab510ca5af2e3acc06ae7b4#ff75c2a59029cc5c6ab510ca5af2e3acc06ae7b4"
+version = "4.18.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b3f0b85e9350e836361886b483b92491b5fa6ef7262499a4befb9a7151afe1a8"
 dependencies = [
  "apache-avro 0.21.0",
  "base64 0.22.1",

@@ -34,6 +34,8 @@ abstract class BaseCommand extends Command
 
     private const REQUEST_ID_CONFLICT_REASON = 'request_id_conflict';
 
+    private const REQUEST_ID_AMBIGUOUS_REASON = 'request_id_ambiguous';
+
     private const NAMESPACE_SCOPED_COMMAND_NAMES = [
         'activity:complete',
         'activity:describe',
@@ -739,7 +741,15 @@ abstract class BaseCommand extends Command
         }
 
         if (is_bool($result['intent_verified'] ?? null)) {
-            $output->writeln('  Intent Verified: '.($result['intent_verified'] ? 'yes' : 'no'));
+            // A legacy receipt is retained without a recorded intent, so the
+            // Server returned it without comparing this command to it.
+            $verified = 'no';
+            if ($result['intent_verified']) {
+                $verified = 'yes';
+            } elseif (($result['retained'] ?? null) === true) {
+                $verified = "no (legacy receipt; the Server did not compare this command's intent with it)";
+            }
+            $output->writeln('  Intent Verified: '.$verified);
         }
     }
 
@@ -1821,6 +1831,25 @@ abstract class BaseCommand extends Command
     }
 
     /**
+     * @return array{id: string, severity: string, message: string}
+     */
+    private function requestIdAmbiguousRecommendation(ServerHttpException $e, ?InputInterface $input): array
+    {
+        $requestId = $this->nonEmptyScalarString(($e->body ?? [])['request_id'] ?? null)
+            ?? ($input !== null ? $this->errorRequestIdContext($input) : null)
+            ?? 'given';
+
+        return [
+            'id' => 'request_id.ambiguous',
+            'severity' => 'error',
+            'message' => sprintf(
+                'Request id [%s] matches more than one retained command, so the Server recorded nothing and selected no receipt. Retrying it unchanged fails the same way. Inspect workflow history to see which commands were admitted, and pass a new --request-id to record a new command.',
+                $requestId,
+            ),
+        ];
+    }
+
+    /**
      * @return list<array{id: string, severity: string, message: string, command?: string}>
      */
     private function httpErrorRecommendations(ServerHttpException $e, ?InputInterface $input): array
@@ -1860,6 +1889,10 @@ abstract class BaseCommand extends Command
                     $parts === [] ? 'intent' : implode('/', $parts),
                 ),
             ]];
+        }
+
+        if ($e->statusCode === 409 && $e->reason() === self::REQUEST_ID_AMBIGUOUS_REASON) {
+            return [$this->requestIdAmbiguousRecommendation($e, $input)];
         }
 
         if ($e->statusCode >= 400 && $e->statusCode <= 499) {

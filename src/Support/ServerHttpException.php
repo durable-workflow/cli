@@ -45,6 +45,14 @@ class ServerHttpException extends ServerException
 
     public function exitCode(): int
     {
+        if ($this->statusCode === 409 && $this->reason() === 'request_id_conflict') {
+            return ExitCode::REQUEST_ID_CONFLICT;
+        }
+
+        if ($this->statusCode === 409 && $this->reason() === 'request_id_ambiguous') {
+            return ExitCode::REQUEST_ID_AMBIGUOUS;
+        }
+
         return ExitCode::fromHttpStatus($this->statusCode);
     }
 }

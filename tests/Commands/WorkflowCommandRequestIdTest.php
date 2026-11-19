@@ -57,7 +57,7 @@ final class WorkflowCommandRequestIdTest extends TestCase
                 : $this->runUpdate($client, $arguments, $decorated);
             self::assertSame($value, $client->lastPostBody['request_id']);
             self::assertSame(match ($scenario) {
-                'conflict' => ExitCode::INVALID, 'uncertain' => ExitCode::NETWORK, default => Command::SUCCESS,
+                'conflict' => ExitCode::REQUEST_ID_CONFLICT, 'uncertain' => ExitCode::NETWORK, default => Command::SUCCESS,
             }, $tester->getStatusCode());
             if ($json) {
                 $decoded = $this->json($tester);
@@ -343,7 +343,7 @@ final class WorkflowCommandRequestIdTest extends TestCase
             '--input' => '[{"approved":false}]',
         ]);
 
-        self::assertSame(ExitCode::INVALID, $tester->getStatusCode());
+        self::assertSame(ExitCode::REQUEST_ID_CONFLICT, $tester->getStatusCode());
         self::assertNotSame(Command::SUCCESS, $tester->getStatusCode());
         self::assertSame('approve-1', $client->lastPostBody['request_id']);
 
@@ -375,12 +375,12 @@ final class WorkflowCommandRequestIdTest extends TestCase
             '--json' => true,
         ]);
 
-        self::assertSame(ExitCode::INVALID, $tester->getStatusCode());
+        self::assertSame(ExitCode::REQUEST_ID_CONFLICT, $tester->getStatusCode());
 
         $decoded = $this->json($tester);
 
         self::assertSame('Server error: Request id already identifies a different signal.', $decoded['error']);
-        self::assertSame(ExitCode::INVALID, $decoded['exit_code']);
+        self::assertSame(ExitCode::REQUEST_ID_CONFLICT, $decoded['exit_code']);
         self::assertSame('workflow:signal', $decoded['command']);
         self::assertSame(409, $decoded['status_code']);
         self::assertSame('request_id_conflict', $decoded['reason']);
@@ -413,7 +413,7 @@ final class WorkflowCommandRequestIdTest extends TestCase
             '--json' => true,
         ]);
 
-        self::assertSame(ExitCode::INVALID, $tester->getStatusCode());
+        self::assertSame(ExitCode::REQUEST_ID_CONFLICT, $tester->getStatusCode());
         self::assertSame('/workflows/wf-1/runs/run-2/update/approve', $client->lastPostPath);
 
         $decoded = $this->json($tester);
@@ -437,6 +437,75 @@ final class WorkflowCommandRequestIdTest extends TestCase
         self::assertSame('quota-7', $decoded['cli_fields']['request_id']);
         self::assertSame($body, $decoded['server_response']);
         self::assertSame(['request_id.conflict'], array_column($decoded['recommendations'], 'id'));
+    }
+
+    public function test_request_id_ambiguous_has_its_own_exit_code_and_selects_no_receipt(): void
+    {
+        $body = [
+            'message' => 'The request_id matches more than one retained command.',
+            'reason' => 'request_id_ambiguous',
+            'retained' => true,
+            'intent_verified' => false,
+            'retryable' => false,
+        ];
+        foreach (['signal', 'update'] as $operation) {
+            $client = new CommandRequestIdFakeClient([], exception: new ServerHttpException(
+                'Server error: The request_id matches more than one retained command.',
+                409,
+                body: $body,
+            ), contract: self::requestContract());
+            $arguments = ['workflow-id' => 'wf-1', $operation.'-name' => 'approve', '--request-id' => 'shared-key', '--json' => true];
+            $tester = $operation === 'signal' ? $this->runSignal($client, $arguments) : $this->runUpdate($client, $arguments);
+
+            self::assertSame(ExitCode::REQUEST_ID_AMBIGUOUS, $tester->getStatusCode());
+            self::assertSame(10, ExitCode::REQUEST_ID_AMBIGUOUS);
+            $decoded = $this->json($tester);
+            self::assertSame(ExitCode::REQUEST_ID_AMBIGUOUS, $decoded['exit_code']);
+            self::assertSame('request_id_ambiguous', $decoded['reason']);
+            self::assertSame('shared-key', $decoded['request_id']);
+            self::assertArrayNotHasKey('command_id', $decoded);
+            self::assertSame(['request_id.ambiguous'], array_column($decoded['recommendations'], 'id'));
+            self::assertStringContainsString('Request id [shared-key] matches more than one retained command', $decoded['recommendations'][0]['message']);
+        }
+
+        $client = new CommandRequestIdFakeClient([], exception: new ServerHttpException('Server error: ambiguous', 409, body: $body));
+        $human = $this->runSignal($client, ['workflow-id' => 'wf-1', 'signal-name' => 'approve', '--request-id' => 'shared-key']);
+        self::assertSame(ExitCode::REQUEST_ID_AMBIGUOUS, $human->getStatusCode());
+        self::assertStringContainsString('Reason: request_id_ambiguous', $human->getDisplay());
+        self::assertStringNotContainsString('The outcome of this command is unknown.', $human->getDisplay());
+    }
+
+    public function test_other_409_refusals_keep_the_invalid_exit_code(): void
+    {
+        $client = new CommandRequestIdFakeClient([], exception: new ServerHttpException(
+            'Server error: Run is closed.',
+            409,
+            body: ['message' => 'Run is closed.', 'reason' => 'run_not_active'],
+        ));
+        $tester = $this->runSignal($client, ['workflow-id' => 'wf-1', 'signal-name' => 'approve', '--json' => true]);
+
+        self::assertSame(ExitCode::INVALID, $tester->getStatusCode());
+        self::assertSame(['request.invalid'], array_column($this->json($tester)['recommendations'], 'id'));
+    }
+
+    public function test_a_legacy_unverified_receipt_is_not_shown_as_a_verified_match(): void
+    {
+        $receipt = self::signalReceipt(['request_id' => 'legacy-key', 'retained' => true, 'intent_verified' => false]);
+        $human = $this->runSignal(
+            new CommandRequestIdFakeClient($receipt, contract: self::requestContract()),
+            ['workflow-id' => 'wf-1', 'signal-name' => 'approve', '--request-id' => 'legacy-key'],
+        );
+
+        self::assertSame(Command::SUCCESS, $human->getStatusCode());
+        self::assertStringContainsString("Intent Verified: no (legacy receipt; the Server did not compare this command's intent with it)", $human->getDisplay());
+
+        $json = $this->runSignal(
+            new CommandRequestIdFakeClient($receipt, contract: self::requestContract()),
+            ['workflow-id' => 'wf-1', 'signal-name' => 'approve', '--request-id' => 'legacy-key', '--json' => true],
+        );
+        $decoded = $this->json($json);
+        self::assertTrue($decoded['retained']);
+        self::assertFalse($decoded['intent_verified']);
     }
 
     public function test_signal_transport_failure_prints_the_key_that_was_sent(): void

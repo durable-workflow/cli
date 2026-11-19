@@ -49,6 +49,16 @@ class ExitCodePolicyTest extends TestCase
         yield '200 ok → FAILURE (non-error status)' => [200, ExitCode::FAILURE];
     }
 
+    public function test_request_id_refusals_have_their_own_exit_codes(): void
+    {
+        self::assertSame(9, ExitCode::REQUEST_ID_CONFLICT);
+        self::assertSame(10, ExitCode::REQUEST_ID_AMBIGUOUS);
+        self::assertSame(ExitCode::REQUEST_ID_CONFLICT, (new ServerHttpException('x', 409, body: ['reason' => 'request_id_conflict']))->exitCode());
+        self::assertSame(ExitCode::REQUEST_ID_AMBIGUOUS, (new ServerHttpException('x', 409, body: ['reason' => 'request_id_ambiguous']))->exitCode());
+        self::assertSame(ExitCode::INVALID, (new ServerHttpException('x', 409, body: ['reason' => 'run_not_active']))->exitCode());
+        self::assertSame(ExitCode::INVALID, (new ServerHttpException('x', 422, body: ['reason' => 'request_id_conflict']))->exitCode());
+    }
+
     public function test_base_command_translates_network_exception_to_network_exit_code(): void
     {
         $command = new ThrowingBaseCommand(new NetworkException('Connection refused'));

@@ -986,3 +986,188 @@ fn update_points_an_unfinished_update_at_update_outcome_only_when_the_server_can
     let stdout = String::from_utf8(output.stdout).unwrap();
     assert!(!stdout.contains("workflow:update-outcome"), "{stdout}");
 }
+
+fn refusal_ids(error: &Value) -> Vec<String> {
+    error["recommendations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|item| item["id"].as_str().unwrap().to_owned())
+        .collect()
+}
+
+#[test]
+fn request_id_conflict_exits_9_names_the_retained_command_and_is_not_resent() {
+    let scratch = Scratch::new();
+    let server = Server::new(vec![Reply::Json {
+        status: 409,
+        body: json!({
+            "message": "The request_id was already used for a different signal command.",
+            "reason": "request_id_conflict",
+            "outcome": "rejected_request_id_conflict",
+            "retained": true,
+            "intent_verified": true,
+            "retained_command_id": "cmd-1",
+            "retained_outcome": "signal_received",
+            "conflict": ["arguments"],
+        }),
+    }]);
+    let output = scratch.run(
+        &server.url,
+        &[
+            "workflow:signal",
+            "chk-42",
+            "approve",
+            "--request-id=approve-1",
+            "--json",
+        ],
+    );
+    assert_eq!(output.status.code(), Some(9), "{output:?}");
+    assert_eq!(server.lines().len(), 1, "a conflict is never resent");
+    let error = stdout_json(&output);
+    assert_eq!(error["exit_code"], 9);
+    assert_eq!(error["reason"], "request_id_conflict");
+    assert_eq!(error["request_id"], "approve-1");
+    assert_eq!(error["retained_command_id"], "cmd-1");
+    assert_eq!(refusal_ids(&error), ["request_id.conflict"]);
+
+    let human = scratch.run(
+        &server.url,
+        &["workflow:update", "chk-42", "adjust", "--input=[2]"],
+    );
+    assert_eq!(human.status.code(), Some(9), "{human:?}");
+    let stderr = String::from_utf8(human.stderr).unwrap();
+    assert!(stderr.contains("Reason: request_id_conflict"), "{stderr}");
+    assert!(stderr.contains("Retained command: id cmd-1"), "{stderr}");
+    assert!(stderr.contains("Conflicting parts: arguments"), "{stderr}");
+    let generated = stderr
+        .lines()
+        .find_map(|line| line.strip_prefix("Request ID: "))
+        .unwrap_or_else(|| panic!("{stderr}"));
+    assert!(is_generated(generated, "update"), "{stderr}");
+    assert!(
+        stderr.contains(&format!("Request id [{generated}] already identifies")),
+        "{stderr}"
+    );
+    assert_eq!(server.lines().len(), 2);
+}
+
+#[test]
+fn request_id_ambiguous_exits_10_selects_no_receipt_and_is_not_resent() {
+    let scratch = Scratch::new();
+    let server = Server::new(vec![Reply::Json {
+        status: 409,
+        body: json!({
+            "message": "The request_id matches more than one retained command.",
+            "reason": "request_id_ambiguous",
+            "retained": true,
+            "intent_verified": false,
+            "retryable": false,
+        }),
+    }]);
+    for (kind, name) in [
+        ("workflow:signal", "approve"),
+        ("workflow:update", "adjust"),
+    ] {
+        let output = scratch.run(
+            &server.url,
+            &[kind, "chk-42", name, "--request-id=shared-key", "--json"],
+        );
+        assert_eq!(output.status.code(), Some(10), "{output:?}");
+        let error = stdout_json(&output);
+        assert_eq!(error["exit_code"], 10);
+        assert_eq!(error["reason"], "request_id_ambiguous");
+        assert_eq!(error["request_id"], "shared-key");
+        assert!(
+            error["command_id"].is_null(),
+            "no receipt is selected: {error}"
+        );
+        assert!(
+            error["update_id"].is_null(),
+            "no receipt is selected: {error}"
+        );
+        assert_eq!(refusal_ids(&error), ["request_id.ambiguous"]);
+    }
+    assert_eq!(server.lines().len(), 2, "each ambiguity is sent once");
+
+    let human = scratch.run(
+        &server.url,
+        &[
+            "workflow:signal",
+            "chk-42",
+            "approve",
+            "--request-id=shared-key",
+        ],
+    );
+    assert_eq!(human.status.code(), Some(10));
+    let stderr = String::from_utf8(human.stderr).unwrap();
+    assert!(stderr.contains("Reason: request_id_ambiguous"), "{stderr}");
+    assert!(
+        stderr.contains("Request id [shared-key] matches more than one retained command"),
+        "{stderr}"
+    );
+    assert!(
+        !stderr.contains("The outcome of this command is unknown."),
+        "an ambiguity is a definite refusal: {stderr}"
+    );
+}
+
+#[test]
+fn other_conflicts_keep_exit_2() {
+    let scratch = Scratch::new();
+    let server = Server::new(vec![Reply::Json {
+        status: 409,
+        body: json!({"message": "Run is closed.", "reason": "run_not_active"}),
+    }]);
+    let output = scratch.run(
+        &server.url,
+        &["workflow:signal", "chk-42", "approve", "--json"],
+    );
+    assert_eq!(output.status.code(), Some(2), "{output:?}");
+    assert_eq!(refusal_ids(&stdout_json(&output)), ["request.invalid"]);
+}
+
+#[test]
+fn a_legacy_unverified_receipt_is_not_shown_as_a_verified_match() {
+    let scratch = Scratch::new();
+    let server = Server::new(vec![ok(json!({
+        "workflow_id": "chk-42",
+        "signal_name": "approve",
+        "outcome": "signal_received",
+        "command_id": "cmd-legacy",
+        "request_id": "legacy-key",
+        "retained": true,
+        "intent_verified": false,
+        "control_plane": contract("signal", json!({})),
+    }))]);
+    let human = scratch.run(
+        &server.url,
+        &[
+            "workflow:signal",
+            "chk-42",
+            "approve",
+            "--request-id=legacy-key",
+        ],
+    );
+    assert_eq!(human.status.code(), Some(0), "{human:?}");
+    let stdout = String::from_utf8(human.stdout).unwrap();
+    assert!(
+        stdout.contains(
+            "Intent Verified: no (legacy receipt; the Server did not compare this command's intent with it)"
+        ),
+        "{stdout}"
+    );
+    let json = scratch.run(
+        &server.url,
+        &[
+            "workflow:signal",
+            "chk-42",
+            "approve",
+            "--request-id=legacy-key",
+            "--json",
+        ],
+    );
+    let receipt = stdout_json(&json);
+    assert_eq!(receipt["retained"], true);
+    assert_eq!(receipt["intent_verified"], false);
+}

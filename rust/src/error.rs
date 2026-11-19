@@ -13,6 +13,12 @@ pub mod exit {
     pub const SERVER: i32 = 6;
     pub const TIMEOUT: i32 = 7;
     pub const COMPATIBILITY: i32 = 8;
+    /// HTTP 409 `request_id_conflict`: the command key already names a
+    /// retained command with a different intent. Nothing was recorded.
+    pub const REQUEST_ID_CONFLICT: i32 = 9;
+    /// HTTP 409 `request_id_ambiguous`: the command key matches more than one
+    /// retained command. Nothing was recorded and no receipt was selected.
+    pub const REQUEST_ID_AMBIGUOUS: i32 = 10;
 
     pub fn from_http_status(status: u16) -> i32 {
         match status {
@@ -62,6 +68,16 @@ impl CliError {
             CliError::Invalid(_) => exit::INVALID,
             CliError::Network(_) => exit::NETWORK,
             CliError::Timeout(_) => exit::TIMEOUT,
+            CliError::Http { status: 409, .. }
+                if self.reason() == Some(REQUEST_ID_CONFLICT_REASON) =>
+            {
+                exit::REQUEST_ID_CONFLICT
+            }
+            CliError::Http { status: 409, .. }
+                if self.reason() == Some(REQUEST_ID_AMBIGUOUS_REASON) =>
+            {
+                exit::REQUEST_ID_AMBIGUOUS
+            }
             CliError::Http { status, .. } => exit::from_http_status(*status),
             CliError::Compatibility(_) => exit::COMPATIBILITY,
             CliError::Failure(_) => exit::FAILURE,
@@ -183,6 +199,10 @@ impl ErrorContext<'_> {
 /// different command.
 const REQUEST_ID_CONFLICT_REASON: &str = "request_id_conflict";
 
+/// The Server's refusal reason for a request ID that matches more than one
+/// retained command, so no receipt can be selected.
+const REQUEST_ID_AMBIGUOUS_REASON: &str = "request_id_ambiguous";
+
 /// 2.x `errorRecommendations()`: the error's next step, then, for a keyed
 /// command whose outcome is unknown, the inspect-before-retry warning.
 pub fn recommendations(error: &CliError, context: &ErrorContext) -> Vec<Value> {
@@ -264,6 +284,20 @@ fn base_recommendations(error: &CliError, context: &ErrorContext) -> Vec<Value> 
                     "Request id [{request_id}] already identifies a {} command with a different {}. Repeat that original command unchanged to read its receipt, or pass a new --request-id to record a new command.",
                     scalar_text(body.get("retained_command_type")).unwrap_or_else(|| "retained".into()),
                     if parts.is_empty() { "intent".to_string() } else { parts.join("/") },
+                ),
+            })];
+        }
+        if error.reason() == Some(REQUEST_ID_AMBIGUOUS_REASON) {
+            let empty = Map::new();
+            let body = body.as_ref().unwrap_or(&empty);
+            let request_id = scalar_text(body.get("request_id"))
+                .or_else(|| context.request_id.clone())
+                .unwrap_or_else(|| "given".into());
+            return vec![json!({
+                "id": "request_id.ambiguous",
+                "severity": "error",
+                "message": format!(
+                    "Request id [{request_id}] matches more than one retained command, so the Server recorded nothing and selected no receipt. Retrying it unchanged fails the same way. Inspect workflow history to see which commands were admitted, and pass a new --request-id to record a new command.",
                 ),
             })];
         }
@@ -661,6 +695,21 @@ mod tests {
         assert_eq!(exit::from_http_status(408), exit::TIMEOUT);
         assert_eq!(exit::from_http_status(409), exit::INVALID);
         assert_eq!(exit::from_http_status(503), exit::SERVER);
+    }
+
+    #[test]
+    fn request_id_refusals_have_their_own_exit_codes() {
+        let conflict = CliError::from_http(409, r#"{"reason":"request_id_conflict"}"#);
+        assert_eq!(conflict.exit_code(), exit::REQUEST_ID_CONFLICT);
+        assert_eq!(exit::REQUEST_ID_CONFLICT, 9);
+        let ambiguous = CliError::from_http(409, r#"{"reason":"request_id_ambiguous"}"#);
+        assert_eq!(ambiguous.exit_code(), exit::REQUEST_ID_AMBIGUOUS);
+        assert_eq!(exit::REQUEST_ID_AMBIGUOUS, 10);
+        // Only the Server's 409 refusal is typed; other statuses keep their category.
+        let other = CliError::from_http(422, r#"{"reason":"request_id_conflict"}"#);
+        assert_eq!(other.exit_code(), exit::INVALID);
+        let closed = CliError::from_http(409, r#"{"reason":"run_not_active"}"#);
+        assert_eq!(closed.exit_code(), exit::INVALID);
     }
 
     #[test]

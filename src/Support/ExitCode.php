@@ -42,6 +42,12 @@ final class ExitCode
     /** Compatibility failure — the CLI/server protocol window cannot be used safely. */
     public const COMPATIBILITY = 8;
 
+    /** HTTP 409 `request_id_conflict` — the command key names a retained command with a different intent; nothing was recorded. */
+    public const REQUEST_ID_CONFLICT = 9;
+
+    /** HTTP 409 `request_id_ambiguous` — the command key matches more than one retained command; nothing was recorded and no receipt was selected. */
+    public const REQUEST_ID_AMBIGUOUS = 10;
+
     private function __construct() {}
 
     /**

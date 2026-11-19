@@ -137,6 +137,40 @@ schema-only mutations that the predecessor's row-only comparison accepted.
 Modern and legacy zero-write checks use the same bounded typed logical snapshot,
 including catalog SQL, columns, indexes, triggers, views and all table rows.
 
+## Published Server 3.13.0 cohort
+
+`published_cohort.py` is the current, self-contained installed cohort. It runs
+one phase per invocation against a published native Server image by digest,
+with one CLI binary, and builds nothing:
+
+- `--phase modern`: committed-response loss for signals and updates with a
+  generated key (recovered from the JSON error envelope) and an explicit key,
+  four simultaneous first sends and four concurrent identical retries,
+  changed-argument, changed-name and changed-run-target conflicts with no
+  database change, 255-character ASCII, two-byte and four-byte keys (each
+  retried four ways at once), local refusal of 256 characters before any
+  POST, case-sensitive keys, completed and continued runs (retained readback,
+  conflicts, and a fresh key refused on the closed or historical run with no
+  admission), an explicitly selected run, and namespace isolation.
+- `--phase legacy`: real API admissions, then a stopped copy rewritten by the
+  accepted Rust SDK `sqlite_legacy.py` held-descriptor helper. On restart it
+  checks legacy readback (`retained: true`, `intent_verified: false`, never
+  shown as verified in human output) for open, completed and continued runs,
+  name/run conflicts, and the three ambiguity shapes, each with an unchanged
+  complete logical snapshot. The synthetic transform is not a physical 3.8
+  upgrade.
+
+Pass `--typed-exit-codes` for a CLI with the request-ID exit codes (9
+`REQUEST_ID_CONFLICT`, 10 `REQUEST_ID_AMBIGUOUS`); without it every refusal
+must exit 2, as CLI 2.10.0 and earlier do. `--inputs` names a directory with
+the shared proxy (`.github` `117118c8`), `sqlite_legacy.py` and
+`command-key-legacy-v1-vectors.json` (`sdk-rust` `6280877b`); each is checked
+against its SHA256 in the script before use. The Server runs as the invoking
+user with one CPU, 1 GiB, 256 PIDs, a read-only root and a numeric loopback
+port, and every created container is removed and its absence checked.
+`.github/workflows/published-command-keys.yml` runs both phases for the
+published CLI and for this checkout's build.
+
 ## Physical 3.8 upgrade
 
 `run_cli_216.py` verifies and holds literal-hash modern, legacy or physical implementation bytes

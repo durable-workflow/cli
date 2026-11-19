@@ -727,6 +727,19 @@ SH);
 
         self::assertStringContainsString('reproducible-build:', $buildWorkflow);
         self::assertStringContainsString('scripts/verify-reproducible-build.sh', $buildWorkflow);
+
+        // CI runs the same two-tree algorithm through the pinned PHP container
+        // profile instead of the unbound upstream PHP setup action.
+        $ciVerifier = self::readRepoFile('scripts/ci/verify-php-reproducible-build.sh');
+        self::assertStringContainsString('git -C "$ROOT" archive', $ciVerifier);
+        self::assertStringContainsString('scripts/build.sh phar', $ciVerifier);
+        self::assertStringContainsString('PHAR builds are not bit-identical', $ciVerifier);
+        self::assertStringContainsString('scripts/ci/prepare-php-repro-tree.sh', $ciVerifier);
+        self::assertStringContainsString('run: bash "$GITHUB_WORKSPACE/scripts/ci/setup-php-repro-container.sh"', $buildWorkflow);
+        self::assertStringContainsString('run: scripts/ci/verify-php-reproducible-build.sh', $buildWorkflow);
+        $reproducibleJob = substr($buildWorkflow, (int) strpos($buildWorkflow, '  reproducible-build:'));
+        $reproducibleJob = substr($reproducibleJob, 0, (int) strpos($reproducibleJob, "\n  rust:"));
+        self::assertStringNotContainsString('shivammathur/setup-php', $reproducibleJob);
     }
 
     private static function readRepoFile(string $path): string

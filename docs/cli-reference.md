@@ -538,22 +538,27 @@ Explicit empty or whitespace-only keys are refused before POST. Keys contain
 truncation or case conversion. The key is shown safely in human output and
 preserved exactly in JSON/JSONL, including after a timeout or network failure.
 
-After a lost response the admission outcome is unknown. Inspect workflow
-history and command receipts before retrying; a key alone does not establish
-retry safety. Rely on the complete retained-admission and canonical-intent
-guarantee only when the Server advertises that published capability. Ordinary
-request-key storage and partial update receipt lookup do not supply the full
-signal/update guarantee. No currently qualified published Server tuple
-advertises that complete capability.
+After a lost response the admission outcome is unknown. The CLI sends each
+signal or update once and never resends it; the key it used is printed, and is
+in the JSON error envelope's `request_id`. On a Server that advertises
+`capabilities.command_request_keys` (native Server 3.9.2 and later), the key is
+a durable command key on the workflow instance: repeat the same command with
+the same `--request-id`, name, input and `--run-id` and the Server returns the
+original receipt (`retained: true`, `intent_verified: true`) without recording
+a second command. On other Servers, inspect workflow history and command
+receipts before retrying; a key alone does not establish retry safety.
 
-When the Server reports receipt metadata, `retained: true` identifies an
-original receipt and `intent_verified` reports whether its intent was
-verified. Preserve its original status and exact target. A qualified
-retained-admission contract may refuse a different typed intent with HTTP 409
-and `reason: request_id_conflict`; the response identifies the retained
-command and conflict parts. Legacy receipts with unverified intent never
-authorize a new command. Deduplicated admission does not make external effects
-exactly once.
+The same key with a different name, input or run target is refused with HTTP
+409 `reason: request_id_conflict`, and the CLI exits `9`
+(`REQUEST_ID_CONFLICT`). The response identifies the retained command and the
+conflicting parts. A key that matches more than one retained command is refused
+with HTTP 409 `reason: request_id_ambiguous` and exits `10`
+(`REQUEST_ID_AMBIGUOUS`); nothing is recorded and no receipt is selected.
+Neither refusal records anything. A legacy receipt, admitted before the Server
+recorded command intent, reads back with `retained: true` and
+`intent_verified: false`: the Server returned it without comparing the retried
+command with it, and the human output says so. It never authorizes a new
+command. Deduplicated admission does not make external effects exactly once.
 
 `workflow:update-outcome` reads an update that was sent earlier by its update
 ID, with one `GET /api/workflows/{workflow_id}/updates/{update_id}`, and never
@@ -802,13 +807,15 @@ from there:
 |------|------|---------|
 | 0 | `SUCCESS` | Operation completed successfully. |
 | 1 | `FAILURE` | Generic failure — command ran but did not succeed. |
-| 2 | `INVALID` | Invalid usage — bad arguments, unknown options, or local validation. Also returned for HTTP 4xx responses that are not covered below (e.g. 400, 422). |
+| 2 | `INVALID` | Invalid usage — bad arguments, unknown options, or local validation. Also returned for HTTP 4xx responses that are not covered below (e.g. 400, 422, and a `409` other than a request-ID refusal). |
 | 3 | `NETWORK` | Could not reach the server (connection refused, DNS failure, TLS handshake failure, transport error). |
 | 4 | `AUTH` | Authentication or authorization failure. Returned for HTTP `401` and `403`. |
 | 5 | `NOT_FOUND` | Resource not found. Returned for HTTP `404`. |
 | 6 | `SERVER` | Server error. Returned for HTTP `5xx`. |
 | 7 | `TIMEOUT` | Request timed out before the server responded. Also returned for HTTP `408`. |
 | 8 | `COMPATIBILITY` | Compatibility failure. The CLI/server protocol window cannot be used safely, so the command refused before the requested operation. |
+| 9 | `REQUEST_ID_CONFLICT` | HTTP `409` with reason `request_id_conflict`. The signal or update's `--request-id` already names a retained command with a different name, input or run target. Nothing was recorded. Repeat the original command unchanged to read its receipt, or use a new `--request-id`. |
+| 10 | `REQUEST_ID_AMBIGUOUS` | HTTP `409` with reason `request_id_ambiguous`. The `--request-id` matches more than one retained command, so the Server recorded nothing and selected no receipt. Retrying it unchanged fails the same way. |
 
 Example:
 

@@ -1,0 +1,127 @@
+name: Published command keys
+
+# Installed signal/update command-key cohort (durable-workflow/.github#216)
+# against the published native Server image, by digest. The published job
+# runs the released CLI binary; the source job runs this checkout's build
+# and expects the request-ID exit codes (9 conflict, 10 ambiguous).
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/published-command-keys.yml'
+      - 'scripts/acceptance/command-keys/published_cohort.py'
+      - 'rust/src/error.rs'
+      - 'rust/src/commands/workflow_message.rs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  SERVER_INDEX: sha256:30ccaf2cea6810a92915a9eb389f1a63ea870818a74c9cc1a321379b07b2d25c
+  SERVER_SOURCE: 2d1244be4611e1bc4aa4f0d856c708bed17937b4
+  SERVER_VERSION: 3.13.0
+  CLI_VERSION: 2.10.0
+  CLI_SHA256: dfd1d0417c5767c95a30b25296558b90e4ad12e7319487449b303076a2fd0a58
+  PROXY_SOURCE: 117118c83093822469b3824ba9587ff4068ed29f
+  HELPER_SOURCE: 6280877bd8e4ebf5db0ff523239c4246230571db
+
+jobs:
+  cohort:
+    name: ${{ matrix.cli }} CLI, ${{ matrix.phase }} cells
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        cli: [published, source]
+        phase: [modern, legacy]
+    defaults:
+      run:
+        shell: bash --noprofile --norc -e -o pipefail {0}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6
+        with:
+          python-version: '3.13'
+      - name: Bootstrap verified dependency trust
+        uses: durable-workflow/.github/.github/actions/bootstrap-patched-pip@75587fc33ff40c34f32ef777293dad56bb6f48c7  # clean-trust
+        with:
+          clients: pip,python,cargo,curl,git
+      - name: Download the accepted shared inputs
+        run: |
+          umask 077
+          inputs="$RUNNER_TEMP/command-key-inputs"
+          mkdir -m 700 "$inputs"
+          echo "INPUTS=$inputs" >> "$GITHUB_ENV"
+          fetch() { curl --fail --silent --show-error --location --proto '=https' --max-time 60 --max-filesize "$3" "$1" --output "$inputs/$2"; }
+          fetch "https://raw.githubusercontent.com/durable-workflow/.github/$PROXY_SOURCE/conformance/command-keys/committed_response_loss.py" committed_response_loss.py 65536
+          fetch "https://raw.githubusercontent.com/durable-workflow/sdk-rust/$HELPER_SOURCE/scripts/acceptance/command-keys/sqlite_legacy.py" sqlite_legacy.py 131072
+          fetch "https://raw.githubusercontent.com/durable-workflow/sdk-rust/$HELPER_SOURCE/scripts/acceptance/command-keys/command-key-legacy-v1-vectors.json" command-key-legacy-v1-vectors.json 131072
+          # The cohort verifies each file against its accepted SHA256 before use.
+      - name: Download the published CLI
+        if: matrix.cli == 'published'
+        run: |
+          curl --fail --silent --show-error --location --proto '=https' --max-time 120 --max-filesize 67108864 \
+            "https://github.com/durable-workflow/cli/releases/download/$CLI_VERSION/dw-linux-x86_64" --output "$INPUTS/dw"
+          echo "$CLI_SHA256  $INPUTS/dw" | sha256sum -c -
+          {
+            echo "CLI_BINARY=$INPUTS/dw"
+            echo "CLI_BINARY_SHA256=$CLI_SHA256"
+            echo "TYPED_EXIT="
+          } >> "$GITHUB_ENV"
+      - name: Install Rust 1.99
+        if: matrix.cli == 'source'
+        uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4  # stable
+        with:
+          toolchain: 1.99.0
+      - name: Build this checkout's CLI
+        if: matrix.cli == 'source'
+        working-directory: rust
+        run: |
+          cargo build --locked
+          cp target/debug/dw "$INPUTS/dw"
+          {
+            echo "CLI_BINARY=$INPUTS/dw"
+            echo "CLI_BINARY_SHA256=$(sha256sum "$INPUTS/dw" | cut -d' ' -f1)"
+            echo "TYPED_EXIT=--typed-exit-codes"
+          } >> "$GITHUB_ENV"
+      - name: Pull the published Server by digest
+        run: docker pull "ghcr.io/durable-workflow/server@$SERVER_INDEX"
+      - name: Run the ${{ matrix.phase }} cells
+        run: |
+          # TYPED_EXIT is empty for the published CLI.
+          # shellcheck disable=SC2086
+          timeout --kill-after=30s 15m python3 -I scripts/acceptance/command-keys/published_cohort.py \
+            --phase "${{ matrix.phase }}" $TYPED_EXIT \
+            --cli "$CLI_BINARY" --cli-sha256 "$CLI_BINARY_SHA256" --inputs "$INPUTS" \
+            --server-index "$SERVER_INDEX" --server-source "$SERVER_SOURCE" --server-version "$SERVER_VERSION" \
+            --work-dir "$RUNNER_TEMP/cohort" --container-prefix "cli-command-keys-$GITHUB_RUN_ID" \
+            --owner "$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" | tee command-key-result.json
+          python3 -I -c 'import json,sys; r=json.loads(open("command-key-result.json").read().splitlines()[-1]); print("::notice::", r["phase"], r["outcome"], r["checks"], "checks; cleanup", r["cleanup"]); sys.exit(r["outcome"] != "pass")'
+          {
+            echo "### ${{ matrix.cli }} CLI, ${{ matrix.phase }} cells"
+            echo '```json'
+            tail -n 1 command-key-result.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Remove any container this run created
+        if: always()
+        run: |
+          ids="$(docker ps --all --quiet --filter "label=durable-workflow.cli-command-keys=$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT")"
+          if [ -n "$ids" ]; then docker rm --force --volumes $ids; fi
+          test -z "$(docker ps --all --quiet --filter "label=durable-workflow.cli-command-keys=$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT")"
+      - name: Keep the sanitized observations
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
+        with:
+          name: command-keys-${{ matrix.cli }}-${{ matrix.phase }}
+          path: |
+            command-key-result.json
+            ${{ runner.temp }}/cohort/checks.json
+            ${{ runner.temp }}/cohort/invocations.json
+          retention-days: 7
+          if-no-files-found: warn

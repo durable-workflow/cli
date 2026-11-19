@@ -15597,6 +15597,93 @@
    "reference": "php-main"
   },
   {
+   "name": "workflow signal request id ambiguous JSON",
+   "argv": [
+    "workflow:signal",
+    "chk-42",
+    "approve",
+    "--server={mock}",
+    "--request-id=approve-1",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/signal/approve": {
+     "method": "POST",
+     "status": 409,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "message": "The request_id matches more than one retained command.",
+      "reason": "request_id_ambiguous",
+      "retained": true,
+      "intent_verified": false,
+      "retryable": false
+     }
+    }
+   },
+   "reference": "php-main"
+  },
+  {
+   "name": "workflow signal request id ambiguous human",
+   "argv": [
+    "workflow:signal",
+    "chk-42",
+    "approve",
+    "--server={mock}",
+    "--request-id=approve-1"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/signal/approve": {
+     "method": "POST",
+     "status": 409,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "message": "The request_id matches more than one retained command.",
+      "reason": "request_id_ambiguous",
+      "retained": true,
+      "intent_verified": false,
+      "retryable": false
+     }
+    }
+   },
+   "reference": "php-main"
+  },
+  {
+   "name": "workflow update request id ambiguous JSON",
+   "argv": [
+    "workflow:update",
+    "chk-42",
+    "quota.adjust",
+    "--server={mock}",
+    "--request-id=approve-1",
+    "--wait=completed",
+    "--json"
+   ],
+   "mock": [],
+   "mock_routes": {
+    "/api/workflows/chk-42/update/quota.adjust": {
+     "method": "POST",
+     "status": 409,
+     "headers": {
+      "X-Durable-Workflow-Control-Plane-Version": "2"
+     },
+     "body": {
+      "message": "The request_id matches more than one retained command.",
+      "reason": "request_id_ambiguous",
+      "retained": true,
+      "intent_verified": false,
+      "retryable": false
+     }
+    }
+   },
+   "reference": "php-main"
+  },
+  {
    "name": "workflow update server error JSON",
    "argv": [
     "workflow:update",

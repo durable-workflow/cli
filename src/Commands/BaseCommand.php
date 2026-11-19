@@ -34,6 +34,8 @@ abstract class BaseCommand extends Command
 
     private const REQUEST_ID_CONFLICT_REASON = 'request_id_conflict';
 
+    private const REQUEST_ID_AMBIGUOUS_REASON = 'request_id_ambiguous';
+
     private const NAMESPACE_SCOPED_COMMAND_NAMES = [
         'activity:complete',
         'activity:describe',
@@ -739,7 +741,12 @@ abstract class BaseCommand extends Command
         }
 
         if (is_bool($result['intent_verified'] ?? null)) {
-            $output->writeln('  Intent Verified: '.($result['intent_verified'] ? 'yes' : 'no'));
+            // A legacy receipt is retained without a recorded intent, so the
+            // Server returned it without comparing this command to it.
+            $legacy = $result['intent_verified'] === false && ($result['retained'] ?? null) === true;
+            $output->writeln('  Intent Verified: '.($result['intent_verified']
+                ? 'yes'
+                : ($legacy ? "no (legacy receipt; the Server did not compare this command's intent with it)" : 'no')));
         }
     }
 
@@ -1858,6 +1865,22 @@ abstract class BaseCommand extends Command
                     $requestId,
                     $this->nonEmptyScalarString($body['retained_command_type'] ?? null) ?? 'retained',
                     $parts === [] ? 'intent' : implode('/', $parts),
+                ),
+            ]];
+        }
+
+        if ($e->statusCode === 409 && $e->reason() === self::REQUEST_ID_AMBIGUOUS_REASON) {
+            $body = $e->body ?? [];
+            $requestId = $this->nonEmptyScalarString($body['request_id'] ?? null)
+                ?? ($input !== null ? $this->errorRequestIdContext($input) : null)
+                ?? 'given';
+
+            return [[
+                'id' => 'request_id.ambiguous',
+                'severity' => 'error',
+                'message' => sprintf(
+                    'Request id [%s] matches more than one retained command, so the Server recorded nothing and selected no receipt. Retrying it unchanged fails the same way. Inspect workflow history to see which commands were admitted, and pass a new --request-id to record a new command.',
+                    $requestId,
                 ),
             ]];
         }

@@ -143,9 +143,18 @@ fn receipt_lines(result: &Value) {
         ));
     }
     if let Some(Value::Bool(verified)) = result.get("intent_verified") {
+        // A legacy receipt is retained without a recorded intent, so the
+        // Server returned it without comparing this command to it.
+        let legacy = !*verified && result.get("retained") == Some(&Value::Bool(true));
         formatter::writeln_out(&format!(
             "  Intent Verified: {}",
-            if *verified { "yes" } else { "no" }
+            if *verified {
+                "yes"
+            } else if legacy {
+                "no (legacy receipt; the Server did not compare this command's intent with it)"
+            } else {
+                "no"
+            }
         ));
     }
 }

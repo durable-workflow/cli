@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 final class ReferenceRuntimeRefused extends RuntimeException {}
 
-if (PHP_VERSION !== '8.4.27' || ini_get('phar.readonly') !== '1'
+if (PHP_VERSION !== '8.4.28' || ini_get('phar.readonly') !== '1'
     || ini_get('memory_limit') !== '-1' || ini_get('opcache.enable_cli') !== '0' || date_default_timezone_get() !== 'UTC'
     || ! in_array('/usr/local/etc/php/conf.d/zz-cli-reference.ini', explode(",\n", trim((string) php_ini_scanned_files())), true)) {
     throw new ReferenceRuntimeRefused('The exact PHP source-reference profile must be active.');

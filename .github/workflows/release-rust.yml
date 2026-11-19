@@ -501,7 +501,7 @@ jobs:
       LEGACY_VERSION: 2.3.5
       LEGACY_PHAR_SHA256: 67538671d44709312dd0ce77ec890094daf5c70d1e15eaa777c22231627d05a5
       # Pinned official PHP index, including native amd64 and arm64 images.
-      LEGACY_PHP_IMAGE: php:8.4.27-cli-bookworm@sha256:b3e907a1108629c562c4bb313ce3449e34d49991f6bb2487913f6146f47200fe
+      LEGACY_PHP_IMAGE: php:8.4.28-cli-bookworm@sha256:85da896b3eeb8bcd83fe612e51a529b7d5983a1fab92ef5f63c7ac6e2842fc46
     steps:
       # setup-php could not install PHP on macos-15 for 2.5.0-rc.3 (twice,
       # ~29 minutes each), so macOS takes PHP 8.4 from Homebrew core, as

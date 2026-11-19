@@ -40,6 +40,12 @@ MANIFEST_SHA256 = 'da1990000c611d7377690c7526487d6415fa4f9cb42d299f59585a7c2eebf
 EMPTY = {'codec': 'avro', 'blob': 'wwHioz3/VYAiNwA='}
 ONE = {'codec': 'avro', 'blob': 'wwHioz3/VYAiNwQC'}
 NIL_RUN = '00000000000000000000000000'
+REDACTED = '[redacted]'
+WORKFLOWS = '/api/workflows/'
+LEGACY_DB = 'legacy.sqlite'
+MANIFEST_NAME = 'command-key-legacy-v1-vectors.json'
+HEX = frozenset('0123456789abcdef')
+CONCURRENCY = 4
 
 CHECKS, INVOCATIONS = [], []
 STATE = {}
@@ -75,7 +81,7 @@ class Runtime:
     def docker(self, *args, check=True):
         result = subprocess.run(['docker', *args], capture_output=True, text=True, timeout=60)
         if check and result.returncode:
-            raise RuntimeError('docker ' + args[0] + ' failed: ' + result.stderr.replace(self.token, '[redacted]')[:2000])
+            raise RuntimeError('docker ' + args[0] + ' failed: ' + result.stderr.replace(self.token, REDACTED)[:2000])
         return result.stdout.strip()
 
     def start(self, database):
@@ -174,7 +180,7 @@ def message(kind, workflow, key=None, value=1, name=None, run=None, namespace='d
 
 
 def path_for(kind, fixture, run=None):
-    path = '/api/workflows/' + fixture['workflow']
+    path = WORKFLOWS + fixture['workflow']
     if run:
         path += '/runs/' + run
     return path + '/' + kind + '/' + ('finish' if kind == 'signal' else 'set')
@@ -218,7 +224,7 @@ def fixture(kind, tag, namespace='default', workflow=None):
 
 
 def history(f, run=None):
-    status, body = request('GET', '/api/workflows/' + f['workflow'] + '/runs/' + (run or f['run']) + '/history',
+    status, body = request('GET', WORKFLOWS + f['workflow'] + '/runs/' + (run or f['run']) + '/history',
                            namespace=f['namespace'])
     require(status == 200, 'history read', body)
     return body['events']
@@ -256,7 +262,8 @@ def original(kind, f, key=None, lost=False, run=None):
     chosen = answer.get('request_id')
     require(isinstance(chosen, str) and chosen != '', kind + ': CLI reports the command key it sent', answer)
     if key is None:
-        require(re.fullmatch('cli-' + kind + '-[0-9a-f]{32}', chosen) is not None, kind + ': generated key shape')
+        suffix = chosen.removeprefix('cli-' + kind + '-')
+        require(suffix != chosen and len(suffix) == 32 and set(suffix) <= HEX, kind + ': generated key shape', chosen)
     else:
         require(chosen == key, kind + ': CLI reports the explicit key')
     if lost:
@@ -354,13 +361,13 @@ def run_modern(info):
         explicit = original(kind, f, key=kind + '-explicit-loss', lost=True)
         retained(kind, f, explicit)
         key = kind + '-concurrent'
-        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
-            replies = list(pool.map(lambda _: message(kind, f['workflow'], key), range(4)))
+        with concurrent.futures.ThreadPoolExecutor(max_workers=CONCURRENCY) as pool:
+            replies = list(pool.map(lambda _, k=kind, w=f['workflow'], r=key: message(k, w, r), range(CONCURRENCY)))
         require(len({r['command_id'] for r in replies}) == 1 and sum(r.get('retained') is True for r in replies) == 3,
                 kind + ': four simultaneous first sends admit exactly one command', replies)
         before = snapshot()
-        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
-            again = list(pool.map(lambda _: message(kind, f['workflow'], key), range(4)))
+        with concurrent.futures.ThreadPoolExecutor(max_workers=CONCURRENCY) as pool:
+            again = list(pool.map(lambda _, k=kind, w=f['workflow'], r=key: message(k, w, r), range(CONCURRENCY)))
         require(all(r.get('retained') is True and r['command_id'] == replies[0]['command_id'] for r in again),
                 kind + ': four concurrent identical retries return the original receipt')
         require(snapshot() == before, kind + ': concurrent retries write nothing')
@@ -368,8 +375,8 @@ def run_modern(info):
                 kind + ': history has one admission per key')
         for label, unicode_key in (('ascii', 'k' * 255), ('two-byte', 'é' * 255), ('four-byte', '🙂' * 255)):
             unicode_record = original(kind, f, key=unicode_key)
-            with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
-                list(pool.map(lambda _: retained(kind, f, unicode_record), range(4)))
+            with concurrent.futures.ThreadPoolExecutor(max_workers=CONCURRENCY) as pool:
+                list(pool.map(lambda _, k=kind, x=f, r=unicode_record: retained(k, x, r), range(CONCURRENCY)))
             require(len(unicode_key) == 255, kind + ': 255-character ' + label + ' key retained')
         before, wire = snapshot(), len(STATE['proxy'].records)
         message(kind, f['workflow'], key='é' * 256, namespace=f['namespace'], exit_code=2)
@@ -393,7 +400,7 @@ def run_modern(info):
             require(reason in ('run_not_active', 'run_closed', 'workflow_closed', 'historical_run_command_rejected',
                                'workflow_not_running', 'run_not_current'), kind + ': ' + action + ' fence reason', reason)
             if action == 'continue_as_new':
-                status, described = request('GET', '/api/workflows/' + f['workflow'])
+                status, described = request('GET', WORKFLOWS + f['workflow'])
                 successor = described.get('run_id')
                 require(status == 200 and successor and successor != f['run'], kind + ': continued run has a successor')
                 successor_events = [e['event_type'] for e in history(f, successor)]
@@ -452,10 +459,10 @@ def run_legacy(manifest):
     source = STATE['work'] / 'data' / 'seed.sqlite'
     with sqlite3.connect(source) as connection:
         require(connection.execute('PRAGMA wal_checkpoint(TRUNCATE)').fetchone()[0] == 0, 'stopped seed checkpointed')
-    transform = STATE['helper'].transform_copy(source, STATE['work'] / 'data' / 'legacy.sqlite', selections, stopped=True)
+    transform = STATE['helper'].transform_copy(source, STATE['work'] / 'data' / LEGACY_DB, selections, stopped=True)
     require(transform['transformed'] == len(selections), 'helper rewrote exactly the selected admissions', transform)
-    STATE['database'] = 'legacy.sqlite'
-    info = STATE['runtime'].start('legacy.sqlite')
+    STATE['database'] = LEGACY_DB
+    info = STATE['runtime'].start(LEGACY_DB)
     require(info['version'] == STATE['options'].server_version, 'same Server version on the legacy copy')
     STATE['proxy'] = STATE['proxy_type'](STATE['runtime'].base)
     threading.Thread(target=STATE['proxy'].serve_forever, kwargs={'poll_interval': .01}, daemon=True).start()
@@ -477,8 +484,9 @@ def run_legacy(manifest):
         label = kind + ':' + case['shape'] + ':' + case.get('state', 'open')
         before = snapshot()
         if case['shape'] == 'readback':
-            with concurrent.futures.ThreadPoolExecutor(max_workers=manifest['legacy_readback']['concurrency']) as pool:
-                replies = list(pool.map(lambda _: readback(case), range(manifest['legacy_readback']['concurrency'])))
+            require(manifest['legacy_readback']['concurrency'] == CONCURRENCY, 'accepted vector concurrency')
+            with concurrent.futures.ThreadPoolExecutor(max_workers=CONCURRENCY) as pool:
+                replies = list(pool.map(lambda _, c=case: readback(c), range(CONCURRENCY)))
             require(len({r['command_id'] for r in replies}) == 1, label + ': concurrent readers get one original identity')
             readback(case, run=f['run'])
             human = subprocess.run([STATE['cli'], 'workflow:' + kind, f['workflow'],
@@ -542,13 +550,13 @@ def main():
                    options.inputs / 'committed_response_loss.py')
     helper = module(verified(options.inputs / 'sqlite_legacy.py', HELPER_SHA256, 'SQLite helper'), 'sqlite_legacy',
                     options.inputs / 'sqlite_legacy.py')
-    manifest_bytes = verified(options.inputs / 'command-key-legacy-v1-vectors.json', MANIFEST_SHA256, 'legacy manifest')
+    manifest_bytes = verified(options.inputs / MANIFEST_NAME, MANIFEST_SHA256, 'legacy manifest')
     work = options.work_dir
     work.mkdir(mode=0o700)
     for name in ('data', 'home', 'config', 'tmp', 'bin'):
         (work / name).mkdir(mode=0o700)
-    (work / 'command-key-legacy-v1-vectors.json').write_bytes(manifest_bytes)
-    helper.MANIFEST = work / 'command-key-legacy-v1-vectors.json'
+    (work / MANIFEST_NAME).write_bytes(manifest_bytes)
+    helper.MANIFEST = work / MANIFEST_NAME
     binary = work / 'bin' / 'dw'
     with open(os.open(binary, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o500), 'wb') as output:
         output.write(cli_bytes)
@@ -580,7 +588,7 @@ def main():
             transform = run_legacy(json.loads(manifest_bytes))
         outcome = 'pass'
     except Exception as failure:  # report the first failure, then clean up
-        error = (type(failure).__name__ + ': ' + str(failure)).replace(token, '[redacted]')
+        error = (type(failure).__name__ + ': ' + str(failure)).replace(token, REDACTED)
     finally:
         if STATE.get('proxy'):
             STATE['proxy'].shutdown()
@@ -603,7 +611,7 @@ def main():
               'runner_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
               'container_ids': runtime.ids, 'cleanup': cleanup, 'transform': transform}
     (work / 'checks.json').write_text(json.dumps(CHECKS, indent=1))
-    (work / 'invocations.json').write_text(json.dumps(INVOCATIONS, indent=1).replace(token, '[redacted]'))
+    (work / 'invocations.json').write_text(json.dumps(INVOCATIONS, indent=1).replace(token, REDACTED))
     print(json.dumps(report), flush=True)
     return 0 if outcome == 'pass' else 1
 

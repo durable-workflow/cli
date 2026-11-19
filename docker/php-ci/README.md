@@ -42,3 +42,17 @@ build identity fields needed by the source reference cross that boundary.
 Run `prepare-php-reference-container.sh CONFIG_ID PRIVATE_STATE` to check an
 already-inspected image, or the setup script to build the pinned runtime. The
 proposed caller fixture preserves the original vector, Cargo and parity commands.
+
+The two-build PHAR reproducibility caller reuses the reviewed PHAR profile
+through a separate launcher. Its archived trees and comparison artifacts
+live outside PHP's writable temporary data. The host prepares one selected
+tree at a time; PHP sees that tree read-only with only vendor, build and the
+generated build-info file writable. Other trees and the compared PHAR copy
+are not mounted. The original build script's mutable Box cache path is
+routed through the existing guard and read-only pinned Box artifact.
+
+The `reproducible-build` job in `build.yml` runs
+`scripts/ci/verify-php-reproducible-build.sh` after this profile's setup; the
+ordinary local `scripts/verify-reproducible-build.sh` is unchanged. Each host-prepared tree receives a
+read-only Box configuration with its timestamp set from `SOURCE_DATE_EPOCH`.
+This pins PHAR metadata as well as the original input-file normalization.

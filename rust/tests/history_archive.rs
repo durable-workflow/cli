@@ -500,6 +500,9 @@ struct Mock {
 
 type Route = (&'static str, u16, Vec<u8>);
 
+/// A route status that answers 200 only after 20 seconds.
+const SLOW: u16 = 299;
+
 impl Mock {
     fn new(routes: Vec<Route>) -> Self {
         use std::io::{Read, Write};
@@ -507,53 +510,64 @@ impl Mock {
         let url = format!("http://{}/prefix", listener.local_addr().unwrap());
         let requests = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
         let observed = requests.clone();
-        let info = include_bytes!("../src/compat/fixtures/cluster-info-php-2.11.8.json").to_vec();
+        let info = std::sync::Arc::new(
+            include_bytes!("../src/compat/fixtures/cluster-info-php-2.11.8.json").to_vec(),
+        );
+        let routes = std::sync::Arc::new(routes);
         std::thread::spawn(move || {
             for stream in listener.incoming() {
                 let Ok(mut stream) = stream else { continue };
-                stream
-                    .set_read_timeout(Some(Duration::from_secs(2)))
-                    .unwrap();
-                let mut bytes = Vec::new();
-                let mut buffer = [0; 4096];
-                loop {
-                    if let Some(end) = bytes.windows(4).position(|part| part == b"\r\n\r\n") {
-                        let head = String::from_utf8_lossy(&bytes[..end]).to_lowercase();
-                        let length = head
-                            .lines()
-                            .find_map(|line| line.strip_prefix("content-length:"))
-                            .and_then(|value| value.trim().parse::<usize>().ok())
-                            .unwrap_or(0);
-                        if bytes.len() >= end + 4 + length {
-                            break;
+                let (routes, observed, info) = (routes.clone(), observed.clone(), info.clone());
+                // One thread per connection, so a slow answer blocks nothing else.
+                std::thread::spawn(move || {
+                    stream
+                        .set_read_timeout(Some(Duration::from_secs(2)))
+                        .unwrap();
+                    let mut bytes = Vec::new();
+                    let mut buffer = [0; 4096];
+                    loop {
+                        if let Some(end) = bytes.windows(4).position(|part| part == b"\r\n\r\n") {
+                            let head = String::from_utf8_lossy(&bytes[..end]).to_lowercase();
+                            let length = head
+                                .lines()
+                                .find_map(|line| line.strip_prefix("content-length:"))
+                                .and_then(|value| value.trim().parse::<usize>().ok())
+                                .unwrap_or(0);
+                            if bytes.len() >= end + 4 + length {
+                                break;
+                            }
+                        }
+                        match stream.read(&mut buffer) {
+                            Ok(0) | Err(_) => break,
+                            Ok(size) => bytes.extend_from_slice(&buffer[..size]),
                         }
                     }
-                    match stream.read(&mut buffer) {
-                        Ok(0) | Err(_) => break,
-                        Ok(size) => bytes.extend_from_slice(&buffer[..size]),
+                    let line = String::from_utf8_lossy(&bytes)
+                        .lines()
+                        .next()
+                        .unwrap_or_default()
+                        .to_owned();
+                    let (mut status, body) = if line.starts_with("GET /prefix/api/cluster/info ") {
+                        (200, info.to_vec())
+                    } else {
+                        observed.lock().unwrap().push(line.clone());
+                        routes
+                            .iter()
+                            .find(|(prefix, _, _)| line.starts_with(prefix))
+                            .map(|(_, status, body)| (*status, body.clone()))
+                            .unwrap_or((404, b"{}".to_vec()))
+                    };
+                    if status == SLOW {
+                        std::thread::sleep(Duration::from_secs(20));
+                        status = 200;
                     }
-                }
-                let line = String::from_utf8_lossy(&bytes)
-                    .lines()
-                    .next()
-                    .unwrap_or_default()
-                    .to_owned();
-                let (status, body) = if line.starts_with("GET /prefix/api/cluster/info ") {
-                    (200, info.clone())
-                } else {
-                    observed.lock().unwrap().push(line.clone());
-                    routes
-                        .iter()
-                        .find(|(prefix, _, _)| line.starts_with(prefix))
-                        .map(|(_, status, body)| (*status, body.clone()))
-                        .unwrap_or((404, b"{}".to_vec()))
-                };
-                let head = format!(
+                    let head = format!(
                     "HTTP/1.1 {status} Test\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
                     body.len()
                 );
-                let _ = stream.write_all(head.as_bytes());
-                let _ = stream.write_all(&body);
+                    let _ = stream.write_all(head.as_bytes());
+                    let _ = stream.write_all(&body);
+                });
             }
         });
         Self { url, requests }
@@ -845,4 +859,146 @@ fn a_resumed_copy_replaces_corrupt_and_partial_objects_and_releases_the_recorded
     assert_eq!(code, 2);
     assert!(mock.lines().is_empty(), "{:?}", mock.lines());
     assert_eq!(fs::read(target.join(MOCK_ID)).unwrap(), b"keep");
+}
+
+#[test]
+fn a_refused_acquire_surfaces_its_error_and_leaves_no_owner_recorded() {
+    let project = Project::new();
+    let dir = project.0.join("forbidden");
+    let mock = Mock::new(vec![(
+        ACQUIRE,
+        403,
+        json!({"reason": "forbidden", "message": "This action requires the admin role."})
+            .to_string()
+            .into_bytes(),
+    )]);
+    let (code, error) = mock_archive(&project, &mock, &dir);
+    assert_eq!(code, 4, "{error}");
+    assert!(!dir.exists(), "a refused acquire left its directory");
+    // The owner never held the hold: nothing to release.
+    assert!(
+        !mock.lines().iter().any(|line| line.starts_with(RELEASE)),
+        "{:?}",
+        mock.lines()
+    );
+
+    // An unfinished archive recorded against another Server is not resumed
+    // here, so its recorded owner is never released at the wrong Server.
+    let elsewhere = project.0.join("elsewhere");
+    fs::create_dir_all(&elsewhere).unwrap();
+    fs::write(elsewhere.join(".dw-history-archive.json"), json!({"schema": "dw.history-archive.in-progress.v1",
+        "owner": OTHER_OWNER, "workflow_id": "wf", "run_id": "run", "server": "http://127.0.0.1:9/other",
+        "namespace": "default"}).to_string()).unwrap();
+    let mock = Mock::new(vec![]);
+    let (code, error) = mock_archive(&project, &mock, &elsewhere);
+    assert_eq!(code, 2, "{error}");
+    assert!(
+        error["error"]
+            .as_str()
+            .unwrap()
+            .contains("--server=http://127.0.0.1:9/other"),
+        "{error}"
+    );
+    assert!(mock.lines().is_empty(), "{:?}", mock.lines());
+}
+
+/// Start `dw workflow:history-archive` against `mock`, wait until the mock
+/// has seen a request starting with `first`, and send `signal`.
+fn signal_during(
+    project: &Project,
+    mock: &Mock,
+    dir: &Path,
+    first: &str,
+    signal: i32,
+) -> std::process::Child {
+    let child = project
+        .command(&[
+            "workflow:history-archive",
+            "wf",
+            "run",
+            dir.to_str().unwrap(),
+            "--server",
+            &mock.url,
+            "--token=fixture-token",
+            "--json",
+        ])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    wait_for(mock, first);
+    unsafe { libc::kill(child.id() as i32, signal) };
+    child
+}
+
+fn wait_for(mock: &Mock, prefix: &str) {
+    let deadline = Instant::now() + Duration::from_secs(30);
+    while !mock.lines().iter().any(|line| line.starts_with(prefix)) {
+        assert!(
+            Instant::now() < deadline,
+            "never saw {prefix}: {:?}",
+            mock.lines()
+        );
+        std::thread::sleep(Duration::from_millis(20));
+    }
+}
+
+fn exit_within(mut child: std::process::Child, seconds: u64) -> i32 {
+    let deadline = Instant::now() + Duration::from_secs(seconds);
+    loop {
+        if let Some(status) = child.try_wait().unwrap() {
+            return status.code().unwrap_or(-1);
+        }
+        if Instant::now() >= deadline {
+            let _ = child.kill();
+            panic!("dw did not exit within {seconds}s");
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
+}
+
+#[test]
+fn sigterm_stops_the_copy_and_releases_and_a_second_signal_stops_the_release() {
+    let project = Project::new();
+
+    // SIGTERM while an object downloads: the copy stops, the hold is
+    // released, and the unfinished archive keeps no owner.
+    let mock = Mock::new(vec![
+        (ACQUIRE, 200, held()),
+        (RENEW, 200, held()),
+        (EXPORT, 200, mock_export()),
+        (OBJECT, SLOW, MOCK_BYTES.to_vec()),
+        (RELEASE, 200, held()),
+    ]);
+    let dir = project.0.join("terminated");
+    let child = signal_during(&project, &mock, &dir, OBJECT, libc::SIGTERM);
+    assert_eq!(exit_within(child, 10), 143);
+    assert!(
+        mock.lines().iter().any(|line| line.starts_with(RELEASE)),
+        "{:?}",
+        mock.lines()
+    );
+    assert!(!dir.join("receipt.json").exists());
+    let progress: Value =
+        serde_json::from_slice(&fs::read(dir.join(".dw-history-archive.json")).unwrap()).unwrap();
+    assert_eq!(progress["owner"], Value::Null, "{progress}");
+
+    // Ctrl-C during the copy, then again while the release hangs: dw stops
+    // waiting and keeps its owner recorded for the next run.
+    let mock = Mock::new(vec![
+        (ACQUIRE, 200, held()),
+        (RENEW, 200, held()),
+        (EXPORT, 200, mock_export()),
+        (OBJECT, SLOW, MOCK_BYTES.to_vec()),
+        (RELEASE, SLOW, held()),
+    ]);
+    let dir = project.0.join("interrupted");
+    let child = signal_during(&project, &mock, &dir, OBJECT, libc::SIGINT);
+    wait_for(&mock, RELEASE);
+    unsafe { libc::kill(child.id() as i32, libc::SIGINT) };
+    assert_eq!(exit_within(child, 10), 130);
+    let progress: Value =
+        serde_json::from_slice(&fs::read(dir.join(".dw-history-archive.json")).unwrap()).unwrap();
+    assert!(progress["owner"].is_string(), "{progress}");
+    assert_eq!(progress["server"], json!(mock.url), "{progress}");
 }

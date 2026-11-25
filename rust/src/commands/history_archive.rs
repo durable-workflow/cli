@@ -166,6 +166,8 @@ struct Directory {
     created: bool,
     /// The hold owner a crashed earlier copy recorded.
     stale_owner: Option<String>,
+    /// The Server and namespace an unfinished archive was recorded against.
+    recorded: Option<(Option<String>, Option<String>)>,
     /// Released when dropped, or by the OS if dw dies.
     _lock: std::fs::File,
 }
@@ -230,6 +232,7 @@ fn prepare(dir: &Path, workflow_id: &str, run_id: &str) -> Result<Directory, Cli
         return Ok(Directory {
             created,
             stale_owner: None,
+            recorded: None,
             _lock: lock,
         });
     }
@@ -274,6 +277,10 @@ fn prepare(dir: &Path, workflow_id: &str, run_id: &str) -> Result<Directory, Cli
     }
     Ok(Directory {
         created,
+        recorded: progress.as_ref().map(|progress| {
+            let text = |key: &str| progress[key].as_str().map(str::to_owned);
+            (text("server"), text("namespace"))
+        }),
         stale_owner: progress.and_then(|progress| progress["owner"].as_str().map(str::to_owned)),
         _lock: lock,
     })
@@ -606,6 +613,23 @@ async fn copy(
     Ok((plan, copied))
 }
 
+/// Resolves when dw is asked to stop: Ctrl-C (exit 130) or, on Unix,
+/// SIGTERM (exit 143). Each call waits for a new signal.
+async fn interrupted() -> i32 {
+    #[cfg(unix)]
+    {
+        use tokio::signal::unix::{signal, SignalKind};
+        if let Ok(mut terminate) = signal(SignalKind::terminate()) {
+            return tokio::select! {
+                _ = tokio::signal::ctrl_c() => 130,
+                _ = terminate.recv() => 143,
+            };
+        }
+    }
+    let _ = tokio::signal::ctrl_c().await;
+    130
+}
+
 pub fn archive(context: &Context, input: &Input) -> Result<i32, CliError> {
     let workflow_id = input.arg("workflow-id").unwrap_or_default().to_owned();
     let run_id = input.arg("run-id").unwrap_or_default().to_owned();
@@ -624,6 +648,26 @@ pub fn archive(context: &Context, input: &Input) -> Result<i32, CliError> {
     };
     context.preflight(false)?;
     let directory = prepare(&dir, &workflow_id, &run_id)?;
+    if let Some((server, namespace)) = &directory.recorded {
+        // A recorded owner belongs to the Server that granted it: releasing
+        // it anywhere else would settle nothing.
+        let connection = &context.connection;
+        let same_server = server.as_deref().is_none_or(|server| {
+            server.trim_end_matches('/') == connection.server.trim_end_matches('/')
+        });
+        let same_namespace = namespace
+            .as_deref()
+            .is_none_or(|namespace| namespace == connection.namespace);
+        if !same_server || !same_namespace {
+            return Err(CliError::Invalid(format!(
+                "This unfinished archive was recorded against {} (namespace {}). Resume it with --server={} --namespace={}.",
+                server.as_deref().unwrap_or(&connection.server),
+                namespace.as_deref().unwrap_or(&connection.namespace),
+                server.as_deref().unwrap_or(&connection.server),
+                namespace.as_deref().unwrap_or(&connection.namespace),
+            )));
+        }
+    }
     let owner = new_owner()?;
     let run = Run {
         context,
@@ -633,24 +677,42 @@ pub fn archive(context: &Context, input: &Input) -> Result<i32, CliError> {
         owner: &owner,
         ttl,
         stale_settled: std::cell::Cell::new(true),
+        acquire_refused: std::cell::Cell::new(false),
     };
     let runtime = context.runtime();
     // One cancellation scope covers everything that can take or rely on the
-    // hold; `biased` lets a pending Ctrl-C win at the next await, so no
-    // receipt is written after it.
+    // hold; `biased` lets a pending Ctrl-C or SIGTERM win at the next await,
+    // so no receipt is written after it.
     let finished = runtime.block_on(async {
         tokio::select! {
             biased;
-            _ = tokio::signal::ctrl_c() => None,
-            result = run.held(directory.stale_owner.as_deref()) => Some(result),
+            code = interrupted() => Err(code),
+            result = run.held(directory.stale_owner.as_deref()) => Ok(result),
         }
     });
     // Release on every path. Releasing an owner that never acquired the hold
-    // is a harmless refusal.
-    let released = runtime.block_on(hold(context, "release", &owner, ttl));
-    let settled = matches!(released, Ok((200, _)) | Ok((409, _)));
+    // is a harmless refusal; an acquire the Server refused took nothing. A
+    // second Ctrl-C or SIGTERM stops waiting for the release and keeps the
+    // owner recorded for the next run.
+    let (settled, stopped_again) = if run.acquire_refused.get() {
+        (true, None)
+    } else {
+        runtime.block_on(async {
+            tokio::select! {
+                biased;
+                code = interrupted() => (false, Some(code)),
+                released = hold(context, "release", &owner, ttl) => {
+                    (matches!(released, Ok((200, _)) | Ok((409, _))), None)
+                }
+            }
+        })
+    };
+    let finished = match (finished, stopped_again) {
+        (Err(code), _) | (Ok(_), Some(code)) => Err(code),
+        (Ok(result), None) => Ok(result),
+    };
     let outcome = match &finished {
-        Some(Ok(result)) => result["outcome"]
+        Ok(Ok(result)) => result["outcome"]
             .as_str()
             .unwrap_or("incomplete")
             .to_owned(),
@@ -668,14 +730,14 @@ pub fn archive(context: &Context, input: &Input) -> Result<i32, CliError> {
         ));
     }
     match finished {
-        None => {
+        Err(code) => {
             formatter::writeln_err(
                 "<error>Cancelled. The archive is incomplete; run the same command again to resume.</error>",
             );
-            Ok(130)
+            Ok(code)
         }
-        Some(Err(error)) => Err(error),
-        Some(Ok(mut result)) => {
+        Ok(Err(error)) => Err(error),
+        Ok(Ok(mut result)) => {
             result["hold"]["released"] = json!(settled);
             if context.mode.machine_readable() {
                 output::print_json(&result);
@@ -700,12 +762,16 @@ struct Run<'a> {
     /// False while a crashed copy's recorded owner is not yet released: its
     /// record must survive this run, whatever else happens.
     stale_settled: std::cell::Cell<bool>,
+    /// The acquire was answered with a refusal: this owner never held the
+    /// hold, so there is nothing to release and no owner to keep recorded.
+    acquire_refused: std::cell::Cell<bool>,
 }
 
 impl Run<'_> {
     fn progress(&self, owner: Option<&str>) -> Result<(), CliError> {
         let progress = json!({"schema": PROGRESS_SCHEMA, "owner": owner, "workflow_id": self.workflow_id,
-            "run_id": self.run_id, "namespace": self.context.connection.namespace, "updated_at": batch_manifest::utc_now()});
+            "run_id": self.run_id, "server": self.context.connection.server, "namespace": self.context.connection.namespace,
+            "updated_at": batch_manifest::utc_now()});
         write_atomic(
             &self.dir.join(PROGRESS_FILE),
             output::encode_pretty(&progress).as_bytes(),
@@ -731,6 +797,9 @@ impl Run<'_> {
         // leaves the owner for the next run to release.
         self.progress(Some(self.owner))?;
         let (status, acquired) = hold(self.context, "acquire", self.owner, self.ttl).await?;
+        if status != 200 {
+            self.acquire_refused.set(true);
+        }
         if status == 404 {
             return Err(CliError::Failure(
                 "The Server does not serve the external payload backup hold (/api/system/external-payload-backup-hold), which a history archive copies under. Use native Server 3.x or later.".into(),

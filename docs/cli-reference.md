@@ -703,6 +703,12 @@ dw task-queue:resume orders --build-id build-2026.04.20-a3f
 dw task-queue:pause-activities orders --reason="payments vendor outage"
 dw task-queue:activity-dispatch orders
 dw task-queue:resume-activities orders
+
+# Inspect and retire an old worker build, or a whole queue (native Server 3.14.0+)
+dw task-queue:retirement orders --build-id build-2026.04.20-a3f
+dw task-queue:retire orders --build-id build-2026.04.20-a3f --expected-revision=sha256:...
+dw task-queue:retirement orders
+dw task-queue:retire orders
 ```
 
 An activity dispatch pause holds every new activity lease on one task queue
@@ -721,6 +727,34 @@ These commands need a Server that advertises
 as published PHP Server 2.x, `dw` refuses with exit 8 before sending the
 request. `task-queue:describe` and `task-queue:list` show the activity
 dispatch state when the Server reports it, and print nothing new otherwise.
+
+`task-queue:retirement` is a read-only inventory of everything that still
+depends on one build (`--build-id` or `--unversioned`) or, without either, on
+every cohort of the queue (Server #519): open runs pinned to it (including
+waiting, continued and child runs), ready, leased and delayed tasks (activity
+retries and timers), open activities, pending update validations, schedules
+(queue scope only), and unattributed open runs, which make the inventory
+incomplete. Each blocker has its exact count, up to 20 sample identities and a
+recovery action. When `Retirable` is `yes`, the output prints the matching
+`task-queue:retire` command bound to `observation.inventory_revision`.
+
+`task-queue:retire` sends one guarded retire request and never resends it. The
+Server repeats the inventory inside the serialized transition and records
+retirement only when it is empty: the build is never selected for new starts
+again and its workers are marked draining; run pins, activity queues and
+history are unchanged. A refusal is HTTP 409 and changes nothing; `dw` prints
+the reason (`selected_for_new_starts`, `inventory_incomplete`,
+`live_dependencies`, `inventory_changed`, `unknown_deployment` or
+`unknown_task_queue`), each blocker with its sample and recovery, and the
+Server's `expected_resolution`, and exits 2. `--expected-revision` refuses the
+retire with `inventory_changed` if anything the inspection observed has
+changed. `--json` returns the Server payload; a refusal keeps the usual error
+envelope with the full body in `server_response`.
+
+Unlike `task-queue:drain`, which stops a build's polls immediately whether or
+not work is still pinned to it, retirement waits for that work. Both commands
+need a Server that advertises `capabilities.worker_build_retirement`; on any
+other Server `dw` refuses with exit 8 before sending the request.
 
 ### Worker Protocol Diagnostics
 

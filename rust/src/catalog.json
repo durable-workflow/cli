@@ -11431,6 +11431,365 @@
    "rust_only": true
   },
   {
+   "name": "task-queue:retire",
+   "description": "Retire a worker build or task queue when nothing depends on it",
+   "synopsis": "task-queue:retire [-s|--server [SERVER]] [--namespace [NAMESPACE]] [--token [TOKEN]] [--tls-verify TLS-VERIFY] [--env ENV] [--output OUTPUT] [--build-id BUILD-ID] [--unversioned] [--expected-revision EXPECTED-REVISION] [--json] [--] <task-queue>",
+   "aliases": [],
+   "hidden": false,
+   "help": "Retire one worker build (<info>--build-id</info> or <info>--unversioned</info>), or every\ncohort on the task queue, only when nothing depends on it. The Server\nrepeats the <info>dw task-queue:retirement</info> check inside the same serialized\ntransition that starts, continuations, retries and task creation take,\nand records retirement only when the inventory is empty.\n\nA retired build is never selected for new starts, cannot be promoted, and\nits workers are marked draining. When every cohort on a queue is retired\nand no active worker remains, new starts on the queue are refused until a\nnew worker cohort registers. Run pins, activity queues and history are\nunchanged.\n\nThe request is sent once and never resent. A refusal (HTTP 409) changes\nnothing: dw prints the reason (selected_for_new_starts,\ninventory_incomplete, live_dependencies, inventory_changed,\nunknown_deployment or unknown_task_queue), each blocker with its count,\nsample and recovery action, and exits 2. Promote the replacement build\nfirst with <info>dw task-queue:promote</info>.\n\nPass <info>--expected-revision</info> with the inventory_revision from an inspection\nto refuse if anything that inspection observed has changed.\n\nNeeds a Server that advertises the worker_build_retirement capability\n(native Server 3.14.0 or later). dw reads cluster info first and refuses\nwith exit 8, without sending the request, when it is missing.\n\n<comment>Examples:</comment>\n\n  <info>dw task-queue:retire orders --build-id build-2026.04.21-z9 --expected-revision sha256:...</info>\n  <info>dw task-queue:retire orders --unversioned</info>\n  <info>dw task-queue:retire orders --json</info>",
+   "definition": {
+    "arguments": {
+     "task-queue": {
+      "name": "task-queue",
+      "is_required": true,
+      "is_array": false,
+      "description": "Task queue name, exactly as workers register it",
+      "default": null
+     }
+    },
+    "options": {
+     "server": {
+      "name": "--server",
+      "shortcut": "-s",
+      "accept_value": true,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Server URL",
+      "default": null
+     },
+     "namespace": {
+      "name": "--namespace",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Target namespace",
+      "default": null
+     },
+     "token": {
+      "name": "--token",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Auth token",
+      "default": null
+     },
+     "tls-verify": {
+      "name": "--tls-verify",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": true,
+      "is_multiple": false,
+      "description": "Verify TLS certificates (true/false). Defaults to $DURABLE_WORKFLOW_TLS_VERIFY, then the selected profile, then true.",
+      "default": null
+     },
+     "env": {
+      "name": "--env",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": true,
+      "is_multiple": false,
+      "description": "Named dw environment to use (overrides $DW_ENV and any env set via `dw env:use`). Hard-fails when the profile does not exist.",
+      "default": null
+     },
+     "output": {
+      "name": "--output",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": true,
+      "is_multiple": false,
+      "description": "Output format: table (human-readable), json (single JSON document), jsonl (one JSON object per line, for list commands)",
+      "default": "table"
+     },
+     "build-id": {
+      "name": "--build-id",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": true,
+      "is_multiple": false,
+      "description": "Build ID of one cohort on the queue; omit it (and --unversioned) for the whole queue",
+      "default": null
+     },
+     "unversioned": {
+      "name": "--unversioned",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Target the unversioned cohort (workers without a build_id)",
+      "default": false
+     },
+     "expected-revision": {
+      "name": "--expected-revision",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": true,
+      "is_multiple": false,
+      "description": "observation.inventory_revision from dw task-queue:retirement; refuse if the inventory changed since",
+      "default": null
+     },
+     "json": {
+      "name": "--json",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Output the command response as JSON (alias for --output=json)",
+      "default": false
+     },
+     "help": {
+      "name": "--help",
+      "shortcut": "-h",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Display help for the given command. When no command is given display help for the <info>list</info> command",
+      "default": false
+     },
+     "silent": {
+      "name": "--silent",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Do not output any message",
+      "default": false
+     },
+     "quiet": {
+      "name": "--quiet",
+      "shortcut": "-q",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Only errors are displayed. All other output is suppressed",
+      "default": false
+     },
+     "verbose": {
+      "name": "--verbose",
+      "shortcut": "-v|-vv|-vvv",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug",
+      "default": false
+     },
+     "version": {
+      "name": "--version",
+      "shortcut": "-V",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Display this application version",
+      "default": false
+     },
+     "ansi": {
+      "name": "--ansi",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Force (or disable --no-ansi) ANSI output",
+      "default": null
+     },
+     "no-ansi": {
+      "name": "--no-ansi",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Negate the \"--ansi\" option",
+      "default": null
+     },
+     "no-interaction": {
+      "name": "--no-interaction",
+      "shortcut": "-n",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Do not ask any interactive question",
+      "default": false
+     }
+    }
+   },
+   "rust_only": true
+  },
+  {
+   "name": "task-queue:retirement",
+   "description": "Show what blocks retiring a worker build or task queue",
+   "synopsis": "task-queue:retirement [-s|--server [SERVER]] [--namespace [NAMESPACE]] [--token [TOKEN]] [--tls-verify TLS-VERIFY] [--env ENV] [--output OUTPUT] [--build-id BUILD-ID] [--unversioned] [--json] [--] <task-queue>",
+   "aliases": [],
+   "hidden": false,
+   "help": "Show what still depends on one worker build, or on the whole task queue,\nin the selected namespace, and whether it can be retired safely. This is a\nread-only preview: nothing changes.\n\nWith <info>--build-id</info> (or <info>--unversioned</info>) the inventory covers runs pinned\nto that build on the queue; without either it covers every cohort on the\nqueue, including schedules that start runs on it. Each blocker gives its\nexact count, up to 20 sample identities and a recovery action:\n\n  - open runs (waiting, continued and child runs keep their build pin);\n  - ready, leased and delayed tasks (activity retries and timers);\n  - open activities recorded on the queue;\n  - pending update validations;\n  - schedules (whole queue only);\n  - unattributed open runs, which make the inventory incomplete and\n    retirement unavailable.\n\nWhen it is retirable, pass its observation.inventory_revision to\n<info>dw task-queue:retire --expected-revision</info> so the retire is refused if\nanything changed in between.\n\nNeeds a Server that advertises the worker_build_retirement capability\n(native Server 3.14.0 or later). dw reads cluster info first and refuses\nwith exit 8, without sending the request, when it is missing.\n\n<comment>Examples:</comment>\n\n  <info>dw task-queue:retirement orders --build-id build-2026.04.21-z9</info>\n  <info>dw task-queue:retirement orders --unversioned --json</info>\n  <info>dw task-queue:retirement orders</info>",
+   "definition": {
+    "arguments": {
+     "task-queue": {
+      "name": "task-queue",
+      "is_required": true,
+      "is_array": false,
+      "description": "Task queue name, exactly as workers register it",
+      "default": null
+     }
+    },
+    "options": {
+     "server": {
+      "name": "--server",
+      "shortcut": "-s",
+      "accept_value": true,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Server URL",
+      "default": null
+     },
+     "namespace": {
+      "name": "--namespace",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Target namespace",
+      "default": null
+     },
+     "token": {
+      "name": "--token",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Auth token",
+      "default": null
+     },
+     "tls-verify": {
+      "name": "--tls-verify",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": true,
+      "is_multiple": false,
+      "description": "Verify TLS certificates (true/false). Defaults to $DURABLE_WORKFLOW_TLS_VERIFY, then the selected profile, then true.",
+      "default": null
+     },
+     "env": {
+      "name": "--env",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": true,
+      "is_multiple": false,
+      "description": "Named dw environment to use (overrides $DW_ENV and any env set via `dw env:use`). Hard-fails when the profile does not exist.",
+      "default": null
+     },
+     "output": {
+      "name": "--output",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": true,
+      "is_multiple": false,
+      "description": "Output format: table (human-readable), json (single JSON document), jsonl (one JSON object per line, for list commands)",
+      "default": "table"
+     },
+     "build-id": {
+      "name": "--build-id",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": true,
+      "is_multiple": false,
+      "description": "Build ID of one cohort on the queue; omit it (and --unversioned) for the whole queue",
+      "default": null
+     },
+     "unversioned": {
+      "name": "--unversioned",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Target the unversioned cohort (workers without a build_id)",
+      "default": false
+     },
+     "json": {
+      "name": "--json",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Output the command response as JSON (alias for --output=json)",
+      "default": false
+     },
+     "help": {
+      "name": "--help",
+      "shortcut": "-h",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Display help for the given command. When no command is given display help for the <info>list</info> command",
+      "default": false
+     },
+     "silent": {
+      "name": "--silent",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Do not output any message",
+      "default": false
+     },
+     "quiet": {
+      "name": "--quiet",
+      "shortcut": "-q",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Only errors are displayed. All other output is suppressed",
+      "default": false
+     },
+     "verbose": {
+      "name": "--verbose",
+      "shortcut": "-v|-vv|-vvv",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug",
+      "default": false
+     },
+     "version": {
+      "name": "--version",
+      "shortcut": "-V",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Display this application version",
+      "default": false
+     },
+     "ansi": {
+      "name": "--ansi",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Force (or disable --no-ansi) ANSI output",
+      "default": null
+     },
+     "no-ansi": {
+      "name": "--no-ansi",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Negate the \"--ansi\" option",
+      "default": null
+     },
+     "no-interaction": {
+      "name": "--no-interaction",
+      "shortcut": "-n",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Do not ask any interactive question",
+      "default": false
+     }
+    }
+   },
+   "rust_only": true
+  },
+  {
    "name": "worker:deregister",
    "description": "Deregister a worker from the server",
    "synopsis": "worker:deregister [-s|--server [SERVER]] [--namespace [NAMESPACE]] [--token [TOKEN]] [--tls-verify TLS-VERIFY] [--env ENV] [--output OUTPUT] [--json] [--] <worker-id>",

@@ -912,3 +912,271 @@ fn principal_label(principal: &Value) -> Option<String> {
 fn reported_dispatch(queue: &Value) -> Option<&Value> {
     php::get(queue, "activity_dispatch").filter(|value| value.is_object())
 }
+
+/// Cluster info capability for the guarded build and queue retirement
+/// routes (Server #519, native Server 3.14.0).
+const WORKER_BUILD_RETIREMENT: &str = "worker_build_retirement";
+
+const RETIREMENT_UNSUPPORTED: &str = "Guarded worker build and task queue retirement needs a native Durable Workflow Server 3.14.0 or later; published PHP Server 2.x has no such route.";
+
+const RETIREMENT_NEXT_STEP: &str = "Connect to a Server that advertises this capability. Without it, inspect the build with dw task-queue:build-ids and stop its workers only after its pinned runs close; dw task-queue:drain stops a build's polls immediately, whether or not work is still pinned to it.";
+
+/// `task-queue:retirement`: one read of the live dependencies that block
+/// retiring one build (`--build-id`, `--unversioned`) or the whole queue.
+pub fn retirement(context: &Context, input: &Input) -> Result<i32, CliError> {
+    retirement_request(context, input, false)
+}
+
+/// `task-queue:retire`: one guarded retire request, never resent. A 409
+/// refusal changed nothing and is reported with its blockers.
+pub fn retire(context: &Context, input: &Input) -> Result<i32, CliError> {
+    retirement_request(context, input, true)
+}
+
+/// The cohort a retirement command names: `None` for the whole queue,
+/// `Some(None)` for the unversioned cohort, `Some(Some(id))` for a build.
+fn retirement_target(input: &Input) -> Result<Option<Option<&str>>, &'static str> {
+    let unversioned = input.flag("unversioned");
+    let build_id = input.opt("build-id").flatten().filter(|id| !id.is_empty());
+    match (unversioned, build_id) {
+        (true, Some(_)) => Err("--unversioned cannot be combined with --build-id. Choose one."),
+        (true, None) => Ok(Some(None)),
+        // The deployment name is `task_queue@build_id`, with `unversioned`
+        // naming the unversioned cohort: such a build id would address
+        // another cohort than the one given.
+        (false, Some(id)) if id.contains('@') => {
+            Err("A build_id containing \"@\" cannot be addressed by the deployment retirement route.")
+        }
+        (false, Some("unversioned")) => Err(
+            "The build_id \"unversioned\" names the unversioned cohort on this route. Pass --unversioned to target it.",
+        ),
+        (false, Some(id)) => Ok(Some(Some(id))),
+        (false, None) => Ok(None),
+    }
+}
+
+fn retirement_request(context: &Context, input: &Input, retire: bool) -> Result<i32, CliError> {
+    let task_queue = input.arg("task-queue").unwrap_or_default();
+    let target = match retirement_target(input) {
+        Ok(target) => target,
+        Err(message) => return Ok(crate::command_usage_error(&input.command, message)),
+    };
+    let expected_revision = if retire {
+        input.opt_str("expected-revision")
+    } else {
+        None
+    };
+    let info = context.preflight(false)?;
+    crate::compat::require_capability(
+        &info,
+        crate::build_info::version(),
+        WORKER_BUILD_RETIREMENT,
+        RETIREMENT_UNSUPPORTED,
+        RETIREMENT_NEXT_STEP,
+    )
+    .map_err(CliError::Compatibility)?;
+    let action = if retire { "retire" } else { "retirement" };
+    let namespace = context.connection.namespace.as_str();
+    let segments: Vec<String> = match target {
+        // `{namespace}/{task_queue}@{build_id}`; each part is one encoded
+        // path segment, so a queue name cannot select another route.
+        Some(build) => vec![
+            "deployments".into(),
+            namespace.into(),
+            format!("{task_queue}@{}", build.unwrap_or("unversioned")),
+            action.into(),
+        ],
+        None => vec!["task-queues".into(), task_queue.into(), action.into()],
+    };
+    let request = if retire {
+        let body = match expected_revision {
+            Some(revision) => json!({ "expected_inventory_revision": revision }),
+            None => json!({}),
+        };
+        RawRequest::post(segments).json(body)
+    } else {
+        RawRequest::get(segments)
+    };
+    let result = with_namespace(
+        context.resource_request(request)?,
+        &context.connection.namespace,
+        None,
+    );
+    if context.mode.machine_readable() {
+        output::print_json(&result);
+        return Ok(0);
+    }
+    let shown_queue = match php::get(&result, "task_queue").filter(|value| !value.is_null()) {
+        Some(value) => text(Some(value)),
+        None => formatter::display_text(task_queue),
+    };
+    let subject = match target {
+        Some(build) => format!(
+            "build_id {} on task queue {shown_queue}",
+            formatter::display_text(&build_id_label(build.map(|id| json!(id)).as_ref()))
+        ),
+        None => format!("task queue {shown_queue}"),
+    };
+    if retire {
+        formatter::writeln_out(&format!("<info>Retired {subject}.</info>"));
+    } else {
+        formatter::writeln_out(&format!("<info>Retirement inventory for {subject}</info>"));
+    }
+    write_namespace_line(&result);
+    for line in retirement_lines(&result, !retire) {
+        formatter::writeln_out(&line);
+    }
+    let message = php::get(&result, "message").filter(|value| nonempty_scalar(Some(value)));
+    let mut closing = Vec::new();
+    if let Some(message) = message {
+        closing.push(text(Some(message)));
+    }
+    if !retire {
+        if let Some(resolution) =
+            php::get(&result, "expected_resolution").filter(|value| nonempty_scalar(Some(value)))
+        {
+            closing.push(format!("Next: {}", text(Some(resolution))));
+        } else if php::get(&result, "retirable") == Some(&Value::Bool(true)) {
+            let target_flag = match target {
+                Some(Some(id)) => format!(" --build-id={}", formatter::display_text(id)),
+                Some(None) => " --unversioned".into(),
+                None => String::new(),
+            };
+            let revision = php::array_get(php::get(&result, "observation"), "inventory_revision")
+                .filter(|value| nonempty_scalar(Some(value)))
+                .map(|value| format!(" --expected-revision={}", text(Some(value))))
+                .unwrap_or_default();
+            closing.push(format!(
+                "Retire it with <info>dw task-queue:retire {}{target_flag}{revision}</info>; the Server repeats this check atomically and refuses if anything changed.",
+                formatter::display_text(task_queue)
+            ));
+        }
+    }
+    if !closing.is_empty() {
+        formatter::writeln_out("");
+        for line in closing {
+            formatter::writeln_out(&line);
+        }
+    }
+    Ok(0)
+}
+
+/// The inventory of a retirement inspection, retire receipt or 409
+/// refusal, as indented `Label: value` lines, then each blocker with its
+/// count, details, recovery and sample. `verdict` adds whether it is
+/// retirable and why not, which a receipt and a refusal already state.
+pub(crate) fn retirement_lines(result: &Value, verdict: bool) -> Vec<String> {
+    let field = |value: Option<&Value>| {
+        value
+            .filter(|value| nonempty_scalar(Some(value)))
+            .map(|value| text(Some(value)))
+    };
+    let mut lines = Vec::new();
+    if verdict {
+        let retirable = match php::get(result, "retirable") {
+            Some(Value::Bool(true)) => "yes",
+            Some(Value::Bool(false)) => "no",
+            _ => "-",
+        };
+        lines.push(format!("  Retirable: {retirable}"));
+        if let Some(reason) = field(php::get(result, "reason")) {
+            lines.push(format!("  Reason: {reason}"));
+        }
+    }
+    if let Some(at) = field(php::get(result, "retired_at")) {
+        lines.push(format!("  Retired at: {at}"));
+    }
+    if let Some(by) = php::get(result, "retired_by").and_then(principal_label) {
+        lines.push(format!("  Retired by: {by}"));
+    }
+    let observation = php::get(result, "observation");
+    for (label, key) in [
+        ("Inventory", "status"),
+        ("Inventory revision", "inventory_revision"),
+        ("Observed at", "observed_at"),
+    ] {
+        if let Some(value) = field(php::array_get(observation, key)) {
+            lines.push(format!("  {label}: {value}"));
+        }
+    }
+    let build_ids = php::get(result, "build_ids")
+        .filter(|value| value.is_array())
+        .map(|ids| {
+            php::values(ids)
+                .into_iter()
+                .map(|id| formatter::display_text(&build_id_label(Some(id))))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    if !build_ids.is_empty() {
+        lines.push(format!("  Build IDs: {}", build_ids.join(", ")));
+    }
+    let blockers = php::get(result, "blockers")
+        .filter(|value| value.is_array())
+        .map(php::values)
+        .unwrap_or_default();
+    if let Some(counts) = php::get(result, "counts").filter(|value| value.is_object()) {
+        let rows = counts
+            .as_object()
+            .into_iter()
+            .flatten()
+            .map(|(kind, count)| vec![formatter::display_text(kind), text_or(Some(count), "-")])
+            .collect::<Vec<_>>();
+        if !rows.is_empty() {
+            lines.push(String::new());
+            lines.push(output::render_table(&["Dependency", "Count"], &rows));
+        }
+    }
+    if !blockers.is_empty() {
+        lines.push(String::new());
+        lines.push("Blockers:".into());
+    }
+    for blocker in blockers {
+        let kind = text_or(php::get(blocker, "kind"), "-");
+        let count = text_or(php::get(blocker, "count"), "-");
+        let details = blocker
+            .as_object()
+            .into_iter()
+            .flatten()
+            .filter(|(key, value)| {
+                !matches!(
+                    key.as_str(),
+                    "kind" | "count" | "sample" | "sample_truncated" | "recovery"
+                ) && php::is_scalar(Some(*value))
+            })
+            .map(|(key, value)| format!("{} {}", formatter::display_text(key), text(Some(value))))
+            .collect::<Vec<_>>();
+        if details.is_empty() {
+            lines.push(format!("  {kind}: {count}"));
+        } else {
+            lines.push(format!("  {kind}: {count} ({})", details.join(", ")));
+        }
+        if let Some(recovery) = field(php::get(blocker, "recovery")) {
+            lines.push(format!("    Recovery: {recovery}"));
+        }
+        let samples = php::get(blocker, "sample")
+            .filter(|value| value.is_array())
+            .map(php::values)
+            .unwrap_or_default();
+        for sample in &samples {
+            lines.push(format!("    - {}", sample_label(sample)));
+        }
+        if truthy(php::get(blocker, "sample_truncated")) {
+            lines.push(format!("    (showing {} of {count})", samples.len()));
+        }
+    }
+    lines
+}
+
+/// One sample identity as `key=value` pairs, in the Server's order.
+fn sample_label(sample: &Value) -> String {
+    match sample.as_object() {
+        Some(fields) => fields
+            .iter()
+            .filter(|(_, value)| nonempty_scalar(Some(*value)))
+            .map(|(key, value)| format!("{}={}", formatter::display_text(key), text(Some(value))))
+            .collect::<Vec<_>>()
+            .join(", "),
+        None => text(Some(sample)),
+    }
+}

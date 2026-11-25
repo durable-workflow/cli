@@ -890,3 +890,338 @@ fn list_adds_the_activity_dispatch_column_only_when_the_server_reports_it() {
     let stdout = stdout_text(&scratch.run(&server.url, &["task-queue:list"]));
     assert!(!stdout.contains("Activity Dispatch"), "{stdout}");
 }
+
+/// Cluster info of a Server that advertises guarded retirement (native
+/// Server 3.14.0, Server #519).
+fn retirement_info() -> Value {
+    let mut info = info();
+    info["capabilities"] = json!({"worker_build_retirement": true});
+    info
+}
+
+fn blocked_inventory() -> Value {
+    json!({
+        "namespace": "orders",
+        "task_queue": "orders",
+        "build_id": "build-1",
+        "scope": "build",
+        "retirable": false,
+        "observation": {
+            "status": "complete",
+            "observed_at": "2026-11-25T10:00:00.000000Z",
+            "sample_limit": 20,
+            "inventory_revision": "sha256:blocked",
+            "atomic_with_action": false
+        },
+        "counts": {"open_runs": 3, "ready_tasks": 0, "delayed_tasks": 1, "unattributed_runs": 0},
+        "blockers": [
+            {
+                "kind": "open_runs", "count": 3, "waiting_runs": 1, "continued_runs": 0, "child_runs": 0,
+                "sample": [{"workflow_id": "order-1", "run_id": "run-1", "workflow_type": "Order", "status": "waiting"}],
+                "sample_truncated": true,
+                "recovery": "Keep a worker for this cohort running until these runs close."
+            },
+            {
+                "kind": "delayed_tasks", "count": 1, "activity_retries": 1, "timers": 0,
+                "sample": [{"task_id": "task-1", "run_id": "run-1"}],
+                "sample_truncated": false,
+                "recovery": "Keep a compatible worker available until these delayed retries come due."
+            }
+        ],
+        "build_ids": ["build-1"],
+        "deployment": null,
+        "reason": "live_dependencies",
+        "message": "At least one live dependency still needs this build.",
+        "expected_resolution": "Let the blocking work finish, or cancel or terminate it, then inspect again."
+    })
+}
+
+fn clear_inventory(scope: &str) -> Value {
+    json!({
+        "namespace": "orders",
+        "task_queue": "orders",
+        "build_id": null,
+        "scope": scope,
+        "retirable": true,
+        "observation": {
+            "status": "complete",
+            "observed_at": "2026-11-25T10:00:00.000000Z",
+            "sample_limit": 20,
+            "inventory_revision": "sha256:clear",
+            "atomic_with_action": false
+        },
+        "counts": {"open_runs": 0, "schedules": 0},
+        "blockers": [],
+        "build_ids": [null, "build-1"],
+        "reason": null,
+        "message": "No live dependency was observed. The guarded retire action repeats this check atomically before it records retirement.",
+        "expected_resolution": null
+    })
+}
+
+#[test]
+fn retirement_reads_one_build_inventory_and_reports_its_blockers() {
+    let scratch = Scratch::new();
+    let server = Server::new(retirement_info(), vec![ok(blocked_inventory())]);
+    let stdout = stdout_text(&scratch.run(
+        &server.url,
+        &["task-queue:retirement", "orders", "--build-id=build-1"],
+    ));
+    assert_eq!(
+        server.request_lines(),
+        ["GET /prefix/api/deployments/orders/orders%40build-1/retirement HTTP/1.1"]
+    );
+    for expected in [
+        "Retirement inventory for build_id build-1 on task queue orders",
+        "  Namespace: orders",
+        "  Retirable: no",
+        "  Reason: live_dependencies",
+        "  Inventory: complete",
+        "  Inventory revision: sha256:blocked",
+        "  Build IDs: build-1",
+        "open_runs",
+        "Blockers:",
+        "  open_runs: 3 (waiting_runs 1, continued_runs 0, child_runs 0)",
+        "    Recovery: Keep a worker for this cohort running until these runs close.",
+        "    - workflow_id=order-1, run_id=run-1, workflow_type=Order, status=waiting",
+        "    (showing 1 of 3)",
+        "  delayed_tasks: 1 (activity_retries 1, timers 0)",
+        "Next: Let the blocking work finish, or cancel or terminate it, then inspect again.",
+    ] {
+        assert!(stdout.contains(expected), "{expected}: {stdout}");
+    }
+    assert!(!stdout.contains("dw task-queue:retire "), "{stdout}");
+
+    let server = Server::new(retirement_info(), vec![ok(blocked_inventory())]);
+    let output = scratch.run(
+        &server.url,
+        &[
+            "task-queue:retirement",
+            "orders",
+            "--build-id=build-1",
+            "--json",
+        ],
+    );
+    assert_eq!(json_stdout(&output), blocked_inventory());
+}
+
+#[test]
+fn retirement_of_a_queue_or_the_unversioned_cohort_uses_its_own_route() {
+    let scratch = Scratch::new();
+    let server = Server::new(retirement_info(), vec![ok(clear_inventory("task_queue"))]);
+    let stdout = stdout_text(&scratch.run(&server.url, &["task-queue:retirement", "a/b"]));
+    assert_eq!(
+        server.request_lines(),
+        ["GET /prefix/api/task-queues/a%2Fb/retirement HTTP/1.1"]
+    );
+    for expected in [
+        "Retirement inventory for task queue orders",
+        "  Retirable: yes",
+        "  Build IDs: (unversioned), build-1",
+        "dw task-queue:retire a/b --expected-revision=sha256:clear",
+    ] {
+        assert!(stdout.contains(expected), "{expected}: {stdout}");
+    }
+    assert!(!stdout.contains("Blockers:"), "{stdout}");
+
+    let server = Server::new(retirement_info(), vec![ok(clear_inventory("build"))]);
+    let stdout = stdout_text(&scratch.run(
+        &server.url,
+        &["task-queue:retirement", "a/b", "--unversioned"],
+    ));
+    assert_eq!(
+        server.request_lines(),
+        ["GET /prefix/api/deployments/orders/a%2Fb%40unversioned/retirement HTTP/1.1"]
+    );
+    assert!(
+        stdout.contains("dw task-queue:retire a/b --unversioned --expected-revision=sha256:clear"),
+        "{stdout}"
+    );
+}
+
+#[test]
+fn retire_sends_one_guarded_request_bound_to_the_inspected_revision() {
+    let scratch = Scratch::new();
+    let mut retired = clear_inventory("build");
+    retired["build_id"] = json!("build-1");
+    retired["build_ids"] = json!(["build-1"]);
+    retired["outcome"] = json!("retired");
+    retired["command_status"] = json!("accepted");
+    retired["changed"] = json!(true);
+    retired["retired_at"] = json!("2026-11-25T10:05:00.000000Z");
+    retired["retired_by"] =
+        json!({"type": "auth:token", "id": "role:operator", "label": "Operator"});
+    retired["message"] = json!("Retired: no live dependency was observed in the transition that recorded retirement. Its workers are marked draining and claim nothing.");
+    retired["observation"]["atomic_with_action"] = json!(true);
+    let server = Server::new(retirement_info(), vec![ok(retired.clone())]);
+    let stdout = stdout_text(&scratch.run(
+        &server.url,
+        &[
+            "task-queue:retire",
+            "orders",
+            "--build-id=build-1",
+            "--expected-revision=sha256:clear",
+        ],
+    ));
+    assert_eq!(
+        server.request_lines(),
+        ["POST /prefix/api/deployments/orders/orders%40build-1/retire HTTP/1.1"]
+    );
+    assert_eq!(
+        server.body(0),
+        json!({"expected_inventory_revision": "sha256:clear"})
+    );
+    for expected in [
+        "Retired build_id build-1 on task queue orders.",
+        "  Namespace: orders",
+        "  Retired at: 2026-11-25T10:05:00.000000Z",
+        "  Retired by: Operator (auth:token role:operator)",
+        "  Inventory revision: sha256:clear",
+        "Its workers are marked draining and claim nothing.",
+    ] {
+        assert!(stdout.contains(expected), "{expected}: {stdout}");
+    }
+    assert!(!stdout.contains("Retirable:"), "{stdout}");
+
+    let server = Server::new(retirement_info(), vec![ok(retired.clone())]);
+    let output = scratch.run(&server.url, &["task-queue:retire", "orders", "--json"]);
+    assert_eq!(json_stdout(&output), retired);
+    assert_eq!(
+        server.request_lines(),
+        ["POST /prefix/api/task-queues/orders/retire HTTP/1.1"]
+    );
+    assert_eq!(server.body(0), json!({}));
+}
+
+#[test]
+fn a_refused_retire_changes_nothing_and_reports_the_blockers() {
+    let scratch = Scratch::new();
+    let mut refused = blocked_inventory();
+    refused["rejection_reason"] = json!("live_dependencies");
+    refused["outcome"] = json!("rejected_live_dependencies");
+    refused["command_status"] = json!("rejected");
+    refused["changed"] = json!(false);
+    let reply = Reply {
+        status: 409,
+        headers: Vec::new(),
+        body: Some(refused.clone()),
+    };
+    let server = Server::new(retirement_info(), vec![reply.clone()]);
+    let output = scratch.run(
+        &server.url,
+        &["task-queue:retire", "orders", "--build-id=build-1"],
+    );
+    assert_eq!(output.status.code(), Some(2), "{output:?}");
+    assert_eq!(server.requests().len(), 1);
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    for expected in [
+        "At least one live dependency still needs this build.",
+        "Reason: live_dependencies",
+        "  open_runs: 3 (waiting_runs 1, continued_runs 0, child_runs 0)",
+        "    Recovery: Keep a worker for this cohort running until these runs close.",
+        "    - workflow_id=order-1, run_id=run-1, workflow_type=Order, status=waiting",
+        "  - Let the blocking work finish, or cancel or terminate it, then inspect again.",
+    ] {
+        assert!(stderr.contains(expected), "{expected}: {stderr}");
+    }
+    assert!(!stderr.contains("Retirable:"), "{stderr}");
+
+    let server = Server::new(retirement_info(), vec![reply]);
+    let output = scratch.run(
+        &server.url,
+        &[
+            "task-queue:retire",
+            "orders",
+            "--build-id=build-1",
+            "--json",
+        ],
+    );
+    assert_eq!(output.status.code(), Some(2), "{output:?}");
+    assert_eq!(server.requests().len(), 1);
+    let envelope: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(envelope["exit_code"], json!(2), "{envelope}");
+    assert_eq!(envelope["status_code"], json!(409), "{envelope}");
+    assert_eq!(envelope["reason"], json!("live_dependencies"), "{envelope}");
+    assert_eq!(
+        envelope["outcome"],
+        json!("rejected_live_dependencies"),
+        "{envelope}"
+    );
+    assert_eq!(envelope["server_response"], refused, "{envelope}");
+    assert_eq!(
+        envelope["recommendations"][0]["id"],
+        json!("retirement.refused"),
+        "{envelope}"
+    );
+}
+
+#[test]
+fn a_server_without_retirement_is_refused_before_any_request() {
+    let scratch = Scratch::new();
+    let mut not_advertised = info();
+    not_advertised["capabilities"] = json!({"worker_build_retirement": false});
+    for info in [info(), not_advertised] {
+        for args in [
+            vec!["task-queue:retirement", "orders", "--build-id=build-1"],
+            vec!["task-queue:retire", "orders"],
+        ] {
+            let server = Server::new(info.clone(), vec![ok(json!({}))]);
+            let output = scratch.run(&server.url, &args);
+            assert_eq!(output.status.code(), Some(8), "{args:?}: {output:?}");
+            assert!(server.requests().is_empty(), "{args:?}");
+            let stderr = String::from_utf8(output.stderr).unwrap();
+            assert!(
+                stderr.contains("does not advertise capabilities.worker_build_retirement"),
+                "{stderr}"
+            );
+        }
+    }
+}
+
+#[test]
+fn retirement_targets_are_checked_before_any_request() {
+    let scratch = Scratch::new();
+    for (args, message) in [
+        (
+            vec![
+                "task-queue:retire",
+                "orders",
+                "--build-id=b",
+                "--unversioned",
+            ],
+            "--unversioned cannot be combined with --build-id",
+        ),
+        (
+            vec!["task-queue:retirement", "orders", "--build-id=a@b"],
+            "containing \"@\"",
+        ),
+        (
+            vec!["task-queue:retire", "orders", "--build-id=unversioned"],
+            "names the unversioned cohort",
+        ),
+    ] {
+        let server = Server::new(retirement_info(), vec![ok(json!({}))]);
+        let output = scratch.run(&server.url, &args);
+        assert_eq!(output.status.code(), Some(1), "{args:?}: {output:?}");
+        assert!(server.requests().is_empty(), "{args:?}");
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(stderr.contains(message), "{message}: {stderr}");
+    }
+}
+
+#[test]
+fn a_lost_retire_response_is_never_resent() {
+    let scratch = Scratch::new();
+    let server = Server::new(retirement_info(), vec![lost()]);
+    let output = scratch.run(
+        &server.url,
+        &[
+            "task-queue:retire",
+            "orders",
+            "--build-id=build-1",
+            "--json",
+        ],
+    );
+    assert_eq!(output.status.code(), Some(3), "{output:?}");
+    assert_eq!(server.requests().len(), 1);
+}

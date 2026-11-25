@@ -263,6 +263,26 @@ fn conflict_lines(body: &Map<String, Value>) -> Vec<String> {
     lines
 }
 
+/// The 409 body of a guarded `task-queue:retire` the Server refused
+/// (Server #519): `command_status: "rejected"` with its inventory.
+fn retirement_refusal<'a>(
+    error: &'a CliError,
+    context: &ErrorContext,
+) -> Option<&'a Map<String, Value>> {
+    match error {
+        CliError::Http {
+            status: 409,
+            body: Some(body),
+            ..
+        } if context.command == "task-queue:retire"
+            && body.get("command_status").and_then(Value::as_str) == Some("rejected") =>
+        {
+            Some(body)
+        }
+        _ => None,
+    }
+}
+
 fn base_recommendations(error: &CliError, context: &ErrorContext) -> Vec<Value> {
     let item = |id: &str, message: &str, command: String| json!({"id": id, "severity": "error", "message": message, "command": command});
     let help = format!("dw {} --help", context.command);
@@ -301,6 +321,17 @@ fn base_recommendations(error: &CliError, context: &ErrorContext) -> Vec<Value> 
                 ),
             })];
         }
+    }
+    // A refused retirement changed nothing; the Server names what to do.
+    if let Some(refusal) = retirement_refusal(error, context) {
+        let resolution = scalar_text(refusal.get("expected_resolution")).unwrap_or_else(|| {
+            "Nothing was retired. Resolve the blockers, inspect again with dw task-queue:retirement, then retry.".into()
+        });
+        return vec![json!({
+            "id": "retirement.refused",
+            "severity": "error",
+            "message": resolution,
+        })];
     }
     // A failed update read later is final, not a request to fix and retry.
     if context.command == "workflow:update-outcome"
@@ -654,6 +685,13 @@ pub fn human(error: &CliError, context: &ErrorContext) -> String {
                     .iter()
                     .map(|line| human_output_text(line)),
             );
+        }
+        if let Some(refusal) = retirement_refusal(error, context) {
+            // Already display text: the refusal's inventory and blockers.
+            lines.extend(crate::commands::task_queue::retirement_lines(
+                &Value::Object(refusal.clone()),
+                false,
+            ));
         }
     }
     if let Some(errors) = error.validation_errors() {

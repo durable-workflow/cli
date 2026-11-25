@@ -649,7 +649,15 @@ records, and it replaces or removes `objects/ep_*` entries.
 It refuses a completed archive, another run's archive, any other directory, a
 linked `objects/` directory, and a directory another dw is writing. While
 another backup or archive holds the hold, the copy is refused with the Server's
-HTTP 409; retry later. Ctrl-C stops the copy and releases the hold (exit 130).
+HTTP 409; retry later. Ctrl-C (exit 130) or, on Unix, SIGTERM (exit 143) stops
+the copy and releases the hold. A signal during that final release stops
+waiting for it; the owner stays recorded for the next run (after a verified
+archive dw prints how to release it). An acquire the Server refuses with 400,
+401, 403, 404, 409, 422 or 429 (for example 403 for a non-admin token) took
+nothing: dw records nothing and reports that error. Any other answer may hide a
+hold that was taken, so its owner is released and kept like any other. The
+progress record names the Server and namespace; while it still names an owner
+to release, dw resumes it only against the same ones.
 
 `workflow:history-archive-check` needs no Server. It reads every file back and
 reports `verified`, `incomplete` with a finding per failed check (such as

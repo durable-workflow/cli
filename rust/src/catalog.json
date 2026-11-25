@@ -13415,12 +13415,12 @@
    "rust_only": true
   },
   {
-   "name": "workflow:history-archive-verify",
+   "name": "workflow:history-archive-check",
    "description": "Verify a history archive from its files alone",
-   "synopsis": "workflow:history-archive-verify [--output OUTPUT] [--json] [--] <directory>",
+   "synopsis": "workflow:history-archive-check [--output OUTPUT] [--json] [--] <directory>",
    "aliases": [],
    "hidden": false,
-   "help": "Verify an archive written by <info>dw workflow:history-archive</info> using nothing\nbut its files: no Server, database or payload store. Every object is read\nback and checked against the length and SHA-256 its reference records, the\nmanifest must list exactly the objects the export references, the history\nmust be complete, and the receipt must match the manifest and history.\n\nOutcomes: verified (exit 0); incomplete (exit 1, with a finding for each\nfailed check, such as object_missing, object_digest_mismatch or\nreceipt_missing); refused (exit 2: not an archive this dw can read, such as\na newer format version).\n\n<comment>Examples:</comment>\n\n  <info>dw workflow:history-archive-verify ./archives/chk-42</info>\n  <info>dw workflow:history-archive-verify ./archives/chk-42 --json</info>",
+   "help": "Verify an archive written by <info>dw workflow:history-archive</info> using nothing\nbut its files: no Server, database or payload store. Every object is read\nback and checked against the length and SHA-256 its reference records, the\nmanifest must list exactly the objects the export references, the history\nmust be complete, and the receipt must match the manifest and history.\n\nOutcomes: verified (exit 0); incomplete (exit 1, with a finding for each\nfailed check, such as object_missing, object_digest_mismatch or\nreceipt_missing); refused (exit 2: not an archive this dw can read, such as\na newer format version).\n\n<comment>Examples:</comment>\n\n  <info>dw workflow:history-archive-check ./archives/chk-42</info>\n  <info>dw workflow:history-archive-check ./archives/chk-42 --json</info>",
    "definition": {
     "arguments": {
      "directory": {

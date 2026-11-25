@@ -1,4 +1,4 @@
-//! `workflow:history-archive` and `workflow:history-archive-verify`
+//! `workflow:history-archive` and `workflow:history-archive-check`
 //! (durable-workflow/server#520): a self-contained, verified archive of one
 //! run's history and the exact bytes of every external payload it
 //! references, copied under the Server's external payload backup hold.
@@ -137,15 +137,28 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), CliError> {
             Err(error) if error.kind() != std::io::ErrorKind::NotFound => return Err(error),
             _ => {}
         }
-        let mut file = std::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&partial)?;
+        let mut options = std::fs::OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
+        let mut file = options.open(&partial)?;
         file.write_all(bytes)?;
         file.sync_all()?;
-        std::fs::rename(&partial, path)
+        std::fs::rename(&partial, path)?;
+        sync_parent(path);
+        Ok(())
     };
     write().map_err(|error| io_failure(path, error))
+}
+
+/// Make a rename durable before anything that depends on it is written.
+fn sync_parent(path: &Path) {
+    #[cfg(unix)]
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::File::open(parent).and_then(|dir| dir.sync_all());
+    }
+    #[cfg(not(unix))]
+    let _ = path;
 }
 
 /// What the target directory already holds, and its lock.
@@ -165,6 +178,12 @@ fn prepare(dir: &Path, workflow_id: &str, run_id: &str) -> Result<Directory, Cli
     let created = !dir.exists();
     if created {
         std::fs::create_dir_all(dir).map_err(|error| io_failure(dir, error))?;
+        // Payload bytes leave the Server's access control: owner-only.
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700));
+        }
     }
     let lock_existed = dir.join(LOCK_FILE).exists();
     let refuse = |message: String| {
@@ -180,10 +199,14 @@ fn prepare(dir: &Path, workflow_id: &str, run_id: &str) -> Result<Directory, Cli
     if !metadata.is_dir() {
         return refuse(format!("{} is not a directory.", dir.display()));
     }
-    let lock = std::fs::OpenOptions::new()
-        .create(true)
-        .truncate(false)
-        .write(true)
+    let mut options = std::fs::OpenOptions::new();
+    options.create(true).truncate(false).write(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(libc::O_NOFOLLOW).mode(0o600);
+    }
+    let lock = options
         .open(dir.join(LOCK_FILE))
         .map_err(|error| io_failure(dir, error))?;
     if lock.try_lock().is_err() {
@@ -203,7 +226,7 @@ fn prepare(dir: &Path, workflow_id: &str, run_id: &str) -> Result<Directory, Cli
     }
     if dir.join(RECEIPT_FILE).exists() {
         return refuse(format!(
-            "{} already holds a completed archive. Verify it with dw workflow:history-archive-verify, or choose a new directory.",
+            "{} already holds a completed archive. Verify it with dw workflow:history-archive-check, or choose a new directory.",
             dir.display()
         ));
     }
@@ -341,7 +364,24 @@ fn has_bytes(path: &Path, size: i64, sha256: &str) -> bool {
     if !metadata.is_file() || metadata.len() != size as u64 {
         return false;
     }
-    std::fs::read(path).is_ok_and(|bytes| archive::sha256_hex(&bytes) == sha256)
+    let Ok(mut file) = std::fs::File::open(path) else {
+        return false;
+    };
+    let mut hasher = Sha256::new();
+    let mut buffer = vec![0u8; 64 * 1024];
+    loop {
+        match std::io::Read::read(&mut file, &mut buffer) {
+            Ok(0) => break,
+            Ok(read) => hasher.update(&buffer[..read]),
+            Err(_) => return false,
+        }
+    }
+    let digest: String = hasher
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    digest == sha256
 }
 
 /// Fetch one object into `path`, checking its length and digest before the
@@ -410,9 +450,11 @@ async fn fetch_object(
     let partial = path.with_extension("partial");
     // A leftover (or planted) partial is replaced, never followed.
     let _ = tokio::fs::remove_file(&partial).await;
-    let mut file = tokio::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
+    let mut options = tokio::fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    options.mode(0o600);
+    let mut file = options
         .open(&partial)
         .await
         .map_err(|error| io_failure(&partial, error))?;
@@ -453,6 +495,7 @@ async fn fetch_object(
     tokio::fs::rename(&partial, path)
         .await
         .map_err(|error| io_failure(path, error))?;
+    sync_parent(path);
     Ok(Ok(()))
 }
 
@@ -505,6 +548,11 @@ async fn copy(
     let export_bytes = response.body_bytes().to_vec();
     let export: Value = serde_json::from_slice(&export_bytes)
         .map_err(|_| CliError::Failure("The Server's history export is not valid JSON.".into()))?;
+    if export["workflow"]["instance_id"] != workflow_id || export["workflow"]["run_id"] != run_id {
+        return Err(CliError::Failure(format!(
+            "Server error: the history export does not describe workflow {workflow_id} run {run_id}."
+        )));
+    }
     let plan = archive::plan(&export);
     let mut copied = Copied::default();
     if !plan.blockers.is_empty() {
@@ -598,6 +646,11 @@ pub fn archive(context: &Context, input: &Input) -> Result<i32, CliError> {
         _ => "incomplete".to_owned(),
     };
     run.finish(&directory, &outcome, settled);
+    if !settled {
+        formatter::writeln_err(&format!(
+            "<error>The backup hold (owner {owner}) could not be released; it expires on its own within --hold-ttl ({ttl} seconds). Its owner stays recorded in {PROGRESS_FILE}, and the next run in this directory releases it.</error>"
+        ));
+    }
     match finished {
         None => {
             formatter::writeln_err(
@@ -606,7 +659,8 @@ pub fn archive(context: &Context, input: &Input) -> Result<i32, CliError> {
             Ok(130)
         }
         Some(Err(error)) => Err(error),
-        Some(Ok(result)) => {
+        Some(Ok(mut result)) => {
+            result["hold"]["released"] = json!(settled);
             if context.mode.machine_readable() {
                 output::print_json(&result);
             } else {
@@ -643,7 +697,15 @@ impl Run<'_> {
     async fn held(&self, stale_owner: Option<&str>) -> Result<Value, CliError> {
         if let Some(stale) = stale_owner {
             // A crashed earlier copy's hold, released if it is still held.
-            let _ = hold(self.context, "release", stale, self.ttl).await;
+            // Its owner stays recorded until that release settles.
+            match hold(self.context, "release", stale, self.ttl).await {
+                Ok((200 | 409, _)) => {}
+                _ => {
+                    return Err(CliError::Failure(format!(
+                        "Unable to release the backup hold an earlier copy recorded (owner {stale}). Run the command again, or wait for the hold to expire."
+                    )))
+                }
+            }
         }
         // Recorded before the hold exists, so a crash at any later point
         // leaves the owner for the next run to release.
@@ -709,12 +771,17 @@ impl Run<'_> {
                 "incomplete"
             } else {
                 match hold_status(self.context, self.owner).await? {
-                    (200, confirmed) if confirmed["active"] == true => {
+                    // The same acquisition: active, and not re-acquired since.
+                    (200, confirmed)
+                        if confirmed["active"] == true
+                            && confirmed["acquired_at"] == held.report["acquired_at"] =>
+                    {
                         let mut record = hold_record(self.owner, &held.report);
                         record["confirmed_at"] = confirmed["database_time"].clone();
                         record["expires_at"] = confirmed["expires_at"].clone();
                         // Bound to the manifest bytes the verification read.
-                        let receipt = archive::receipt(&report, &batch_manifest::utc_now(), record);
+                        let receipt = archive::receipt(&report, &batch_manifest::utc_now(), record)
+                            .expect("the report is verified");
                         write_atomic(
                             &self.dir.join(RECEIPT_FILE),
                             output::encode_pretty(&receipt).as_bytes(),
@@ -743,18 +810,28 @@ impl Run<'_> {
     fn finish(&self, directory: &Directory, outcome: &str, released: bool) {
         let dir = self.dir;
         let copied = dir.join(HISTORY_FILE).exists() || dir.join(MANIFEST_FILE).exists();
-        if outcome == "verified" || !copied {
+        if !released {
+            // Keep the owner recorded (and the lock file, which a later run
+            // reopens) until a release settles.
+            return;
+        }
+        if outcome == "verified" {
             let _ = std::fs::remove_file(dir.join(PROGRESS_FILE));
-            if directory.created && !copied {
+            // A concurrent run that still opens this lock file finds the
+            // receipt and refuses.
+            let _ = std::fs::remove_file(dir.join(LOCK_FILE));
+        } else if !copied {
+            let _ = std::fs::remove_file(dir.join(PROGRESS_FILE));
+            if directory.created {
                 let _ = std::fs::remove_dir(dir.join(OBJECTS_DIR));
                 let _ = std::fs::remove_file(dir.join(LOCK_FILE));
                 let _ = std::fs::remove_dir(dir);
-                return;
             }
-        } else if released {
+        } else {
+            // An unfinished archive keeps its record and lock file; no owner
+            // is left to release.
             let _ = self.progress(None);
         }
-        let _ = std::fs::remove_file(dir.join(LOCK_FILE));
     }
 }
 

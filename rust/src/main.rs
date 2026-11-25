@@ -71,7 +71,7 @@ fn handler(name: &str) -> Option<Handler> {
         "workflow:history" => Handler::Server(workflow_run::history),
         "workflow:history-export" => Handler::Server(workflow_run::history_export),
         "workflow:history-archive" => Handler::Server(history_archive::archive),
-        "workflow:history-archive-verify" => Handler::Local(history_archive::verify),
+        "workflow:history-archive-check" => Handler::Local(history_archive::verify),
         "workflow:query" => Handler::Server(workflow_message::query),
         "workflow:start" => Handler::Server(workflow_message::start),
         "workflow:signal" => Handler::Server(workflow_message::signal),

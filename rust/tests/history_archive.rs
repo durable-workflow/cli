@@ -1,4 +1,4 @@
-//! `workflow:history-archive` and `workflow:history-archive-verify`
+//! `workflow:history-archive` and `workflow:history-archive-check`
 //! (durable-workflow/server#520) against the real native Server that
 //! `dw server:start-dev` runs, with a local external payload store.
 #![cfg(unix)]
@@ -80,7 +80,7 @@ impl Project {
 
     fn verify(&self, dir: &Path) -> (i32, Value) {
         let output = self.run(&[
-            "workflow:history-archive-verify",
+            "workflow:history-archive-check",
             dir.to_str().unwrap(),
             "--json",
         ]);
@@ -680,6 +680,27 @@ fn a_lost_hold_or_a_failed_object_leaves_no_receipt_and_still_releases() {
     assert!(
         !mock.lines().iter().any(|line| line.starts_with(STATUS)),
         "verified after losing the hold"
+    );
+    assert!(!dir.join("receipt.json").exists());
+
+    // The owner holds the hold again, but from a later acquisition: the hold
+    // lapsed in between, so no receipt.
+    let reacquired = json!({"active": true, "owner": "x", "acquired_at": "2026-11-25 00:09:00",
+        "expires_at": "2026-11-25 00:24:00", "database_time": "2026-11-25 00:09:01"});
+    let mock = Mock::new(vec![
+        (ACQUIRE, 200, held()),
+        (RENEW, 200, held()),
+        (EXPORT, 200, mock_export()),
+        (OBJECT, 200, MOCK_BYTES.to_vec()),
+        (STATUS, 200, reacquired.to_string().into_bytes()),
+        (RELEASE, 200, held()),
+    ]);
+    let dir = project.0.join("reacquired");
+    let (code, result) = mock_archive(&project, &mock, &dir);
+    assert_eq!(
+        (code, result["outcome"].clone()),
+        (1, json!("incomplete")),
+        "{result}"
     );
     assert!(!dir.join("receipt.json").exists());
 

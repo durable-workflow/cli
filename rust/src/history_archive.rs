@@ -319,7 +319,8 @@ fn walk(value: &Value, path: String, plan: &mut Plan, seen: &mut BTreeMap<String
                         Some(path),
                     )),
                 }
-            } else if text.starts_with(PHP_STORED_PREFIX) {
+            } else if text.contains(PHP_STORED_PREFIX) || text.contains(NATIVE_STORED_PREFIX) {
+                // Embedded anywhere else, as retention would count it.
                 plan.blockers.push(unsupported(path));
             }
         }
@@ -450,8 +451,13 @@ pub fn manifest(
 /// The receipt for a verified cold verification `report`, bound to the exact
 /// manifest and history bytes that verification read. `hold` records that
 /// the copy's hold was still held after the verification.
-pub fn receipt(report: &Value, verified_at: &str, hold: Value) -> Value {
-    json!({
+///
+/// Answers `None` unless the report's outcome is `verified`.
+pub fn receipt(report: &Value, verified_at: &str, hold: Value) -> Option<Value> {
+    if report["outcome"] != "verified" {
+        return None;
+    }
+    Some(json!({
         "schema": RECEIPT_SCHEMA,
         "format_version": FORMAT_VERSION,
         "outcome": "verified",
@@ -462,7 +468,7 @@ pub fn receipt(report: &Value, verified_at: &str, hold: Value) -> Value {
         "object_count": report["object_count"],
         "object_bytes": report["object_bytes"],
         "hold": hold,
-    })
+    }))
 }
 
 /// Verify an archive from its files alone, its receipt included: `verified`,
@@ -884,6 +890,8 @@ fn check_receipt(
     } else if hold["kind"] != HOLD_KIND
         || hold["owner"].as_str().is_none()
         || hold["owner"] != manifest["hold"]["owner"]
+        || hold["acquired_at"].is_null()
+        || hold["acquired_at"] != manifest["hold"]["acquired_at"]
         || !hold["confirmed_at"].is_string()
         || receipt["object_count"] != out["object_count"]
         || receipt["object_bytes"] != out["object_bytes"]
@@ -1050,6 +1058,10 @@ mod tests {
         );
 
         // Anything else the Server treats as a reference refuses the archive.
+        assert!(receipt(&json!({"outcome": "incomplete"}), "now", json!({})).is_none());
+        let mut embedded = export(b"a", b"b");
+        embedded["timeline"] = json!([{"summary": "payload dw-external-payload:v1:eyJ9 attached"}]);
+        assert_eq!(codes(&plan(&embedded)), ["unsupported_payload_reference"]);
         let mut php = export(b"a", b"b");
         php["commands"] = json!([{"payload": "dw-external-payload:v1:eyJkaXNrIjoiczMifQ=="}]);
         assert_eq!(codes(&plan(&php)), ["unsupported_payload_reference"]);
@@ -1098,7 +1110,7 @@ mod tests {
         std::fs::write(dir.join(HISTORY_FILE), &bytes).unwrap();
         std::fs::write(dir.join(OBJECTS_DIR).join(ID_A), a).unwrap();
         std::fs::write(dir.join(OBJECTS_DIR).join(ID_B), b).unwrap();
-        let hold = json!({"kind": HOLD_KIND, "owner": "7f1c3a1e-0000-4000-8000-000000000001"});
+        let hold = json!({"kind": HOLD_KIND, "owner": "7f1c3a1e-0000-4000-8000-000000000001", "acquired_at": "2026-11-25 00:00:00"});
         let manifest = manifest(
             &export,
             &bytes,
@@ -1114,7 +1126,7 @@ mod tests {
         assert_eq!(contents["outcome"], "verified", "{contents}");
         let mut confirmed = hold;
         confirmed["confirmed_at"] = json!("2026-11-25 00:00:01");
-        let receipt = receipt(&contents, "2026-11-25T00:00:01Z", confirmed);
+        let receipt = receipt(&contents, "2026-11-25T00:00:01Z", confirmed).unwrap();
         std::fs::write(
             dir.join(RECEIPT_FILE),
             serde_json::to_vec_pretty(&receipt).unwrap(),
@@ -1278,6 +1290,22 @@ mod tests {
                         .as_object_mut()
                         .unwrap()
                         .remove("confirmed_at");
+                    std::fs::write(
+                        dir.join(RECEIPT_FILE),
+                        serde_json::to_vec(&receipt).unwrap(),
+                    )
+                    .unwrap();
+                },
+                &["receipt_invalid"],
+                "incomplete",
+            ),
+            (
+                "receipt for a re-acquired hold",
+                |dir| {
+                    let mut receipt: Value =
+                        serde_json::from_slice(&std::fs::read(dir.join(RECEIPT_FILE)).unwrap())
+                            .unwrap();
+                    receipt["hold"]["acquired_at"] = json!("2026-11-25 00:10:00");
                     std::fs::write(
                         dir.join(RECEIPT_FILE),
                         serde_json::to_vec(&receipt).unwrap(),

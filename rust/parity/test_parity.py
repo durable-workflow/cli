@@ -270,7 +270,7 @@ class RustOnlyCommandTest(unittest.TestCase):
         self.assertEqual(["batch:cancel", "batch:resume", "batch:show", "batch:signal", "batch:update",
                           "task-queue:activity-dispatch", "task-queue:pause-activities",
                           "task-queue:resume-activities", "task-queue:retire", "task-queue:retirement",
-                          "workflow:history-archive", "workflow:history-archive-verify",
+                          "workflow:history-archive", "workflow:history-archive-check",
                           "workflow:update-outcome", "workflow:version-usage"],
                          parity.rust_only_commands())
 

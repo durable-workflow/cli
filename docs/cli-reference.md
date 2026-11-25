@@ -601,6 +601,59 @@ and a workflow that appears on more than one list page is targeted once, at
 its first listed run. JSON output lists each selected `workflow_id`, `run_id`
 and `namespace` in `targets`, and each failure includes its `run_id`.
 
+#### Verified history archives
+
+`workflow:history-export` keeps each external payload as a reference envelope,
+so its bundle still depends on the source database and payload store.
+`workflow:history-archive` writes a self-contained archive of one closed run
+instead (Server #520). The archive holds the export, the exact bytes of every
+external payload it references, a manifest with each object's codec, length
+and SHA-256, and a receipt. It stays readable after retention prunes the run,
+and without the Server or its payload store.
+
+```bash
+dw workflow:history-archive order-123 01HXYZ ./archives/order-123
+dw workflow:history-archive order-123 01HXYZ ./archives/order-123 --hold-ttl=1800 --json
+dw workflow:history-archive-verify ./archives/order-123
+```
+
+The copy runs under the Server's external payload backup hold, so it needs an
+admin credential. dw takes these steps:
+
+1. It acquires the hold with a new owner, so no payload is reclaimed during
+   the copy.
+2. It reads the export and fetches each object once, checking its length and
+   digest.
+3. It writes the manifest and verifies the whole directory from disk.
+4. It confirms the hold never lapsed, and only then writes `receipt.json`.
+
+The hold is renewed during the copy and released on every path.
+
+The outcome is `verified` (exit 0), `incomplete` (exit 1) or `refused`
+(exit 2):
+
+- **Incomplete:** an object could not be copied, the hold was lost, or
+  verification failed. No receipt is written.
+- **Refused:** nothing is copied. The run is open, pruned or redacted, or it
+  holds a reference the runtime transport cannot fetch.
+
+Run the same command into the same directory to resume an incomplete archive.
+Objects already present with the right digest are kept. A crashed copy's hold
+is released by the next run, or expires after `--hold-ttl` seconds (900 by
+default, 60 to 3600). dw never writes into a directory that holds other files,
+a completed archive, or another run's archive. While another backup or archive
+holds the hold, the copy is refused with the Server's HTTP 409; retry later.
+
+`workflow:history-archive-verify` needs no Server. It reads every file back and
+reports `verified`, `incomplete` with a finding per failed check (such as
+`object_missing`, `object_digest_mismatch` or `receipt_missing`), or `refused`
+for a directory it cannot read as an archive. `--json` returns the full report.
+
+An archive covers the selected run only. It is not a database backup. It is
+written unencrypted and its lifetime is yours to manage. The format, scope and
+finding codes are specified in the Server's
+[history archive guide](https://github.com/durable-workflow/server/blob/main/docs/history-archives.md).
+
 ### Nexus service calls
 
 Inspect one durable call in its endpoint namespace:

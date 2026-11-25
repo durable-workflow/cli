@@ -5,6 +5,7 @@ mod completion_log;
 pub mod debug;
 pub mod doctor;
 pub mod env;
+pub mod history_archive;
 pub mod info;
 pub mod namespace;
 mod operator_metrics;

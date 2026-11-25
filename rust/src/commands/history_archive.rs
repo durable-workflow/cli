@@ -209,11 +209,20 @@ fn prepare(dir: &Path, workflow_id: &str, run_id: &str) -> Result<Directory, Cli
     let lock = options
         .open(dir.join(LOCK_FILE))
         .map_err(|error| io_failure(dir, error))?;
-    if lock.try_lock().is_err() {
-        return Err(CliError::Invalid(format!(
-            "Another dw is writing an archive in {}. Wait for it to finish.",
-            dir.display()
-        )));
+    match lock.try_lock() {
+        Ok(()) => {}
+        Err(std::fs::TryLockError::WouldBlock) => {
+            return Err(CliError::Invalid(format!(
+                "Another dw is writing an archive in {}. Wait for it to finish.",
+                dir.display()
+            )))
+        }
+        Err(std::fs::TryLockError::Error(error)) => {
+            return Err(CliError::Failure(format!(
+                "Unable to lock {}: {error}",
+                dir.join(LOCK_FILE).display()
+            )))
+        }
     }
     let mut entries = std::fs::read_dir(dir).map_err(|error| io_failure(dir, error))?;
     let empty = entries.all(|entry| entry.is_ok_and(|entry| entry.file_name() == LOCK_FILE));
@@ -561,6 +570,7 @@ async fn copy(
     prune_objects(dir, &plan)?;
     write_atomic(&dir.join(HISTORY_FILE), &export_bytes)?;
     let http = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
         .danger_accept_invalid_certs(!context.connection.tls_verify)
         .build()
         .map_err(|error| CliError::Failure(format!("Unable to build the HTTP client: {error}")))?;
@@ -622,6 +632,7 @@ pub fn archive(context: &Context, input: &Input) -> Result<i32, CliError> {
         run_id: &run_id,
         owner: &owner,
         ttl,
+        stale_settled: std::cell::Cell::new(true),
     };
     let runtime = context.runtime();
     // One cancellation scope covers everything that can take or rely on the
@@ -647,8 +658,13 @@ pub fn archive(context: &Context, input: &Input) -> Result<i32, CliError> {
     };
     run.finish(&directory, &outcome, settled);
     if !settled {
+        let next = if outcome == "verified" {
+            format!("Release it with POST /api/system/external-payload-backup-hold/release {{\"owner\": \"{owner}\"}}, or let it expire.")
+        } else {
+            format!("Its owner stays recorded in {PROGRESS_FILE}, and the next run in this directory releases it.")
+        };
         formatter::writeln_err(&format!(
-            "<error>The backup hold (owner {owner}) could not be released; it expires on its own within --hold-ttl ({ttl} seconds). Its owner stays recorded in {PROGRESS_FILE}, and the next run in this directory releases it.</error>"
+            "<error>The backup hold (owner {owner}) could not be released; it expires on its own within --hold-ttl ({ttl} seconds). {next}</error>"
         ));
     }
     match finished {
@@ -681,6 +697,9 @@ struct Run<'a> {
     run_id: &'a str,
     owner: &'a str,
     ttl: u64,
+    /// False while a crashed copy's recorded owner is not yet released: its
+    /// record must survive this run, whatever else happens.
+    stale_settled: std::cell::Cell<bool>,
 }
 
 impl Run<'_> {
@@ -696,10 +715,11 @@ impl Run<'_> {
     /// Everything done under the hold. Answers the result document.
     async fn held(&self, stale_owner: Option<&str>) -> Result<Value, CliError> {
         if let Some(stale) = stale_owner {
+            self.stale_settled.set(false);
             // A crashed earlier copy's hold, released if it is still held.
             // Its owner stays recorded until that release settles.
             match hold(self.context, "release", stale, self.ttl).await {
-                Ok((200 | 409, _)) => {}
+                Ok((200 | 409, _)) => self.stale_settled.set(true),
                 _ => {
                     return Err(CliError::Failure(format!(
                         "Unable to release the backup hold an earlier copy recorded (owner {stale}). Run the command again, or wait for the hold to expire."
@@ -810,7 +830,7 @@ impl Run<'_> {
     fn finish(&self, directory: &Directory, outcome: &str, released: bool) {
         let dir = self.dir;
         let copied = dir.join(HISTORY_FILE).exists() || dir.join(MANIFEST_FILE).exists();
-        if !released {
+        if !released || !self.stale_settled.get() {
             // Keep the owner recorded (and the lock file, which a later run
             // reopens) until a release settles.
             return;
@@ -822,9 +842,10 @@ impl Run<'_> {
             let _ = std::fs::remove_file(dir.join(LOCK_FILE));
         } else if !copied {
             let _ = std::fs::remove_file(dir.join(PROGRESS_FILE));
+            // Only dw's own leftovers: an empty objects/ and the lock file.
+            let _ = std::fs::remove_dir(dir.join(OBJECTS_DIR));
+            let _ = std::fs::remove_file(dir.join(LOCK_FILE));
             if directory.created {
-                let _ = std::fs::remove_dir(dir.join(OBJECTS_DIR));
-                let _ = std::fs::remove_file(dir.join(LOCK_FILE));
                 let _ = std::fs::remove_dir(dir);
             }
         } else {

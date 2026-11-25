@@ -658,11 +658,13 @@ for a directory it cannot read as an archive. `--json` returns the full report.
 
 Each object must arrive within half the hold lease (at least 30 seconds), and an
 interrupted download starts again on the next run. An object too large to
-transfer in that time cannot be archived; raise `--hold-ttl`, up to 3600.
+transfer in that time cannot be archived; raise `--hold-ttl`, up to 3600. The
+cold verification after the last renewal must also finish within one lease.
+An invalid `--hold-ttl` is a usage error (exit 1).
 
 An archive covers the selected run only. It is not a database backup. It is
-written unencrypted, in an owner-only directory (0700) with owner-only files
-(0600) on Unix, and its lifetime is yours to manage. The digests detect
+written unencrypted, with owner-only files (0600) on Unix, in an owner-only
+directory (0700) when dw creates it, and its lifetime is yours to manage. The digests detect
 damage, not deliberate tampering. The format, scope and
 finding codes are specified in the Server's
 [history archive guide](https://github.com/durable-workflow/server/blob/main/docs/history-archives.md).

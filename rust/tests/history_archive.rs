@@ -808,6 +808,24 @@ fn a_resumed_copy_replaces_corrupt_and_partial_objects_and_releases_the_recorded
     );
     assert_eq!(project.verify(&dir).0, 0);
 
+    // The recorded owner cannot be released: the run stops, and its record
+    // still names that owner for the next run.
+    let stuck = project.0.join("stuck");
+    fs::create_dir_all(&stuck).unwrap();
+    let record = json!({"schema": "dw.history-archive.in-progress.v1", "owner": OTHER_OWNER, "workflow_id": "wf", "run_id": "run"});
+    fs::write(stuck.join(".dw-history-archive.json"), record.to_string()).unwrap();
+    let mock = Mock::new(vec![(RELEASE, 500, b"{}".to_vec())]);
+    let (code, _) = mock_archive(&project, &mock, &stuck);
+    assert_eq!(code, 1);
+    assert!(
+        !mock.lines().iter().any(|line| line.starts_with(ACQUIRE)),
+        "{:?}",
+        mock.lines()
+    );
+    let kept: Value =
+        serde_json::from_slice(&fs::read(stuck.join(".dw-history-archive.json")).unwrap()).unwrap();
+    assert_eq!(kept["owner"], OTHER_OWNER, "{kept}");
+
     // A linked objects directory is refused before anything is touched.
     let linked = project.0.join("linked");
     fs::create_dir_all(&linked).unwrap();

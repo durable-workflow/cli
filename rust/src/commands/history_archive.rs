@@ -9,7 +9,7 @@
 //! writes the manifest, verifies the whole directory from disk, confirms the
 //! hold is still its own, and only then writes the receipt. The owner is
 //! recorded before the hold is acquired and released on every path, Ctrl-C
-//! included; a crash leaves the hold to expire, and the next run in the same
+//! and (on Unix) SIGTERM included; a crash leaves the hold to expire, and the next run in the same
 //! directory releases the owner it recorded. A lock file keeps two dw
 //! processes out of the same directory.
 
@@ -648,9 +648,10 @@ pub fn archive(context: &Context, input: &Input) -> Result<i32, CliError> {
     };
     context.preflight(false)?;
     let directory = prepare(&dir, &workflow_id, &run_id)?;
-    if let Some((server, namespace)) = &directory.recorded {
+    if let (Some((server, namespace)), Some(_)) = (&directory.recorded, &directory.stale_owner) {
         // A recorded owner belongs to the Server that granted it: releasing
-        // it anywhere else would settle nothing.
+        // it anywhere else would settle nothing. The namespace keeps the
+        // archive's identity; the hold itself is Server-wide.
         let connection = &context.connection;
         let same_server = server.as_deref().is_none_or(|server| {
             server.trim_end_matches('/') == connection.server.trim_end_matches('/')
@@ -707,9 +708,11 @@ pub fn archive(context: &Context, input: &Input) -> Result<i32, CliError> {
             }
         })
     };
+    // A signal during the release only stops the wait: what the copy already
+    // finished (a verified archive, or an error) stays its outcome.
     let finished = match (finished, stopped_again) {
-        (Err(code), _) | (Ok(_), Some(code)) => Err(code),
-        (Ok(result), None) => Ok(result),
+        (Err(code), _) => Err(code),
+        (Ok(result), _) => Ok(result),
     };
     let outcome = match &finished {
         Ok(Ok(result)) => result["outcome"]
@@ -797,7 +800,10 @@ impl Run<'_> {
         // leaves the owner for the next run to release.
         self.progress(Some(self.owner))?;
         let (status, acquired) = hold(self.context, "acquire", self.owner, self.ttl).await?;
-        if status != 200 {
+        // Only these answers are refused before anything is saved; any other
+        // status (a 5xx after a commit, a proxy's 502 or 504) may hide a hold
+        // that was taken, so its owner is released and kept like any other.
+        if matches!(status, 400 | 401 | 403 | 404 | 409 | 422 | 429) {
             self.acquire_refused.set(true);
         }
         if status == 404 {

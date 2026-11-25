@@ -882,6 +882,24 @@ fn a_refused_acquire_surfaces_its_error_and_leaves_no_owner_recorded() {
         mock.lines()
     );
 
+    // A 5xx may hide a hold that was taken: its owner is released and kept.
+    let unclear = project.0.join("unclear");
+    let mock = Mock::new(vec![
+        (ACQUIRE, 503, b"{}".to_vec()),
+        (RELEASE, 500, b"{}".to_vec()),
+    ]);
+    let (code, error) = mock_archive(&project, &mock, &unclear);
+    assert_eq!(code, 6, "{error}");
+    assert!(
+        mock.lines().iter().any(|line| line.starts_with(RELEASE)),
+        "{:?}",
+        mock.lines()
+    );
+    let kept: Value =
+        serde_json::from_slice(&fs::read(unclear.join(".dw-history-archive.json")).unwrap())
+            .unwrap();
+    assert!(kept["owner"].is_string(), "{kept}");
+
     // An unfinished archive recorded against another Server is not resumed
     // here, so its recorded owner is never released at the wrong Server.
     let elsewhere = project.0.join("elsewhere");

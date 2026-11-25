@@ -7,9 +7,11 @@
 //! refuses an export that cannot be a complete archive, fetches each object
 //! once through the runtime transport and checks its length and digest,
 //! writes the manifest, verifies the whole directory from disk, confirms the
-//! hold is still its own, and only then writes the receipt. The hold is
-//! released on every path; a crash leaves it to expire, and the next run in
-//! the same directory releases the owner it recorded.
+//! hold is still its own, and only then writes the receipt. The owner is
+//! recorded before the hold is acquired and released on every path, Ctrl-C
+//! included; a crash leaves the hold to expire, and the next run in the same
+//! directory releases the owner it recorded. A lock file keeps two dw
+//! processes out of the same directory.
 
 use crate::cli::Input;
 use crate::client::{map_error, Context};
@@ -28,6 +30,8 @@ use std::time::{Duration, Instant};
 /// behind for the next run to release.
 const PROGRESS_FILE: &str = ".dw-history-archive.json";
 const PROGRESS_SCHEMA: &str = "dw.history-archive.in-progress.v1";
+/// Held with an OS file lock while a copy runs in the directory.
+const LOCK_FILE: &str = ".dw-history-archive.lock";
 const RESULT_SCHEMA: &str = "dw.history-archive.result.v1";
 const DEFAULT_HOLD_TTL: u64 = 900;
 const HOLD_SEGMENTS: [&str; 2] = ["system", "external-payload-backup-hold"];
@@ -128,7 +132,15 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), CliError> {
     let partial = path.with_extension("partial");
     let write = || -> std::io::Result<()> {
         use std::io::Write;
-        let mut file = std::fs::File::create(&partial)?;
+        // A leftover (or planted) partial is replaced, never followed.
+        match std::fs::remove_file(&partial) {
+            Err(error) if error.kind() != std::io::ErrorKind::NotFound => return Err(error),
+            _ => {}
+        }
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&partial)?;
         file.write_all(bytes)?;
         file.sync_all()?;
         std::fs::rename(&partial, path)
@@ -136,46 +148,71 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), CliError> {
     write().map_err(|error| io_failure(path, error))
 }
 
-/// What the target directory already holds.
+/// What the target directory already holds, and its lock.
 struct Directory {
     created: bool,
     /// The hold owner a crashed earlier copy recorded.
     stale_owner: Option<String>,
+    /// Released when dropped, or by the OS if dw dies.
+    _lock: std::fs::File,
 }
 
 /// Create the directory, or accept an empty one or an unfinished archive of
-/// the same run. A completed archive and any other directory are refused
+/// the same run, and lock it. A completed archive, another run's archive,
+/// any other directory and a directory another dw is writing are refused
 /// before the Server is contacted.
 fn prepare(dir: &Path, workflow_id: &str, run_id: &str) -> Result<Directory, CliError> {
-    if !dir.exists() {
+    let created = !dir.exists();
+    if created {
         std::fs::create_dir_all(dir).map_err(|error| io_failure(dir, error))?;
-        return Ok(Directory {
-            created: true,
-            stale_owner: None,
-        });
     }
+    let lock_existed = dir.join(LOCK_FILE).exists();
+    let refuse = |message: String| {
+        if !lock_existed {
+            let _ = std::fs::remove_file(dir.join(LOCK_FILE));
+        }
+        if created {
+            let _ = std::fs::remove_dir(dir);
+        }
+        Err(CliError::Invalid(message))
+    };
     let metadata = std::fs::symlink_metadata(dir).map_err(|error| io_failure(dir, error))?;
     if !metadata.is_dir() {
+        return refuse(format!("{} is not a directory.", dir.display()));
+    }
+    let lock = std::fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .write(true)
+        .open(dir.join(LOCK_FILE))
+        .map_err(|error| io_failure(dir, error))?;
+    if lock.try_lock().is_err() {
         return Err(CliError::Invalid(format!(
-            "{} is not a directory.",
+            "Another dw is writing an archive in {}. Wait for it to finish.",
             dir.display()
         )));
     }
-    let empty = std::fs::read_dir(dir)
-        .map_err(|error| io_failure(dir, error))?
-        .next()
-        .is_none();
+    let mut entries = std::fs::read_dir(dir).map_err(|error| io_failure(dir, error))?;
+    let empty = entries.all(|entry| entry.is_ok_and(|entry| entry.file_name() == LOCK_FILE));
     if empty {
         return Ok(Directory {
-            created: false,
+            created,
             stale_owner: None,
+            _lock: lock,
         });
     }
     if dir.join(RECEIPT_FILE).exists() {
-        return Err(CliError::Invalid(format!(
+        return refuse(format!(
             "{} already holds a completed archive. Verify it with dw workflow:history-archive-verify, or choose a new directory.",
             dir.display()
-        )));
+        ));
+    }
+    let objects = std::fs::symlink_metadata(dir.join(OBJECTS_DIR));
+    if objects.is_ok_and(|metadata| !metadata.is_dir()) {
+        return refuse(format!(
+            "{}/{OBJECTS_DIR} is not a directory.",
+            dir.display()
+        ));
     }
     let read = |name: &str| {
         std::fs::read(dir.join(name))
@@ -189,23 +226,24 @@ fn prepare(dir: &Path, workflow_id: &str, run_id: &str) -> Result<Directory, Cli
         (Some(progress), _) => (progress["workflow_id"].clone(), progress["run_id"].clone()),
         (None, Some(manifest)) => (manifest["identity"]["workflow_id"].clone(), manifest["identity"]["run_id"].clone()),
         (None, None) => {
-            return Err(CliError::Invalid(format!(
+            return refuse(format!(
                 "{} is not empty and is not an unfinished history archive. Choose an empty or new directory.",
                 dir.display()
-            )))
+            ))
         }
     };
     if archived_workflow != workflow_id || archived_run != run_id {
-        return Err(CliError::Invalid(format!(
+        return refuse(format!(
             "{} holds an unfinished archive of another run ({} / {}). Choose another directory.",
             dir.display(),
             archived_workflow.as_str().unwrap_or("-"),
             archived_run.as_str().unwrap_or("-")
-        )));
+        ));
     }
     Ok(Directory {
-        created: false,
+        created,
         stale_owner: progress.and_then(|progress| progress["owner"].as_str().map(str::to_owned)),
+        _lock: lock,
     })
 }
 
@@ -280,6 +318,11 @@ impl Hold<'_> {
         if self.renewed.elapsed() < Duration::from_secs(self.ttl / 3) {
             return Ok(Ok(()));
         }
+        self.renew().await
+    }
+
+    /// Renew now, so what follows starts with a full lease.
+    async fn renew(&mut self) -> Result<Result<(), Value>, CliError> {
         let (status, body) = hold(self.context, "renew", &self.owner, self.ttl).await?;
         if status != 200 || body["active"] != true {
             return Ok(Err(body));
@@ -361,8 +404,18 @@ async fn fetch_object(
             .to_owned();
         return failure(&reason, Some(status));
     }
+    // Async file I/O: the copy runs on the CLI's single-threaded runtime
+    // alongside the Ctrl-C handler.
+    use tokio::io::AsyncWriteExt;
     let partial = path.with_extension("partial");
-    let mut file = std::fs::File::create(&partial).map_err(|error| io_failure(&partial, error))?;
+    // A leftover (or planted) partial is replaced, never followed.
+    let _ = tokio::fs::remove_file(&partial).await;
+    let mut file = tokio::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&partial)
+        .await
+        .map_err(|error| io_failure(&partial, error))?;
     let mut hasher = Sha256::new();
     let mut length: u64 = 0;
     loop {
@@ -370,18 +423,18 @@ async fn fetch_object(
             Ok(Some(chunk)) => chunk,
             Ok(None) => break,
             Err(_) => {
-                let _ = std::fs::remove_file(&partial);
+                let _ = tokio::fs::remove_file(&partial).await;
                 return failure("transfer_interrupted", Some(status));
             }
         };
         length += chunk.len() as u64;
         if length > reference.size_bytes as u64 {
-            let _ = std::fs::remove_file(&partial);
+            let _ = tokio::fs::remove_file(&partial).await;
             return failure("external_payload_integrity_mismatch", Some(status));
         }
         hasher.update(&chunk);
-        use std::io::Write;
         file.write_all(&chunk)
+            .await
             .map_err(|error| io_failure(&partial, error))?;
     }
     let digest: String = hasher
@@ -390,13 +443,16 @@ async fn fetch_object(
         .map(|byte| format!("{byte:02x}"))
         .collect();
     if length != reference.size_bytes as u64 || digest != reference.sha256 {
-        let _ = std::fs::remove_file(&partial);
+        let _ = tokio::fs::remove_file(&partial).await;
         return failure("external_payload_integrity_mismatch", Some(status));
     }
     file.sync_all()
+        .await
         .map_err(|error| io_failure(&partial, error))?;
     drop(file);
-    std::fs::rename(&partial, path).map_err(|error| io_failure(path, error))?;
+    tokio::fs::rename(&partial, path)
+        .await
+        .map_err(|error| io_failure(path, error))?;
     Ok(Ok(()))
 }
 
@@ -426,7 +482,7 @@ async fn copy(
     dir: &Path,
     workflow_id: &str,
     run_id: &str,
-) -> Result<(Value, Plan, Copied), CliError> {
+) -> Result<(Plan, Copied), CliError> {
     let export = RawRequest::get([
         "workflows",
         workflow_id,
@@ -452,7 +508,7 @@ async fn copy(
     let plan = archive::plan(&export);
     let mut copied = Copied::default();
     if !plan.blockers.is_empty() {
-        return Ok((export, plan, copied));
+        return Ok((plan, copied));
     }
     prune_objects(dir, &plan)?;
     write_atomic(&dir.join(HISTORY_FILE), &export_bytes)?;
@@ -489,7 +545,7 @@ async fn copy(
         &dir.join(MANIFEST_FILE),
         output::encode_pretty(&manifest).as_bytes(),
     )?;
-    Ok((export, plan, copied))
+    Ok((plan, copied))
 }
 
 pub fn archive(context: &Context, input: &Input) -> Result<i32, CliError> {
@@ -510,145 +566,199 @@ pub fn archive(context: &Context, input: &Input) -> Result<i32, CliError> {
     };
     context.preflight(false)?;
     let directory = prepare(&dir, &workflow_id, &run_id)?;
-    let runtime = context.runtime();
-    if let Some(stale) = &directory.stale_owner {
-        // A crashed earlier copy's hold: released if it is still recorded.
-        let _ = runtime.block_on(hold(context, "release", stale, ttl));
-    }
     let owner = new_owner()?;
-    let (status, acquired) = runtime.block_on(hold(context, "acquire", &owner, ttl))?;
-    if status == 404 {
-        return Err(CliError::Failure(
-            "The Server does not serve the external payload backup hold (/api/system/external-payload-backup-hold), which a history archive copies under. Use native Server 3.x or later.".into(),
-        ));
-    }
-    if status != 200 {
-        cleanup_created(&dir, &directory);
-        return Err(http_error(status, &acquired));
-    }
-    let progress = json!({"schema": PROGRESS_SCHEMA, "owner": owner, "workflow_id": workflow_id, "run_id": run_id,
-        "namespace": context.connection.namespace, "started_at": batch_manifest::utc_now()});
-    write_atomic(
-        &dir.join(PROGRESS_FILE),
-        output::encode_pretty(&progress).as_bytes(),
-    )?;
-    let mut held = Hold {
+    let run = Run {
         context,
-        owner: owner.clone(),
+        dir: &dir,
+        workflow_id: &workflow_id,
+        run_id: &run_id,
+        owner: &owner,
         ttl,
-        renewed: Instant::now(),
-        report: acquired,
     };
-
-    let copied = runtime.block_on(async {
+    let runtime = context.runtime();
+    // One cancellation scope covers everything that can take or rely on the
+    // hold; `biased` lets a pending Ctrl-C win at the next await, so no
+    // receipt is written after it.
+    let finished = runtime.block_on(async {
         tokio::select! {
-            result = copy(context, &mut held, &dir, &workflow_id, &run_id) => Some(result),
+            biased;
             _ = tokio::signal::ctrl_c() => None,
+            result = run.held(directory.stale_owner.as_deref()) => Some(result),
         }
     });
-    let finish = |held: &Hold| {
-        let released = runtime.block_on(hold(context, "release", &held.owner, ttl));
-        if matches!(released, Ok((200, _))) {
-            let _ = std::fs::remove_file(dir.join(PROGRESS_FILE));
-        }
+    // Release on every path. Releasing an owner that never acquired the hold
+    // is a harmless refusal.
+    let released = runtime.block_on(hold(context, "release", &owner, ttl));
+    let settled = matches!(released, Ok((200, _)) | Ok((409, _)));
+    let outcome = match &finished {
+        Some(Ok(result)) => result["outcome"]
+            .as_str()
+            .unwrap_or("incomplete")
+            .to_owned(),
+        _ => "incomplete".to_owned(),
     };
-    let (export, plan, copied) = match copied {
+    run.finish(&directory, &outcome, settled);
+    match finished {
         None => {
-            finish(&held);
-            formatter::writeln_err("<error>Cancelled. The archive is incomplete; run the same command again to resume.</error>");
-            return Ok(130);
+            formatter::writeln_err(
+                "<error>Cancelled. The archive is incomplete; run the same command again to resume.</error>",
+            );
+            Ok(130)
         }
-        Some(Err(error)) => {
-            finish(&held);
-            return Err(error);
-        }
-        Some(Ok(result)) => result,
-    };
-
-    let mut result = json!({
-        "schema": RESULT_SCHEMA,
-        "directory": dir.display().to_string(),
-        "namespace": context.connection.namespace,
-        "workflow_id": workflow_id,
-        "run_id": run_id,
-        "objects": plan.objects.len(),
-        "object_bytes": plan.object_bytes(),
-        "copied": copied.copied,
-        "resumed": copied.resumed,
-        "failures": copied.failures,
-        "hold": {"owner": owner, "acquired_at": held.report["acquired_at"]},
-    });
-    let outcome = if !plan.blockers.is_empty() {
-        result["blockers"] = Value::Array(
-            plan.blockers
-                .iter()
-                .map(archive::Finding::to_json)
-                .collect(),
-        );
-        "refused"
-    } else if let Some(lost) = &copied.hold_lost {
-        result["hold_lost"] = lost.clone();
-        "incomplete"
-    } else {
-        // Cold verification: every byte read back from the directory.
-        let report = archive::verify_contents(&dir);
-        let confirmed = runtime.block_on(hold_status(context, &owner));
-        let confirmed = match confirmed {
-            Ok((200, body)) if body["active"] == true => Ok(body),
-            Ok((_, body)) => Err(body),
-            Err(error) => Err(json!({"reason": error.message()})),
-        };
-        let outcome = match (&report["outcome"], confirmed) {
-            (verified, Ok(confirmed)) if verified == "verified" => {
-                let mut record = hold_record(&owner, &held.report);
-                record["confirmed_at"] = confirmed["database_time"].clone();
-                record["expires_at"] = confirmed["expires_at"].clone();
-                let manifest_bytes = std::fs::read(dir.join(MANIFEST_FILE))
-                    .map_err(|error| io_failure(&dir, error))?;
-                let receipt =
-                    archive::receipt(&manifest_bytes, &report, &batch_manifest::utc_now(), record);
-                write_atomic(
-                    &dir.join(RECEIPT_FILE),
-                    output::encode_pretty(&receipt).as_bytes(),
-                )?;
-                result["receipt"] = json!(dir.join(RECEIPT_FILE).display().to_string());
-                "verified"
+        Some(Err(error)) => Err(error),
+        Some(Ok(result)) => {
+            if context.mode.machine_readable() {
+                output::print_json(&result);
+            } else {
+                for line in result_lines(&result) {
+                    formatter::writeln_out(&line);
+                }
             }
-            (verified, Err(lost)) if verified == "verified" => {
-                result["hold_lost"] = lost;
+            Ok(exit_for(&outcome))
+        }
+    }
+}
+
+/// One archive run's fixed inputs.
+struct Run<'a> {
+    context: &'a Context,
+    dir: &'a Path,
+    workflow_id: &'a str,
+    run_id: &'a str,
+    owner: &'a str,
+    ttl: u64,
+}
+
+impl Run<'_> {
+    fn progress(&self, owner: Option<&str>) -> Result<(), CliError> {
+        let progress = json!({"schema": PROGRESS_SCHEMA, "owner": owner, "workflow_id": self.workflow_id,
+            "run_id": self.run_id, "namespace": self.context.connection.namespace, "updated_at": batch_manifest::utc_now()});
+        write_atomic(
+            &self.dir.join(PROGRESS_FILE),
+            output::encode_pretty(&progress).as_bytes(),
+        )
+    }
+
+    /// Everything done under the hold. Answers the result document.
+    async fn held(&self, stale_owner: Option<&str>) -> Result<Value, CliError> {
+        if let Some(stale) = stale_owner {
+            // A crashed earlier copy's hold, released if it is still held.
+            let _ = hold(self.context, "release", stale, self.ttl).await;
+        }
+        // Recorded before the hold exists, so a crash at any later point
+        // leaves the owner for the next run to release.
+        self.progress(Some(self.owner))?;
+        let (status, acquired) = hold(self.context, "acquire", self.owner, self.ttl).await?;
+        if status == 404 {
+            return Err(CliError::Failure(
+                "The Server does not serve the external payload backup hold (/api/system/external-payload-backup-hold), which a history archive copies under. Use native Server 3.x or later.".into(),
+            ));
+        }
+        if status != 200 {
+            return Err(http_error(status, &acquired));
+        }
+        let mut held = Hold {
+            context: self.context,
+            owner: self.owner.to_owned(),
+            ttl: self.ttl,
+            renewed: Instant::now(),
+            report: acquired,
+        };
+        let (plan, copied) = copy(
+            self.context,
+            &mut held,
+            self.dir,
+            self.workflow_id,
+            self.run_id,
+        )
+        .await?;
+        let mut result = json!({
+            "schema": RESULT_SCHEMA,
+            "directory": self.dir.display().to_string(),
+            "namespace": self.context.connection.namespace,
+            "workflow_id": self.workflow_id,
+            "run_id": self.run_id,
+            "objects": plan.objects.len(),
+            "object_bytes": plan.object_bytes(),
+            "copied": copied.copied,
+            "resumed": copied.resumed,
+            "failures": copied.failures,
+            "hold": {"owner": self.owner, "acquired_at": held.report["acquired_at"]},
+        });
+        let lost = match copied.hold_lost {
+            Some(lost) => Some(lost),
+            None if plan.blockers.is_empty() => held.renew().await?.err(),
+            None => None,
+        };
+        let outcome = if !plan.blockers.is_empty() {
+            result["blockers"] = Value::Array(
+                plan.blockers
+                    .iter()
+                    .map(archive::Finding::to_json)
+                    .collect(),
+            );
+            "refused"
+        } else if let Some(lost) = lost {
+            result["hold_lost"] = lost;
+            "incomplete"
+        } else {
+            // Cold verification: every byte read back from the directory.
+            let report = archive::verify_contents(self.dir);
+            tokio::task::yield_now().await;
+            let outcome = if report["outcome"] != "verified" {
                 "incomplete"
-            }
-            _ => "incomplete",
+            } else {
+                match hold_status(self.context, self.owner).await? {
+                    (200, confirmed) if confirmed["active"] == true => {
+                        let mut record = hold_record(self.owner, &held.report);
+                        record["confirmed_at"] = confirmed["database_time"].clone();
+                        record["expires_at"] = confirmed["expires_at"].clone();
+                        // Bound to the manifest bytes the verification read.
+                        let receipt = archive::receipt(&report, &batch_manifest::utc_now(), record);
+                        write_atomic(
+                            &self.dir.join(RECEIPT_FILE),
+                            output::encode_pretty(&receipt).as_bytes(),
+                        )?;
+                        result["receipt"] =
+                            json!(self.dir.join(RECEIPT_FILE).display().to_string());
+                        "verified"
+                    }
+                    (_, lost) => {
+                        result["hold_lost"] = lost;
+                        "incomplete"
+                    }
+                }
+            };
+            result["verification"] = report;
+            outcome
         };
-        result["verification"] = report;
-        outcome
-    };
-    finish(&held);
-    if outcome == "refused" {
-        // Nothing was copied; leave the directory as it was found.
-        cleanup_created(&dir, &directory);
+        result["outcome"] = json!(outcome);
+        Ok(result)
     }
-    result["outcome"] = json!(outcome);
-    if context.mode.machine_readable() {
-        output::print_json(&result);
-    } else {
-        for line in result_lines(&result, &export) {
-            formatter::writeln_out(&line);
+
+    /// Leave the directory in a state the next run understands: a verified
+    /// archive without dw's records; nothing at all when nothing was copied
+    /// into a directory this run created; otherwise an unfinished archive
+    /// whose record names the owner still to release, if any.
+    fn finish(&self, directory: &Directory, outcome: &str, released: bool) {
+        let dir = self.dir;
+        let copied = dir.join(HISTORY_FILE).exists() || dir.join(MANIFEST_FILE).exists();
+        if outcome == "verified" || !copied {
+            let _ = std::fs::remove_file(dir.join(PROGRESS_FILE));
+            if directory.created && !copied {
+                let _ = std::fs::remove_dir(dir.join(OBJECTS_DIR));
+                let _ = std::fs::remove_file(dir.join(LOCK_FILE));
+                let _ = std::fs::remove_dir(dir);
+                return;
+            }
+        } else if released {
+            let _ = self.progress(None);
         }
-    }
-    Ok(exit_for(outcome))
-}
-
-/// Remove the directory if this run created it and left it empty.
-fn cleanup_created(dir: &Path, directory: &Directory) {
-    let _ = std::fs::remove_file(dir.join(PROGRESS_FILE));
-    if directory.created {
-        let _ = std::fs::remove_dir(dir.join(OBJECTS_DIR));
-        let _ = std::fs::remove_dir(dir);
+        let _ = std::fs::remove_file(dir.join(LOCK_FILE));
     }
 }
 
-fn result_lines(result: &Value, export: &Value) -> Vec<String> {
+fn result_lines(result: &Value) -> Vec<String> {
     let text = |value: &Value| {
         value
             .as_str()
@@ -674,7 +784,17 @@ fn result_lines(result: &Value, export: &Value) -> Vec<String> {
                 text(&blocker["message"])
             ));
         }
-        if export["history_complete"] != true {
+        let incomplete = result["blockers"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .any(|blocker| {
+                matches!(
+                    blocker["code"].as_str(),
+                    Some("history_incomplete" | "history_pruned")
+                )
+            });
+        if incomplete {
             lines.push("Archive a closed run whose history has not been pruned.".into());
         }
         return lines;

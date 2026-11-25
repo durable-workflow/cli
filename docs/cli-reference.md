@@ -640,9 +640,12 @@ The outcome is `verified` (exit 0), `incomplete` (exit 1) or `refused`
 Run the same command into the same directory to resume an incomplete archive.
 Objects already present with the right digest are kept. A crashed copy's hold
 is released by the next run, or expires after `--hold-ttl` seconds (900 by
-default, 60 to 3600). dw never writes into a directory that holds other files,
-a completed archive, or another run's archive. While another backup or archive
-holds the hold, the copy is refused with the Server's HTTP 409; retry later.
+default, 60 to 3600). dw writes only into a new or empty directory, or into an
+unfinished archive of the same run, where it replaces only `objects/ep_*` files.
+It refuses a completed archive, another run's archive, any other directory, a
+linked `objects/` directory, and a directory another dw is writing. While
+another backup or archive holds the hold, the copy is refused with the Server's
+HTTP 409; retry later. Ctrl-C stops the copy and releases the hold (exit 130).
 
 `workflow:history-archive-verify` needs no Server. It reads every file back and
 reports `verified`, `incomplete` with a finding per failed check (such as

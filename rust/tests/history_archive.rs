@@ -490,3 +490,320 @@ fn open_runs_held_holds_and_foreign_directories_are_refused_before_copying() {
     ]);
     assert_eq!(output.status.code(), Some(1));
 }
+
+/// A loopback Server for the paths dw calls while archiving. Each route
+/// answers as given; every request line is recorded.
+struct Mock {
+    url: String,
+    requests: std::sync::Arc<std::sync::Mutex<Vec<String>>>,
+}
+
+type Route = (&'static str, u16, Vec<u8>);
+
+impl Mock {
+    fn new(routes: Vec<Route>) -> Self {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}/prefix", listener.local_addr().unwrap());
+        let requests = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let observed = requests.clone();
+        let info = include_bytes!("../src/compat/fixtures/cluster-info-php-2.11.8.json").to_vec();
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(mut stream) = stream else { continue };
+                stream
+                    .set_read_timeout(Some(Duration::from_secs(2)))
+                    .unwrap();
+                let mut bytes = Vec::new();
+                let mut buffer = [0; 4096];
+                loop {
+                    if let Some(end) = bytes.windows(4).position(|part| part == b"\r\n\r\n") {
+                        let head = String::from_utf8_lossy(&bytes[..end]).to_lowercase();
+                        let length = head
+                            .lines()
+                            .find_map(|line| line.strip_prefix("content-length:"))
+                            .and_then(|value| value.trim().parse::<usize>().ok())
+                            .unwrap_or(0);
+                        if bytes.len() >= end + 4 + length {
+                            break;
+                        }
+                    }
+                    match stream.read(&mut buffer) {
+                        Ok(0) | Err(_) => break,
+                        Ok(size) => bytes.extend_from_slice(&buffer[..size]),
+                    }
+                }
+                let line = String::from_utf8_lossy(&bytes)
+                    .lines()
+                    .next()
+                    .unwrap_or_default()
+                    .to_owned();
+                let (status, body) = if line.starts_with("GET /prefix/api/cluster/info ") {
+                    (200, info.clone())
+                } else {
+                    observed.lock().unwrap().push(line.clone());
+                    routes
+                        .iter()
+                        .find(|(prefix, _, _)| line.starts_with(prefix))
+                        .map(|(_, status, body)| (*status, body.clone()))
+                        .unwrap_or((404, b"{}".to_vec()))
+                };
+                let head = format!(
+                    "HTTP/1.1 {status} Test\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                    body.len()
+                );
+                let _ = stream.write_all(head.as_bytes());
+                let _ = stream.write_all(&body);
+            }
+        });
+        Self { url, requests }
+    }
+
+    fn lines(&self) -> Vec<String> {
+        self.requests.lock().unwrap().clone()
+    }
+}
+
+const MOCK_ID: &str = "ep_01ARZ3NDEKTSV4RRFFQ69G5FAV";
+const MOCK_BYTES: &[u8] = b"archived bytes";
+
+/// A complete export with one runtime reference to `MOCK_BYTES`.
+fn mock_export() -> Vec<u8> {
+    let sha: String = Sha256::digest(MOCK_BYTES)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    let envelope = json!({"codec": "avro", "external_payload": {"schema": "durable-workflow.v2.runtime-external-payload-reference.v1",
+        "reference_id": MOCK_ID, "codec": "avro", "size_bytes": MOCK_BYTES.len(), "sha256": sha}});
+    json!({"schema": "durable-workflow.v2.history-export", "schema_version": 2, "history_complete": true,
+        "workflow": {"instance_id": "wf", "run_id": "run", "last_history_sequence": 1, "details_state": "retained", "details_pruned_at": null},
+        "payloads": {"codec": "avro", "arguments": {"available": true, "data": envelope}},
+        "history_events": [{"sequence": 1, "type": "StartAccepted", "payload": {}}],
+        "redaction": {"applied": false}, "payload_manifest": {"version": 1, "entries": []}})
+    .to_string()
+    .into_bytes()
+}
+
+fn held() -> Vec<u8> {
+    json!({"schema": "durable-workflow.external-payload-backup-hold.v1", "active": true, "owner": "x",
+        "acquired_at": "2026-11-25 00:00:00", "expires_at": "2026-11-25 00:15:00", "database_time": "2026-11-25 00:00:01"})
+    .to_string()
+    .into_bytes()
+}
+
+fn not_owned() -> Vec<u8> {
+    json!({"reason": "backup_hold_not_owned"})
+        .to_string()
+        .into_bytes()
+}
+
+const ACQUIRE: &str = "POST /prefix/api/system/external-payload-backup-hold/acquire ";
+const RENEW: &str = "POST /prefix/api/system/external-payload-backup-hold/renew ";
+const RELEASE: &str = "POST /prefix/api/system/external-payload-backup-hold/release ";
+const STATUS: &str = "GET /prefix/api/system/external-payload-backup-hold?owner=";
+const EXPORT: &str = "GET /prefix/api/workflows/wf/runs/run/history/export ";
+const OBJECT: &str = "GET /prefix/api/external-payloads/v1/ep_01ARZ3NDEKTSV4RRFFQ69G5FAV ";
+
+fn mock_archive(project: &Project, mock: &Mock, dir: &Path) -> (i32, Value) {
+    let output = project.run(&[
+        "workflow:history-archive",
+        "wf",
+        "run",
+        dir.to_str().unwrap(),
+        "--server",
+        &mock.url,
+        "--token=fixture-token",
+        "--json",
+    ]);
+    (
+        output.status.code().unwrap_or(-1),
+        serde_json::from_slice(&output.stdout).unwrap_or(Value::Null),
+    )
+}
+
+#[test]
+fn a_lost_hold_or_a_failed_object_leaves_no_receipt_and_still_releases() {
+    let project = Project::new();
+
+    // The hold is no longer this owner's when the copy confirms it.
+    let mock = Mock::new(vec![
+        (ACQUIRE, 200, held()),
+        (RENEW, 200, held()),
+        (EXPORT, 200, mock_export()),
+        (OBJECT, 200, MOCK_BYTES.to_vec()),
+        (STATUS, 409, not_owned()),
+        (RELEASE, 409, not_owned()),
+    ]);
+    let dir = project.0.join("lost");
+    let (code, result) = mock_archive(&project, &mock, &dir);
+    assert_eq!(
+        (code, result["outcome"].clone()),
+        (1, json!("incomplete")),
+        "{result}"
+    );
+    assert_eq!(
+        result["hold_lost"]["reason"], "backup_hold_not_owned",
+        "{result}"
+    );
+    assert_eq!(result["verification"]["outcome"], "verified", "{result}");
+    assert!(!dir.join("receipt.json").exists());
+    assert!(
+        mock.lines().iter().any(|line| line.starts_with(RELEASE)),
+        "{:?}",
+        mock.lines()
+    );
+    // The unfinished archive is resumable; no owner is left to release.
+    let progress: Value =
+        serde_json::from_slice(&fs::read(dir.join(".dw-history-archive.json")).unwrap()).unwrap();
+    assert_eq!(progress["owner"], Value::Null, "{progress}");
+
+    // A renewal refused before verification stops the copy the same way.
+    let mock = Mock::new(vec![
+        (ACQUIRE, 200, held()),
+        (RENEW, 409, not_owned()),
+        (EXPORT, 200, mock_export()),
+        (OBJECT, 200, MOCK_BYTES.to_vec()),
+        (STATUS, 200, held()),
+        (RELEASE, 409, not_owned()),
+    ]);
+    let dir = project.0.join("renewal");
+    let (code, result) = mock_archive(&project, &mock, &dir);
+    assert_eq!(
+        (code, result["outcome"].clone()),
+        (1, json!("incomplete")),
+        "{result}"
+    );
+    assert_eq!(
+        result["hold_lost"]["reason"], "backup_hold_not_owned",
+        "{result}"
+    );
+    assert!(
+        !mock.lines().iter().any(|line| line.starts_with(STATUS)),
+        "verified after losing the hold"
+    );
+    assert!(!dir.join("receipt.json").exists());
+
+    // The object is gone at the source.
+    let mock = Mock::new(vec![
+        (ACQUIRE, 200, held()),
+        (RENEW, 200, held()),
+        (EXPORT, 200, mock_export()),
+        (
+            OBJECT,
+            404,
+            json!({"reason": "external_payload_not_found"})
+                .to_string()
+                .into_bytes(),
+        ),
+        (STATUS, 200, held()),
+        (RELEASE, 200, held()),
+    ]);
+    let dir = project.0.join("missing");
+    let (code, result) = mock_archive(&project, &mock, &dir);
+    assert_eq!(
+        (code, result["outcome"].clone()),
+        (1, json!("incomplete")),
+        "{result}"
+    );
+    assert_eq!(
+        result["failures"][0]["reason"], "external_payload_not_found",
+        "{result}"
+    );
+    assert_eq!(
+        result["verification"]["findings"][0]["code"], "object_missing",
+        "{result}"
+    );
+    assert!(!dir.join("receipt.json").exists());
+    assert!(dir.join("manifest.json").exists());
+    assert!(mock.lines().iter().any(|line| line.starts_with(RELEASE)));
+}
+
+#[test]
+fn a_resumed_copy_replaces_corrupt_and_partial_objects_and_releases_the_recorded_owner() {
+    let project = Project::new();
+    let dir = project.0.join("resume");
+    fs::create_dir_all(dir.join("objects")).unwrap();
+    fs::write(
+        dir.join(".dw-history-archive.json"),
+        json!({"schema": "dw.history-archive.in-progress.v1",
+        "owner": OTHER_OWNER, "workflow_id": "wf", "run_id": "run"})
+        .to_string(),
+    )
+    .unwrap();
+    fs::write(dir.join("objects").join(MOCK_ID), b"archived bytez").unwrap();
+    fs::write(
+        dir.join("objects").join(format!("{MOCK_ID}.partial")),
+        b"half",
+    )
+    .unwrap();
+    fs::write(
+        dir.join("objects").join("ep_01BX5ZZKBKACTAV9WEVGEMMVRZ"),
+        b"no longer referenced",
+    )
+    .unwrap();
+    let mock = Mock::new(vec![
+        (ACQUIRE, 200, held()),
+        (RENEW, 200, held()),
+        (EXPORT, 200, mock_export()),
+        (OBJECT, 200, MOCK_BYTES.to_vec()),
+        (STATUS, 200, held()),
+        (RELEASE, 200, held()),
+    ]);
+    let (code, result) = mock_archive(&project, &mock, &dir);
+    assert_eq!(
+        (code, result["outcome"].clone()),
+        (0, json!("verified")),
+        "{result}"
+    );
+    assert_eq!(
+        (result["copied"].clone(), result["resumed"].clone()),
+        (json!(1), json!(0)),
+        "{result}"
+    );
+    assert_eq!(
+        fs::read(dir.join("objects").join(MOCK_ID)).unwrap(),
+        MOCK_BYTES
+    );
+    let mut names: Vec<String> = fs::read_dir(&dir)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+    assert_eq!(
+        names,
+        [
+            "history-export.json",
+            "manifest.json",
+            "objects",
+            "receipt.json"
+        ]
+    );
+    assert_eq!(fs::read_dir(dir.join("objects")).unwrap().count(), 1);
+    // The crashed copy's owner was released before this copy acquired.
+    let lines = mock.lines();
+    assert!(
+        lines[0].starts_with(RELEASE) && lines[1].starts_with(ACQUIRE),
+        "{lines:?}"
+    );
+    assert_eq!(project.verify(&dir).0, 0);
+
+    // A linked objects directory is refused before anything is touched.
+    let linked = project.0.join("linked");
+    fs::create_dir_all(&linked).unwrap();
+    fs::write(
+        linked.join(".dw-history-archive.json"),
+        json!({"schema": "dw.history-archive.in-progress.v1",
+        "owner": null, "workflow_id": "wf", "run_id": "run"})
+        .to_string(),
+    )
+    .unwrap();
+    let target = project.0.join("elsewhere");
+    fs::create_dir_all(&target).unwrap();
+    fs::write(target.join(MOCK_ID), b"keep").unwrap();
+    std::os::unix::fs::symlink(&target, linked.join("objects")).unwrap();
+    let mock = Mock::new(vec![]);
+    let (code, _) = mock_archive(&project, &mock, &linked);
+    assert_eq!(code, 2);
+    assert!(mock.lines().is_empty(), "{:?}", mock.lines());
+    assert_eq!(fs::read(target.join(MOCK_ID)).unwrap(), b"keep");
+}

@@ -41,11 +41,6 @@ pub const OBJECTS_DIR: &str = "objects";
 pub const HOLD_KIND: &str = "durable-workflow.external-payload-backup-hold.v1";
 const EXPORT_SCHEMA: &str = "durable-workflow.v2.history-export";
 const EXPORT_SCHEMA_VERSION: i64 = 2;
-/// A runtime reference stored as text, as native stores it in a column.
-const NATIVE_STORED_PREFIX: &str = "dw-native-external-payload-v1:";
-/// A published PHP stored reference: a provider object, not fetchable
-/// through the runtime transport.
-const PHP_STORED_PREFIX: &str = "dw-external-payload:v1:";
 
 /// `durable-workflow.v2.runtime-external-payload-reference.v1`, as the
 /// Server validates it.
@@ -105,6 +100,11 @@ impl Reference {
         })
     }
 }
+/// A runtime reference stored as text, as native stores it in a column.
+const NATIVE_STORED_PREFIX: &str = "dw-native-external-payload-v1:";
+/// A published PHP stored reference: a provider object, not fetchable
+/// through the runtime transport.
+const PHP_STORED_PREFIX: &str = "dw-external-payload:v1:";
 
 /// Application values the export decodes into plain JSON. A map there that
 /// looks like an envelope is application data, not a reference.
@@ -447,17 +447,17 @@ pub fn manifest(
     })
 }
 
-/// The receipt for a cold verification `report` of the archive whose manifest
-/// bytes are `manifest_bytes`. `hold` records that the copy's hold was still
-/// held after the verification.
-pub fn receipt(manifest_bytes: &[u8], report: &Value, verified_at: &str, hold: Value) -> Value {
+/// The receipt for a verified cold verification `report`, bound to the exact
+/// manifest and history bytes that verification read. `hold` records that
+/// the copy's hold was still held after the verification.
+pub fn receipt(report: &Value, verified_at: &str, hold: Value) -> Value {
     json!({
         "schema": RECEIPT_SCHEMA,
         "format_version": FORMAT_VERSION,
         "outcome": "verified",
         "verification": "cold",
         "verified_at": verified_at,
-        "manifest_sha256": sha256_hex(manifest_bytes),
+        "manifest_sha256": report["manifest_sha256"],
         "history_sha256": report["history_sha256"],
         "object_count": report["object_count"],
         "object_bytes": report["object_bytes"],
@@ -568,6 +568,32 @@ fn check(dir: &Path, receipt_required: bool) -> Value {
     };
     let mut out = Map::new();
     out.insert("schema".into(), json!(REPORT_SCHEMA));
+    let Some((manifest_bytes, manifest)) = read_manifest(dir, &mut report) else {
+        return finish(out, report);
+    };
+    out.insert("identity".into(), manifest["identity"].clone());
+    out.insert("manifest_sha256".into(), json!(sha256_hex(&manifest_bytes)));
+    let plan = check_history(dir, &manifest, &mut report, &mut out);
+    let listed = check_listing(&manifest, &mut report);
+    let (verified, verified_bytes) = match &plan {
+        Some(plan) => {
+            check_unreferenced(plan, &listed, &mut report);
+            check_objects(dir, plan, &listed, &mut report)
+        }
+        None => (0, 0),
+    };
+    let plan = plan.unwrap_or_default();
+    out.insert("object_count".into(), json!(plan.objects.len()));
+    out.insert("object_bytes".into(), json!(plan.object_bytes()));
+    out.insert("verified_objects".into(), json!(verified));
+    out.insert("verified_object_bytes".into(), json!(verified_bytes));
+    check_receipt(dir, &manifest, receipt_required, &mut report, &mut out);
+    finish(out, report)
+}
+
+/// The manifest's bytes and document, or `None` after refusing an archive
+/// this verifier cannot read.
+fn read_manifest(dir: &Path, report: &mut Report) -> Option<(Vec<u8>, Value)> {
     let manifest_bytes = match read_file(&dir.join(MANIFEST_FILE)) {
         FileRead::Bytes(bytes) => bytes,
         FileRead::Missing => {
@@ -576,24 +602,21 @@ fn check(dir: &Path, receipt_required: bool) -> Value {
                 format!("{MANIFEST_FILE} is missing; this is not a history archive."),
                 Some(MANIFEST_FILE.into()),
             );
-            return finish(out, report);
+            return None;
         }
         other => {
             report.unreadable(MANIFEST_FILE, other);
             report.refused = true;
-            return finish(out, report);
+            return None;
         }
     };
-    let manifest: Value = match serde_json::from_slice(&manifest_bytes) {
-        Ok(value @ Value::Object(_)) => value,
-        _ => {
-            report.refuse(
-                "manifest_invalid",
-                format!("{MANIFEST_FILE} is not a JSON object."),
-                Some(MANIFEST_FILE.into()),
-            );
-            return finish(out, report);
-        }
+    let Ok(manifest @ Value::Object(_)) = serde_json::from_slice::<Value>(&manifest_bytes) else {
+        report.refuse(
+            "manifest_invalid",
+            format!("{MANIFEST_FILE} is not a JSON object."),
+            Some(MANIFEST_FILE.into()),
+        );
+        return None;
     };
     if manifest["schema"] != MANIFEST_SCHEMA {
         report.refuse(
@@ -601,7 +624,7 @@ fn check(dir: &Path, receipt_required: bool) -> Value {
             format!("The manifest schema is not {MANIFEST_SCHEMA}."),
             Some("schema".into()),
         );
-        return finish(out, report);
+        return None;
     }
     if manifest["format_version"] != FORMAT_VERSION {
         report.refuse(
@@ -609,12 +632,19 @@ fn check(dir: &Path, receipt_required: bool) -> Value {
             format!("Archive format version {} is not supported; this verifier reads version {FORMAT_VERSION}.", manifest["format_version"]),
             Some("format_version".into()),
         );
-        return finish(out, report);
+        return None;
     }
-    out.insert("identity".into(), manifest["identity"].clone());
-    out.insert("manifest_sha256".into(), json!(sha256_hex(&manifest_bytes)));
+    Some((manifest_bytes, manifest))
+}
 
-    // The history file, by the manifest's length and digest.
+/// The history file by the manifest's length and digest, and the plan of
+/// the export it holds; `None` when there is no readable export.
+fn check_history(
+    dir: &Path,
+    manifest: &Value,
+    report: &mut Report,
+    out: &mut Map<String, Value>,
+) -> Option<Plan> {
     let history = &manifest["history"];
     if history["path"] != HISTORY_FILE {
         report.fail(
@@ -623,67 +653,65 @@ fn check(dir: &Path, receipt_required: bool) -> Value {
             Some("history.path".into()),
         );
     }
-    let export_bytes = match read_file(&dir.join(HISTORY_FILE)) {
-        FileRead::Bytes(bytes) => Some(bytes),
+    let bytes = match read_file(&dir.join(HISTORY_FILE)) {
+        FileRead::Bytes(bytes) => bytes,
         other => {
             report.unreadable(HISTORY_FILE, other);
-            None
+            return None;
         }
     };
-    let mut plan = Plan::default();
-    if let Some(bytes) = &export_bytes {
-        let digest = sha256_hex(bytes);
-        out.insert("history_sha256".into(), json!(digest));
-        if history["size_bytes"].as_u64() != Some(bytes.len() as u64)
-            || history["sha256"] != digest.as_str()
-        {
-            report.fail(
-                "history_digest_mismatch",
-                format!("{HISTORY_FILE} does not match the manifest's length and SHA-256."),
-                Some(HISTORY_FILE.into()),
-            );
-        }
-        match serde_json::from_slice::<Value>(bytes) {
-            Ok(export) => {
-                plan = self::plan(&export);
-                for blocker in &plan.blockers {
-                    report.findings.push(blocker.clone());
-                }
-                let workflow = &export["workflow"];
-                let identity = &manifest["identity"];
-                if identity["workflow_id"] != workflow["instance_id"]
-                    || identity["run_id"] != workflow["run_id"]
-                    || identity["last_history_sequence"] != workflow["last_history_sequence"]
-                {
-                    report.fail(
-                        "identity_mismatch",
-                        "The manifest identity does not match the archived export.",
-                        Some("identity".into()),
-                    );
-                }
-            }
-            Err(_) => report.fail(
-                "history_invalid",
-                format!("{HISTORY_FILE} is not valid JSON."),
-                Some(HISTORY_FILE.into()),
-            ),
-        }
+    let digest = sha256_hex(&bytes);
+    if history["size_bytes"].as_u64() != Some(bytes.len() as u64)
+        || history["sha256"] != digest.as_str()
+    {
+        report.fail(
+            "history_digest_mismatch",
+            format!("{HISTORY_FILE} does not match the manifest's length and SHA-256."),
+            Some(HISTORY_FILE.into()),
+        );
     }
+    out.insert("history_sha256".into(), json!(digest));
+    let Ok(export) = serde_json::from_slice::<Value>(&bytes) else {
+        report.fail(
+            "history_invalid",
+            format!("{HISTORY_FILE} is not valid JSON."),
+            Some(HISTORY_FILE.into()),
+        );
+        return None;
+    };
+    let plan = plan(&export);
+    report.findings.extend(plan.blockers.iter().cloned());
+    let workflow = &export["workflow"];
+    let identity = &manifest["identity"];
+    if identity["workflow_id"] != workflow["instance_id"]
+        || identity["run_id"] != workflow["run_id"]
+        || identity["last_history_sequence"] != workflow["last_history_sequence"]
+    {
+        report.fail(
+            "identity_mismatch",
+            "The manifest identity does not match the archived export.",
+            Some("identity".into()),
+        );
+    }
+    Some(plan)
+}
 
-    // Every object the export references, and nothing else, by its length and digest.
-    let listed: Vec<&Value> = manifest["objects"]
-        .as_array()
-        .map(|objects| objects.iter().collect())
-        .unwrap_or_default();
-    if !manifest["objects"].is_array() {
+/// The manifest's object entries: a list, each reference id once, with
+/// totals that match.
+fn check_listing<'a>(manifest: &'a Value, report: &mut Report) -> Vec<&'a Value> {
+    let Some(listed) = manifest["objects"].as_array() else {
         report.fail(
             "manifest_inconsistent",
             "objects must be a list.",
             Some("objects".into()),
         );
-    }
-    let mut ids: Vec<&Value> = listed.iter().map(|entry| &entry["reference_id"]).collect();
-    ids.sort_by_key(|id| id.to_string());
+        return Vec::new();
+    };
+    let mut ids: Vec<String> = listed
+        .iter()
+        .map(|entry| entry["reference_id"].to_string())
+        .collect();
+    ids.sort();
     if ids.windows(2).any(|pair| pair[0] == pair[1]) {
         report.fail(
             "manifest_inconsistent",
@@ -691,20 +719,55 @@ fn check(dir: &Path, receipt_required: bool) -> Value {
             Some("objects".into()),
         );
     }
-    let objects_dir = std::fs::symlink_metadata(dir.join(OBJECTS_DIR));
-    let objects_linked = objects_dir
-        .as_ref()
-        .is_ok_and(|metadata| !metadata.file_type().is_dir());
-    if objects_linked {
+    let totals = &manifest["totals"];
+    let bytes: i64 = listed
+        .iter()
+        .filter_map(|entry| entry["size_bytes"].as_i64())
+        .sum();
+    if totals["object_count"] != listed.len() || totals["object_bytes"].as_i64() != Some(bytes) {
+        report.fail(
+            "manifest_inconsistent",
+            "totals do not match the listed objects.",
+            Some("totals".into()),
+        );
+    }
+    listed.iter().collect()
+}
+
+fn check_unreferenced(plan: &Plan, listed: &[&Value], report: &mut Report) {
+    for entry in listed {
+        if !plan
+            .objects
+            .iter()
+            .any(|object| entry["reference_id"] == object.reference.reference_id.as_str())
+        {
+            report.fail(
+                "object_unreferenced",
+                format!(
+                    "The manifest lists {} but the export does not reference it.",
+                    entry["reference_id"]
+                ),
+                Some("objects".into()),
+            );
+        }
+    }
+}
+
+/// Every object the export references, by its manifest entry and its file's
+/// length and digest. Answers the count and bytes that verified.
+fn check_objects(dir: &Path, plan: &Plan, listed: &[&Value], report: &mut Report) -> (usize, i64) {
+    if std::fs::symlink_metadata(dir.join(OBJECTS_DIR))
+        .is_ok_and(|metadata| !metadata.file_type().is_dir())
+    {
         report.fail(
             "file_not_regular",
             format!("{OBJECTS_DIR} is not a directory; links are not self-contained."),
             Some(OBJECTS_DIR.into()),
         );
+        return (0, 0);
     }
-    let mut verified = 0usize;
-    let mut verified_bytes = 0i64;
-    for object in plan.objects.iter().filter(|_| !objects_linked) {
+    let mut verified = (0, 0);
+    for object in &plan.objects {
         let reference = &object.reference;
         let path = object.path();
         let Some(entry) = listed
@@ -754,51 +817,23 @@ fn check(dir: &Path, receipt_required: bool) -> Value {
                 Some(path),
             ),
             Ok(_) => {
-                verified += 1;
-                verified_bytes += reference.size_bytes;
+                verified.0 += 1;
+                verified.1 += reference.size_bytes;
             }
         }
     }
-    if export_bytes.is_some() {
-        for entry in &listed {
-            if !plan
-                .objects
-                .iter()
-                .any(|object| entry["reference_id"] == object.reference.reference_id.as_str())
-            {
-                report.fail(
-                    "object_unreferenced",
-                    format!(
-                        "The manifest lists {} but the export does not reference it.",
-                        entry["reference_id"]
-                    ),
-                    Some("objects".into()),
-                );
-            }
-        }
-    }
-    let totals = &manifest["totals"];
-    if totals["object_count"] != listed.len()
-        || totals["object_bytes"].as_i64()
-            != Some(
-                listed
-                    .iter()
-                    .filter_map(|entry| entry["size_bytes"].as_i64())
-                    .sum(),
-            )
-    {
-        report.fail(
-            "manifest_inconsistent",
-            "totals do not match the listed objects.",
-            Some("totals".into()),
-        );
-    }
-    out.insert("object_count".into(), json!(plan.objects.len()));
-    out.insert("object_bytes".into(), json!(plan.object_bytes()));
-    out.insert("verified_objects".into(), json!(verified));
-    out.insert("verified_object_bytes".into(), json!(verified_bytes));
+    verified
+}
 
-    // The receipt binds a cold verification to these exact manifest bytes.
+/// The receipt binds a cold verification, under a confirmed hold of the
+/// manifest's owner, to these exact manifest and history bytes.
+fn check_receipt(
+    dir: &Path,
+    manifest: &Value,
+    required: bool,
+    report: &mut Report,
+    out: &mut Map<String, Value>,
+) {
     let receipt = match read_file(&dir.join(RECEIPT_FILE)) {
         FileRead::Bytes(bytes) => match serde_json::from_slice::<Value>(&bytes) {
             Ok(receipt @ Value::Object(_)) => Ok(receipt),
@@ -810,32 +845,55 @@ fn check(dir: &Path, receipt_required: bool) -> Value {
         Ok(receipt) => json!({"present": true, "verified_at": receipt["verified_at"], "hold": receipt["hold"]}),
         Err(_) => json!({"present": false}),
     });
-    if receipt_required {
-        match receipt {
-            Err(FileRead::Missing) => report.fail(
+    if !required {
+        return;
+    }
+    let receipt = match receipt {
+        Ok(receipt) => receipt,
+        Err(FileRead::Missing) => {
+            report.fail(
                 "receipt_missing",
                 "No verification receipt: the archive was never completed, or its copy or hold failed.",
                 Some(RECEIPT_FILE.into()),
-            ),
-            Err(read) => report.unreadable(RECEIPT_FILE, read),
-            Ok(receipt) => {
-                if receipt["schema"] != RECEIPT_SCHEMA || receipt["format_version"] != FORMAT_VERSION || receipt["outcome"] != "verified" {
-                    report.fail("receipt_invalid", format!("{RECEIPT_FILE} is not a {RECEIPT_SCHEMA} verified receipt."), Some(RECEIPT_FILE.into()));
-                } else if receipt["manifest_sha256"] != out["manifest_sha256"] || receipt["history_sha256"] != *out.get("history_sha256").unwrap_or(&Value::Null) {
-                    report.fail("receipt_mismatch", "The receipt was issued for a different manifest or history.", Some(RECEIPT_FILE.into()));
-                } else if receipt["hold"]["kind"] != HOLD_KIND
-                    || receipt["hold"]["owner"].as_str().is_none()
-                    || receipt["hold"]["owner"] != manifest["hold"]["owner"]
-                    || !receipt["hold"]["confirmed_at"].is_string()
-                    || receipt["object_count"] != out["object_count"]
-                    || receipt["object_bytes"] != out["object_bytes"]
-                {
-                    report.fail("receipt_invalid", "The receipt's hold confirmation or counts do not match the archive.", Some(RECEIPT_FILE.into()));
-                }
-            }
+            );
+            return;
         }
+        Err(read) => {
+            report.unreadable(RECEIPT_FILE, read);
+            return;
+        }
+    };
+    let hold = &receipt["hold"];
+    if receipt["schema"] != RECEIPT_SCHEMA
+        || receipt["format_version"] != FORMAT_VERSION
+        || receipt["outcome"] != "verified"
+    {
+        report.fail(
+            "receipt_invalid",
+            format!("{RECEIPT_FILE} is not a {RECEIPT_SCHEMA} verified receipt."),
+            Some(RECEIPT_FILE.into()),
+        );
+    } else if receipt["manifest_sha256"] != out["manifest_sha256"]
+        || receipt["history_sha256"] != *out.get("history_sha256").unwrap_or(&Value::Null)
+    {
+        report.fail(
+            "receipt_mismatch",
+            "The receipt was issued for a different manifest or history.",
+            Some(RECEIPT_FILE.into()),
+        );
+    } else if hold["kind"] != HOLD_KIND
+        || hold["owner"].as_str().is_none()
+        || hold["owner"] != manifest["hold"]["owner"]
+        || !hold["confirmed_at"].is_string()
+        || receipt["object_count"] != out["object_count"]
+        || receipt["object_bytes"] != out["object_bytes"]
+    {
+        report.fail(
+            "receipt_invalid",
+            "The receipt's hold confirmation or counts do not match the archive.",
+            Some(RECEIPT_FILE.into()),
+        );
     }
-    finish(out, report)
 }
 
 fn finish(mut out: Map<String, Value>, report: Report) -> Value {
@@ -1056,12 +1114,7 @@ mod tests {
         assert_eq!(contents["outcome"], "verified", "{contents}");
         let mut confirmed = hold;
         confirmed["confirmed_at"] = json!("2026-11-25 00:00:01");
-        let receipt = receipt(
-            &manifest_bytes,
-            &contents,
-            "2026-11-25T00:00:01Z",
-            confirmed,
-        );
+        let receipt = receipt(&contents, "2026-11-25T00:00:01Z", confirmed);
         std::fs::write(
             dir.join(RECEIPT_FILE),
             serde_json::to_vec_pretty(&receipt).unwrap(),

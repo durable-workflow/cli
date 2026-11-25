@@ -11,6 +11,7 @@ mod config;
 mod descriptor;
 mod error;
 mod formatter;
+mod history_archive;
 mod lookup;
 mod output;
 mod payload;
@@ -36,9 +37,9 @@ enum Handler {
 /// reported as not yet available.
 fn handler(name: &str) -> Option<Handler> {
     use commands::{
-        activity_task, batch, completion, debug, doctor, env, namespace, runtime, schedule, schema,
-        search_attribute, server, start_dev, system, task_queue, upgrade, version_usage, worker,
-        workflow, workflow_control, workflow_message, workflow_run,
+        activity_task, batch, completion, debug, doctor, env, history_archive, namespace, runtime,
+        schedule, schema, search_attribute, server, start_dev, system, task_queue, upgrade,
+        version_usage, worker, workflow, workflow_control, workflow_message, workflow_run,
     };
     Some(match name {
         "completion" => Handler::Local(completion::completion),
@@ -69,6 +70,8 @@ fn handler(name: &str) -> Option<Handler> {
         "workflow:show-run" => Handler::Server(workflow_run::show_run),
         "workflow:history" => Handler::Server(workflow_run::history),
         "workflow:history-export" => Handler::Server(workflow_run::history_export),
+        "workflow:history-archive" => Handler::Server(history_archive::archive),
+        "workflow:history-archive-check" => Handler::Local(history_archive::verify),
         "workflow:query" => Handler::Server(workflow_message::query),
         "workflow:start" => Handler::Server(workflow_message::start),
         "workflow:signal" => Handler::Server(workflow_message::signal),
@@ -150,6 +153,7 @@ const NAMESPACE_SCOPED: &[&str] = &[
     "workflow:show-run",
     "workflow:history",
     "workflow:history-export",
+    "workflow:history-archive",
     "workflow:query",
     "workflow:start",
     "workflow:signal",

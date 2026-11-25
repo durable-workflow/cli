@@ -1,5 +1,5 @@
 {
- "comment": "Rust-only commands appended to the 2.x catalog by update-catalog.sh: batch:* (cli#60), the task queue activity dispatch pause (task-queue:activity-dispatch, task-queue:pause-activities, task-queue:resume-activities; Server #577), guarded worker build and task queue retirement (task-queue:retirement, task-queue:retire; Server #519) and workflow:update-outcome (Server #1131, durable-workflow/.github#212). 2.x has no equivalent, so parity skips their help and strips them from listings.",
+ "comment": "Rust-only commands appended to the 2.x catalog by update-catalog.sh: batch:* (cli#60), the task queue activity dispatch pause (task-queue:activity-dispatch, task-queue:pause-activities, task-queue:resume-activities; Server #577), guarded worker build and task queue retirement (task-queue:retirement, task-queue:retire; Server #519), workflow:update-outcome (Server #1131, durable-workflow/.github#212) and verified history archives (workflow:history-archive, workflow:history-archive-check; Server #520). 2.x has no equivalent, so parity skips their help and strips them from listings.",
  "commands": [
   {
    "name": "batch:cancel",
@@ -1809,6 +1809,298 @@
       "is_value_required": false,
       "is_multiple": false,
       "description": "Output the command response as JSON (alias for --output=json)",
+      "default": false
+     },
+     "help": {
+      "name": "--help",
+      "shortcut": "-h",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Display help for the given command. When no command is given display help for the <info>list</info> command",
+      "default": false
+     },
+     "silent": {
+      "name": "--silent",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Do not output any message",
+      "default": false
+     },
+     "quiet": {
+      "name": "--quiet",
+      "shortcut": "-q",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Only errors are displayed. All other output is suppressed",
+      "default": false
+     },
+     "verbose": {
+      "name": "--verbose",
+      "shortcut": "-v|-vv|-vvv",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug",
+      "default": false
+     },
+     "version": {
+      "name": "--version",
+      "shortcut": "-V",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Display this application version",
+      "default": false
+     },
+     "ansi": {
+      "name": "--ansi",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Force (or disable --no-ansi) ANSI output",
+      "default": null
+     },
+     "no-ansi": {
+      "name": "--no-ansi",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Negate the \"--ansi\" option",
+      "default": null
+     },
+     "no-interaction": {
+      "name": "--no-interaction",
+      "shortcut": "-n",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Do not ask any interactive question",
+      "default": false
+     }
+    }
+   },
+   "rust_only": true
+  },
+  {
+   "name": "workflow:history-archive",
+   "description": "Copy a run's history and every external payload it references into a verified archive",
+   "synopsis": "workflow:history-archive [-s|--server [SERVER]] [--namespace [NAMESPACE]] [--token [TOKEN]] [--tls-verify TLS-VERIFY] [--env ENV] [--output OUTPUT] [--hold-ttl HOLD-TTL] [--json] [--] <workflow-id> <run-id> <directory>",
+   "aliases": [],
+   "hidden": false,
+   "help": "Write a self-contained archive of one closed run to <directory>: the\nServer's history export, the exact bytes of every external payload it\nreferences, a manifest with each object's codec, length and SHA-256, and a\nreceipt. The archive stays readable after retention prunes the run and\nwithout the Server or its payload store.\n\nThe copy runs under the Server's external payload backup hold, so it needs\nan admin credential, and no payload is reclaimed meanwhile. dw acquires the\nhold with a new owner, reads the export, fetches each object once and\nchecks its length and digest, writes the manifest, verifies the whole\ndirectory from disk, confirms the hold never lapsed, and only then writes\nreceipt.json. The hold is released on every path.\n\nOutcomes: verified (exit 0); incomplete (exit 1: an object could not be\ncopied, the hold was lost, or verification failed; no receipt); refused\n(exit 2, nothing copied: an open, pruned or redacted run, or a reference\nthe runtime transport cannot fetch). Run the same command again to resume\nan incomplete archive; objects already present are kept. A hold owned by\nanother backup or archive refuses the copy (HTTP 409); retry later.\n\nAn archive covers the selected run only. It is not a database backup, and\nit is written unencrypted: protect and encrypt it as the payloads require.\n\n<comment>Examples:</comment>\n\n  <info>dw workflow:history-archive chk-42 01HZ... ./archives/chk-42</info>\n  <info>dw workflow:history-archive chk-42 01HZ... ./archives/chk-42 --json</info>",
+   "definition": {
+    "arguments": {
+     "workflow-id": {
+      "name": "workflow-id",
+      "is_required": true,
+      "is_array": false,
+      "description": "Workflow ID",
+      "default": null
+     },
+     "run-id": {
+      "name": "run-id",
+      "is_required": true,
+      "is_array": false,
+      "description": "Run ID of a closed run",
+      "default": null
+     },
+     "directory": {
+      "name": "directory",
+      "is_required": true,
+      "is_array": false,
+      "description": "New or empty directory to write the archive to, or an unfinished archive of the same run to resume",
+      "default": null
+     }
+    },
+    "options": {
+     "server": {
+      "name": "--server",
+      "shortcut": "-s",
+      "accept_value": true,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Server URL",
+      "default": null
+     },
+     "namespace": {
+      "name": "--namespace",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Target namespace",
+      "default": null
+     },
+     "token": {
+      "name": "--token",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Auth token",
+      "default": null
+     },
+     "tls-verify": {
+      "name": "--tls-verify",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": true,
+      "is_multiple": false,
+      "description": "Verify TLS certificates (true/false). Defaults to $DURABLE_WORKFLOW_TLS_VERIFY, then the selected profile, then true.",
+      "default": null
+     },
+     "env": {
+      "name": "--env",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": true,
+      "is_multiple": false,
+      "description": "Named dw environment to use (overrides $DW_ENV and any env set via `dw env:use`). Hard-fails when the profile does not exist.",
+      "default": null
+     },
+     "output": {
+      "name": "--output",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": true,
+      "is_multiple": false,
+      "description": "Output format: table (human-readable), json (single JSON document), jsonl (one JSON object per line, for list commands)",
+      "default": "table"
+     },
+     "hold-ttl": {
+      "name": "--hold-ttl",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": true,
+      "is_multiple": false,
+      "description": "Backup hold lease in seconds, renewed during the copy (60 to 3600)",
+      "default": "900"
+     },
+     "json": {
+      "name": "--json",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Output the command response as JSON (alias for --output=json)",
+      "default": false
+     },
+     "help": {
+      "name": "--help",
+      "shortcut": "-h",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Display help for the given command. When no command is given display help for the <info>list</info> command",
+      "default": false
+     },
+     "silent": {
+      "name": "--silent",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Do not output any message",
+      "default": false
+     },
+     "quiet": {
+      "name": "--quiet",
+      "shortcut": "-q",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Only errors are displayed. All other output is suppressed",
+      "default": false
+     },
+     "verbose": {
+      "name": "--verbose",
+      "shortcut": "-v|-vv|-vvv",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug",
+      "default": false
+     },
+     "version": {
+      "name": "--version",
+      "shortcut": "-V",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Display this application version",
+      "default": false
+     },
+     "ansi": {
+      "name": "--ansi",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Force (or disable --no-ansi) ANSI output",
+      "default": null
+     },
+     "no-ansi": {
+      "name": "--no-ansi",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Negate the \"--ansi\" option",
+      "default": null
+     },
+     "no-interaction": {
+      "name": "--no-interaction",
+      "shortcut": "-n",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Do not ask any interactive question",
+      "default": false
+     }
+    }
+   },
+   "rust_only": true
+  },
+  {
+   "name": "workflow:history-archive-check",
+   "description": "Verify a history archive from its files alone",
+   "synopsis": "workflow:history-archive-check [--output OUTPUT] [--json] [--] <directory>",
+   "aliases": [],
+   "hidden": false,
+   "help": "Verify an archive written by <info>dw workflow:history-archive</info> using nothing\nbut its files: no Server, database or payload store. Every object is read\nback and checked against the length and SHA-256 its reference records, the\nmanifest must list exactly the objects the export references, the history\nmust be complete, and the receipt must match the manifest and history.\n\nOutcomes: verified (exit 0); incomplete (exit 1, with a finding for each\nfailed check, such as object_missing, object_digest_mismatch or\nreceipt_missing); refused (exit 2: not an archive this dw can read, such as\na newer format version).\n\n<comment>Examples:</comment>\n\n  <info>dw workflow:history-archive-check ./archives/chk-42</info>\n  <info>dw workflow:history-archive-check ./archives/chk-42 --json</info>",
+   "definition": {
+    "arguments": {
+     "directory": {
+      "name": "directory",
+      "is_required": true,
+      "is_array": false,
+      "description": "Archive directory",
+      "default": null
+     }
+    },
+    "options": {
+     "output": {
+      "name": "--output",
+      "shortcut": "",
+      "accept_value": true,
+      "is_value_required": true,
+      "is_multiple": false,
+      "description": "Output format: table (human-readable), json (single JSON document), jsonl (one JSON object per line, for list commands)",
+      "default": "table"
+     },
+     "json": {
+      "name": "--json",
+      "shortcut": "",
+      "accept_value": false,
+      "is_value_required": false,
+      "is_multiple": false,
+      "description": "Output the command response as JSON",
       "default": false
      },
      "help": {

@@ -1020,3 +1020,47 @@ fn sigterm_stops_the_copy_and_releases_and_a_second_signal_stops_the_release() {
     assert!(progress["owner"].is_string(), "{progress}");
     assert_eq!(progress["server"], json!(mock.url), "{progress}");
 }
+
+#[test]
+fn a_hard_linked_object_is_fetched_again_on_resume() {
+    use std::os::unix::fs::MetadataExt;
+    let project = Project::new();
+    let dir = project.0.join("linked-object");
+    fs::create_dir_all(dir.join("objects")).unwrap();
+    fs::write(
+        dir.join(".dw-history-archive.json"),
+        json!({"schema": "dw.history-archive.in-progress.v1",
+        "owner": null, "workflow_id": "wf", "run_id": "run"})
+        .to_string(),
+    )
+    .unwrap();
+    // The right bytes, but shared with a file outside the archive.
+    let outside = project.0.join("outside-copy");
+    fs::write(&outside, MOCK_BYTES).unwrap();
+    fs::hard_link(&outside, dir.join("objects").join(MOCK_ID)).unwrap();
+    let mock = Mock::new(vec![
+        (ACQUIRE, 200, held()),
+        (RENEW, 200, held()),
+        (EXPORT, 200, mock_export()),
+        (OBJECT, 200, MOCK_BYTES.to_vec()),
+        (STATUS, 200, held()),
+        (RELEASE, 200, held()),
+    ]);
+    let (code, result) = mock_archive(&project, &mock, &dir);
+    assert_eq!(
+        (code, result["outcome"].clone()),
+        (0, json!("verified")),
+        "{result}"
+    );
+    assert_eq!(
+        (result["copied"].clone(), result["resumed"].clone()),
+        (json!(1), json!(0)),
+        "{result}"
+    );
+    assert_eq!(
+        fs::metadata(dir.join("objects").join(MOCK_ID))
+            .unwrap()
+            .nlink(),
+        1
+    );
+}

@@ -380,6 +380,12 @@ fn has_bytes(path: &Path, size: i64, sha256: &str) -> bool {
     if !metadata.is_file() || metadata.len() != size as u64 {
         return false;
     }
+    // A hard-linked object would never verify: fetch it again, and the
+    // rename replaces the link with the archive's own file.
+    #[cfg(unix)]
+    if std::os::unix::fs::MetadataExt::nlink(&metadata) != 1 {
+        return false;
+    }
     let Ok(mut file) = std::fs::File::open(path) else {
         return false;
     };
@@ -708,12 +714,10 @@ pub fn archive(context: &Context, input: &Input) -> Result<i32, CliError> {
             }
         })
     };
-    // A signal during the release only stops the wait: what the copy already
-    // finished (a verified archive, or an error) stays its outcome.
-    let finished = match (finished, stopped_again) {
-        (Err(code), _) => Err(code),
-        (Ok(result), _) => Ok(result),
-    };
+    // A signal during the release only stops the wait (`stopped_again`
+    // leaves the release unsettled): what the copy already finished, a
+    // verified archive or an error, stays its outcome.
+    let _ = stopped_again;
     let outcome = match &finished {
         Ok(Ok(result)) => result["outcome"]
             .as_str()

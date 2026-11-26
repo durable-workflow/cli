@@ -1169,7 +1169,7 @@ pub(crate) fn retirement_lines(result: &Value, verdict: bool) -> Vec<String> {
 }
 
 /// One sample identity as `key=value` pairs, in the Server's order.
-fn sample_label(sample: &Value) -> String {
+pub(crate) fn sample_label(sample: &Value) -> String {
     match sample.as_object() {
         Some(fields) => fields
             .iter()

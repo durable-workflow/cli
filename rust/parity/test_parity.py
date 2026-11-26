@@ -268,6 +268,7 @@ class RustOnlyCommandTest(unittest.TestCase):
 
     def test_the_catalog_marks_the_batch_activity_dispatch_and_update_outcome_commands_rust_only(self):
         self.assertEqual(["batch:cancel", "batch:resume", "batch:show", "batch:signal", "batch:update",
+                          "namespace:retention-apply", "namespace:retention-plan",
                           "task-queue:activity-dispatch", "task-queue:pause-activities",
                           "task-queue:resume-activities", "task-queue:retire", "task-queue:retirement",
                           "workflow:history-archive", "workflow:history-archive-check",

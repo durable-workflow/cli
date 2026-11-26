@@ -711,6 +711,87 @@ dw namespace:update staging --retention=14
 dw namespace:delete staging --json
 ```
 
+#### Retention plan and guarded apply
+
+`namespace:update --retention` activates the new policy at once, and the next
+retention pass applies it to existing closed runs. To see what a change would
+do first, preview it with `namespace:retention-plan`, then apply it with
+`namespace:retention-apply` only while that plan still holds (native Server
+3.30.0+, Server #522). Both need an admin token.
+
+```bash
+# Preview shortening billing's retention to 7 days; nothing changes
+dw namespace:retention-plan billing --retention=7
+
+# Preview keeping terminal history until it is deleted or archived
+dw namespace:retention-plan billing --retention-mode=forever
+
+# Apply the plan with its revisions; a retroactive policy needs the confirmation
+dw namespace:retention-apply billing --retention=7 \
+  --policy-revision=sha256:... --plan-revision=sha256:... --confirm-retroactive-pruning
+
+# Or save the plan and apply exactly what it planned
+dw namespace:retention-plan billing --retention=7 --json > plan.json
+dw namespace:retention-apply billing --plan-file=plan.json --confirm-retroactive-pruning
+```
+
+`namespace:retention-plan` takes the proposed `--retention` days,
+`--retention-mode` (`bounded` or `forever`), or both. A field you leave out
+keeps its current value. It shows the current and proposed policy with their
+cutoffs and whether the proposal is retroactive, meaning it makes closed runs
+eligible for pruning that the current policy keeps. It then counts closed,
+unarchived runs in four groups: `newly_eligible`, `no_longer_eligible`,
+`unchanged_eligible` and `unchanged_retained`. It also counts the runs a prune
+would not delete: `archived`, `forever`, `not_terminal`, and eligible runs held
+by `detached_activity_hold`, `external_payload_cleanup_unavailable` or
+`backup_hold`. Each group lists up to five example runs, oldest first.
+
+`--scan-limit` (default 1000, at most 10000) bounds each count, and
+`--hold-scan-limit` (default 100, at most 1000) bounds how many eligible runs
+are checked for holds. A count that reaches its bound is shown as `at least N`.
+The plan is then incomplete, and `Incomplete` names each such count.
+
+The output ends with the plan's scope and the exact `namespace:retention-apply`
+command for it. That command repeats the resolved proposal and both revisions,
+and adds `--confirm-retroactive-pruning` when the plan is retroactive.
+`--json` returns the Server's `durable-workflow.v2.retention-plan.v1` document
+unchanged.
+
+The plan writes nothing. It changes no policy, marks no row, fetches no payload
+and prunes nothing. It describes one moment: runs can close, age past the
+cutoff, be archived, or gain and lose holds, and the policy can change before
+the next retention pass. It is not a list of what a later prune will delete.
+
+`namespace:retention-apply` sends the proposal with `--policy-revision` and
+`--plan-revision` once and never resends it. Pass the same `--retention` and
+`--retention-mode` you planned, or pass `--plan-file` with the plan's saved
+`--json` output. That file supplies the proposal and both revisions, so it
+cannot be combined with those four options. A retroactive proposal also needs
+`--confirm-retroactive-pruning`, because pruning is irreversible. The Server
+checks the revisions and updates the policy in one transaction. It refuses, and
+changes nothing, in these cases. `dw` prints the reason and the next step, and
+exits 2:
+
+| Status and reason | Cause | Next step |
+| --- | --- | --- |
+| `409 retention_policy_revision_stale` | The namespace changed after the plan. The refusal carries the current `policy_revision`. | Plan again, review it, and apply the new plan's revisions. |
+| `409 retention_plan_revision_mismatch` | The proposal sent is not the one that was planned. | Apply the plan's exact proposal, or plan this one. |
+| `422 retention_pruning_confirmation_required` | The proposal is retroactive and `--confirm-retroactive-pruning` was not passed. | Review `newly_eligible`, then repeat with the confirmation. |
+
+With `--json` a refusal keeps the usual error envelope, with `reason`,
+`status_code` and the full body in `server_response`.
+
+An accepted apply shows the previous and new policy with their revisions, and
+`--json` returns `durable-workflow.v2.retention-apply.v1`. The apply changes
+only the namespace's policy and prunes nothing itself. Each later retention pass
+prunes the closed, unarchived runs past the cutoff at that pass. That can
+include runs that closed or aged after the plan, and it skips runs archived or
+held at that time.
+
+A Server without these routes answers 404. `dw` exits 5 and says that native
+Server 3.30.0 or later is needed. `namespace:update` is unchanged and still
+activates a policy at once, with no plan or confirmation.
+
 Configure external payload storage for a namespace:
 
 ```bash

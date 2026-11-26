@@ -139,6 +139,25 @@ opaque `next_cursor` with the same query to continue. JSON and JSONL preserve th
 whole page, including counts. Drain or fence admissions and restart the query
 before making a branch-removal decision.
 
+## Retention changes
+
+Before shortening a namespace's history retention, preview which closed runs
+would become eligible for irreversible pruning, then apply the policy only
+while that plan still holds (native Server 3.30.0+):
+
+```bash
+dw namespace:retention-plan billing --retention=7
+dw namespace:retention-plan billing --retention=7 --json > plan.json
+dw namespace:retention-apply billing --plan-file=plan.json --confirm-retroactive-pruning
+```
+
+The plan writes nothing. Counts that reach their scan limit are shown as
+`at least N`. The apply refuses, changing nothing, if the namespace changed
+since the plan, if the proposal differs from the planned one, or if a
+retroactive policy is not confirmed. `namespace:update` still activates a
+policy at once. See the
+[retention plan reference](docs/cli-reference.md#retention-plan-and-guarded-apply).
+
 ## Automation Contract
 
 All read and mutating commands support machine-readable output. Use

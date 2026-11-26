@@ -498,7 +498,7 @@ def print_result(case, differences, reason, reference, candidate, verbose):
 
 def rust_only_commands():
     """Catalog commands with no 2.x equivalent (cli#60, Server #577,
-    Server #1131, Server #519, Server #520), in catalog order."""
+    Server #1131, Server #519, Server #520, Server #522), in catalog order."""
     with open(os.path.join(CRATE, "src", "catalog.json"), encoding="utf-8") as handle:
         return [command["name"] for command in json.load(handle)["commands"] if command.get("rust_only")]
 

@@ -9,6 +9,7 @@ pub mod history_archive;
 pub mod info;
 pub mod namespace;
 mod operator_metrics;
+pub mod retention_plan;
 pub mod runtime;
 pub mod schedule;
 pub mod schema;

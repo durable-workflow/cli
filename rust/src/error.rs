@@ -283,6 +283,59 @@ fn retirement_refusal<'a>(
     }
 }
 
+/// The two retention plan commands (Server #522, native Server 3.30.0).
+const RETENTION_PLAN_COMMANDS: &[&str] = &["namespace:retention-plan", "namespace:retention-apply"];
+
+/// The next step for a guarded retention apply the Server refused, which
+/// changed nothing, or for a Server without the retention plan routes.
+fn retention_plan_recommendation(error: &CliError, context: &ErrorContext) -> Option<Value> {
+    let CliError::Http { status, body, .. } = error else {
+        return None;
+    };
+    if !RETENTION_PLAN_COMMANDS.contains(&context.command) {
+        return None;
+    }
+    let namespace = body
+        .as_ref()
+        .and_then(|body| scalar_text(body.get("namespace")))
+        .unwrap_or_else(|| "<name>".into());
+    let plan = format!("dw namespace:retention-plan {namespace}");
+    let reason = error.reason();
+    match (*status, reason) {
+        (409, Some("retention_policy_revision_stale")) => {
+            let current = body
+                .as_ref()
+                .and_then(|body| scalar_text(body.get("policy_revision")))
+                .map(|revision| format!(" Its current policy revision is {revision}."))
+                .unwrap_or_default();
+            Some(json!({
+                "id": "retention_plan.stale",
+                "severity": "error",
+                "message": format!("Nothing was applied: the namespace changed after the plan.{current} Plan the policy again, review the new plan, then apply it with its revisions."),
+                "command": plan,
+            }))
+        }
+        (409, Some("retention_plan_revision_mismatch")) => Some(json!({
+            "id": "retention_plan.mismatch",
+            "severity": "error",
+            "message": "Nothing was applied: the policy sent is not the policy that was planned. Apply with the plan's exact --retention and --retention-mode (or --plan-file), or plan this policy first.",
+            "command": plan,
+        })),
+        (422, Some("retention_pruning_confirmation_required")) => Some(json!({
+            "id": "retention_plan.confirmation_required",
+            "severity": "error",
+            "message": "Nothing was applied: this policy makes closed runs eligible for pruning that the current policy keeps, and pruning is irreversible. Review the plan's newly_eligible runs, then repeat the command with --confirm-retroactive-pruning.",
+        })),
+        (404, reason) if reason != Some("namespace_not_found") => Some(json!({
+            "id": "retention_plan.unsupported",
+            "severity": "error",
+            "message": "This Server has no retention plan route. Previewing a retention policy and the guarded apply need native Durable Workflow Server 3.30.0 or later; on an older Server, dw namespace:update activates a policy at once, without a plan.",
+            "command": "dw server:info",
+        })),
+        _ => None,
+    }
+}
+
 fn base_recommendations(error: &CliError, context: &ErrorContext) -> Vec<Value> {
     let item = |id: &str, message: &str, command: String| json!({"id": id, "severity": "error", "message": message, "command": command});
     let help = format!("dw {} --help", context.command);
@@ -332,6 +385,9 @@ fn base_recommendations(error: &CliError, context: &ErrorContext) -> Vec<Value> 
             "severity": "error",
             "message": resolution,
         })];
+    }
+    if let Some(next) = retention_plan_recommendation(error, context) {
+        return vec![next];
     }
     // A failed update read later is final, not a request to fix and retry.
     if context.command == "workflow:update-outcome"
@@ -639,6 +695,8 @@ pub fn human(error: &CliError, context: &ErrorContext) -> String {
                 | "namespace:create"
                 | "namespace:update"
                 | "namespace:delete"
+                | "namespace:retention-plan"
+                | "namespace:retention-apply"
         ) || [
             "batch:",
             "schedule:",

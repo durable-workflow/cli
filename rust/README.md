@@ -194,10 +194,21 @@ option definitions and help text), generated from the pinned reference by
 read it, so they match 2.x even for commands not ported yet. The harness
 also checks `--help` for every catalog command.
 
-Commands with no 2.x equivalent (the `batch:*` commands, cli#60, the task
-queue activity dispatch commands, Server #577, and `workflow:update-outcome`,
-Server #1131) are added from
-`parity/catalog-additions.json` and marked `rust_only`. The harness
+Commands with no 2.x equivalent are added from
+`parity/catalog-additions.json` and marked `rust_only`:
+
+- `batch:cancel`, `batch:resume`, `batch:show`, `batch:signal` and
+  `batch:update` (cli#60);
+- `namespace:retention-plan` and `namespace:retention-apply` (Server #522);
+- `task-queue:activity-dispatch`, `task-queue:pause-activities` and
+  `task-queue:resume-activities` (Server #577);
+- `task-queue:retirement` and `task-queue:retire` (Server #519);
+- `workflow:history-archive` and `workflow:history-archive-check`
+  (Server #520);
+- `workflow:update-outcome` (Server #1131);
+- `workflow:version-usage` (durable-workflow/.github#220).
+
+`parity/test_parity.py` checks this list against the catalog. The harness
 announces them, does not compare their `--help`, and removes only them from
 the candidate's listings and completions before comparing, so the rest of
 each listing is still checked against 2.x. A namespace header is removed

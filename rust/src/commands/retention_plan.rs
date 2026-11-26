@@ -266,6 +266,28 @@ pub fn apply(context: &Context, input: &Input) -> Result<i32, CliError> {
     Ok(0)
 }
 
+/// The `dw namespace:retention-plan` command that plans again what a
+/// refused apply tried: its `--retention-mode` and `--retention`, or the
+/// proposed policy of its `--plan-file`. Planning with no proposal would
+/// compare the current policy with itself.
+pub fn replan_command(input: &Input) -> String {
+    let name = input.arg("name").unwrap_or_default();
+    let mut command = format!("dw namespace:retention-plan {name}");
+    let attempted = match input.opt_str("plan-file") {
+        Some(path) => plan_file_body(path, name).ok(),
+        None => proposal(input).ok(),
+    };
+    if let Some(body) = attempted {
+        if let Some(mode) = body.get("retention_mode").and_then(Value::as_str) {
+            command.push_str(&format!(" --retention-mode={mode}"));
+        }
+        if let Some(days) = body.get("retention_days").and_then(Value::as_i64) {
+            command.push_str(&format!(" --retention={days}"));
+        }
+    }
+    command
+}
+
 /// The proposed `retention_mode` and `retention_days` from the options; a
 /// field left out keeps the namespace's current value on the Server.
 fn proposal(input: &Input) -> Result<Map<String, Value>, CliError> {

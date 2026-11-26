@@ -405,6 +405,14 @@ fn a_forever_plan_sends_only_the_mode_and_its_apply_needs_no_confirmation() {
     );
     assert!(!stdout.contains("is retroactive"), "{stdout}");
 
+    // -r is --retention, as on namespace:create and namespace:update.
+    let server = Server::new(info(), vec![ok(shortening_plan())]);
+    stdout_text(&scratch.run(
+        &server.url,
+        &["namespace:retention-plan", "billing", "-r", "7"],
+    ));
+    assert_eq!(server.body(0), json!({"retention_days": 7}));
+
     // A plan with no proposal compares the current policy with itself.
     let server = Server::new(info(), vec![ok(forever_plan())]);
     stdout_text(&scratch.run(&server.url, &["namespace:retention-plan", "billing"]));
@@ -508,7 +516,7 @@ fn each_refused_apply_changes_nothing_and_says_what_to_do_next() {
                 "Server error: The namespace changed after the plan. Request a new plan and apply its revisions.",
                 "Reason: retention_policy_revision_stale",
                 "Nothing was applied: the namespace changed after the plan. Its current policy revision is sha256:newer.",
-                "    Try: dw namespace:retention-plan billing",
+                "    Try: dw namespace:retention-plan billing --retention=7\n",
             ],
         ),
         (
@@ -522,7 +530,7 @@ fn each_refused_apply_changes_nothing_and_says_what_to_do_next() {
             vec![
                 "Reason: retention_plan_revision_mismatch",
                 "Nothing was applied: the policy sent is not the policy that was planned.",
-                "    Try: dw namespace:retention-plan billing",
+                "    Try: dw namespace:retention-plan billing --retention=7\n",
             ],
         ),
         (
@@ -562,6 +570,84 @@ fn each_refused_apply_changes_nothing_and_says_what_to_do_next() {
         assert_eq!(envelope["reason"], body["reason"], "{envelope}");
         assert_eq!(envelope["server_response"], body, "{envelope}");
         assert_eq!(envelope["recommendations"][0]["id"], json!(id), "{envelope}");
+    }
+}
+
+fn stale() -> Reply {
+    refusal(
+        409,
+        json!({
+            "reason": "retention_policy_revision_stale",
+            "namespace": "billing",
+            "message": "The namespace changed after the plan. Request a new plan and apply its revisions.",
+            "policy_revision": "sha256:newer"
+        }),
+    )
+}
+
+#[test]
+fn the_replan_hint_repeats_the_proposal_the_apply_tried() {
+    let scratch = Scratch::new();
+    let path = scratch.0.join("plan.json");
+    let plan_file = format!("--plan-file={}", path.display());
+    for (plan, args, command) in [
+        (
+            None,
+            vec![
+                "namespace:retention-apply",
+                "billing",
+                "-r",
+                "14",
+                "--retention-mode=bounded",
+                "--policy-revision=a",
+                "--plan-revision=b",
+            ],
+            "dw namespace:retention-plan billing --retention-mode=bounded --retention=14",
+        ),
+        (
+            None,
+            vec![
+                "namespace:retention-apply",
+                "billing",
+                "--retention-mode=forever",
+                "--policy-revision=a",
+                "--plan-revision=b",
+            ],
+            "dw namespace:retention-plan billing --retention-mode=forever",
+        ),
+        (
+            Some(shortening_plan()),
+            vec!["namespace:retention-apply", "billing", &plan_file],
+            "dw namespace:retention-plan billing --retention-mode=bounded --retention=7",
+        ),
+        (
+            Some(forever_plan()),
+            vec!["namespace:retention-apply", "billing", &plan_file],
+            "dw namespace:retention-plan billing --retention-mode=forever",
+        ),
+    ] {
+        if let Some(plan) = plan {
+            fs::write(&path, plan.to_string()).unwrap();
+        }
+        let server = Server::new(info(), vec![stale()]);
+        let output = scratch.run(&server.url, &args);
+        assert_eq!(output.status.code(), Some(2), "{args:?}: {output:?}");
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(
+            stderr.contains(&format!("    Try: {command}\n")),
+            "{command}: {stderr}"
+        );
+
+        let server = Server::new(info(), vec![stale()]);
+        let mut json_args = args.clone();
+        json_args.push("--json");
+        let output = scratch.run(&server.url, &json_args);
+        let envelope: Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(
+            envelope["recommendations"][0]["command"],
+            json!(command),
+            "{envelope}"
+        );
     }
 }
 

@@ -509,6 +509,8 @@ fn report(error: &CliError, input: &Input, server_command: bool) -> i32 {
         keyed: commands::workflow_message::command_request_id().is_some(),
         update: (input.command == "workflow:update")
             .then(|| commands::workflow_message::UpdateErrorRequest::from_input(input)),
+        retention_replan: (input.command == "namespace:retention-apply")
+            .then(|| commands::retention_plan::replan_command(input)),
         server_flag: input.opt_str("server").map(str::to_string),
         env_flag: input.opt_str("env").map(str::to_string),
     };

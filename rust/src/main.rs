@@ -37,9 +37,10 @@ enum Handler {
 /// reported as not yet available.
 fn handler(name: &str) -> Option<Handler> {
     use commands::{
-        activity_task, batch, completion, debug, doctor, env, history_archive, namespace, runtime,
-        schedule, schema, search_attribute, server, start_dev, system, task_queue, upgrade,
-        version_usage, worker, workflow, workflow_control, workflow_message, workflow_run,
+        activity_task, batch, completion, debug, doctor, env, history_archive, namespace,
+        retention_plan, runtime, schedule, schema, search_attribute, server, start_dev, system,
+        task_queue, upgrade, version_usage, worker, workflow, workflow_control, workflow_message,
+        workflow_run,
     };
     Some(match name {
         "completion" => Handler::Local(completion::completion),
@@ -65,6 +66,8 @@ fn handler(name: &str) -> Option<Handler> {
         "namespace:create" => Handler::Server(namespace::create),
         "namespace:update" => Handler::Server(namespace::update),
         "namespace:delete" => Handler::Server(namespace::delete),
+        "namespace:retention-plan" => Handler::Server(retention_plan::plan),
+        "namespace:retention-apply" => Handler::Server(retention_plan::apply),
         "workflow:list-runs" => Handler::Server(workflow::list_runs),
         "workflow:describe" => Handler::Server(workflow_run::describe),
         "workflow:show-run" => Handler::Server(workflow_run::show_run),

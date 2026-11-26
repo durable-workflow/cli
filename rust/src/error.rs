@@ -179,6 +179,9 @@ pub struct ErrorContext<'a> {
     /// The request a failed `workflow:update` was sending, for its error
     /// diagnostics.
     pub update: Option<crate::commands::workflow_message::UpdateErrorRequest>,
+    /// The `namespace:retention-plan` command that plans again what a
+    /// refused `namespace:retention-apply` tried to apply.
+    pub retention_replan: Option<String>,
     pub server_flag: Option<String>,
     pub env_flag: Option<String>,
 }
@@ -299,7 +302,10 @@ fn retention_plan_recommendation(error: &CliError, context: &ErrorContext) -> Op
         .as_ref()
         .and_then(|body| scalar_text(body.get("namespace")))
         .unwrap_or_else(|| "<name>".into());
-    let plan = format!("dw namespace:retention-plan {namespace}");
+    let plan = context
+        .retention_replan
+        .clone()
+        .unwrap_or_else(|| format!("dw namespace:retention-plan {namespace}"));
     let reason = error.reason();
     match (*status, reason) {
         (409, Some("retention_policy_revision_stale")) => {
@@ -779,6 +785,7 @@ mod tests {
             request_id: None,
             keyed: false,
             update: None,
+            retention_replan: None,
             server_flag: None,
             env_flag: None,
         }
@@ -867,6 +874,7 @@ mod tests {
             request_id: None,
             keyed: false,
             update: None,
+            retention_replan: None,
             server_flag: Some("http://127.0.0.1:1".into()),
             env_flag: None,
         };

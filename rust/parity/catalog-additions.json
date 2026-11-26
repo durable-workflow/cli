@@ -2564,7 +2564,7 @@
   {
    "name": "namespace:retention-apply",
    "description": "Apply a planned retention policy only while the plan still holds",
-   "synopsis": "namespace:retention-apply [-s|--server [SERVER]] [--namespace [NAMESPACE]] [--token [TOKEN]] [--tls-verify TLS-VERIFY] [--env ENV] [--output OUTPUT] [--retention RETENTION] [--retention-mode RETENTION-MODE] [--policy-revision POLICY-REVISION] [--plan-revision PLAN-REVISION] [--confirm-retroactive-pruning] [--plan-file PLAN-FILE] [--json] [--] <name>",
+   "synopsis": "namespace:retention-apply [-s|--server [SERVER]] [--namespace [NAMESPACE]] [--token [TOKEN]] [--tls-verify TLS-VERIFY] [--env ENV] [--output OUTPUT] [-r|--retention RETENTION] [--retention-mode RETENTION-MODE] [--policy-revision POLICY-REVISION] [--plan-revision PLAN-REVISION] [--confirm-retroactive-pruning] [--plan-file PLAN-FILE] [--json] [--] <name>",
    "aliases": [],
    "hidden": false,
    "help": "Apply a retention policy previewed with <info>dw namespace:retention-plan</info>, only\nwhile that plan still holds. Pass the same proposal with the plan's\n<info>--policy-revision</info> and <info>--plan-revision</info>, or pass the plan's saved JSON with\n<info>--plan-file</info>.\n\nA retroactive proposal, one that makes closed runs eligible for pruning\nthat the current policy keeps (fewer days, or bounded replacing forever),\nalso needs <info>--confirm-retroactive-pruning</info>, because pruning is irreversible.\n\nThe request is sent once and never resent. The Server checks the revisions\nand updates the policy in one transaction. A refusal changes nothing, and\ndw prints what to do next and exits 2:\n\n  retention_policy_revision_stale (409): the namespace changed after the\n    plan. Plan again and apply the new plan's revisions.\n  retention_plan_revision_mismatch (409): the proposal is not the one that\n    was planned.\n  retention_pruning_confirmation_required (422): the proposal is\n    retroactive and --confirm-retroactive-pruning was not passed.\n\nThe apply changes only the namespace's policy. Each later retention pass\nprunes the closed, unarchived runs past the cutoff at that pass, which can\ninclude runs that closed or aged after the plan. <info>dw namespace:update</info>\nstill activates a policy at once, without a plan. Needs an admin token and\nnative Server 3.30.0 or later.\n\n<comment>Examples:</comment>\n\n  <info>dw namespace:retention-apply billing --retention=7 --policy-revision=sha256:... --plan-revision=sha256:... --confirm-retroactive-pruning</info>\n  <info>dw namespace:retention-apply billing --plan-file=plan.json --confirm-retroactive-pruning</info>",
@@ -2635,7 +2635,7 @@
      },
      "retention": {
       "name": "--retention",
-      "shortcut": "",
+      "shortcut": "-r",
       "accept_value": true,
       "is_value_required": true,
       "is_multiple": false,
@@ -2775,10 +2775,10 @@
   {
    "name": "namespace:retention-plan",
    "description": "Preview a proposed retention policy without applying it",
-   "synopsis": "namespace:retention-plan [-s|--server [SERVER]] [--namespace [NAMESPACE]] [--token [TOKEN]] [--tls-verify TLS-VERIFY] [--env ENV] [--output OUTPUT] [--retention RETENTION] [--retention-mode RETENTION-MODE] [--scan-limit SCAN-LIMIT] [--hold-scan-limit HOLD-SCAN-LIMIT] [--json] [--] <name>",
+   "synopsis": "namespace:retention-plan [-s|--server [SERVER]] [--namespace [NAMESPACE]] [--token [TOKEN]] [--tls-verify TLS-VERIFY] [--env ENV] [--output OUTPUT] [-r|--retention RETENTION] [--retention-mode RETENTION-MODE] [--scan-limit SCAN-LIMIT] [--hold-scan-limit HOLD-SCAN-LIMIT] [--json] [--] <name>",
    "aliases": [],
    "hidden": false,
-   "help": "Preview what a proposed history-retention policy would do to a namespace,\nwithout applying it. Pass the proposed <info>--retention</info> days, <info>--retention-mode</info>, or\nboth; a field you leave out keeps its current value.\n\nThe plan counts closed, unarchived runs that become eligible for pruning\n(newly_eligible), stop being eligible (no_longer_eligible), stay eligible\nor stay retained, with up to five example runs each, oldest first. It also\ncounts runs a prune would not delete: archived runs past the proposed\ncutoff, runs a forever policy keeps, open runs, and eligible runs held by\nan open abandoned activity, an unsettled external payload reference or an\nactive backup hold. A count that reaches <info>--scan-limit</info> (default 1000, at\nmost 10000) or <info>--hold-scan-limit</info> (default 100, at most 1000) is shown as\n\"at least N\" and makes the plan incomplete.\n\nThe plan writes nothing: it changes no policy, marks no row and prunes\nnothing. It describes one moment. Runs can close, age, be archived or gain\nand lose holds, and the policy can change, before the next retention pass.\n\nApply the plan with <info>dw namespace:retention-apply</info> and its two revisions;\nthe human output prints the exact command. Needs an admin token and native\nServer 3.30.0 or later.\n\n<comment>Examples:</comment>\n\n  <info>dw namespace:retention-plan billing --retention=7</info>\n  <info>dw namespace:retention-plan archive --retention-mode=forever</info>\n  <info>dw namespace:retention-plan billing --retention=7 --json > plan.json</info>",
+   "help": "Preview what a proposed history-retention policy would do to a namespace,\nwithout applying it. Pass the proposed <info>--retention</info> days, <info>--retention-mode</info>, or\nboth; a field you leave out keeps its current value.\n\nThe plan counts closed, unarchived runs that become eligible for pruning\n(newly_eligible), stop being eligible (no_longer_eligible), stay eligible\nor stay retained, with up to five example runs each, oldest first. It also\ncounts runs a prune would not delete: archived runs past the proposed\ncutoff, runs a forever policy keeps, open runs, and eligible runs held by\nan open abandoned activity, an unsettled external payload reference or an\nactive backup hold. A count that reaches <info>--scan-limit</info> (default 1000, at\nmost 10000) or <info>--hold-scan-limit</info> (default 100, at most 1000) is shown as\n\"at least N\" and makes the plan incomplete.\n\nThe plan writes nothing: it changes no policy, marks no row and prunes\nnothing. It describes one moment. Runs can close, age, be archived or gain\nand lose holds, and the policy can change, before the next retention pass.\n\nApply the plan with <info>dw namespace:retention-apply</info> and its two revisions;\nthe human output prints the exact command. Needs an admin token and native\nServer 3.30.0 or later.\n\n<comment>Examples:</comment>\n\n  <info>dw namespace:retention-plan billing --retention=7</info>\n  <info>dw namespace:retention-plan billing -r 7 --scan-limit=5000</info>\n  <info>dw namespace:retention-plan archive --retention-mode=forever</info>\n  <info>dw namespace:retention-plan billing --retention=7 --json > plan.json</info>",
    "definition": {
     "arguments": {
      "name": {
@@ -2846,7 +2846,7 @@
      },
      "retention": {
       "name": "--retention",
-      "shortcut": "",
+      "shortcut": "-r",
       "accept_value": true,
       "is_value_required": true,
       "is_multiple": false,

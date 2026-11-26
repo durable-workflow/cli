@@ -735,7 +735,7 @@ dw namespace:retention-plan billing --retention=7 --json > plan.json
 dw namespace:retention-apply billing --plan-file=plan.json --confirm-retroactive-pruning
 ```
 
-`namespace:retention-plan` takes the proposed `--retention` days,
+`namespace:retention-plan` takes the proposed `--retention` (`-r`) days,
 `--retention-mode` (`bounded` or `forever`), or both. A field you leave out
 keeps its current value. It shows the current and proposed policy with their
 cutoffs and whether the proposal is retroactive, meaning it makes closed runs
@@ -777,6 +777,10 @@ exits 2:
 | `409 retention_policy_revision_stale` | The namespace changed after the plan. The refusal carries the current `policy_revision`. | Plan again, review it, and apply the new plan's revisions. |
 | `409 retention_plan_revision_mismatch` | The proposal sent is not the one that was planned. | Apply the plan's exact proposal, or plan this one. |
 | `422 retention_pruning_confirmation_required` | The proposal is retroactive and `--confirm-retroactive-pruning` was not passed. | Review `newly_eligible`, then repeat with the confirmation. |
+
+After a stale or mismatched apply, the suggested `namespace:retention-plan`
+command repeats the proposal you tried to apply: your `--retention` and
+`--retention-mode`, or the proposed policy in the `--plan-file`.
 
 With `--json` a refusal keeps the usual error envelope, with `reason`,
 `status_code` and the full body in `server_response`.

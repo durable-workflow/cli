@@ -239,6 +239,10 @@ class PhpMainReferenceTest(unittest.TestCase):
         self.assertEqual("Run <bin>/dw workflow:signal",
                          parity.normalize_text(f"Run {root}/bin/dw workflow:signal", "/nowhere"))
 
+    def test_cli_version_is_normalized_but_a_matching_constraint_is_not(self):
+        self.assertEqual("client <cli-version> needs python >=2.13.0,<3.0.0",
+                         parity.normalize_text("client 2.13.0 needs python >=2.13.0,<3.0.0", "/nowhere", "2.13.0"))
+
     def test_checkout_without_dependencies_is_refused(self):
         root = self.checkout()
         (root / "vendor" / "autoload.php").unlink()

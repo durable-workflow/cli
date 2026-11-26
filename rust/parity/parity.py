@@ -164,7 +164,9 @@ def normalize_text(text, config_dir, version=None):
         text = re.sub(directory, "<bin>/", text)
     if version:
         text = VERSION_LINE.sub("dw <version>", text)
-        text = re.sub(r"(?<![\w.])" + re.escape(version) + r"(?![\w.-])", "<cli-version>", text)
+        # A version constraint that happens to name the same version, such
+        # as the Server's SDK range ">=2.13.0,<3.0.0", is not the CLI's own.
+        text = re.sub(r"(?<![\w.=<>~^])" + re.escape(version) + r"(?![\w.-])", "<cli-version>", text)
     text = VERSION_LINE.sub("dw <version>", text)
     text = BUILD_IDENTITY.sub("(commit <commit>, built <date>)", text)
     text = MARKDOWN_TITLE.sub(r"\1\n<underline>", text)

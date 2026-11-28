@@ -22,7 +22,7 @@ class BuildWorkflowTest(unittest.TestCase):
         versions = self.jobs['test']['strategy']['matrix']['php'][:]
         steps = self.jobs['test-php83']['steps']
         setup = next(step for step in steps if step.get('uses', '').startswith(
-            'durable-workflow/.github/.github/actions/setup-php-linux@'))
+            'shivammathur/setup-php@'))
         versions.append(setup['with']['php-version'])
         self.assertCountEqual(['8.2', '8.3', '8.4', '8.5'], versions)
 
